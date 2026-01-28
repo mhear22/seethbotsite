@@ -1,1152 +1,1341 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>✨ mald.mikahear.es ✨</title>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@400;700&display=swap');
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Quicksand', sans-serif;
-            background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
-            transition: background 0.5s ease;
-        }
-
-        body.dark {
-            background: linear-gradient(135deg, #1a5c2a 0%, #2d5a3d 100%);
-        }
-
-        body.dark .container {
-            background: rgba(40, 44, 52, 0.95);
-        }
-
-        body.dark h1 {
-            color: #e2e8f0;
-        }
-
-        body.dark p {
-            color: #a0a0a0;
-        }
-
-        /* Particle system */
-        .particle {
-            position: fixed;
-            border-radius: 50%;
-            pointer-events: none;
-            z-index: 1000;
-        }
-
-        /* Physics animations */
-        @keyframes springBounce {
-            0%, 100% { transform: translateY(0) scale(1); }
-            25% { transform: translateY(-15px) scale(1.05); }
-            50% { transform: translateY(0) scale(1.02); }
-            75% { transform: translateY(-5px) scale(1.01); }
-        }
-
-        @keyframes particleExplosion {
-            0% { transform: scale(0); opacity: 1; }
-            50% { transform: scale(1.5) rotate(180deg); opacity: 0.5; }
-            100% { transform: scale(0) rotate(360deg); opacity: 0; }
-        }
-
-        /* Expanding circles */
-        .bg-circle {
-            position: fixed;
-            border-radius: 50%;
-            opacity: 0.3;
-            pointer-events: none;
-            animation: expandPhysics 20s ease-in-out infinite;
-            transition: transform 0.2s ease;
-        }
-
-        .bg-circle:nth-child(1) {
-            width: 400px;
-            height: 400px;
-            background: radial-gradient(circle, rgba(34, 197, 94, 0.3) 0%, transparent 70%);
-            top: -200px;
-            right: -100px;
-            animation-delay: 0s;
-        }
-
-        .bg-circle:nth-child(2) {
-            width: 500px;
-            height: 500px;
-            background: radial-gradient(circle, rgba(34, 197, 94, 0.2) 0%, transparent 70%);
-            top: -250px;
-            left: 50%;
-            animation-delay: 5s;
-        }
-
-        .bg-circle:nth-child(3) {
-            width: 600px;
-            height: 600px;
-            background: radial-gradient(circle, rgba(255, 255, 255, 0.15) 0%, transparent 70%);
-            bottom: -200px;
-            right: -100px;
-            animation-delay: 10s;
-        }
-
-        @keyframes expandPhysics {
-            0%, 100% {
-                transform: scale(1);
-                opacity: 0.3;
-            }
-            50% {
-                transform: scale(1.5);
-                opacity: 0.2;
-            }
-        }
-
-        /* Quote section */
-        .quote-section {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            padding: 20px;
-            background: rgba(255, 255, 255, 0.95);
-            border-bottom: 2px solid rgba(255, 107, 157, 0.2);
-            z-index: 5;
-            backdrop-filter: blur(10px);
-            transition: transform 0.1s ease;
-        }
-
-        .quote-section:hover {
-            transform: translateY(5px) scale(1.01);
-        }
-
-        .quote-text {
-            text-align: center;
-            color: #ff6b9d;
-            font-size: 24px;
-            font-weight: bold;
-            max-width: 800px;
-            margin: 0 auto;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            transition: transform 0.1s ease;
-        }
-
-        .quote-text:hover {
-            transform: scale(1.05);
-        }
-
-        /* EmulatorJS container */
-        .emulator-container {
-            margin-top: 30px;
-            width: 480px;
-            height: 480px;
-            background: rgba(0, 0, 0, 0.8);
-            border-radius: 15px;
-            overflow: hidden;
-            position: relative;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
-            border: 2px solid #333;
-        }
-
-        .emulator-frame {
-            width: 100%;
-            height: 100%;
-            border: none;
-        }
-
-        .emulator-screen {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            right: 10px;
-            bottom: 10px;
-            background: #000;
-            border-radius: 5px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .emulator-screen-off {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: #111;
-            padding: 10px;
-            border-radius: 5px;
-            color: #fff;
-            font-size: 12px;
-            font-family: 'Courier New', monospace;
-        }
-
-        .emulator-buttons {
-            position: absolute;
-            bottom: 10px;
-            left: 10px;
-            right: 10px;
-            display: flex;
-            gap: 5px;
-            background: rgba(0, 0, 0, 0.5);
-            padding: 5px;
-            border-radius: 5px;
-            justify-content: center;
-        }
-
-        .emulator-btn {
-            background: #333;
-            color: #fff;
-            border: none;
-            padding: 5px 10px;
-            border-radius: 3px;
-            cursor: pointer;
-            font-size: 12px;
-            font-family: 'Courier New', monospace;
-            transition: all 0.1s;
-        }
-
-        .emulator-btn:hover {
-            background: #555;
-        }
-
-        .emulator-btn:active {
-            background: #777;
-        }
-
-        .emulator-label {
-            color: #888;
-            font-size: 10px;
-            text-align: center;
-            margin-bottom: 5px;
-        }
-
-        /* COOLNESS RANKINGS */
-        .rankings-panel {
-            position: fixed;
-            bottom: 20px;
-            left: 20px;
-            width: 220px;
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 20px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-            z-index: 100;
-            padding: 15px;
-            transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-        }
-
-        .rankings-panel.collapsed {
-            transform: translateX(-260px);
-        }
-
-        .rankings-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-        }
-
-        .rankings-header h3 {
-            margin: 0;
-            color: #ff6b9d;
-            font-size: 16px;
-        }
-
-        .rankings-close {
-            background: none;
-            border: none;
-            color: #666;
-            font-size: 18px;
-            cursor: pointer;
-            padding: 0 5px;
-            line-height: 1;
-            transition: transform 0.2s ease;
-        }
-
-        .rankings-close:hover {
-            color: #ff6b9d;
-            transform: scale(1.2);
-        }
-
-        .rankings-list {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .rank-item {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 8px;
-            background: rgba(255, 107, 157, 0.1);
-            border-radius: 10px;
-            transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-        }
-
-        .rank-item:hover {
-            background: rgba(255, 107, 157, 0.2);
-            transform: scale(1.02);
-            animation: springBounce 0.3s ease;
-        }
-
-        .rank-avatar {
-            font-size: 24px;
-            width: 40px;
-            height: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 50%;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-        }
-
-        .rank-name {
-            flex: 1;
-            font-size: 14px;
-            font-weight: bold;
-            color: #333;
-            transition: all 0.2s ease;
-        }
-
-        .rank-name.current-user {
-            color: #ff6b9d;
-        }
-
-        .rank-score {
-            font-family: 'Courier New', monospace;
-            font-size: 20px;
-            font-weight: bold;
-            color: #90EE90;
-            min-width: 50px;
-            text-align: right;
-            transition: all 0.2s ease;
-        }
-
-        .rank-score.updated {
-            animation: springBounce 0.3s ease;
-        }
-
-        .rank-label {
-            font-size: 12px;
-            color: #666;
-        }
-
-        /* CAT PANEL */
-        .cat-panel {
-            position: fixed;
-            bottom: 20px;
-            left: 260px;
-            width: 280px;
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 20px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-            z-index: 100;
-            padding: 15px;
-            transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-        }
-
-        .cat-panel.collapsed {
-            transform: translateX(-300px);
-        }
-
-        .cat-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-        }
-
-        .cat-header h3 {
-            margin: 0;
-            color: #ff6b9d;
-            font-size: 16px;
-        }
-
-        .cat-close {
-            background: none;
-            border: none;
-            color: #666;
-            font-size: 18px;
-            cursor: pointer;
-            padding: 0 5px;
-            line-height: 1;
-            transition: transform 0.2s ease;
-        }
-
-        .cat-close:hover {
-            color: #ff6b9d;
-            transform: scale(1.2);
-        }
-
-        .cat-content {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .cat-image {
-            width: 100%;
-            border-radius: 15px;
-            transition: transform 0.2s ease;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-        }
-
-        .cat-image:hover {
-            transform: scale(1.02);
-        }
-
-        /* RANKINGS TOGGLE BUTTON */
-        .rankings-toggle {
-            position: fixed;
-            bottom: 20px;
-            left: 20px;
-            background: rgba(255, 107, 157, 0.9);
-            color: white;
-            border: none;
-            border-radius: 20px;
-            padding: 10px 15px;
-            cursor: pointer;
-            z-index: 101;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-            font-size: 20px;
-            transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-        }
-
-        .rankings-toggle:hover {
-            transform: scale(1.1);
-            animation: springBounce 0.3s ease;
-        }
-
-        /* MIKA BUTTON */
-        .mika-btn {
-            position: fixed;
-            bottom: 70px;
-            right: 20px;
-            background: linear-gradient(45deg, #ff6b9d, #ff8a80);
-            color: white;
-            border: none;
-            border-radius: 20px;
-            padding: 10px 20px;
-            cursor: pointer;
-            z-index: 101;
-            box-shadow: 0 5px 15px rgba(255, 107, 157, 0.4);
-            font-size: 16px;
-            font-family: 'Quicksand', sans-serif;
-            font-weight: bold;
-            transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-        }
-
-        .mika-btn:hover {
-            transform: translateY(-3px) scale(1.02);
-            box-shadow: 0 8px 20px rgba(255, 107, 157, 0.6);
-            animation: springBounce 0.3s ease;
-        }
-
-        .mika-btn:active {
-            transform: translateY(0) scale(0.98);
-        }
-
-        /* MIKA MODAL */
-        .mika-modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-        }
-
-        .mika-modal.active {
-            display: flex;
-        }
-
-        .mika-modal-box {
-            background: rgba(255, 255, 255, 0.95);
-            padding: 60px 40px;
-            border-radius: 40px;
-            box-shadow: 0 30px 80px rgba(0, 0, 0, 0.15);
-            text-align: center;
-            animation: popIn 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-            min-width: 300px;
-            max-width: 500px;
-        }
-
-        body.dark .mika-modal {
-            background: linear-gradient(135deg, #1a5c2a 0%, #2d5a3d 100%);
-        }
-
-        body.dark .mika-modal-box {
-            background: rgba(40, 44, 52, 0.95);
-        }
-
-        /* TACHOMETER */
-        .tachometer {
-            position: fixed;
-            top: 20px;
-            left: 20px;
-            width: 160px;
-            height: 160px;
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 50%;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-            z-index: 100;
-            padding: 15px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            transition: transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-        }
-
-        .tachometer:hover {
-            transform: scale(1.02);
-        }
-
-        .tachometer-dial {
-            position: relative;
-            width: 130px;
-            height: 130px;
-            background: linear-gradient(180deg, #90EE90 0%, #32CD32 100%);
-            border-radius: 50%;
-            margin-bottom: 10px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.3);
-        }
-
-        .tachometer-ticks {
-            position: absolute;
-            top: 10px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 116px;
-            display: flex;
-            justify-content: space-between;
-            padding: 0 10px;
-        }
-
-        .tick {
-            width: 2px;
-            height: 15px;
-            background: #fff;
-            border-radius: 2px;
-        }
-
-        .tick.major {
-            width: 4px;
-            height: 20px;
-            background: #fff;
-            border-radius: 2px;
-        }
-
-        .tachometer-needle {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 60px;
-            height: 4px;
-            background: linear-gradient(90deg, #ff4444, #ff0000);
-            transform-origin: left center;
-            animation: needleSwing 2s cubic-bezier(0.25, 0.46, 0.45, 0.94) infinite;
-            border-radius: 2px;
-            transition: transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-        }
-
-        @keyframes needleSwing {
-            0% { transform: rotate(-90deg); }
-            50% { transform: rotate(90deg); }
-            100% { transform: rotate(-90deg); }
-        }
-
-        .tachometer-label {
-            text-align: center;
-            color: #90EE90;
-            font-size: 14px;
-            font-weight: bold;
-            text-transform: uppercase;
-            margin-top: 8px;
-        }
-
-        .tachometer-value {
-            text-align: center;
-            color: #fff;
-            font-size: 28px;
-            font-family: 'Courier New', monospace;
-            text-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
-            margin-top: 5px;
-            transition: all 0.2s ease;
-        }
-
-        .tachometer-value.updated {
-            animation: springBounce 0.3s ease;
-        }
-
-        .fart-btn {
-            margin-top: 10px;
-            background: linear-gradient(45deg, #90EE90, #32CD32);
-            color: white;
-            border: none;
-            padding: 12px 20px;
-            border-radius: 25px;
-            font-size: 16px;
-            cursor: pointer;
-            font-family: 'Quicksand', sans-serif;
-            font-weight: bold;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-            transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-            position: relative;
-            overflow: visible;
-        }
-
-        .fart-btn:hover {
-            transform: translateY(-2px) scale(1.02);
-            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3);
-            animation: springBounce 0.3s ease;
-        }
-
-        .fart-btn:active {
-            transform: translateY(0) scale(0.98);
-        }
-
-        .fart-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        /* Container */
-        .container {
-            text-align: center;
-            padding: 40px;
-            background: rgba(255, 255, 255, 0.9);
-            border-radius: 30px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
-            max-width: 500px;
-            animation: float 3s ease-in-out infinite;
-            position: relative;
-            z-index: 10;
-            transition: transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-        }
-
-        @keyframes float {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-10px); }
-        }
-
-        .emoji {
-            font-size: 80px;
-            margin-bottom: 20px;
-            animation: bounce 2s ease-in-out infinite;
-            transition: all 0.2s ease;
-        }
-
-        .emoji:hover {
-            transform: scale(1.05) rotate(10deg);
-        }
-
-        @keyframes bounce {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.1); }
-        }
-
-        h1 {
-            color: #ff6b9d;
-            font-size: 36px;
-            margin-bottom: 15px;
-            transition: all 0.2s ease;
-        }
-
-        p {
-            color: #666;
-            font-size: 18px;
-            line-height: 1.6;
-            margin-bottom: 20px;
-            transition: all 0.2s ease;
-        }
-
-        .sparkles {
-            position: absolute;
-            font-size: 30px;
-            animation: sparkle 2s ease-in-out infinite;
-            transition: all 0.2s ease;
-        }
-
-        @keyframes sparkle {
-            0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.5; transform: scale(0.8); }
-        }
-
-        .sparkles:nth-child(1) { top: 10%; left: 10%; animation-delay: 0s; }
-        .sparkles:nth-child(2) { top: 20%; right: 15%; animation-delay: 0.3s; }
-        .sparkles:nth-child(3) { bottom: 15%; left: 15%; animation-delay: 0.6s; }
-        .sparkles:nth-child(4) { bottom: 25%; right: 10%; animation-delay: 0.9s; }
-
-        .button-row {
-            display: flex;
-            gap: 15px;
-            justify-content: center;
-            flex-wrap: wrap;
-        }
-
-        .cute-btn {
-            background: linear-gradient(45deg, #ff6b9d, #ff8a80);
-            color: white;
-            border: none;
-            padding: 15px 30px;
-            border-radius: 50px;
-            font-size: 18px;
-            cursor: pointer;
-            font-family: 'Quicksand', sans-serif;
-            font-weight: bold;
-            box-shadow: 0 5px 15px rgba(255, 107, 157, 0.4);
-            transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-            position: relative;
-            overflow: visible;
-        }
-
-        .cute-btn:hover {
-            transform: translateY(-3px) scale(1.02);
-            box-shadow: 0 8px 20px rgba(255, 107, 157, 0.6);
-            animation: springBounce 0.3s ease;
-        }
-
-        .cute-btn:active {
-            transform: translateY(0) scale(0.98);
-        }
-
-        /* Particle burst container */
-        .fart-btn::after {
-            content: '';
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            top: 50%;
-            left: 50%;
-            background: radial-gradient(circle, rgba(144, 238, 144, 0.5) 0%, transparent 70%);
-            border-radius: 50%;
-            transform: translate(-50%, -50%);
-            opacity: 0;
-            transition: all 0.3s ease;
-        }
-
-        .fart-btn.exploded::after {
-            opacity: 1;
-            animation: particleExplosion 0.5s ease-out forwards;
-        }
-
-        .heart {
-            position: fixed;
-            font-size: 20px;
-            animation: floatUp 4s ease-in infinite;
-            z-index: 1000;
-        }
-
-        @keyframes floatUp {
-            0% { opacity: 0; transform: translateY(100vh); }
-            10% { opacity: 1; }
-            90% { opacity: 1; }
-            100% { opacity: 0; transform: translateY(-100vh); }
-            0% { opacity: 0; }
-        }
-
-        .confirmation {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-        }
-
-        .confirmation.active {
-            display: flex;
-        }
-
-        .confirmation-box {
-            background: rgba(255, 255, 255, 0.95);
-            padding: 60px 40px;
-            border-radius: 40px;
-            box-shadow: 0 30px 80px rgba(0, 0, 0, 0.15);
-            text-align: center;
-            animation: popIn 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-        }
-
-        @keyframes popIn {
-            0% { transform: scale(0.5) opacity: 0; }
-            100% { transform: scale(1); opacity: 1; }
-        }
-
-        .confirmation .emoji {
-            font-size: 100px;
-        }
-
-        /* Music control */
-        .music-control {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: rgba(255, 255, 255, 0.8);
-            border-radius: 20px;
-            padding: 10px 15px;
-            cursor: pointer;
-            z-index: 100;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-            font-size: 24px;
-            transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-        }
-
-        .music-control:hover {
-            transform: scale(1.1);
-            animation: springBounce 0.3s ease;
-        }
-
-        .dark-toggle {
-            position: fixed;
-            bottom: 20px;
-            left: 20px;
-            background: rgba(255, 255, 255, 0.8);
-            border-radius: 20px;
-            padding: 10px 15px;
-            cursor: pointer;
-            z-index: 100;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-            font-size: 24px;
-            transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-        }
-
-        .dark-toggle:hover {
-            transform: scale(1.1);
-            animation: springBounce 0.3s ease;
-        }
-
-        body.dark .music-control {
-            background: rgba(40, 44, 52, 0.9);
-        }
-
-        body.dark .dark-toggle {
-            background: rgba(40, 44, 52, 0.9);
-        }
-
-        /* Feed panel */
-        .feed-panel {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            width: 320px;
-            max-height: calc(100vh - 40px);
-            overflow-y: auto;
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 20px;
-            box-shadow: -5px 0 20px rgba(0, 0, 0, 0.1);
-            z-index: 100;
-            transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-        }
-
-        .feed-panel.collapsed {
-            transform: translateX(340px);
-        }
-
-        .feed-panel:hover {
-            transform: translateX(-5px) scale(1.005);
-        }
-
-        .feed-header {
-            padding: 15px;
-            background: rgba(255, 107, 157, 0.9);
-            border-radius: 20px 20px 0 0;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .feed-header h3 {
-            margin: 0;
-            color: white;
-            font-size: 16px;
-        }
-
-        .feed-close {
-            background: none;
-            border: none;
-            color: white;
-            font-size: 24px;
-            cursor: pointer;
-            padding: 5px;
-            line-height: 1;
-        }
-
-        .feed-content {
-            padding: 15px;
-        }
-
-        .feed-section {
-            margin-bottom: 20px;
-            transition: transform 0.2s ease;
-        }
-
-        .feed-section:hover {
-            transform: scale(1.005);
-        }
-
-        .feed-section h4 {
-            color: #ff6b9d;
-            margin-bottom: 10px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .feed-section iframe {
-            width: 100%;
-            height: 250px;
-            border: none;
-            border-radius: 10px;
-        }
-
-        .feed-section p {
-            font-size: 12px;
-            color: #666;
-            margin: 5px 0 0 0;
-            line-height: 1.4;
-        }
-
-        .feed-toggle {
-            position: fixed;
-            top: 20px;
-            right: 350px;
-            background: rgba(255, 107, 157, 0.9);
-            color: white;
-            border: none;
-            border-radius: 20px;
-            padding: 10px 15px;
-            cursor: pointer;
-            z-index: 101;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-            font-size: 20px;
-            transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-        }
-
-        .feed-toggle:hover {
-            transform: scale(1.1);
-            animation: springBounce 0.3s ease;
-        }
-
-        body.dark .feed-panel {
-            background: rgba(40, 44, 52, 0.95);
-        }
-
-        body.dark .feed-header {
-            background: rgba(232, 94, 144, 0.9);
-        }
-
-        body.dark .feed-toggle {
-            background: rgba(232, 94, 144, 0.9);
-        }
-
-        body.dark .cat-panel {
-            background: rgba(40, 44, 52, 0.95);
-        }
-
-        body.dark .rankings-toggle {
-            background: rgba(232, 94, 144, 0.9);
-        }
-
-        body.dark .mika-btn {
-            background: linear-gradient(45deg, #e85e90, #ff6b9d);
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>✨ mald.mikahear.es ✨</title>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@400;700&display=swap');
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Quicksand', sans-serif;
+      background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      transition: background 0.5s ease;
+    }
+
+    body.dark {
+      background: linear-gradient(135deg, #1a5c2a 0%, #2d5a3d 100%);
+    }
+
+    body.dark .container {
+      background: rgba(40, 44, 52, 0.95);
+    }
+
+    body.dark h1 {
+      color: #e2e8f0;
+    }
+
+    body.dark p {
+      color: #a0a0a0;
+    }
+
+    /* Particle system */
+    .particle {
+      position: fixed;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 1000;
+    }
+
+    /* Physics animations */
+    @keyframes springBounce {
+      0%, 100% { transform: translateY(0) scale(1); }
+      25% { transform: translateY(-15px) scale(1.05); }
+      50% { transform: translateY(0) scale(1.02); }
+      75% { transform: translateY(-5px) scale(1.01); }
+    }
+
+    @keyframes particleExplosion {
+      0% { transform: scale(0); opacity: 1; }
+      50% { transform: scale(1.5) rotate(180deg); opacity: 0.5; }
+      100% { transform: scale(0) rotate(360deg); opacity: 0; }
+    }
+
+    /* Expanding circles */
+    .bg-circle {
+      position: fixed;
+      border-radius: 50%;
+      opacity: 0.3;
+      pointer-events: none;
+      animation: expandPhysics 20s ease-in-out infinite;
+      transition: transform 0.2s ease;
+    }
+
+    .bg-circle:nth-child(1) {
+      width: 400px;
+      height: 400px;
+      background: radial-gradient(circle, rgba(34, 197, 94, 0.3) 0%, transparent 70%);
+      top: -200px;
+      right: -100px;
+      animation-delay: 0s;
+    }
+
+    .bg-circle:nth-child(2) {
+      width: 500px;
+      height: 500px;
+      background: radial-gradient(circle, rgba(34, 197, 94, 0.2) 0%, transparent 70%);
+      top: -250px;
+      left: 50%;
+      animation-delay: 5s;
+    }
+
+    .bg-circle:nth-child(3) {
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(255, 255, 255, 0.15) 0%, transparent 70%);
+      bottom: -200px;
+      right: -100px;
+      animation-delay: 10s;
+    }
+
+    @keyframes expandPhysics {
+      0%, 100% {
+        transform: scale(1);
+        opacity: 0.3;
+      }
+      50% {
+        transform: scale(1.5);
+        opacity: 0.2;
+      }
+    }
+
+    /* Quote section */
+    .quote-section {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      padding: 20px;
+      background: rgba(255, 255, 255, 0.95);
+      border-bottom: 2px solid rgba(255, 107, 157, 0.2);
+      z-index: 5;
+      backdrop-filter: blur(10px);
+      transition: transform 0.1s ease;
+    }
+
+    .quote-section:hover {
+      transform: translateY(5px) scale(1.01);
+    }
+
+    .quote-text {
+      text-align: center;
+      color: #ff6b9d;
+      font-size: 24px;
+      font-weight: bold;
+      max-width: 800px;
+      margin: 0 auto;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      transition: transform 0.1s ease;
+    }
+
+    .quote-text:hover {
+      transform: scale(1.05);
+    }
+
+    /* Emulator container */
+    .emulator-container {
+      margin-top: 30px;
+      width: 480px;
+      height: 480px;
+      background: rgba(0, 0, 0, 0.8);
+      border-radius: 15px;
+      overflow: hidden;
+      position: relative;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+      border: 2px solid #333;
+    }
+
+    .emulator-frame {
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+
+    .emulator-screen {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      right: 10px;
+      bottom: 10px;
+      background: #000;
+      border-radius: 5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .emulator-screen-off {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: #111;
+      padding: 10px;
+      border-radius: 5px;
+      color: #fff;
+      font-size: 12px;
+      font-family: 'Courier New', monospace;
+    }
+
+    .emulator-buttons {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      right: 10px;
+      display: flex;
+      gap: 5px;
+      background: rgba(0, 0, 0, 0.5);
+      padding: 5px;
+      border-radius: 5px;
+      justify-content: center;
+    }
+
+    .emulator-btn {
+      background: #333;
+      color: #fff;
+      border: none;
+      padding: 5px 10px;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 12px;
+      font-family: 'Courier New', monospace;
+      transition: all 0.1s;
+    }
+
+    .emulator-btn:hover {
+      background: #555;
+    }
+
+    .emulator-btn:active {
+      background: #777;
+    }
+
+    .emulator-label {
+      color: #888;
+      font-size: 10px;
+      text-align: center;
+      margin-bottom: 5px;
+    }
+
+    /* COOLNESS RANKINGS */
+    .rankings-panel {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      width: 220px;
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 20px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+      z-index: 100;
+      padding: 15px;
+      transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    }
+
+    .rankings-panel.collapsed {
+      transform: translateX(-260px);
+    }
+
+    .rankings-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .rankings-header h3 {
+      margin: 0;
+      color: #ff6b9d;
+      font-size: 16px;
+    }
+
+    .rankings-close {
+      background: none;
+      border: none;
+      color: #666;
+      font-size: 18px;
+      cursor: pointer;
+      padding: 0 5px;
+      line-height: 1;
+      transition: transform 0.2s ease;
+    }
+
+    .rankings-close:hover {
+      color: #ff6b9d;
+      transform: scale(1.2);
+    }
+
+    .rankings-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .rank-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px;
+      background: rgba(255, 107, 157, 0.1);
+      border-radius: 10px;
+      transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    }
+
+    .rank-item:hover {
+      background: rgba(255, 107, 157, 0.2);
+      transform: scale(1.02);
+      animation: springBounce 0.3s ease;
+    }
+
+    .rank-avatar {
+      font-size: 24px;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-radius: 50%;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    }
+
+    .rank-name {
+      flex: 1;
+      font-size: 14px;
+      font-weight: bold;
+      color: #333;
+      transition: all 0.2s ease;
+    }
+
+    .rank-name.current-user {
+      color: #ff6b9d;
+    }
+
+    .rank-score {
+      font-family: 'Courier New', monospace;
+      font-size: 20px;
+      font-weight: bold;
+      color: #90EE90;
+      min-width: 50px;
+      text-align: right;
+      transition: all 0.2s ease;
+    }
+
+    .rank-score.updated {
+      animation: springBounce 0.3s ease;
+    }
+
+    .rank-label {
+      font-size: 12px;
+      color: #666;
+    }
+
+    /* CAT PANEL */
+    .cat-panel {
+      position: fixed;
+      bottom: 20px;
+      left: 260px;
+      width: 280px;
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 20px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+      z-index: 100;
+      padding: 15px;
+      transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    }
+
+    .cat-panel.collapsed {
+      transform: translateX(-300px);
+    }
+
+    .cat-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .cat-header h3 {
+      margin: 0;
+      color: #ff6b9d;
+      font-size: 16px;
+    }
+
+    .cat-close {
+      background: none;
+      border: none;
+      color: #666;
+      font-size: 18px;
+      cursor: pointer;
+      padding: 0 5px;
+      line-height: 1;
+      transition: transform 0.2s ease;
+    }
+
+    .cat-close:hover {
+      color: #ff6b9d;
+      transform: scale(1.2);
+    }
+
+    .cat-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .cat-image {
+      width: 100%;
+      border-radius: 15px;
+      transition: transform 0.2s ease;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    .cat-image:hover {
+      transform: scale(1.02);
+    }
+
+    /* RANKINGS TOGGLE BUTTON */
+    .rankings-toggle {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      background: rgba(255, 107, 157, 0.9);
+      color: white;
+      border: none;
+      border-radius: 20px;
+      padding: 10px 15px;
+      cursor: pointer;
+      z-index: 101;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+      font-size: 20px;
+      transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    }
+
+    .rankings-toggle:hover {
+      transform: scale(1.1);
+      animation: springBounce 0.3s ease;
+    }
+
+    /* MIKA BUTTON */
+    .mika-btn {
+      position: fixed;
+      bottom: 70px;
+      right: 20px;
+      background: linear-gradient(45deg, #ff6b9d, #ff8a80);
+      color: white;
+      border: none;
+      border-radius: 20px;
+      padding: 10px 20px;
+      cursor: pointer;
+      z-index: 101;
+      box-shadow: 0 5px 15px rgba(255, 107, 157, 0.4);
+      font-size: 16px;
+      font-family: 'Quicksand', sans-serif;
+      font-weight: bold;
+      transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    }
+
+    .mika-btn:hover {
+      transform: translateY(-3px) scale(1.02);
+      box-shadow: 0 8px 20px rgba(255, 107, 157, 0.6);
+      animation: springBounce 0.3s ease;
+    }
+
+    .mika-btn:active {
+      transform: translateY(0) scale(0.98);
+    }
+
+    /* MIKA MODAL */
+    .mika-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .mika-modal.active {
+      display: flex;
+    }
+
+    .mika-modal-box {
+      background: rgba(255, 255, 255, 0.95);
+      padding: 60px 40px;
+      border-radius: 40px;
+      box-shadow: 0 30px 80px rgba(0, 0, 0, 0.15);
+      text-align: center;
+      animation: popIn 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      min-width: 300px;
+      max-width: 500px;
+    }
+
+    body.dark .mika-modal {
+      background: linear-gradient(135deg, #1a5c2a 0%, #2d5a3d 100%);
+    }
+
+    body.dark .mika-modal-box {
+      background: rgba(40, 44, 52, 0.95);
+    }
+
+    /* TACHOMETER */
+    .tachometer {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      width: 160px;
+      height: 160px;
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 50%;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+      z-index: 100;
+      padding: 15px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      transition: transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    }
+
+    .tachometer:hover {
+      transform: scale(1.02);
+    }
+
+    .tachometer-dial {
+      position: relative;
+      width: 130px;
+      height: 130px;
+      background: linear-gradient(180deg, #90EE90 0%, #32CD32 100%);
+      border-radius: 50%;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.3);
+    }
+
+    .tachometer-ticks {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 116px;
+      display: flex;
+      justify-content: space-between;
+      padding: 0 10px;
+    }
+
+    .tick {
+      width: 2px;
+      height: 15px;
+      background: #fff;
+      border-radius: 2px;
+    }
+
+    .tick.major {
+      width: 4px;
+      height: 20px;
+      background: #fff;
+      border-radius: 2px;
+    }
+
+    .tachometer-needle {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 60px;
+      height: 4px;
+      background: linear-gradient(90deg, #ff4444, #ff0000);
+      transform-origin: left center;
+      animation: needleSwing 2s cubic-bezier(0.25, 0.46, 0.45, 0.94) infinite;
+      border-radius: 2px;
+      transition: transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    }
+
+    @keyframes needleSwing {
+      0% { transform: rotate(-90deg); }
+      50% { transform: rotate(90deg); }
+      100% { transform: rotate(-90deg); }
+    }
+
+    .tachometer-label {
+      text-align: center;
+      color: #90EE90;
+      font-size: 14px;
+      font-weight: bold;
+      text-transform: uppercase;
+      margin-top: 8px;
+    }
+
+    .tachometer-value {
+      text-align: center;
+      color: #fff;
+      font-size: 28px;
+      font-family: 'Courier New', monospace;
+      text-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
+      margin-top: 5px;
+      transition: all 0.2s ease;
+    }
+
+    .tachometer-value.updated {
+      animation: springBounce 0.3s ease;
+    }
+
+    .fart-btn {
+      margin-top: 10px;
+      background: linear-gradient(45deg, #90EE90, #32CD32);
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 25px;
+      font-size: 16px;
+      cursor: pointer;
+      font-family: 'Quicksand', sans-serif;
+      font-weight: bold;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+      transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      position: relative;
+      overflow: visible;
+    }
+
+    .fart-btn:hover {
+      transform: translateY(-2px) scale(1.02);
+      box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3);
+      animation: springBounce 0.3s ease;
+    }
+
+    .fart-btn:active {
+      transform: translateY(0) scale(0.98);
+    }
+
+    .fart-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* Container */
+    .container {
+      text-align: center;
+      padding: 40px;
+      background: rgba(255, 255, 255, 0.9);
+      border-radius: 30px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+      max-width: 500px;
+      animation: float 3s ease-in-out infinite;
+      position: relative;
+      z-index: 10;
+      transition: transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+
+    .emoji {
+      font-size: 80px;
+      margin-bottom: 20px;
+      animation: bounce 2s ease-in-out infinite;
+      transition: all 0.2s ease;
+    }
+
+    .emoji:hover {
+      transform: scale(1.05) rotate(10deg);
+    }
+
+    @keyframes bounce {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+    }
+
+    h1 {
+      color: #ff6b9d;
+      font-size: 36px;
+      margin-bottom: 15px;
+      transition: all 0.2s ease;
+    }
+
+    p {
+      color: #666;
+      font-size: 18px;
+      line-height: 1.6;
+      margin-bottom: 20px;
+      transition: all 0.2s ease;
+    }
+
+    .sparkles {
+      position: absolute;
+      font-size: 30px;
+      animation: sparkle 2s ease-in-out infinite;
+      transition: all 0.2s ease;
+    }
+
+    @keyframes sparkle {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.8); }
+    }
+
+    .sparkles:nth-child(1) { top: 10%; left: 10%; animation-delay: 0s; }
+    .sparkles:nth-child(2) { top: 20%; right: 15%; animation-delay: 0.3s; }
+    .sparkles:nth-child(3) { bottom: 15%; left: 15%; animation-delay: 0.6s; }
+    .sparkles:nth-child(4) { bottom: 25%; right: 10%; animation-delay: 0.9s; }
+
+    .button-row {
+      display: flex;
+      gap: 15px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .cute-btn {
+      background: linear-gradient(45deg, #ff6b9d, #ff8a80);
+      color: white;
+      border: none;
+      padding: 15px 30px;
+      border-radius: 50px;
+      font-size: 18px;
+      cursor: pointer;
+      font-family: 'Quicksand', sans-serif;
+      font-weight: bold;
+      box-shadow: 0 5px 15px rgba(255, 107, 157, 0.4);
+      transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      position: relative;
+      overflow: visible;
+    }
+
+    .cute-btn:hover {
+      transform: translateY(-3px) scale(1.02);
+      box-shadow: 0 8px 20px rgba(255, 107, 157, 0.6);
+      animation: springBounce 0.3s ease;
+    }
+
+    .cute-btn:active {
+      transform: translateY(0) scale(0.98);
+    }
+
+    /* Particle burst container */
+    .fart-btn::after {
+      content: '';
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      top: 50%;
+      left: 50%;
+      background: radial-gradient(circle, rgba(144, 238, 144, 0.5) 0%, transparent 70%);
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      opacity: 0;
+      transition: all 0.3s ease;
+    }
+
+    .fart-btn.exploded::after {
+      opacity: 1;
+      animation: particleExplosion 0.5s ease-out forwards;
+    }
+
+    .heart {
+      position: fixed;
+      font-size: 20px;
+      animation: floatUp 4s ease-in infinite;
+      z-index: 1000;
+    }
+
+    @keyframes floatUp {
+      0% { opacity: 0; transform: translateY(100vh); }
+      10% { opacity: 1; }
+      90% { opacity: 1; }
+      100% { opacity: 0; transform: translateY(-100vh); }
+    }
+
+    .confirmation {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .confirmation.active {
+      display: flex;
+    }
+
+    .confirmation-box {
+      background: rgba(255, 255, 255, 0.95);
+      padding: 60px 40px;
+      border-radius: 40px;
+      box-shadow: 0 30px 80px rgba(0, 0, 0, 0.15);
+      text-align: center;
+      animation: popIn 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    }
+
+    @keyframes popIn {
+      0% { transform: scale(0.5) opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    .confirmation .emoji {
+      font-size: 100px;
+    }
+
+    /* Music control */
+    .music-control {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: rgba(255, 255, 255, 0.8);
+      border-radius: 20px;
+      padding: 10px 15px;
+      cursor: pointer;
+      z-index: 100;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+      font-size: 24px;
+      transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    }
+
+    .music-control:hover {
+      transform: scale(1.1);
+      animation: springBounce 0.3s ease;
+    }
+
+    .dark-toggle {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      background: rgba(255, 255, 255, 0.8);
+      border-radius: 20px;
+      padding: 10px 15px;
+      cursor: pointer;
+      z-index: 100;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+      font-size: 24px;
+      transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    }
+
+    .dark-toggle:hover {
+      transform: scale(1.1);
+      animation: springBounce 0.3s ease;
+    }
+
+    body.dark .music-control {
+      background: rgba(40, 44, 52, 0.9);
+    }
+
+    body.dark .dark-toggle {
+      background: rgba(40, 44, 52, 0.9);
+    }
+
+    body.dark .cat-panel {
+      background: rgba(40, 44, 52, 0.95);
+    }
+
+    body.dark .rankings-toggle {
+      background: rgba(232, 94, 144, 0.9);
+    }
+
+    body.dark .mika-btn {
+      background: linear-gradient(45deg, #e85e90, #ff6b9d);
+    }
+
+    /* Feed panel */
+    .feed-panel {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      width: 320px;
+      max-height: calc(100vh - 40px);
+      overflow-y: auto;
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 20px;
+      box-shadow: -5px 0 20px rgba(0, 0, 0, 0.1);
+      z-index: 100;
+      transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    }
+
+    .feed-panel.collapsed {
+      transform: translateX(340px);
+    }
+
+    .feed-panel:hover {
+      transform: translateX(-5px) scale(1.005);
+    }
+
+    .feed-header {
+      padding: 15px;
+      background: rgba(255, 107, 157, 0.9);
+      border-radius: 20px 20px 0 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .feed-header h3 {
+      margin: 0;
+      color: white;
+      font-size: 16px;
+    }
+
+    .feed-close {
+      background: none;
+      border: none;
+      color: white;
+      font-size: 24px;
+      cursor: pointer;
+      padding: 5px;
+      line-height: 1;
+    }
+
+    .feed-content {
+      padding: 15px;
+    }
+
+    .feed-section {
+      margin-bottom: 20px;
+      transition: transform 0.2s ease;
+    }
+
+    .feed-section:hover {
+      transform: scale(1.005);
+    }
+
+    .feed-section h4 {
+      color: #ff6b9d;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .feed-section iframe {
+      width: 100%;
+      height: 250px;
+      border: none;
+      border-radius: 10px;
+    }
+
+    .feed-section p {
+      font-size: 12px;
+      color: #666;
+      margin: 5px 0 0 0;
+      line-height: 1.4;
+    }
+
+    .feed-toggle {
+      position: fixed;
+      top: 20px;
+      right: 350px;
+      background: rgba(255, 107, 157, 0.9);
+      color: white;
+      border: none;
+      border-radius: 20px;
+      padding: 10px 15px;
+      cursor: pointer;
+      z-index: 101;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+      font-size: 20px;
+      transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    }
+
+    .feed-toggle:hover {
+      transform: scale(1.1);
+      animation: springBounce 0.3s ease;
+    }
+
+    body.dark .feed-panel {
+      background: rgba(40, 44, 52, 0.95);
+    }
+
+    body.dark .feed-header {
+      background: rgba(232, 94, 144, 0.9);
+    }
+
+    body.dark .feed-toggle {
+      background: rgba(232, 94, 144, 0.9);
+    }
+
+    /* Vue transition */
+    .fade-enter-active,
+    .fade-leave-active {
+      transition: opacity 0.3s ease;
+    }
+
+    .fade-enter-from,
+    .fade-leave-to {
+      opacity: 0;
+    }
+  </style>
 </head>
 <body>
-    <!-- Animated background circles -->
-    <div class="bg-circle"></div>
-    <div class="bg-circle"></div>
-    <div class="bg-circle"></div>
+  <div id="app"></div>
+  <script type="module">
+    import { createApp, ref, onMounted, computed } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js';
 
-    <!-- Quote section -->
-    <div class="quote-section">
-        <div class="quote-text" id="quote">"Stay curious, keep asking questions."</div>
-    </div>
+    const { createApp, ref, onMounted, computed } = Vue;
 
-    <!-- Coolness Rankings -->
-    <div class="rankings-panel" id="rankingsPanel">
-        <div class="rankings-header">
-            <h3>👻 Coolness Rankings</h3>
-            <button class="rankings-close" id="rankingsClose">✕</button>
-        </div>
-        <div class="rankings-list" id="rankingsList">
-            <div class="rank-item">
-                <div class="rank-avatar">🌸</div>
-                <div class="rank-name current-user">You</div>
-                <div class="rank-score">1487</div>
-                <div class="rank-label">pts</div>
-            </div>
-            <div class="rank-item">
-                <div class="rank-avatar">🍄</div>
-                <div class="rank-name">Chang'Yi</div>
-                <div class="rank-score">1397</div>
-                <div class="rank-label">pts</div>
-            </div>
-            <div class="rank-item">
-                <div class="rank-avatar">🌙</div>
-                <div class="rank-name">Orlando</div>
-                <div class="rank-score">1089</div>
-                <div class="rank-label">pts</div>
-            </div>
-            <div class="rank-item">
-                <div class="rank-avatar">🎵</div>
-                <div class="rank-name">Ashley</div>
-                <div class="rank-score">987</div>
-                <div class="rank-label">pts</div>
-            </div>
-            <div class="rank-item">
-                <div class="rank-avatar">😺</div>
-                <div class="rank-name">美香</div>
-                <div class="rank-score">789</div>
-                <div class="rank-label">pts</div>
-            </div>
-            <div class="rank-item">
-                <div class="rank-avatar">🍄</div>
-                <div class="rank-name">Goopsworthy</div>
-                <div class="rank-score">689</div>
-                <div class="rank-label">pts</div>
-            </div>
-        </div>
-    </div>
+    createApp({
+      setup() {
+        // State
+        const darkMode = ref(false);
+        const musicPlaying = ref(false);
+        const feedOpen = ref(false);
+        const rankingsOpen = ref(true);
+        const catOpen = ref(true);
+        const mikaModalOpen = ref(false);
+        const confirmationOpen = ref(false);
+        const currentQuoteIndex = ref(0);
+        const currentCatIndex = ref(0);
+        const tachValue = ref(77);
+        const needleAngle = ref(0);
+        const fartClicked = ref(false);
+        const fartExploded = ref(false);
 
-    <!-- Cat Panel -->
-    <div class="cat-panel" id="catPanel">
-        <div class="cat-header">
-            <h3>🐱 Random Cats</h3>
-            <button class="cat-close" id="catClose">✕</button>
-        </div>
-        <div class="cat-content">
-            <img class="cat-image" id="catImage" src="" alt="Random cat" />
-            <button class="cute-btn" id="catBtn">🔄 New Cat</button>
-        </div>
-    </div>
+        // Data
+        const quotes = ref([
+          'Stay curious, keep asking questions.',
+          'The best way to predict future is to create it.',
+          'Every moment is a fresh beginning.',
+          'Chaos is just order waiting to be discovered.',
+          'Your potential is endless.',
+          'Keep being weird.',
+          'Normal is overrated.',
+          'Be energy you want to see in world.'
+        ]);
 
-    <!-- Tachometer gauge -->
-    <div class="tachometer">
-        <div class="tachometer-dial">
-            <div class="tachometer-ticks">
+        const catImages = ref([
+          'https://cataas.com/cat/cute-cat-1/600/398.jpg',
+          'https://cataas.com/cat/orange-tabby/600/417.jpg',
+          'https://cataas.com/cat/siamese/600/374.jpg',
+          'https://cataas.com/cat/fluffy/600/385.jpg',
+          'https://cataas.com/cat/silly/600/388.jpg'
+        ]);
+
+        const rankings = ref([
+          { avatar: '🌸', name: 'You', score: 1487, isCurrentUser: true },
+          { avatar: '🍄', name: "Chang'Yi", score: 1397 },
+          { avatar: '🌙', name: 'Orlando', score: 1089 },
+          { avatar: '🎵', name: 'Ashley', score: 987 },
+          { avatar: '😺', name: '美香', score: 789 },
+          { avatar: '🍄', name: 'Goopsworthy', score: 689 }
+        ]);
+
+        // Computed
+        const currentQuote = computed(() => `"${quotes.value[currentQuoteIndex.value]}"`);
+        const currentCatImage = computed(() => catImages.value[currentCatIndex.value]);
+        const currentNeedleStyle = computed(() => ({
+          transform: `rotate(${needleAngle.value}deg)`
+        }));
+
+        // Methods
+        const toggleDarkMode = () => {
+          darkMode.value = !darkMode.value;
+          document.body.classList.toggle('dark', darkMode.value);
+        };
+
+        const toggleMusic = () => {
+          musicPlaying.value = !musicPlaying.value;
+          const music = document.getElementById('newMusic');
+          if (musicPlaying.value) {
+            music.play();
+          } else {
+            music.pause();
+          }
+        };
+
+        const toggleFeed = () => {
+          feedOpen.value = !feedOpen.value;
+        };
+
+        const toggleRankings = () => {
+          rankingsOpen.value = !rankingsOpen.value;
+        };
+
+        const toggleCat = () => {
+          catOpen.value = !catOpen.value;
+        };
+
+        const openMikaModal = () => {
+          mikaModalOpen.value = true;
+        };
+
+        const closeMikaModal = () => {
+          mikaModalOpen.value = false;
+        };
+
+        const nextQuote = () => {
+          currentQuoteIndex.value = (currentQuoteIndex.value + 1) % quotes.value.length;
+        };
+
+        const nextCat = () => {
+          currentCatIndex.value = Math.floor(Math.random() * catImages.value.length);
+        };
+
+        const onFart = () => {
+          if (fartClicked.value) return;
+          fartClicked.value = true;
+
+          // Play sound
+          const fart = document.getElementById('fartSound');
+          if (fart) {
+            fart.currentTime = 0;
+            fart.play();
+          }
+
+          // Show confirmation
+          setTimeout(() => {
+            confirmationOpen.value = true;
+          }, 300);
+
+          // Explode effect
+          fartExploded.value = true;
+          setTimeout(() => {
+            fartExploded.value = false;
+            fartClicked.value = false;
+          }, 500);
+
+          // Randomize values
+          tachValue.value = Math.floor(Math.random() * 100);
+          needleAngle.value = -90 + (Math.random() * 180);
+        };
+
+        const onTurnMe = () => {
+          const fart = document.getElementById('fartSound');
+          if (fart) {
+            fart.currentTime = 0;
+            fart.play();
+          }
+
+          setTimeout(() => {
+            confirmationOpen.value = true;
+          }, 300);
+        };
+
+        const closeConfirmation = () => {
+          confirmationOpen.value = false;
+        };
+
+        const createHeart = () => {
+          const heart = document.createElement('div');
+          heart.className = 'heart';
+          heart.innerHTML = ['💖', '💕', '💗', '💓', '❤️'][Math.floor(Math.random() * 5)];
+          heart.style.left = Math.random() * 100 + 'vw';
+          heart.style.animationDuration = (Math.random() * 3 + 3) + 's';
+          document.body.appendChild(heart);
+          setTimeout(() => heart.remove(), 6000);
+        };
+
+        // Lifecycle
+        onMounted(() => {
+          // Set initial body class
+          document.body.classList.toggle('dark', darkMode.value);
+
+          // Auto-load cat
+          nextCat();
+
+          // Heart animation interval
+          setInterval(createHeart, 500);
+
+          // Cat auto-load interval
+          setInterval(nextCat, 10000);
+        });
+
+        return {
+          // State
+          darkMode,
+          musicPlaying,
+          feedOpen,
+          rankingsOpen,
+          catOpen,
+          mikaModalOpen,
+          confirmationOpen,
+          currentQuote,
+          currentCatImage,
+          tachValue,
+          currentNeedleStyle,
+          fartClicked,
+          fartExploded,
+          rankings,
+
+          // Methods
+          toggleDarkMode,
+          toggleMusic,
+          toggleFeed,
+          toggleRankings,
+          toggleCat,
+          openMikaModal,
+          closeMikaModal,
+          nextQuote,
+          nextCat,
+          onFart,
+          onTurnMe,
+          closeConfirmation
+        };
+      },
+      template: `
+        <div>
+          <!-- Animated background circles -->
+          <div class="bg-circle"></div>
+          <div class="bg-circle"></div>
+          <div class="bg-circle"></div>
+
+          <!-- Quote section -->
+          <div class="quote-section">
+            <div class="quote-text">{{ currentQuote }}</div>
+          </div>
+
+          <!-- Coolness Rankings Panel -->
+          <div class="rankings-panel" :class="{ collapsed: !rankingsOpen }">
+            <div class="rankings-header">
+              <h3>👻 Coolness Rankings</h3>
+              <button class="rankings-close" @click="toggleRankings">✕</button>
+            </div>
+            <div class="rankings-list">
+              <div v-for="(rank, index) in rankings" :key="index" class="rank-item">
+                <div class="rank-avatar">{{ rank.avatar }}</div>
+                <div class="rank-name" :class="{ 'current-user': rank.isCurrentUser }">{{ rank.name }}</div>
+                <div class="rank-score">{{ rank.score }}</div>
+                <div class="rank-label">pts</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Cat Panel -->
+          <div class="cat-panel" :class="{ collapsed: !catOpen }">
+            <div class="cat-header">
+              <h3>🐱 Random Cats</h3>
+              <button class="cat-close" @click="toggleCat">✕</button>
+            </div>
+            <div class="cat-content">
+              <img :src="currentCatImage" class="cat-image" alt="Random cat" />
+              <button class="cute-btn" @click="nextCat">🔄 New Cat</button>
+            </div>
+          </div>
+
+          <!-- Tachometer gauge -->
+          <div class="tachometer">
+            <div class="tachometer-dial">
+              <div class="tachometer-ticks">
                 <div class="tick"></div>
                 <div class="tick major"></div>
                 <div class="tick"></div>
                 <div class="tick major"></div>
                 <div class="tick"></div>
+              </div>
+              <div class="tachometer-needle" :style="currentNeedleStyle"></div>
+              <div class="tachometer-label">🍄 MOLD METER</div>
+              <div class="tachometer-value">{{ tachValue }}%</div>
             </div>
-            <div class="tachometer-needle" id="tachNeedle"></div>
-            <div class="tachometer-label">🍄 MOLD METER</div>
-            <div class="tachometer-value" id="tachValue">77%</div>
-        </div>
-    <button class="fart-btn" id="fartBtn">💨 Fart!</button>
-    </div>
+            <button class="fart-btn" @click="onFart" :class="{ exploded: fartExploded }" :disabled="fartClicked">💨 Fart!</button>
+          </div>
 
-    <!-- Main container -->
-    <div class="container">
-        <div class="sparkles">✨</div>
-        <div class="sparkles">✨</div>
-        <div class="sparkles">✨</div>
-        <div class="sparkles">✨</div>
+          <!-- Main container -->
+          <div class="container">
+            <div class="sparkles">✨</div>
+            <div class="sparkles">✨</div>
+            <div class="sparkles">✨</div>
+            <div class="sparkles">✨</div>
 
-        <!-- EmulatorJS Player -->
-        <div class="emulator-container">
-            <div class="emulator-screen" id="emulatorScreen"></div>
-            <div class="emulator-buttons">
+            <!-- EmulatorJS Player -->
+            <div class="emulator-container">
+              <div class="emulator-screen"></div>
+              <div class="emulator-buttons">
                 <div class="emulator-label">Game Boy Controls</div>
-                <button class="emulator-btn" id="emulatorUp">▲</button>
-                <button class="emulator-btn" id="emulatorLeft">◄</button>
-                <button class="emulator-btn" id="emulatorRight">►</button>
-                <button class="emulator-btn" id="emulatorDown">▼</button>
-                <div class="emulator-screen-off" id="emulatorOff">LOADING...</div>
+                <button class="emulator-btn">▲</button>
+                <button class="emulator-btn">◄</button>
+                <button class="emulator-btn">►</button>
+                <button class="emulator-btn">▼</button>
+                <div class="emulator-screen-off">LOADING...</div>
+              </div>
+              <iframe class="emulator-frame"></iframe>
             </div>
-            <iframe id="emulatorFrame" class="emulator-frame"></iframe>
-        </div>
 
-        <div class="emoji">🌸</div>
-        <h1>mald.mikahear.es</h1>
-        <p>Welcome to this cute little corner of internet!</p>
-        <p>✨ Stay a while ✨</p>
-        <div class="button-row">
-            <button class="cute-btn" id="turnMe">Turn me into a girl!</button>
-            <button class="cute-btn" id="quoteBtn" style="background: linear-gradient(45deg, #90EE90, #32CD32);">💬 New Quote</button>
-        </div>
-    </div>
+            <div class="emoji">🌸</div>
+            <h1>mald.mikahear.es</h1>
+            <p>Welcome to this cute little corner of internet!</p>
+            <p>✨ Stay a while ✨</p>
+            <div class="button-row">
+              <button class="cute-btn" @click="onTurnMe">Turn me into a girl!</button>
+              <button class="cute-btn" @click="nextQuote" style="background: linear-gradient(45deg, #90EE90, #32CD32);">💬 New Quote</button>
+            </div>
+          </div>
 
-    <!-- Confirmation overlay -->
-    <div class="confirmation" id="confirmation">
-        <div class="confirmation-box">
-            <div class="emoji">💕</div>
-            <h1>So you want to be a girl?</h1>
-            <p>You could totally be a girl if you wanted. No matter who you are or what you've been through, don't let anything stop you from living as your best self!</p>
-            <p>✨ You are valid no matter who you are ✨</p>
-            <button class="cute-btn" id="backBtn">Go back</button>
-        </div>
-    </div>
+          <!-- Confirmation overlay -->
+          <div class="confirmation" :class="{ active: confirmationOpen }">
+            <div class="confirmation-box">
+              <div class="emoji">💕</div>
+              <h1>So you want to be a girl?</h1>
+              <p>You could totally be a girl if you wanted. No matter who you are or what you've been through, don't let anything stop you from living as your best self!</p>
+              <p>✨ You are valid no matter who you are ✨</p>
+              <button class="cute-btn" @click="closeConfirmation">Go back</button>
+            </div>
+          </div>
 
-    <!-- Control buttons -->
-    <div class="rankings-toggle" id="rankingsToggle" title="Toggle rankings">👻</div>
-    <div class="dark-toggle" id="darkBtn" title="Toggle dark mode">🌙</div>
-    <div class="music-control" id="musicBtn" title="Toggle music">🎵</div>
-    <div class="feed-toggle" id="feedToggle" title="Toggle feeds">📰</div>
-    <button class="mika-btn" id="mikaBtn">🌸 Mika</button>
+          <!-- Control buttons -->
+          <div class="rankings-toggle" @click="toggleRankings" title="Toggle rankings">👻</div>
+          <div class="dark-toggle" @click="toggleDarkMode" title="Toggle dark mode">🌙</div>
+          <div class="music-control" @click="toggleMusic" title="Toggle music">🎵</div>
+          <div class="feed-toggle" @click="toggleFeed" title="Toggle feeds">📰</div>
+          <button class="mika-btn" @click="openMikaModal">🌸 Mika</button>
 
-    <!-- Feed panel -->
-    <div class="feed-panel" id="feedPanel">
-        <div class="feed-header">
-            <h3>☁️ Live Feeds</h3>
-            <button class="feed-close" id="feedClose">✕</button>
-        </div>
-        <div class="feed-content">
-            <div class="feed-section">
+          <!-- Feed panel -->
+          <div class="feed-panel" :class="{ collapsed: !feedOpen }">
+            <div class="feed-header">
+              <h3>☁️ Live Feeds</h3>
+              <button class="feed-close" @click="toggleFeed">✕</button>
+            </div>
+            <div class="feed-content">
+              <div class="feed-section">
                 <h4>🐦 Brisbane Radar</h4>
                 <p>Live weather radar for Brisbane area</p>
-                <iframe src="https://www.bom.gov.au/products/IDR064.loop.gif" class="feed-section iframe"></iframe>
-            </div>
-            <div class="feed-section">
+                <iframe src="https://www.bom.gov.au/products/IDR064.loop.gif"></iframe>
+              </div>
+              <div class="feed-section">
                 <h4>🚂 Subway Surfers (YT)</h4>
                 <p>Autoplay gameplay video</p>
-                <iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&mute=1" class="feed-section iframe"></iframe>
-            </div>
-            <div class="feed-section">
+                <iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&mute=1"></iframe>
+              </div>
+              <div class="feed-section">
                 <h4>🐦 BOM Queensland (X)</h4>
                 <p>Latest weather alerts from Bureau of Meteorology</p>
                 <a href="https://x.com/BOM_Qld" target="_blank" style="color: #666; font-size: 12px; display: block; margin-top: 5px;">@BOM_Qld on X/Twitter →</a>
+              </div>
             </div>
+          </div>
+
+          <!-- Mika Modal -->
+          <div class="mika-modal" :class="{ active: mikaModalOpen }">
+            <div class="mika-modal-box">
+              <div class="emoji">🌸</div>
+              <h1>Hi there!</h1>
+              <button class="cute-btn" @click="closeMikaModal">Close</button>
+            </div>
+          </div>
+
+          <!-- Audio -->
+          <audio id="fartSound" src="fart-with-reverb.mp3" preload="auto"></audio>
+          <audio id="newMusic" src="button-sound.mp3" preload="auto"></audio>
         </div>
-    </div>
-
-    <!-- Mika Modal -->
-    <div class="mika-modal" id="mikaModal">
-        <div class="mika-modal-box">
-            <div class="emoji">🌸</div>
-            <h1>Hi there!</h1>
-            <button class="cute-btn" id="mikaClose">Close</button>
-        </div>
-    </div>
-
-    <!-- Audio -->
-    <audio id="fartSound" src="fart-with-reverb.mp3" preload="auto"></audio>
-    <audio id="newMusic" src="button-sound.mp3" preload="auto"></audio>
-
-    <script src="script.js"></script>
+      `
+    }).mount('#app');
+  </script>
 </body>
 </html>
