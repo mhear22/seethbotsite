@@ -340,6 +340,159 @@
             color: #666;
         }
 
+        /* CAT PANEL */
+        .cat-panel {
+            position: fixed;
+            bottom: 20px;
+            left: 260px;
+            width: 280px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            z-index: 100;
+            padding: 15px;
+            transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        .cat-panel.collapsed {
+            transform: translateX(-300px);
+        }
+
+        .cat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .cat-header h3 {
+            margin: 0;
+            color: #ff6b9d;
+            font-size: 16px;
+        }
+
+        .cat-close {
+            background: none;
+            border: none;
+            color: #666;
+            font-size: 18px;
+            cursor: pointer;
+            padding: 0 5px;
+            line-height: 1;
+            transition: transform 0.2s ease;
+        }
+
+        .cat-close:hover {
+            color: #ff6b9d;
+            transform: scale(1.2);
+        }
+
+        .cat-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .cat-image {
+            width: 100%;
+            border-radius: 15px;
+            transition: transform 0.2s ease;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .cat-image:hover {
+            transform: scale(1.02);
+        }
+
+        /* RANKINGS TOGGLE BUTTON */
+        .rankings-toggle {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(255, 107, 157, 0.9);
+            color: white;
+            border: none;
+            border-radius: 20px;
+            padding: 10px 15px;
+            cursor: pointer;
+            z-index: 101;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            font-size: 20px;
+            transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        .rankings-toggle:hover {
+            transform: scale(1.1);
+            animation: springBounce 0.3s ease;
+        }
+
+        /* MIKA BUTTON */
+        .mika-btn {
+            position: fixed;
+            bottom: 70px;
+            right: 20px;
+            background: linear-gradient(45deg, #ff6b9d, #ff8a80);
+            color: white;
+            border: none;
+            border-radius: 20px;
+            padding: 10px 20px;
+            cursor: pointer;
+            z-index: 101;
+            box-shadow: 0 5px 15px rgba(255, 107, 157, 0.4);
+            font-size: 16px;
+            font-family: 'Quicksand', sans-serif;
+            font-weight: bold;
+            transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        .mika-btn:hover {
+            transform: translateY(-3px) scale(1.02);
+            box-shadow: 0 8px 20px rgba(255, 107, 157, 0.6);
+            animation: springBounce 0.3s ease;
+        }
+
+        .mika-btn:active {
+            transform: translateY(0) scale(0.98);
+        }
+
+        /* MIKA MODAL */
+        .mika-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .mika-modal.active {
+            display: flex;
+        }
+
+        .mika-modal-box {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 60px 40px;
+            border-radius: 40px;
+            box-shadow: 0 30px 80px rgba(0, 0, 0, 0.15);
+            text-align: center;
+            animation: popIn 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            min-width: 300px;
+            max-width: 500px;
+        }
+
+        body.dark .mika-modal {
+            background: linear-gradient(135deg, #1a5c2a 0%, #2d5a3d 100%);
+        }
+
+        body.dark .mika-modal-box {
+            background: rgba(40, 44, 52, 0.95);
+        }
+
         /* TACHOMETER */
         .tachometer {
             position: fixed;
@@ -866,6 +1019,18 @@
         </div>
     </div>
 
+    <!-- Cat Panel -->
+    <div class="cat-panel" id="catPanel">
+        <div class="cat-header">
+            <h3>🐱 Random Cats</h3>
+            <button class="cat-close" id="catClose">✕</button>
+        </div>
+        <div class="cat-content">
+            <img class="cat-image" id="catImage" src="" alt="Random cat" />
+            <button class="cute-btn" id="catBtn">🔄 New Cat</button>
+        </div>
+    </div>
+
     <!-- Tachometer gauge -->
     <div class="tachometer">
         <div class="tachometer-dial">
@@ -926,9 +1091,11 @@
     </div>
 
     <!-- Control buttons -->
+    <div class="rankings-toggle" id="rankingsToggle" title="Toggle rankings">👻</div>
     <div class="dark-toggle" id="darkBtn" title="Toggle dark mode">🌙</div>
     <div class="music-control" id="musicBtn" title="Toggle music">🎵</div>
     <div class="feed-toggle" id="feedToggle" title="Toggle feeds">📰</div>
+    <button class="mika-btn" id="mikaBtn">🌸 Mika</button>
 
     <!-- Feed panel -->
     <div class="feed-panel" id="feedPanel">
@@ -952,6 +1119,15 @@
                 <p>Latest weather alerts from Bureau of Meteorology</p>
                 <a href="https://x.com/BOM_Qld" target="_blank" style="color: #666; font-size: 12px; display: block; margin-top: 5px;">@BOM_Qld on X/Twitter →</a>
             </div>
+        </div>
+    </div>
+
+    <!-- Mika Modal -->
+    <div class="mika-modal" id="mikaModal">
+        <div class="mika-modal-box">
+            <div class="emoji">🌸</div>
+            <h1>Hi there!</h1>
+            <button class="cute-btn" id="mikaClose">Close</button>
         </div>
     </div>
 
