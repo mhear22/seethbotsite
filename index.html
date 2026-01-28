@@ -1254,31 +1254,16 @@
           </div>
 
           <!-- Confirmation overlay -->
+          <!-- Control buttons -->
+          <button class="rankings-toggle" @click="toggleRankings" title="Toggle rankings">👻</button>
+          <button class="dark-toggle" @click="toggleDarkMode" :title="darkMode ? 'Light mode' : 'Dark mode'">
+            {{ darkMode ? '☀️' : '🌙' }}
+          </button>
+          <button class="music-control" @click="toggleMusic" :title="musicPlaying ? 'Pause music' : 'Play music'">
+            {{ musicPlaying ? '⏸️' : '🎵' }}
+          </button>
+          <button class="feed-toggle" @click="toggleFeed" title="Toggle feeds">📰</button>
+          <button class="mika-btn" @click="openMikaModal">🌸 Mika</button>
           <ConfirmationModal :is-open="confirmationOpen" @close="closeConfirmation" />
 
           <!-- Control buttons -->
-          <ControlButtons
-            :dark-mode="darkMode"
-            :music-playing="musicPlaying"
-            @toggle-rankings="toggleRankings"
-            @toggle-dark="toggleDarkMode"
-            @toggle-music="toggleMusic"
-            @toggle-feed="toggleFeed"
-            @toggle-mika="openMikaModal"
-          />
-
-          <!-- Feed panel -->
-          <FeedPanel :is-open="feedOpen" @toggle="toggleFeed" />
-
-          <!-- Mika Modal -->
-          <MikaModal :is-open="mikaModalOpen" @close="closeMikaModal" />
-
-          <!-- Audio -->
-          <audio id="fartSound" src="fart-with-reverb.mp3" preload="auto"></audio>
-          <audio id="newMusic" src="button-sound.mp3" preload="auto"></audio>
-        </div>
-      `
-    }).mount('#app');
-  </script>
-</body>
-</html>
