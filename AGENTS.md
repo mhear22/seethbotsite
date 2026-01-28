@@ -12,6 +12,170 @@
 
 ---
 
+## Vue.js 3 Migration
+
+### What Changed
+- **From:** Vanilla JavaScript with manual DOM manipulation
+- **To:** Vue.js 3 with Composition API
+- **Approach:** CDN-based Vue (no build step required)
+- **Date:** 2026-01-29
+
+### Key Migration Learnings
+
+**1. Reactive State Management**
+```javascript
+// BEFORE (Vanilla JS) - Manual DOM updates
+document.getElementById('quote').textContent = `"${quote}"`;
+
+// AFTER (Vue.js) - Reactive computed
+const currentQuote = computed(() => `"${quotes.value[currentQuoteIndex.value]}"`);
+```
+**Learning:** Vue's reactivity system automatically updates the DOM when state changes. No more manual `textContent` or `style` updates.
+
+**2. Event Handling**
+```javascript
+// BEFORE (Vanilla JS)
+document.getElementById('button').addEventListener('click', function() { ... });
+
+// AFTER (Vue.js)
+<button @click="methodName">Click me</button>
+```
+**Learning:** `@click` directive is cleaner than `addEventListener`. Vue handles event cleanup automatically.
+
+**3. Conditional Rendering**
+```javascript
+// BEFORE (Vanilla JS)
+element.classList.toggle('active', isOpen);
+
+// AFTER (Vue.js)
+<div :class="{ active: isOpen }">Content</div>
+```
+**Learning:** `:class` binding provides declarative conditional rendering. Much easier to read and maintain.
+
+**4. List Rendering**
+```javascript
+// BEFORE (Vanilla JS) - Manual DOM creation
+rankings.forEach(rank => {
+  const div = document.createElement('div');
+  div.textContent = rank.name;
+  parent.appendChild(div);
+});
+
+// AFTER (Vue.js) - Declarative v-for
+<div v-for="rank in rankings" :key="rank.name">{{ rank.name }}</div>
+```
+**Learning:** `v-for` directive handles list rendering automatically with proper DOM diffing.
+
+**5. Component Props and Emits**
+```javascript
+// Component registration
+import { MyComponent } from './components/MyComponent.js';
+
+createApp({
+  components: { MyComponent }  // Register component
+});
+
+// Usage in template
+<MyComponent :title="myTitle" @close="handleClose" />
+```
+**Learning:** Props flow data IN to components, emits flow data OUT. This creates a clear, 单向 data flow pattern.
+
+### CDN-Based Vue.js 3
+
+**Setup:**
+```html
+<!-- Vue CDN -->
+<script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+
+<!-- ES Module Import -->
+<script type="module">
+  import { createApp, ref, onMounted, computed } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js';
+</script>
+```
+
+**Benefits:**
+- No build step (no Vite, Webpack, etc.)
+- Works instantly in browser
+- Simple file structure (single HTML file)
+- Great for small projects
+
+**Trade-offs:**
+- No TypeScript support
+- No Single File Components (`.vue` files)
+- No Hot Module Replacement (HMR)
+- No scoped CSS
+
+**Recommendation:** For this project size, CDN-based is perfect. For larger projects, migrate to Vite build setup.
+
+---
+
+## Component Architecture
+
+### Created 8 Reusable Components
+
+| Component | Purpose | Props | Emits |
+|-----------|---------|-------|--------|
+| **RankingsPanel** | Coolness rankings leaderboard | `isOpen`, `rankings` | `toggle` |
+| **CatPanel** | Random cats display | `isOpen`, `catImage` | `toggle`, `new-cat` |
+| **Tachometer** | Mold meter gauge | `value`, `needleAngle`, `clicked`, `exploded` | `fart` |
+| **FeedPanel** | Live feeds (radar, YouTube, Twitter) | `isOpen` | `toggle` |
+| **QuoteSection** | Inspirational quote display | `currentQuote` | `next-quote` |
+| **MikaModal** | Blank modal for Mika button | `isOpen` | `close` |
+| **ConfirmationModal** | "Turn me into a girl" confirmation | `isOpen` | `close` |
+| **ControlButtons** | All control buttons | `darkMode`, `musicPlaying` | `toggle-rankings`, `toggle-dark`, `toggle-music`, `toggle-feed`, `toggle-mika` |
+
+### Component Pattern
+
+```javascript
+// Define component
+export const ComponentName = {
+  template: `...`,  // Component template
+  props: { ... },     // Component inputs
+  emits: [ ... ],     // Component events
+  methods: { ... }    // Component methods
+};
+```
+
+### Benefits
+
+- ✅ **Modular** - Each component is self-contained
+- ✅ **Reusable** - Components can be used multiple times
+- ✅ **Maintainable** - Easier to find and fix issues
+- ✅ **Collaborative** - Multiple developers can work on different components
+- ✅ **Clear contracts** - Props and emits define clear interfaces
+
+### Adding New Components
+
+**Step 1: Create Component File**
+```javascript
+// components/MyComponent.js
+export const MyComponent = {
+  template: '<div>{{ message }}</div>',
+  props: {
+    message: { type: String, required: true }
+  }
+};
+```
+
+**Step 2: Import in Main App**
+```javascript
+import { MyComponent } from './components/MyComponent.js';
+```
+
+**Step 3: Register Component**
+```javascript
+createApp({
+  components: { MyComponent }
+});
+```
+
+**Step 4: Use in Template**
+```javascript
+template: '<MyComponent message="Hello!" />'
+```
+
+---
+
 ## Core Features
 
 ### 1. Main Container & Aesthetics
@@ -167,9 +331,9 @@ const romUrl = 'https://ajones-nasbackup.s3.ap-southeast-2.amazonaws.com/...';
 
 // Mock game state
 let emulatorState = {
-    running: false,
-    screen: 'title',
-    player: { x: 240, y: 220, facing: 'right' }
+  running: false,
+  screen: 'title',
+  player: { x: 240, y: 220, facing: 'right' }
 };
 ```
 
@@ -200,13 +364,13 @@ let emulatorState = {
 #### Floating Hearts
 ```javascript
 function createHeart() {
-    const heart = document.createElement('div');
-    heart.className = 'heart';
-    heart.innerHTML = ['💖', '💕', '💗', '💓', '❤️'][Math.floor(Math.random() * 5)];
-    heart.style.left = Math.random() * 100 + 'vw';
-    heart.style.animationDuration = (Math.random() * 3 + 3) + 's';
-    document.body.appendChild(heart);
-    setTimeout(() => heart.remove(), 6000);
+  const heart = document.createElement('div');
+  heart.className = 'heart';
+  heart.innerHTML = ['💖', '💕', '💗', '💓', '❤️'][Math.floor(Math.random() * 5)];
+  heart.style.left = Math.random() * 100 + 'vw';
+  heart.style.animationDuration = (Math.random() * 3 + 3) + 's';
+  document.body.appendChild(heart);
+  setTimeout(() => heart.remove(), 6000);
 }
 setInterval(createHeart, 500);
 ```
@@ -224,6 +388,7 @@ setInterval(createHeart, 500);
 - CSS animations (GPU accelerated)
 - Minimal DOM manipulation
 - Efficient class toggling for themes
+- Vue.js reactive system (optimized DOM updates)
 
 #### What Needs Improvement:
 1. **Large audio files:**
@@ -308,7 +473,7 @@ git push https://$(cat "$PAT_FILE")@github.com/mhear22/seethbotsite.git
 **Lesson Learned:** 
 - Auto-commit scripts should check for changes first
 - Timestamped commits provide history context
-- Use credential files for automated pushes (but **don't commit the file**)
+- Use credential files for automated pushes (but **don't commit file**)
 
 ---
 
@@ -387,17 +552,26 @@ git push https://$(cat "$PAT_FILE")@github.com/mhear22/seethbotsite.git
 
 ```
 /home/seethbotsite/
+├── components/
+│   ├── README.md              # Component documentation
+│   ├── RankingsPanel.js       # Coolness rankings panel
+│   ├── CatPanel.js            # Random cats panel
+│   ├── Tachometer.js          # Mold meter gauge
+│   ├── FeedPanel.js           # Live feeds panel
+│   ├── QuoteSection.js        # Quote display
+│   ├── MikaModal.js           # Mika modal
+│   ├── ConfirmationModal.js    # Girl transformation confirmation
+│   └── ControlButtons.js      # All control buttons
 ├── .gitignore              # Git ignore rules
-├── .git/                  # Git repository
-├── index.html             # Main HTML (29KB)
-├── script.js              # Main JavaScript (12KB)
-├── package.json           # Node.js dependencies
-├── package-lock.json      # Dependency lock file
-├── 50x.html              # Custom error page
-├── node_modules/          # Dependencies (git-ignored)
-├── fart-with-reverb.mp3   # Audio effect (52KB)
-├── button-sound.mp3       # Button click sound (196KB)
-└── newMusic.mp3           # Background music (7MB) ⚠️ Large file
+├── .git/                    # Git repository
+├── index.html                # Main HTML with Vue.js (31KB)
+├── package.json             # Node.js dependencies
+├── package-lock.json          # Dependency lock file
+├── 50x.html                 # Custom error page
+├── eslint.config.js           # ESLint v9 configuration
+├── fart-with-reverb.mp3      # Audio effect (52KB)
+├── button-sound.mp3          # Button click sound (196KB)
+└── newMusic.mp3              # Background music (7MB) ⚠️ Large file
 ```
 
 ---
@@ -405,10 +579,12 @@ git push https://$(cat "$PAT_FILE")@github.com/mhear22/seethbotsite.git
 ## Key Takeaways
 
 ### ✅ What Worked Well
-- CSS spring animations create delightful interactions
-- Dark mode via class toggling is clean and maintainable
-- Git sync script works reliably for deployment
-- Collapsible panels provide good UX without clutter
+- **CSS spring animations** create delightful interactions
+- **Dark mode** via class toggling is clean and maintainable
+- **Vue.js reactivity** automatically handles DOM updates
+- **Component architecture** makes code modular and reusable
+- **Git sync script** works reliably for deployment
+- **Collapsible panels** provide good UX without clutter
 
 ### ⚠️ What to Watch Out For
 - **Audio autoplay:** Browsers block it by default - always use user interaction triggers
@@ -422,6 +598,11 @@ git push https://$(cat "$PAT_FILE")@github.com/mhear22/seethbotsite.git
 3. Spring animations feel better than linear easing for buttons
 4. Always clean up DOM elements (setTimeout + remove())
 5. Use Chrome DevTools Lighthouse for performance checks
+6. Vue.js `@click` directive is cleaner than `addEventListener`
+7. Vue.js `:class` binding is better than manual classList manipulation
+8. Vue.js `v-for` directive is better than manual DOM creation
+9. Components with clear props/emit interfaces are easier to understand
+10. CDN-based Vue.js is perfect for small projects - no build step needed
 
 ---
 
@@ -431,8 +612,9 @@ git push https://$(cat "$PAT_FILE")@github.com/mhear22/seethbotsite.git
 - **Live Site:** mald.mikahear.es
 - **Git Sync:** `/home/sync-nginx-git.sh`
 - **Docs Location:** This file (`AGENTS.md`)
+- **Component Docs:** `components/README.md`
 
 ---
 
 *Last Updated: 2026-01-29*
-*Version: 1.0*
+*Version: 2.0*
