@@ -41,14 +41,6 @@
       color: #a0a0a0;
     }
 
-    /* Particle system */
-    .particle {
-      position: fixed;
-      border-radius: 50%;
-      pointer-events: none;
-      z-index: 1000;
-    }
-
     /* Physics animations */
     @keyframes springBounce {
       0%, 100% { transform: translateY(0) scale(1); }
@@ -761,6 +753,7 @@
       10% { opacity: 1; }
       90% { opacity: 1; }
       100% { opacity: 0; transform: translateY(-100vh); }
+      0% { opacity: 0; }
     }
 
     .confirmation {
@@ -972,25 +965,23 @@
     body.dark .feed-toggle {
       background: rgba(232, 94, 144, 0.9);
     }
-
-    /* Vue transition */
-    .fade-enter-active,
-    .fade-leave-active {
-      transition: opacity 0.3s ease;
-    }
-
-    .fade-enter-from,
-    .fade-leave-to {
-      opacity: 0;
-    }
   </style>
 </head>
 <body>
   <div id="app"></div>
+  
   <script type="module">
-    import { createApp, ref, onMounted, computed } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js';
-
-    const { createApp, ref, onMounted, computed } = Vue;
+    import { createApp, ref, onMounted } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js';
+    
+    // Import components
+    import { RankingsPanel } from './components/RankingsPanel.js';
+    import { CatPanel } from './components/CatPanel.js';
+    import { Tachometer } from './components/Tachometer.js';
+    import { FeedPanel } from './components/FeedPanel.js';
+    import { QuoteSection } from './components/QuoteSection.js';
+    import { MikaModal } from './components/MikaModal.js';
+    import { ConfirmationModal } from './components/ConfirmationModal.js';
+    import { ControlButtons } from './components/ControlButtons.js';
 
     createApp({
       setup() {
@@ -1039,11 +1030,8 @@
         ]);
 
         // Computed
-        const currentQuote = computed(() => `"${quotes.value[currentQuoteIndex.value]}"`);
-        const currentCatImage = computed(() => catImages.value[currentCatIndex.value]);
-        const currentNeedleStyle = computed(() => ({
-          transform: `rotate(${needleAngle.value}deg)`
-        }));
+        const currentQuote = () => `"${quotes.value[currentQuoteIndex.value]}"`;
+        const currentCatImage = () => catImages.value[currentCatIndex.value];
 
         // Methods
         const toggleDarkMode = () => {
@@ -1170,7 +1158,7 @@
           currentQuote,
           currentCatImage,
           tachValue,
-          currentNeedleStyle,
+          needleAngle,
           fartClicked,
           fartExploded,
           rankings,
@@ -1190,6 +1178,16 @@
           closeConfirmation
         };
       },
+      components: {
+        RankingsPanel,
+        CatPanel,
+        Tachometer,
+        FeedPanel,
+        QuoteSection,
+        MikaModal,
+        ConfirmationModal,
+        ControlButtons
+      },
       template: `
         <div>
           <!-- Animated background circles -->
@@ -1197,55 +1195,32 @@
           <div class="bg-circle"></div>
           <div class="bg-circle"></div>
 
-          <!-- Quote section -->
-          <div class="quote-section">
-            <div class="quote-text">{{ currentQuote }}</div>
-          </div>
+          <!-- Quote Section -->
+          <QuoteSection :current-quote="currentQuote" @next-quote="nextQuote" />
 
-          <!-- Coolness Rankings Panel -->
-          <div class="rankings-panel" :class="{ collapsed: !rankingsOpen }">
-            <div class="rankings-header">
-              <h3>👻 Coolness Rankings</h3>
-              <button class="rankings-close" @click="toggleRankings">✕</button>
-            </div>
-            <div class="rankings-list">
-              <div v-for="(rank, index) in rankings" :key="index" class="rank-item">
-                <div class="rank-avatar">{{ rank.avatar }}</div>
-                <div class="rank-name" :class="{ 'current-user': rank.isCurrentUser }">{{ rank.name }}</div>
-                <div class="rank-score">{{ rank.score }}</div>
-                <div class="rank-label">pts</div>
-              </div>
-            </div>
-          </div>
+          <!-- Rankings Panel -->
+          <RankingsPanel
+            :is-open="rankingsOpen"
+            :rankings="rankings"
+            @toggle="toggleRankings"
+          />
 
           <!-- Cat Panel -->
-          <div class="cat-panel" :class="{ collapsed: !catOpen }">
-            <div class="cat-header">
-              <h3>🐱 Random Cats</h3>
-              <button class="cat-close" @click="toggleCat">✕</button>
-            </div>
-            <div class="cat-content">
-              <img :src="currentCatImage" class="cat-image" alt="Random cat" />
-              <button class="cute-btn" @click="nextCat">🔄 New Cat</button>
-            </div>
-          </div>
+          <CatPanel
+            :is-open="catOpen"
+            :cat-image="currentCatImage"
+            @toggle="toggleCat"
+            @new-cat="nextCat"
+          />
 
-          <!-- Tachometer gauge -->
-          <div class="tachometer">
-            <div class="tachometer-dial">
-              <div class="tachometer-ticks">
-                <div class="tick"></div>
-                <div class="tick major"></div>
-                <div class="tick"></div>
-                <div class="tick major"></div>
-                <div class="tick"></div>
-              </div>
-              <div class="tachometer-needle" :style="currentNeedleStyle"></div>
-              <div class="tachometer-label">🍄 MOLD METER</div>
-              <div class="tachometer-value">{{ tachValue }}%</div>
-            </div>
-            <button class="fart-btn" @click="onFart" :class="{ exploded: fartExploded }" :disabled="fartClicked">💨 Fart!</button>
-          </div>
+          <!-- Tachometer -->
+          <Tachometer
+            :value="tachValue"
+            :needle-angle="needleAngle"
+            :clicked="fartClicked"
+            :exploded="fartExploded"
+            @fart="onFart"
+          />
 
           <!-- Main container -->
           <div class="container">
@@ -1279,56 +1254,24 @@
           </div>
 
           <!-- Confirmation overlay -->
-          <div class="confirmation" :class="{ active: confirmationOpen }">
-            <div class="confirmation-box">
-              <div class="emoji">💕</div>
-              <h1>So you want to be a girl?</h1>
-              <p>You could totally be a girl if you wanted. No matter who you are or what you've been through, don't let anything stop you from living as your best self!</p>
-              <p>✨ You are valid no matter who you are ✨</p>
-              <button class="cute-btn" @click="closeConfirmation">Go back</button>
-            </div>
-          </div>
+          <ConfirmationModal :is-open="confirmationOpen" @close="closeConfirmation" />
 
           <!-- Control buttons -->
-          <div class="rankings-toggle" @click="toggleRankings" title="Toggle rankings">👻</div>
-          <div class="dark-toggle" @click="toggleDarkMode" title="Toggle dark mode">🌙</div>
-          <div class="music-control" @click="toggleMusic" title="Toggle music">🎵</div>
-          <div class="feed-toggle" @click="toggleFeed" title="Toggle feeds">📰</div>
-          <button class="mika-btn" @click="openMikaModal">🌸 Mika</button>
+          <ControlButtons
+            :dark-mode="darkMode"
+            :music-playing="musicPlaying"
+            @toggle-rankings="toggleRankings"
+            @toggle-dark="toggleDarkMode"
+            @toggle-music="toggleMusic"
+            @toggle-feed="toggleFeed"
+            @toggle-mika="openMikaModal"
+          />
 
           <!-- Feed panel -->
-          <div class="feed-panel" :class="{ collapsed: !feedOpen }">
-            <div class="feed-header">
-              <h3>☁️ Live Feeds</h3>
-              <button class="feed-close" @click="toggleFeed">✕</button>
-            </div>
-            <div class="feed-content">
-              <div class="feed-section">
-                <h4>🐦 Brisbane Radar</h4>
-                <p>Live weather radar for Brisbane area</p>
-                <iframe src="https://www.bom.gov.au/products/IDR064.loop.gif"></iframe>
-              </div>
-              <div class="feed-section">
-                <h4>🚂 Subway Surfers (YT)</h4>
-                <p>Autoplay gameplay video</p>
-                <iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&mute=1"></iframe>
-              </div>
-              <div class="feed-section">
-                <h4>🐦 BOM Queensland (X)</h4>
-                <p>Latest weather alerts from Bureau of Meteorology</p>
-                <a href="https://x.com/BOM_Qld" target="_blank" style="color: #666; font-size: 12px; display: block; margin-top: 5px;">@BOM_Qld on X/Twitter →</a>
-              </div>
-            </div>
-          </div>
+          <FeedPanel :is-open="feedOpen" @toggle="toggleFeed" />
 
           <!-- Mika Modal -->
-          <div class="mika-modal" :class="{ active: mikaModalOpen }">
-            <div class="mika-modal-box">
-              <div class="emoji">🌸</div>
-              <h1>Hi there!</h1>
-              <button class="cute-btn" @click="closeMikaModal">Close</button>
-            </div>
-          </div>
+          <MikaModal :is-open="mikaModalOpen" @close="closeMikaModal" />
 
           <!-- Audio -->
           <audio id="fartSound" src="fart-with-reverb.mp3" preload="auto"></audio>
