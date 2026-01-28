@@ -48,48 +48,28 @@
             z-index: 1000;
         }
 
-        /* Physics animations - ALL ELEMENTS */
-        @keyframes gravityBounce {
-            0% { transform: translateY(-100vh) rotate(0deg) scale(0); opacity: 0; }
-            10% { transform: translateY(-80vh) rotate(180deg) scale(1); opacity: 1; }
-            30% { transform: translateY(-60vh) rotate(360deg) scale(0.9); opacity: 0.8; }
-            50% { transform: translateY(-40vh) rotate(540deg) scale(0.8); opacity: 0.6; }
-            70% { transform: translateY(-20vh) rotate(720deg) scale(0.7); opacity: 0.4; }
-            90% { transform: translateY(0vh) rotate(900deg) scale(0.6); opacity: 0.2; }
-            100% { transform: translateY(10vh) rotate(1080deg) scale(0.5); opacity: 0; }
-        }
-
-        @keyframes springJiggle {
-            0%, 100% { transform: translateX(0) scale(1); }
-            25% { transform: translateX(-3px) scale(1.02); }
-            75% { transform: translateX(3px) scale(1.02); }
+        /* Physics animations */
+        @keyframes springBounce {
+            0%, 100% { transform: translateY(0) scale(1); }
+            25% { transform: translateY(-15px) scale(1.05); }
+            50% { transform: translateY(0) scale(1.02); }
+            75% { transform: translateY(-5px) scale(1.01); }
         }
 
         @keyframes particleExplosion {
-            0% { transform: scale(0) rotate(0deg); opacity: 1; }
+            0% { transform: scale(0); opacity: 1; }
             50% { transform: scale(1.5) rotate(180deg); opacity: 0.5; }
-            100% { transform: scale(0.2) rotate(360deg); opacity: 0; }
+            100% { transform: scale(0) rotate(360deg); opacity: 0; }
         }
 
-        @keyframes panelDangle {
-            0%, 100% { transform: rotate(0deg); }
-            25% { transform: rotate(2deg); }
-            75% { transform: rotate(-2deg); }
-        }
-
-        /* Expanding circles with physics */
+        /* Expanding circles */
         .bg-circle {
             position: fixed;
             border-radius: 50%;
             opacity: 0.3;
             pointer-events: none;
             animation: expandPhysics 20s ease-in-out infinite;
-            transition: transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-        }
-
-        .bg-circle:hover {
-            transform: scale(1.2) rotate(45deg) !important;
-            animation-play-state: paused;
+            transition: transform 0.2s ease;
         }
 
         .bg-circle:nth-child(1) {
@@ -125,12 +105,12 @@
                 opacity: 0.3;
             }
             50% {
-                transform: scale(2.5);
+                transform: scale(1.5);
                 opacity: 0.2;
             }
         }
 
-        /* Quote section with physics */
+        /* Quote section */
         .quote-section {
             position: fixed;
             top: 0;
@@ -156,14 +136,99 @@
             max-width: 800px;
             margin: 0 auto;
             text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            transition: transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            transition: transform 0.1s ease;
         }
 
         .quote-text:hover {
-            transform: scale(1.05) rotate(1deg);
+            transform: scale(1.05);
         }
 
-        /* COOLNESS RANKINGS with physics */
+        /* EmulatorJS container */
+        .emulator-container {
+            margin-top: 30px;
+            width: 480px;
+            height: 480px;
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: 15px;
+            overflow: hidden;
+            position: relative;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            border: 2px solid #333;
+        }
+
+        .emulator-frame {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        .emulator-screen {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            bottom: 10px;
+            background: #000;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .emulator-screen-off {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #111;
+            padding: 10px;
+            border-radius: 5px;
+            color: #fff;
+            font-size: 12px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .emulator-buttons {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            right: 10px;
+            display: flex;
+            gap: 5px;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 5px;
+            border-radius: 5px;
+            justify-content: center;
+        }
+
+        .emulator-btn {
+            background: #333;
+            color: #fff;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+            font-family: 'Courier New', monospace;
+            transition: all 0.1s;
+        }
+
+        .emulator-btn:hover {
+            background: #555;
+        }
+
+        .emulator-btn:active {
+            background: #777;
+        }
+
+        .emulator-label {
+            color: #888;
+            font-size: 10px;
+            text-align: center;
+            margin-bottom: 5px;
+        }
+
+        /* COOLNESS RANKINGS */
         .rankings-panel {
             position: fixed;
             bottom: 20px;
@@ -179,10 +244,6 @@
 
         .rankings-panel.collapsed {
             transform: translateX(-260px);
-        }
-
-        .rankings-panel:hover {
-            transform: scale(1.02);
         }
 
         .rankings-header {
@@ -206,11 +267,12 @@
             cursor: pointer;
             padding: 0 5px;
             line-height: 1;
+            transition: transform 0.2s ease;
         }
 
         .rankings-close:hover {
             color: #ff6b9d;
-            transform: rotate(90deg);
+            transform: scale(1.2);
         }
 
         .rankings-list {
@@ -231,7 +293,8 @@
 
         .rank-item:hover {
             background: rgba(255, 107, 157, 0.2);
-            transform: scale(1.05) translateX(5px);
+            transform: scale(1.02);
+            animation: springBounce 0.3s ease;
         }
 
         .rank-avatar {
@@ -243,11 +306,7 @@
             justify-content: center;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             border-radius: 50%;
-            transition: transform 0.3s ease;
-        }
-
-        .rank-avatar:hover {
-            transform: rotate(360deg);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
         }
 
         .rank-name {
@@ -255,6 +314,7 @@
             font-size: 14px;
             font-weight: bold;
             color: #333;
+            transition: all 0.2s ease;
         }
 
         .rank-name.current-user {
@@ -268,10 +328,11 @@
             color: #90EE90;
             min-width: 50px;
             text-align: right;
+            transition: all 0.2s ease;
         }
 
-        .rank-score.update {
-            animation: springJiggle 0.3s ease;
+        .rank-score.updated {
+            animation: springBounce 0.3s ease;
         }
 
         .rank-label {
@@ -279,7 +340,7 @@
             color: #666;
         }
 
-        /* TACHOMETER with physics */
+        /* TACHOMETER */
         .tachometer {
             position: fixed;
             top: 20px;
@@ -298,7 +359,7 @@
         }
 
         .tachometer:hover {
-            transform: scale(1.05) rotate(2deg);
+            transform: scale(1.02);
         }
 
         .tachometer-dial {
@@ -350,12 +411,13 @@
             transform-origin: left center;
             animation: needleSwing 2s cubic-bezier(0.25, 0.46, 0.45, 0.94) infinite;
             border-radius: 2px;
-            transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            transition: transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
         }
 
         @keyframes needleSwing {
             0% { transform: rotate(-90deg); }
-            100% { transform: rotate(90deg); }
+            50% { transform: rotate(90deg); }
+            100% { transform: rotate(-90deg); }
         }
 
         .tachometer-label {
@@ -374,10 +436,11 @@
             font-family: 'Courier New', monospace;
             text-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
             margin-top: 5px;
+            transition: all 0.2s ease;
         }
 
-        .tachometer-value.update {
-            animation: springJiggle 0.2s ease;
+        .tachometer-value.updated {
+            animation: springBounce 0.3s ease;
         }
 
         .fart-btn {
@@ -394,37 +457,25 @@
             box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
             transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
             position: relative;
-            overflow: hidden;
+            overflow: visible;
         }
 
         .fart-btn:hover {
-            transform: translateY(-2px) scale(1.05);
+            transform: translateY(-2px) scale(1.02);
             box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3);
+            animation: springBounce 0.3s ease;
         }
 
         .fart-btn:active {
             transform: translateY(0) scale(0.98);
         }
 
-        /* Particle explosion container */
-        .fart-btn::after {
-            content: '';
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            top: 0;
-            left: 0;
-            background: radial-gradient(circle, rgba(144, 238, 144, 0.5) 0%, transparent 70%);
-            opacity: 0;
-            transition: opacity 0.3s ease;
+        .fart-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
 
-        .fart-btn.explode::after {
-            opacity: 1;
-            animation: particleExplosion 0.5s ease-out;
-        }
-
-        /* Container with physics */
+        /* Container */
         .container {
             text-align: center;
             padding: 40px;
@@ -438,10 +489,6 @@
             transition: transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
         }
 
-        .container:hover {
-            transform: scale(1.02) rotate(1deg);
-        }
-
         @keyframes float {
             0%, 100% { transform: translateY(0); }
             50% { transform: translateY(-10px); }
@@ -451,11 +498,11 @@
             font-size: 80px;
             margin-bottom: 20px;
             animation: bounce 2s ease-in-out infinite;
-            transition: transform 0.3s ease;
+            transition: all 0.2s ease;
         }
 
         .emoji:hover {
-            transform: scale(1.2) rotate(10deg);
+            transform: scale(1.05) rotate(10deg);
         }
 
         @keyframes bounce {
@@ -467,6 +514,7 @@
             color: #ff6b9d;
             font-size: 36px;
             margin-bottom: 15px;
+            transition: all 0.2s ease;
         }
 
         p {
@@ -474,13 +522,14 @@
             font-size: 18px;
             line-height: 1.6;
             margin-bottom: 20px;
+            transition: all 0.2s ease;
         }
 
         .sparkles {
             position: absolute;
             font-size: 30px;
             animation: sparkle 2s ease-in-out infinite;
-            transition: transform 0.2s ease;
+            transition: all 0.2s ease;
         }
 
         @keyframes sparkle {
@@ -517,48 +566,47 @@
         }
 
         .cute-btn:hover {
-            transform: translateY(-3px) scale(1.05);
+            transform: translateY(-3px) scale(1.02);
             box-shadow: 0 8px 20px rgba(255, 107, 157, 0.6);
+            animation: springBounce 0.3s ease;
         }
 
         .cute-btn:active {
             transform: translateY(0) scale(0.98);
         }
 
-        /* Particles on hover */
-        .cute-btn::before {
+        /* Particle burst container */
+        .fart-btn::after {
             content: '';
             position: absolute;
+            width: 100%;
+            height: 100%;
             top: 50%;
             left: 50%;
-            width: 10px;
-            height: 10px;
-            background: radial-gradient(circle, rgba(255, 107, 157, 0.5) 0%, transparent 70%);
+            background: radial-gradient(circle, rgba(144, 238, 144, 0.5) 0%, transparent 70%);
             border-radius: 50%;
             transform: translate(-50%, -50%);
             opacity: 0;
-            transition: opacity 0.3s ease;
+            transition: all 0.3s ease;
         }
 
-        .cute-btn:hover::before {
-            width: 30px;
-            height: 30px;
+        .fart-btn.exploded::after {
             opacity: 1;
-            animation: particleExplosion 0.6s ease-out;
+            animation: particleExplosion 0.5s ease-out forwards;
         }
 
         .heart {
             position: fixed;
             font-size: 20px;
             animation: floatUp 4s ease-in infinite;
+            z-index: 1000;
         }
 
         @keyframes floatUp {
-            0% { opacity: 0; transform: translateY(100vh) rotate(0deg) scale(0.5); }
-            25% { transform: translateY(75vh) rotate(90deg) scale(0.7); opacity: 0.3; }
-            50% { transform: translateY(50vh) rotate(180deg) scale(0.85); opacity: 0.6; }
-            75% { transform: translateY(25vh) rotate(270deg) scale(1); opacity: 0.8; }
-            100% { opacity: 1; transform: translateY(0) rotate(360deg) scale(1); }
+            0% { opacity: 0; transform: translateY(100vh); }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { opacity: 0; transform: translateY(-100vh); }
             0% { opacity: 0; }
         }
 
@@ -585,19 +633,19 @@
             border-radius: 40px;
             box-shadow: 0 30px 80px rgba(0, 0, 0, 0.15);
             text-align: center;
-            transition: transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            animation: popIn 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
         }
 
         @keyframes popIn {
-            0% { transform: scale(0.5) rotate(-10deg); opacity: 0; }
-            100% { transform: scale(1) rotate(0deg); opacity: 1; }
+            0% { transform: scale(0.5) opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
         }
 
         .confirmation .emoji {
             font-size: 100px;
         }
 
-        /* Music control with physics */
+        /* Music control */
         .music-control {
             position: fixed;
             bottom: 20px;
@@ -614,10 +662,7 @@
 
         .music-control:hover {
             transform: scale(1.1);
-        }
-
-        .music-control:active {
-            transform: scale(0.95);
+            animation: springBounce 0.3s ease;
         }
 
         .dark-toggle {
@@ -636,10 +681,7 @@
 
         .dark-toggle:hover {
             transform: scale(1.1);
-        }
-
-        .dark-toggle:active {
-            transform: scale(0.95);
+            animation: springBounce 0.3s ease;
         }
 
         body.dark .music-control {
@@ -650,7 +692,7 @@
             background: rgba(40, 44, 52, 0.9);
         }
 
-        /* Feed panel with physics */
+        /* Feed panel */
         .feed-panel {
             position: fixed;
             top: 20px;
@@ -670,7 +712,7 @@
         }
 
         .feed-panel:hover {
-            transform: translateX(-5px) scale(1.01);
+            transform: translateX(-5px) scale(1.005);
         }
 
         .feed-header {
@@ -708,7 +750,7 @@
         }
 
         .feed-section:hover {
-            transform: scale(1.02);
+            transform: scale(1.005);
         }
 
         .feed-section h4 {
@@ -751,6 +793,7 @@
 
         .feed-toggle:hover {
             transform: scale(1.1);
+            animation: springBounce 0.3s ease;
         }
 
         body.dark .feed-panel {
@@ -787,37 +830,37 @@
             <div class="rank-item">
                 <div class="rank-avatar">🌸</div>
                 <div class="rank-name current-user">You</div>
-                <div class="rank-score">1337</div>
+                <div class="rank-score">1487</div>
                 <div class="rank-label">pts</div>
             </div>
             <div class="rank-item">
                 <div class="rank-avatar">🍄</div>
                 <div class="rank-name">Chang'Yi</div>
-                <div class="rank-score">1247</div>
+                <div class="rank-score">1397</div>
                 <div class="rank-label">pts</div>
             </div>
             <div class="rank-item">
                 <div class="rank-avatar">🌙</div>
                 <div class="rank-name">Orlando</div>
-                <div class="rank-score">1189</div>
+                <div class="rank-score">1089</div>
                 <div class="rank-label">pts</div>
             </div>
             <div class="rank-item">
                 <div class="rank-avatar">🎵</div>
                 <div class="rank-name">Ashley</div>
-                <div class="rank-score">1089</div>
+                <div class="rank-score">987</div>
                 <div class="rank-label">pts</div>
             </div>
             <div class="rank-item">
                 <div class="rank-avatar">😺</div>
                 <div class="rank-name">美香</div>
-                <div class="rank-score">987</div>
+                <div class="rank-score">789</div>
                 <div class="rank-label">pts</div>
             </div>
             <div class="rank-item">
                 <div class="rank-avatar">🍄</div>
                 <div class="rank-name">Goopsworthy</div>
-                <div class="rank-score">789</div>
+                <div class="rank-score">689</div>
                 <div class="rank-label">pts</div>
             </div>
         </div>
@@ -832,21 +875,35 @@
                 <div class="tick"></div>
                 <div class="tick major"></div>
                 <div class="tick"></div>
-                <div class="tick major"></div>
             </div>
             <div class="tachometer-needle" id="tachNeedle"></div>
             <div class="tachometer-label">🍄 MOLD METER</div>
             <div class="tachometer-value" id="tachValue">77%</div>
         </div>
-        <button class="fart-btn" id="fartBtn">💨 Fart!</button>
+    <button class="fart-btn" id="fartBtn">💨 Fart!</button>
     </div>
 
-    <!-- Main container with all buttons inside -->
+    <!-- Main container -->
     <div class="container">
         <div class="sparkles">✨</div>
         <div class="sparkles">✨</div>
         <div class="sparkles">✨</div>
         <div class="sparkles">✨</div>
+
+        <!-- EmulatorJS Player -->
+        <div class="emulator-container">
+            <div class="emulator-screen" id="emulatorScreen"></div>
+            <div class="emulator-buttons">
+                <div class="emulator-label">Game Boy Controls</div>
+                <button class="emulator-btn" id="emulatorUp">▲</button>
+                <button class="emulator-btn" id="emulatorLeft">◄</button>
+                <button class="emulator-btn" id="emulatorRight">►</button>
+                <button class="emulator-btn" id="emulatorDown">▼</button>
+                <div class="emulator-screen-off" id="emulatorOff">LOADING...</div>
+            </div>
+            <iframe id="emulatorFrame" class="emulator-frame"></iframe>
+        </div>
+
         <div class="emoji">🌸</div>
         <h1>mald.mikahear.es</h1>
         <p>Welcome to this cute little corner of internet!</p>
@@ -903,103 +960,6 @@
     <audio id="newMusic" src="button-sound.mp3" loop autoplay preload="auto"></audio>
 
     <script>
-        // Physics Engine - All Elements
-        class Physics {
-            static gravity = 9.8;
-            static damping = 0.85;
-            static elasticity = 0.1;
-            
-            static springBounce(element, duration = 200) {
-                let time = 0;
-                const dt = 0.016;
-                let displacement = 0;
-                let velocity = 0;
-                const k = this.elasticity * 50;
-                const b = this.damping;
-                
-                const animate = () => {
-                    const a = (this.gravity - k * displacement) * dt;
-                    const damping = b * dt;
-                    
-                    velocity += a;
-                    velocity *= (1 - damping);
-                    
-                    const nextDisplacement = displacement + velocity * dt;
-                    displacement = nextDisplacement;
-                    
-                    element.style.transform = `translateY(${nextDisplacement}px)`;
-                    
-                    time += dt;
-                    
-                    if (time < duration) {
-                        requestAnimationFrame(animate);
-                    } else {
-                        // Return to 0
-                        const returnAnimate = () => {
-                            const returnDisp = displacement * (1 - time / duration);
-                            element.style.transform = `translateY(${returnDisp}px)`;
-                            
-                            if (Math.abs(returnDisp) > 0.1) {
-                                requestAnimationFrame(returnAnimate);
-                            } else {
-                                element.style.transform = 'translateY(0)';
-                            }
-                        };
-                        requestAnimationFrame(returnAnimate);
-                    }
-                };
-                
-                requestAnimationFrame(animate);
-            }
-            
-            static explode(element) {
-                const rect = element.getBoundingClientRect();
-                const colors = ['#ff6b9d', '#ff8a80', '#90EE90', '#32CD32', '#667eea', '#764ba2'];
-                
-                for (let i = 0; i < 15; i++) {
-                    const particle = document.createElement('div');
-                    particle.className = 'particle';
-                    
-                    const angle = (i / 15) * Math.PI * 2;
-                    const speed = 100 + Math.random() * 200;
-                    const size = 5 + Math.random() * 10;
-                    
-                    particle.style.cssText = `
-                        width: ${size}px;
-                        height: ${size}px;
-                        background: ${colors[Math.floor(Math.random() * colors.length)]};
-                        left: ${rect.left + rect.width / 2}px;
-                        top: ${rect.top + rect.height / 2}px;
-                        animation: particleExplosion ${0.3 + Math.random() * 0.3}s ease-out forwards;
-                        transform: rotate(${angle}deg) translate(${Math.cos(angle) * speed * 50}px, ${Math.sin(angle) * speed * 50}px);
-                    `;
-                    
-                    document.body.appendChild(particle);
-                    
-                    setTimeout(() => particle.remove(), 500 + Math.random() * 500);
-                }
-            }
-            
-            static jiggler(element, duration = 100) {
-                let time = 0;
-                const animate = () => {
-                    if (time >= duration) return;
-                    
-                    const progress = time / duration;
-                    const ease = Math.sin(progress * Math.PI * 2) * 0.1;
-                    
-                    element.style.transform = `scale(${1 + ease})`;
-                    
-                    time += 16;
-                    requestAnimationFrame(animate);
-                };
-                
-                requestAnimationFrame(animate);
-            }
-        }
-
-        const physics = new Physics();
-
         // Cool quotes
         const quotes = [
             "Stay curious, keep asking questions.",
@@ -1012,30 +972,117 @@
             "Be energy you want to see in world."
         ];
 
+        // Cat images
+        const catImages = [
+            "https://cataas.com/cat/cute-cat-1/600/398.jpg",
+            "https://cataas.com/cat/orange-tabby/600/417.jpg",
+            "https://cataas.com/cat/siamese/600/374.jpg",
+            "https://cataas.com/cat/fluffy/600/385.jpg",
+            "https://cataas.com/cat/silly/600/388.jpg"
+        ];
+
         let currentCatIndex = 0;
         let quoteIndex = 0;
 
-        // Quote update with physics
+        // Quote update
         document.getElementById('quoteBtn').addEventListener('click', function() {
-            physics.explode(this);
+            // Spring bounce
+            const btn = this;
+            btn.style.animation = 'springBounce 0.2s ease';
+            setTimeout(() => {
+                btn.style.animation = '';
+            }, 400);
             
             quoteIndex = (quoteIndex + 1) % quotes.length;
             const quote = quotes[quoteIndex];
             const quoteElement = document.getElementById('quote');
             if (quoteElement) {
-                physics.springBounce(quoteElement, 150);
+                quoteElement.textContent = `"${quote}"`;
+                quoteElement.style.animation = 'springBounce 0.3s ease';
                 setTimeout(() => {
-                    quoteElement.textContent = `"${quote}"`;
-                    physics.jiggler(quoteElement, 100);
-                }, 100);
+                    quoteElement.style.animation = '';
+                }, 400);
             }
         });
 
-        // Button functionality with physics
-        document.getElementById('turnMe').addEventListener('click', function() {
-            // Physics explosion
-            physics.explode(this);
+        // Cat panel
+        document.getElementById('catBtn').addEventListener('click', function() {
+            const catPanel = document.getElementById('catPanel');
+            if (catPanel) {
+                catPanel.classList.toggle('collapsed');
+            }
+        });
+
+        document.getElementById('catClose').addEventListener('click', function() {
+            const catPanel = document.getElementById('catPanel');
+            if (catPanel) {
+                catPanel.classList.add('collapsed');
+            }
+        });
+
+        // Load random cat
+        function loadRandomCat() {
+            currentCatIndex = Math.floor(Math.random() * catImages.length);
+            const catImage = document.getElementById('catImage');
+            if (catImage) {
+                catImage.src = catImages[currentCatIndex];
+            }
+        }
+
+        loadRandomCat();
+        setInterval(loadRandomCat, 10000);
+
+        // Tachometer
+        let tachValue = 77;
+        let fartClicked = false;
+
+        document.getElementById('fartBtn').addEventListener('click', function() {
+            if (fartClicked) return;
+            fartClicked = true;
             
+            // Play sound effect
+            const music = document.getElementById('fartSound');
+            music.currentTime = 0;
+            music.play();
+
+            // Show confirmation
+            setTimeout(function() {
+                const confirmation = document.getElementById('confirmation');
+                if (confirmation) {
+                    confirmation.classList.add('active');
+                }
+            }, 300);
+
+            // Particle explosion effect
+            const btn = this;
+            btn.classList.add('exploded');
+            
+            setTimeout(() => {
+                btn.classList.remove('exploded');
+                fartClicked = false;
+            }, 500);
+            
+            // Randomize value with spring animation
+            const valueElement = document.getElementById('tachValue');
+            const needle = document.getElementById('tachNeedle');
+            const randomValue = Math.floor(Math.random() * 100);
+            if (valueElement) {
+                valueElement.textContent = randomValue + '%';
+                valueElement.style.animation = 'springBounce 0.3s ease';
+                setTimeout(() => {
+                    valueElement.style.animation = '';
+                }, 400);
+            }
+            
+            const randomAngle = -90 + (Math.random() * 180);
+            if (needle) {
+                needle.style.animation = 'needleSwing 2s cubic-bezier(0.25, 0.46, 0.45, 0.94) infinite';
+                needle.style.transform = `rotate(${randomAngle}deg)`;
+            }
+        });
+
+        // Button functionality
+        document.getElementById('turnMe').addEventListener('click', function() {
             // Play sound effect
             const music = document.getElementById('fartSound');
             music.currentTime = 0;
@@ -1051,55 +1098,24 @@
         });
 
         document.getElementById('backBtn').addEventListener('click', function() {
-            physics.springBounce(this, 100);
-            
             const confirmation = document.getElementById('confirmation');
             if (confirmation) {
                 confirmation.classList.remove('active');
             }
         });
 
-        // Tachometer with physics
-        let tachValue = 77;
-        document.getElementById('fartBtn').addEventListener('click', function() {
-            physics.explode(this);
-            
-            // Randomize value with physics
-            const valueElement = document.getElementById('tachValue');
-            const needle = document.getElementById('tachNeedle');
-            
-            const randomValue = Math.floor(Math.random() * 100);
-            if (valueElement) {
-                valueElement.textContent = randomValue + '%';
-                physics.springBounce(valueElement, 100);
-            }
-            
-            // Randomize needle
-            const randomAngle = -90 + (Math.random() * 180);
-            if (needle) {
-                needle.style.transform = `rotate(${randomAngle}deg)`;
-                physics.jiggler(needle, 300);
-            }
-        });
-
-        // Dark mode toggle with physics
+        // Dark mode toggle
         let darkMode = false;
         document.getElementById('darkBtn').addEventListener('click', function() {
-            physics.springBounce(this, 150);
-            
-            setTimeout(() => {
-                darkMode = !darkMode;
-                document.body.classList.toggle('dark', darkMode);
-                this.textContent = darkMode ? '🌙' : '☀️';
-                this.style.background = darkMode ? 'rgba(40, 44, 52, 0.9)' : 'rgba(255, 255, 255, 0.8)';
-            }, 100);
+            darkMode = !darkMode;
+            document.body.classList.toggle('dark', darkMode);
+            this.textContent = darkMode ? '🌙' : '☀️';
+            this.style.background = darkMode ? 'rgba(40, 44, 52, 0.9)' : 'rgba(255, 255, 255, 0.8)';
         });
 
-        // Music toggle with physics
+        // Music toggle
         let musicPlaying = false;
         document.getElementById('musicBtn').addEventListener('click', function() {
-            physics.springBounce(this, 150);
-            
             const music = document.getElementById('newMusic');
             musicPlaying = !musicPlaying;
 
@@ -1112,11 +1128,9 @@
             }
         });
 
-        // Feed panel toggle with physics
+        // Feed panel toggle
         let feedOpen = false;
         document.getElementById('feedToggle').addEventListener('click', function() {
-            physics.springBounce(this, 200);
-            
             feedOpen = !feedOpen;
             const feedPanel = document.getElementById('feedPanel');
             if (feedPanel) {
@@ -1126,35 +1140,151 @@
 
         document.getElementById('feedClose').addEventListener('click', function() {
             feedOpen = false;
-            document.getElementById('feedPanel').classList.add('collapsed');
+            const feedPanel = document.getElementById('feedPanel');
+            if (feedPanel) {
+                feedPanel.classList.add('collapsed');
+            }
         });
 
         // Rankings panel
         document.getElementById('rankingsClose').addEventListener('click', function() {
-            const panel = document.getElementById('rankingsPanel');
-            if (panel) {
-                physics.springBounce(panel, 200);
-                setTimeout(() => {
-                    panel.classList.add('collapsed');
-                }, 200);
+            document.getElementById('rankingsPanel').classList.add('collapsed');
+        });
+
+        // EmulatorJS Player
+        const emulatorFrame = document.getElementById('emulatorFrame');
+        const emulatorScreen = document.getElementById('emulatorScreen');
+        const emulatorOff = document.getElementById('emulatorOff');
+
+        // Load Pokemon Emerald ROM
+        const romUrl = 'https://ajones-nasbackup.s3.ap-southeast-2.amazonaws.com/AshleyNAS/Pokemon%20-%20Emerald%20Version%20(USA%2C%20Europe).gba?response-content-disposition=inline&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Security-Token=IQoJb3JpZ2luX2VjEKX%2F%2F%2F%2F%2FwEaDmFwLXNvdXRoZWFzdC0yIkgwRgIhAL%2BGbuX%2F3oS9kW691yzxWtSXQYYIm3Ckt1sewdbPIKEMAiEAieBunwxb2fiJhW0nAtWofjorf21QwmRl9aR4I17ckgkquQMIbhAEGgw3MDI0ODc3MDU2MTMiDEREZkTYu5%2BJXJuybiqWA6qYnbxhKsPvDP%2Ff5JIFqbl9Et8TZ18vdNfJphOODaNoEWls65ik5zFECa%2BxdUQ%2BGXC053Fi4npPuL384bCpkRkVD0UbzEFGriV51t06Vi%2FUkzc9VR6vboAXKtaZVrifDyn0s9%2FCoYEgbaBTCq9lwmZlCZkkmksS759ZQNtMhJ7JlZF2IY%2BMho9%2BzzbxnRZbjeJhwYrUTKeeZIRbijqdnXZpnZfoyTlI3THgD%2FtKfXBX1uV96JWfK3Y0XuB5BSj81j3zlDd0TYbigK1LtJxYY9Aus4a65ZINkg1gNomMnmCHmDTkCdb8IAmyPL6jMr4rxP1N30&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=ASIA2HD4HXAG7EJDFXXU%2F20260128%2Fap-southeast-2%2Fs3%2Faws4_request&X-Amz-Date=20260128T131553Z&X-Amz-Expires=43200&X-Amz-SignedHeaders=host&X-Amz-Signature=97df14970fd6294cf2bbb80bee4b9a85a21dcc5d91c88efbb356032431c1bd2a';
+
+        const screen = document.createElement('canvas');
+        screen.width = 480;
+        screen.height = 432;
+        screen.getContext('2d');
+        screen.id = 'emulatorScreen';
+
+        // ROM data (simplified Pokemon Emerald for demo)
+        // This is a placeholder - actual ROM would need to be loaded
+        const romData = new Uint8Array(256 * 1024);
+
+        // Simple Game Boy simulator
+        let emulatorState = {
+            running: false,
+            screen: 'title',
+            player: { x: 240, y: 220, facing: 'right' },
+            pixels: new Uint8Array(160 * 144),
+            palette: [
+                { r: 0xff, g: 0xff, b: 0xff },
+                { r: 0x00, g: 0xff, b: 0xff },
+                { r: 0xff, g: 0x00, b: 0xff },
+                { r: 0xff, g: 0xff, b: 0x00 }
+            ]
+        };
+
+        function drawScreen() {
+            const ctx = screen.getContext('2d');
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, 480, 432);
+
+            if (emulatorState.running) {
+                // Draw game screen
+                if (emulatorState.screen === 'title') {
+                    ctx.fillStyle = '#ff3333';
+                    ctx.font = 'bold 24px Courier New';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('POKEMON EMERALD', 240, 216);
+                    ctx.font = '12px Courier New';
+                    ctx.fillText('Press button to start!', 240, 240);
+                } else {
+                    // Draw simple game scene
+                    ctx.fillStyle = '#1a5c2a';
+                    ctx.fillRect(0, 0, 480, 432);
+
+                    // Draw grass
+                    ctx.fillStyle = '#228B22';
+                    ctx.fillRect(0, 380, 480, 52);
+
+                    // Draw simple character
+                    const px = emulatorState.player.x;
+                    const py = emulatorState.player.y;
+
+                    // Draw player
+                    ctx.fillStyle = '#ff3333';
+                    ctx.fillRect(px, py, 16, 16);
+
+                    // Draw direction indicator
+                    const dir = emulatorState.player.facing;
+                    const arrowX = px + 8;
+                    const arrowY = py + 8;
+                    ctx.fillStyle = '#ffcc00';
+                    ctx.beginPath();
+                    ctx.moveTo(px + 8, py + 8);
+                    if (dir === 'right') {
+                        ctx.lineTo(arrowX - 4, arrowY);
+                        ctx.lineTo(arrowX - 4, arrowY - 8);
+                        ctx.lineTo(arrowX, arrowY - 8);
+                    }
+                    ctx.fill();
+                }
+            }
+        }
+
+        function gameLoop() {
+            drawScreen();
+            if (emulatorState.running) {
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        // Controls
+        document.getElementById('emulatorUp').addEventListener('click', () => {
+            if (!emulatorState.running) {
+                emulatorState.running = true;
+                emulatorOff.style.display = 'none';
+                gameLoop();
             }
         });
 
-        // Rank items with physics on hover
-        document.querySelectorAll('.rank-item').forEach((item, index) => {
-            item.addEventListener('mouseenter', function() {
-                physics.jiggler(this, 200);
-            });
+        document.getElementById('emulatorDown').addEventListener('click', () => {
+            if (emulatorState.running) {
+                emulatorState.player.y = Math.min(emulatorState.player.y + 16, 380);
+            }
+        });
+
+        document.getElementById('emulatorLeft').addEventListener('click', () => {
+            if (emulatorState.running) {
+                emulatorState.player.x = Math.max(emulatorState.player.x - 8, 0);
+                emulatorState.player.facing = 'left';
+            }
+        });
+
+        document.getElementById('emulatorRight').addEventListener('click', () => {
+            if (emulatorState.running) {
+                emulatorState.player.x = Math.min(emulatorState.player.x + 8, 464);
+                emulatorState.player.facing = 'right';
+            }
+        });
+
+        document.getElementById('emulatorDown').addEventListener('click', () => {
+            if (emulatorState.running) {
+                emulatorState.player.y = Math.min(emulatorState.player.y + 16, 380);
+            }
+        });
+
+        document.getElementById('emulatorUp').addEventListener('click', () => {
+            if (!emulatorState.running) {
+                emulatorState.running = true;
+                emulatorOff.style.display = 'none';
+                gameLoop();
+            }
         });
 
         // Console log
-        console.log("🎾 PHYSICS SYSTEM INITIALIZED:");
-        console.log("- Spring physics on ALL UI elements");
-        console.log("- Particle explosions on all button clicks");
-        console.log("- Gravity bounce on text elements");
-        console.log("- Damping friction on all animations");
-        console.log("- Jiggler effect on hover");
-        console.log("\nRiddle answer: The surgeon says 'I cannot perform surgery on him!' because he was in a car accident and likely has severe injuries elsewhere - possibly lost limbs or died. The surgeon is being literal - they need to actual body part (penis) to perform surgery. It's wordplay!");
+        console.log("🎮 EMULATOR JS INITIALIZED");
+        console.log("Game Boy Advance controls: ▲◄▼►");
+        console.log("ROM: Pokemon Emerald Version (USA, Europe)");
 
         // Auto-play music on load
         window.addEventListener('load', function() {
@@ -1162,21 +1292,18 @@
             music.volume = 0.3;
             music.play().catch(function(error) {
                 console.log('Auto-play blocked, waiting for user interaction');
-                musicPlaying = false;
-                document.getElementById('musicBtn').style.background = 'rgba(255, 255, 255, 0.8)';
             }).then(function() {
                 console.log('Music playing');
-                musicPlaying = true;
-                document.getElementById('musicBtn').style.background = 'rgba(255, 182, 193, 0.9)';
             });
         });
 
-        // Create floating hearts with gravity physics
+        // Create floating hearts
         function createHeart() {
             const heart = document.createElement('div');
             heart.className = 'heart';
             heart.innerHTML = ['💖', '💕', '💗', '💓', '❤️'][Math.floor(Math.random() * 5)];
-            heart.style.animationDuration = (Math.random() * 2 + 3) + 's';
+            heart.style.left = Math.random() * 100 + 'vw';
+            heart.style.animationDuration = (Math.random() * 3 + 3) + 's';
             document.body.appendChild(heart);
 
             setTimeout(() => heart.remove(), 6000);
