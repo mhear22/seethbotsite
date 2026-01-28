@@ -6,7 +6,7 @@
 
 **Project:** mald.mikahear.es
 **Type:** Single-page interactive personal website
-**Tech Stack:** HTML, CSS (inline), Vanilla JavaScript
+**Tech Stack:** HTML, CSS (inline), Vue.js 3 (Composition API, CDN-based)
 **Deployment:** Git → GitHub → Nginx (auto-sync via cron script)
 **Status:** ✅ Live and operational
 
