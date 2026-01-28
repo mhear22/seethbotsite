@@ -965,26 +965,23 @@
     body.dark .feed-toggle {
       background: rgba(232, 94, 144, 0.9);
     }
-
-    /* Vue transition */
-    .fade-enter-active,
-    .fade-leave-active {
-      transition: opacity 0.3s ease;
-    }
-
-    .fade-enter-from,
-    .fade-leave-to {
-      opacity: 0;
-    }
   </style>
 </head>
 <body>
   <div id="app"></div>
+  
   <script type="module">
     import { createApp, ref, onMounted } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js';
     
     // Import components
-    import { MainApp } from './components/MainApp.js';
+    import { RankingsPanel } from './components/RankingsPanel.js';
+    import { CatPanel } from './components/CatPanel.js';
+    import { Tachometer } from './components/Tachometer.js';
+    import { FeedPanel } from './components/FeedPanel.js';
+    import { QuoteSection } from './components/QuoteSection.js';
+    import { MikaModal } from './components/MikaModal.js';
+    import { ConfirmationModal } from './components/ConfirmationModal.js';
+    import { ControlButtons } from './components/ControlButtons.js';
 
     createApp({
       setup() {
@@ -1033,8 +1030,8 @@
         ]);
 
         // Computed
-        const currentQuote = computed(() => `"${quotes.value[currentQuoteIndex.value]}"`);
-        const currentCatImage = computed(() => catImages.value[currentCatIndex.value]);
+        const currentQuote = () => `"${quotes.value[currentQuoteIndex.value]}"`;
+        const currentCatImage = () => catImages.value[currentCatIndex.value];
 
         // Methods
         const toggleDarkMode = () => {
@@ -1182,39 +1179,91 @@
         };
       },
       components: {
-        MainApp
+        RankingsPanel,
+        CatPanel,
+        Tachometer,
+        FeedPanel,
+        QuoteSection,
+        MikaModal,
+        ConfirmationModal,
+        ControlButtons
       },
       template: `
-        <MainApp
-          :dark-mode="darkMode"
-          :music-playing="musicPlaying"
-          :feed-open="feedOpen"
-          :rankings-open="rankingsOpen"
-          :cat-open="catOpen"
-          :mika-modal-open="mikaModalOpen"
-          :confirmation-open="confirmationOpen"
-          :current-quote="currentQuote"
-          :current-cat-image="currentCatImage"
-          :tach-value="tachValue"
-          :needle-angle="needleAngle"
-          :fart-clicked="fartClicked"
-          :fart-exploded="fartExploded"
-          :rankings="rankings"
-          @toggle-dark-mode="toggleDarkMode"
-          @toggle-music="toggleMusic"
-          @toggle-feed="toggleFeed"
-          @toggle-rankings="toggleRankings"
-          @toggle-cat="toggleCat"
-          @toggle-mika="openMikaModal"
-          @close-mika="closeMikaModal"
-          @next-quote="nextQuote"
-          @new-cat="nextCat"
-          @fart="onFart"
-          @turn-me="onTurnMe"
-          @close-confirmation="closeConfirmation"
-        />
-      `
-    }).mount('#app');
-  </script>
-</body>
-</html>
+        <div>
+          <!-- Animated background circles -->
+          <div class="bg-circle"></div>
+          <div class="bg-circle"></div>
+          <div class="bg-circle"></div>
+
+          <!-- Quote Section -->
+          <QuoteSection :current-quote="currentQuote" @next-quote="nextQuote" />
+
+          <!-- Rankings Panel -->
+          <RankingsPanel
+            :is-open="rankingsOpen"
+            :rankings="rankings"
+            @toggle="toggleRankings"
+          />
+
+          <!-- Cat Panel -->
+          <CatPanel
+            :is-open="catOpen"
+            :cat-image="currentCatImage"
+            @toggle="toggleCat"
+            @new-cat="nextCat"
+          />
+
+          <!-- Tachometer -->
+          <Tachometer
+            :value="tachValue"
+            :needle-angle="needleAngle"
+            :clicked="fartClicked"
+            :exploded="fartExploded"
+            @fart="onFart"
+          />
+
+          <!-- Main container -->
+          <div class="container">
+            <div class="sparkles">✨</div>
+            <div class="sparkles">✨</div>
+            <div class="sparkles">✨</div>
+            <div class="sparkles">✨</div>
+
+            <!-- EmulatorJS Player -->
+            <div class="emulator-container">
+              <div class="emulator-screen"></div>
+              <div class="emulator-buttons">
+                <div class="emulator-label">Game Boy Controls</div>
+                <button class="emulator-btn">▲</button>
+                <button class="emulator-btn">◄</button>
+                <button class="emulator-btn">►</button>
+                <button class="emulator-btn">▼</button>
+                <div class="emulator-screen-off">LOADING...</div>
+              </div>
+              <iframe class="emulator-frame"></iframe>
+            </div>
+
+            <div class="emoji">🌸</div>
+            <h1>mald.mikahear.es</h1>
+            <p>Welcome to this cute little corner of internet!</p>
+            <p>✨ Stay a while ✨</p>
+            <div class="button-row">
+              <button class="cute-btn" @click="onTurnMe">Turn me into a girl!</button>
+              <button class="cute-btn" @click="nextQuote" style="background: linear-gradient(45deg, #90EE90, #32CD32);">💬 New Quote</button>
+            </div>
+          </div>
+
+          <!-- Confirmation overlay -->
+          <!-- Control buttons -->
+          <button class="rankings-toggle" @click="toggleRankings" title="Toggle rankings">👻</button>
+          <button class="dark-toggle" @click="toggleDarkMode" :title="darkMode ? 'Light mode' : 'Dark mode'">
+            {{ darkMode ? '☀️' : '🌙' }}
+          </button>
+          <button class="music-control" @click="toggleMusic" :title="musicPlaying ? 'Pause music' : 'Play music'">
+            {{ musicPlaying ? '⏸️' : '🎵' }}
+          </button>
+          <button class="feed-toggle" @click="toggleFeed" title="Toggle feeds">📰</button>
+          <button class="mika-btn" @click="openMikaModal">🌸 Mika</button>
+          <ConfirmationModal :is-open="confirmationOpen" @close="closeConfirmation" />
+
+          <!-- Control buttons -->
