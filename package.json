@@ -1,0 +1,22 @@
+{
+  "name": "seethbotsite",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mhear22/seethbotsite.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/mhear22/seethbotsite/issues"
+  },
+  "homepage": "https://github.com/mhear22/seethbotsite#readme",
+  "dependencies": {
+    "eslint": "^9.39.2"
+  }
+}
