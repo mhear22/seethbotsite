@@ -159,6 +159,9 @@
           currentRoute.value = route;
         };
 
+        // Computed
+        const currentQuote = computed(() => quotes.value[currentQuoteIndex.value]);
+
         // Lifecycle
         onMounted(() => {
           // Set initial body class
@@ -175,6 +178,7 @@
           musicPlaying,
           feedOpen,
           currentQuoteIndex,
+          currentQuote,
           catImage,
           catLoading,
           tachValue,
@@ -213,7 +217,7 @@
             :dark-mode="darkMode"
             :music-playing="musicPlaying"
             :current-route="currentRoute"
-            :current-quote-index="currentQuoteIndex"
+            :current-quote="currentQuote"
             :current-cat-image="catImage"
             :tach-value="tachValue"
             :fart-clicked="fartClicked"
