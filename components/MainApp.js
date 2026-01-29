@@ -34,7 +34,6 @@ export const MainApp = {
           <!-- Tachometer -->
           <Tachometer
             :value="tachValue"
-            :needle-angle="needleAngle"
             :clicked="fartClicked"
             :exploded="fartExploded"
             @fart="onFart"
@@ -194,10 +193,6 @@ export const MainApp = {
     tachValue: {
       type: Number,
       default: 77
-    },
-    needleAngle: {
-      type: Number,
-      default: 0
     },
     fartClicked: {
       type: Boolean,

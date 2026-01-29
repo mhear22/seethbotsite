@@ -27,7 +27,6 @@
         const currentQuoteIndex = ref(0);
         const currentCatIndex = ref(0);
         const tachValue = ref(77);
-        const needleAngle = ref(0);
         const fartClicked = ref(false);
         const fartExploded = ref(false);
         const mikaModalOpen = ref(false);
@@ -124,7 +123,6 @@
 
           // Randomize values
           tachValue.value = Math.floor(Math.random() * 100);
-          needleAngle.value = -90 + (Math.random() * 180);
         };
 
         const onTurnMe = () => {
@@ -185,7 +183,6 @@
           currentQuote,
           currentCatImage,
           tachValue,
-          needleAngle,
           fartClicked,
           fartExploded,
           panelOpen,
@@ -224,7 +221,6 @@
             :current-quote="currentQuote"
             :current-cat-image="currentCatImage"
             :tach-value="tachValue"
-            :needle-angle="needleAngle"
             :fart-clicked="fartClicked"
             :fart-exploded="fartExploded"
             :rankings="rankings"
