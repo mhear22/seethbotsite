@@ -51,7 +51,7 @@
         const catImage = ref('https://cataas.com/cat');
         const catLoading = ref(false);
 
-        const rankings = ref([
+        const rankings = ref([]);
 
         // Methods
         const toggleDarkMode = () => {
@@ -174,7 +174,7 @@
           darkMode,
           musicPlaying,
           feedOpen,
-          currentQuote,
+          currentQuoteIndex,
           catImage,
           catLoading,
           tachValue,
@@ -190,7 +190,7 @@
           toggleMusic,
           togglePanel,
           nextQuote,
-          fetchNewCat,
+          nextCat,
           onFart,
           onTurnMe,
           closeConfirmation,
@@ -213,8 +213,8 @@
             :dark-mode="darkMode"
             :music-playing="musicPlaying"
             :current-route="currentRoute"
-            :current-quote="currentQuote"
-            :current-cat-image="currentCatImage"
+            :current-quote-index="currentQuoteIndex"
+            :current-cat-image="catImage"
             :tach-value="tachValue"
             :fart-clicked="fartClicked"
             :fart-exploded="fartExploded"
