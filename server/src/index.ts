@@ -5,7 +5,8 @@ import compression from 'compression';
 
 const app: Express = express();
 const PORT = process.env.PORT || 3000;
-const STATIC_DIR = path.join(__dirname, '..', 'dist');
+const STATIC_DIR = process.env.STATIC_DIR || path.join(__dirname, '..', '..');
+const SERVE_ROOT = process.env.SERVE_ROOT || path.join(__dirname, '..', '..');
 
 // Middleware
 app.use(cors());
@@ -14,7 +15,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Serve static files from the Vue.js app
-app.use(express.static(path.join(__dirname, '..', '..')));
+app.use(express.static(SERVE_ROOT));
 
 // API Routes (placeholder for future expansion)
 app.get('/api/health', (req: Request, res: Response) => {
@@ -34,7 +35,7 @@ app.get('/api/rankings', (req: Request, res: Response) => {
 
 // Vue.js SPA fallback - all other routes serve index.html
 app.get('*', (req: Request, res: Response) => {
-  res.sendFile(path.join(__dirname, '..', '..', 'index.html'));
+  res.sendFile(path.join(SERVE_ROOT, 'index.html'));
 });
 
 // Error handling
@@ -46,7 +47,7 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
 // Start server
 app.listen(PORT, () => {
   console.log(`🌸 Server running on http://localhost:${PORT}`);
-  console.log(`📁 Serving static files from: ${path.join(__dirname, '..', '..')}`);
+  console.log(`📁 Serving static files from: ${SERVE_ROOT}`);
   console.log(`✨ Ready to serve the Vue.js app!`);
 });
 

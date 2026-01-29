@@ -14,6 +14,7 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
+      - SERVE_ROOT=/app/seethbotsite
     working_dir: /app/server
     depends_on:
       - nginx
