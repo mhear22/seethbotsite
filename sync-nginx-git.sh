@@ -1,10 +1,9 @@
 #!/bin/bash
 # Sync nginx HTML files to git repo and restart nginx container
-# Supports Docker Compose (port 8081 configuration)
 
 REPO_DIR="/home/seethbotsite"
 PAT_FILE="/home/pat.txt"
-CONTAINER_NAME="test-nginx"
+START_SCRIPT="/home/seethbotsite/start-nginx.sh"
 
 cd "$REPO_DIR" || exit 1
 
@@ -24,15 +23,13 @@ else
 
   if [ $? -eq 0 ]; then
     echo "✅ Successfully synced changes to git."
+    echo ""
+    echo "🔄 Restarting nginx container..."
+    bash "$START_SCRIPT"
+
+    echo "✅ Done! Changes synced, nginx restarted, website live."
+    echo "🌐 Website available at: http://localhost:8081"
   else
     echo "❌ Failed to push to git."
   fi
-
-  # Restart nginx container using Docker Compose
-  echo "🔄 Restarting nginx container using Docker Compose..."
-  docker-compose down 2>/dev/null
-  docker-compose up -d
-
-  echo "✅ Done! Changes synced and nginx restarted."
-  echo "🌐 Website available at: http://localhost:8081"
 fi
