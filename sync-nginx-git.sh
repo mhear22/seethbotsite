@@ -1,29 +1,66 @@
 #!/bin/bash
 # Sync nginx HTML files to git repo and restart nginx container
+# Supports both direct Docker and Docker Compose deployment
 
 REPO_DIR="/home/seethbotsite"
 PAT_FILE="/home/pat.txt"
 CONTAINER_NAME="test-nginx"
+USE_DOCKER_COMPOSE="false"  # Set to "true" if you want to use docker-compose
 
 cd "$REPO_DIR" || exit 1
 
-# Check if there are changes
-if git diff --quiet && git diff --cached --quiet; then
-    echo "No changes to commit."
-    exit 0
+# Function to restart using direct Docker
+restart_direct_docker() {
+    echo "Restarting nginx container using direct Docker..."
+    docker restart "$CONTAINER_NAME" 2>/dev/null || echo "Container not running, starting..."
+    docker ps -a | grep -q "$CONTAINER_NAME" || \
+      docker run -d --name "$CONTAINER_NAME" --restart unless-stopped \
+        -p 8081:80 \
+        -v "$REPO_DIR:/app" \
+        nginx:latest \
+        nginx -g daemon off
+}
+
+# Function to restart using Docker Compose
+restart_docker_compose() {
+    echo "Restarting nginx using Docker Compose..."
+    docker-compose down 2>/dev/null
+    docker-compose up -d
+}
+
+# Check if docker-compose.yml exists
+if [ "$USE_DOCKER_COMPOSE" = "true" ]; then
+    if [ ! -f "docker-compose.yml" ]; then
+        echo "⚠️  Docker Compose requested but docker-compose.yml not found!"
+        echo "   Falling back to direct Docker..."
+        restart_direct_docker
+    else
+        restart_docker_compose
+    fi
+else
+    restart_direct_docker
 fi
 
-# Add all changes
-git add .
+# Check for changes
+if git diff --quiet && git diff --cached --quiet; then
+    echo "✅ No changes to commit."
+else
+    # Add all changes
+    git add .
 
-# Commit with timestamp
-git commit -m "Auto-commit: $(date '+%Y-%m-%d %H:%M:%S')"
+    # Commit with timestamp
+    git commit -m "Auto-commit: $(date '+%Y-%m-%d %H:%M:%S')"
 
-# Push using PAT
-git push https://$(cat "$PAT_FILE")@github.com/mhear22/seethbotsite.git
+    # Push using PAT
+    echo "📤 Pushing to GitHub..."
+    git push https://$(cat "$PAT_FILE")@github.com/mhear22/seethbotsite.git
 
-# Restart nginx container to load latest files
-echo "Restarting nginx container..."
-docker restart "$CONTAINER_NAME"
+    if [ $? -eq 0 ]; then
+        echo "✅ Successfully synced changes to git"
+    else
+        echo "❌ Failed to push to git"
+    fi
+fi
 
-echo "Synced changes to git and restarted nginx."
+echo "✅ Done! Changes synced and nginx restarted."
+echo "🌐 Website available at: http://localhost:8081"
