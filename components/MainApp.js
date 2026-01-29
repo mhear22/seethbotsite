@@ -152,7 +152,18 @@ export const MainApp = {
       <MikaModal :is-open="mikaModalOpen" @close="closeMikaModal" />
 
       <!-- Confirmation overlay -->
-      <ConfirmationModal :is-open="confirmationOpen" @close="closeConfirmation" @confirm="confirmGirlMode" />
+      <div class="confirmation" :class="{ active: confirmationOpen }" @click.self="closeConfirmation">
+        <div class="confirmation-box">
+          <div class="emoji">💕</div>
+          <h1>So you want to be a girl?</h1>
+          <p>You could totally be a girl if you wanted. No matter who you are or what you've been through, don't let anything stop you from living as your best self!</p>
+          <p>✨ You are valid no matter who you are ✨</p>
+          <div class="button-row">
+            <button class="cute-btn" @click="closeConfirmation">Go back</button>
+            <button class="cute-btn" @click="goToGirlMode" style="background: linear-gradient(45deg, #ff6b9d, #ff8a80);">Yes! Turn me into a girl! 💕</button>
+          </div>
+        </div>
+      </div>
 
       <!-- Audio -->
       <audio id="fartSound" src="fart-with-reverb.mp3" preload="auto"></audio>
@@ -264,9 +275,13 @@ export const MainApp = {
     closeConfirmation() {
       this.$emit('confirmation-close');
     },
-    confirmGirlMode() {
+    goToGirlMode() {
+      console.log('Going to girl mode...');
       this.$emit('confirmation-close');
-      this.$emit('route-change', 'girl');
+      setTimeout(() => {
+        this.$emit('route-change', 'girl');
+        console.log('Route change emitted: girl');
+      }, 100);
     },
     getTrendClass(index) {
       // Random trend assignment for demo
