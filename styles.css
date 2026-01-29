@@ -432,88 +432,212 @@ body.dark .full-rank-score {
 }
 
 /* Emulator container */
+/* Emulator Player (Game Boy style) */
 .emulator-container {
-  margin-top: 30px;
-  width: 480px;
-  height: 480px;
-  background: rgba(0, 0, 0, 0.8);
-  border-radius: 15px;
-  overflow: hidden;
-  position: relative;
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
-  border: 2px solid #333;
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 90;
+  animation: popIn 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
-.emulator-frame {
-  width: 100%;
-  height: 100%;
-  border: none;
+@keyframes popIn {
+  0% { transform: scale(0.8) opacity: 0; }
+  100% { transform: scale(1) opacity: 1; }
+}
+
+.emulator-box {
+  background: linear-gradient(180deg, #8b9bb4 0%, #e8edff 50%, #8b9bb4 100%);
+  border-radius: 15px 15px 5px 5px;
+  box-shadow: 
+    -5px 0 10px rgba(0, 0, 0, 0.2),
+    inset -2px -2px 0 rgba(255, 255, 255, 0.1);
+  border: 4px solid #5a5a5a;
+  padding: 15px;
+  position: relative;
 }
 
 .emulator-screen {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  right: 10px;
-  bottom: 10px;
   background: #000;
-  border-radius: 5px;
+  border-radius: 10px 10px 2px 2px;
+  border: 3px solid #333;
+  padding: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
+  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5);
 }
 
-.emulator-screen-off {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background: #111;
-  padding: 10px;
-  border-radius: 5px;
-  color: #fff;
-  font-size: 12px;
-  font-family: 'Courier New', monospace;
+.emulator-screen canvas {
+  display: block;
+  image-rendering: pixelated;
+  width: 100%;
+  height: auto;
 }
 
-.emulator-buttons {
+.emulator-overlay {
   position: absolute;
-  bottom: 10px;
-  left: 10px;
-  right: 10px;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   display: flex;
-  gap: 5px;
-  background: rgba(0, 0, 0, 0.5);
-  padding: 5px;
-  border-radius: 5px;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
+  gap: 15px;
 }
 
-.emulator-btn {
-  background: #333;
+.emulator-title {
+  font-family: 'Courier New', monospace;
+  font-weight: bold;
+  font-size: 14px;
+  color: #ff3333;
+  text-shadow: 1px 1px 0 #ffffff;
+  letter-spacing: 2px;
+}
+
+.emulator-start-btn {
+  background: linear-gradient(180deg, #ff6b6b, #c0392b);
   color: #fff;
   border: none;
-  padding: 5px 10px;
-  border-radius: 3px;
-  cursor: pointer;
+  padding: 10px 25px;
+  border-radius: 5px;
+  font-family: 'Courier New', monospace;
+  font-weight: bold;
   font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+}
+
+.emulator-start-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
+}
+
+.emulator-start-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+}
+
+.emulator-controls {
+  margin-top: 12px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.d-pad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  gap: 3px;
+  width: 90px;
+}
+
+.dpad-up {
+  grid-column: 2;
+}
+
+.dpad-middle {
+  grid-row: 2;
+  display: flex;
+  gap: 3px;
+}
+
+.dpad-down {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.dpad-right {
+  grid-column: 3;
+  grid-row: 2;
+}
+
+.dpad-btn {
+  background: linear-gradient(180deg, #3a3a3a, #1a1a1a);
+  color: #888;
+  border: none;
+  padding: 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
   font-family: 'Courier New', monospace;
   transition: all 0.1s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 
+    0 2px 5px rgba(0, 0, 0, 0.3),
+    inset 0 -2px 0 rgba(255, 255, 255, 0.1);
 }
 
-.emulator-btn:hover {
-  background: #555;
+.dpad-btn:hover {
+  background: linear-gradient(180deg, #4a4a4a, #2a2a2a);
+  color: #aaa;
+  transform: translateY(-1px);
 }
 
-.emulator-btn:active {
-  background: #777;
+.dpad-btn:active {
+  background: linear-gradient(180deg, #2a2a2a, #1a1a1a);
+  color: #666;
+  transform: translateY(1px);
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.action-buttons {
+  display: flex;
+  gap: 5px;
+}
+
+.action-btn {
+  width: 35px;
+  height: 35px;
+  border-radius: 50%;
+  border: 3px solid #c0392b;
+  background: linear-gradient(180deg, #8b4513, #654321);
+  color: #fff;
+  font-weight: bold;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.1s;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+}
+
+.action-btn:hover {
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 5px 12px rgba(0, 0, 0, 0.4);
+}
+
+.action-btn:active {
+  transform: translateY(0) scale(0.98);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
 }
 
 .emulator-label {
-  color: #888;
-  font-size: 10px;
-  text-align: center;
-  margin-bottom: 5px;
+  position: absolute;
+  bottom: -25px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.8);
+  color: #fff;
+  padding: 5px 15px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-family: 'Courier New', monospace;
+  white-space: nowrap;
+}
+
+body.dark .emulator-box {
+  background: linear-gradient(180deg, #5a6b7c 0%, #7d8a94 50%, #5a6b7c 100%);
+  border-color: #3a3f45;
+}
+
+body.dark .emulator-screen {
+  border-color: #1a1a1a;
 }
 
 /* Coolness Rankings */

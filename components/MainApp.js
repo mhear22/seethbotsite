@@ -5,6 +5,7 @@ import { Tachometer } from './Tachometer.js';
 import { GirlModePage } from './GirlModePage.js';
 import { FeedPanel } from './FeedPanel.js';
 import { MikaModal } from './MikaModal.js';
+import { EmulatorPlayer } from './EmulatorPlayer.js';
 
 export const MainApp = {
   template: `
@@ -53,20 +54,6 @@ export const MainApp = {
             <div class="sparkles">✨</div>
             <div class="sparkles">✨</div>
             <div class="sparkles">✨</div>
-
-            <!-- EmulatorJS Player -->
-            <div class="emulator-container">
-              <div class="emulator-screen"></div>
-              <div class="emulator-buttons">
-                <div class="emulator-label">Game Boy Controls</div>
-                <button class="emulator-btn">▲</button>
-                <button class="emulator-btn">◄</button>
-                <button class="emulator-btn">►</button>
-                <button class="emulator-btn">▼</button>
-                <div class="emulator-screen-off">LOADING...</div>
-              </div>
-              <iframe class="emulator-frame"></iframe>
-            </div>
 
             <div class="emoji">🌸</div>
             <h1>mald.mikahear.es</h1>
@@ -151,6 +138,9 @@ export const MainApp = {
           <button class="mika-btn" @click="openMikaModal">🌸 Mika</button>
         </div>
       </div>
+
+      <!-- Emulator Player (fixed in lower right) -->
+      <EmulatorPlayer v-if="currentRoute === 'home'" />
 
       <!-- Feed panel -->
       <FeedPanel :is-open="panels.feed" @toggle="togglePanel('feed')" />
@@ -250,7 +240,8 @@ export const MainApp = {
     Tachometer,
     GirlModePage,
     FeedPanel,
-    MikaModal
+    MikaModal,
+    EmulatorPlayer
   },
   methods: {
     toggleDarkMode() {
