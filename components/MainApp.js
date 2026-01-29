@@ -152,7 +152,7 @@ export const MainApp = {
       <MikaModal :is-open="mikaModalOpen" @close="closeMikaModal" />
 
       <!-- Confirmation overlay -->
-      <ConfirmationModal :is-open="confirmationOpen" @close="closeConfirmation" />
+      <ConfirmationModal :is-open="confirmationOpen" @close="closeConfirmation" @confirm="confirmGirlMode" />
 
       <!-- Audio -->
       <audio id="fartSound" src="fart-with-reverb.mp3" preload="auto"></audio>
@@ -263,6 +263,10 @@ export const MainApp = {
     },
     closeConfirmation() {
       this.$emit('confirmation-close');
+    },
+    confirmGirlMode() {
+      this.$emit('confirmation-close');
+      this.$emit('route-change', 'girl');
     },
     getTrendClass(index) {
       // Random trend assignment for demo
