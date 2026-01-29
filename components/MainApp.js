@@ -5,7 +5,6 @@ import { Tachometer } from './Tachometer.js';
 import { GirlModePage } from './GirlModePage.js';
 import { FeedPanel } from './FeedPanel.js';
 import { MikaModal } from './MikaModal.js';
-import { EmulatorPlayer } from './EmulatorPlayer.js';
 
 export const MainApp = {
   template: `
@@ -139,9 +138,6 @@ export const MainApp = {
         </div>
       </div>
 
-      <!-- Emulator Player (fixed in lower right) -->
-      <EmulatorPlayer v-if="currentRoute === 'home'" />
-
       <!-- Feed panel -->
       <FeedPanel :is-open="panels.feed" @toggle="togglePanel('feed')" />
 
@@ -240,8 +236,7 @@ export const MainApp = {
     Tachometer,
     GirlModePage,
     FeedPanel,
-    MikaModal,
-    EmulatorPlayer
+    MikaModal
   },
   methods: {
     toggleDarkMode() {
