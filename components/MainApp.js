@@ -34,9 +34,10 @@ export const MainApp = {
           <!-- Cat Panel -->
           <CatPanel
             :is-open="panels.cat"
-            :cat-image="currentCatImage"
+            :cat-image="catImage"
+            :loading="catLoading"
             @toggle="togglePanel('cat')"
-            @new-cat="nextCat"
+            @new-cat="fetchNewCat"
           />
 
           <!-- Tachometer -->

@@ -6,8 +6,9 @@ export const CatPanel = {
         <button class="cat-close" @click="toggle">✕</button>
       </div>
       <div class="cat-content">
-        <img :src="catImage" class="cat-image" alt="Random cat" />
-        <button class="cute-btn" @click="$emit('new-cat')">🔄 New Cat</button>
+        <img v-if="!loading" :src="catImage" class="cat-image" alt="Random cat" />
+        <div v-if="loading" class="cat-loading">Loading... 🐱</div>
+        <button class="cute-btn" @click="$emit('new-cat')" :disabled="loading">🔄 New Cat</button>
       </div>
     </div>
   `,
@@ -19,6 +20,10 @@ export const CatPanel = {
     catImage: {
       type: String,
       required: true
+    },
+    loading: {
+      type: Boolean,
+      default: false
     }
   },
   emits: ['toggle', 'new-cat'],
