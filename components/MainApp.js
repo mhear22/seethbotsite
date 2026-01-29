@@ -97,6 +97,40 @@ export const MainApp = {
           </div>
         </div>
 
+        <!-- RANKINGS PAGE -->
+        <div v-if="currentRoute === 'rankings'" class="page rankings-page">
+          <div class="rankings-container">
+            <div class="emoji">👻</div>
+            <h1>Coolness Rankings</h1>
+            <p>Here's the official coolness leaderboard:</p>
+            <div class="full-rankings-list">
+              <div v-for="(rank, index) in rankings" :key="index" class="full-rank-item" :class="{ 'current-user': rank.isCurrentUser }">
+                <div class="full-rank-number">{{ index + 1 }}</div>
+                <div class="full-rank-avatar">{{ rank.avatar }}</div>
+                <div class="full-rank-info">
+                  <div class="full-rank-name">{{ rank.name }}</div>
+                  <div class="full-rank-score">{{ rank.score }} pts</div>
+                </div>
+                <div class="full-rank-trend" :class="getTrendClass(index)">↗️</div>
+              </div>
+            </div>
+            <button class="cute-btn" @click="onRouteChange('home')">← Back Home</button>
+          </div>
+        </div>
+
+        <!-- CATS PAGE -->
+        <div v-if="currentRoute === 'cats'" class="page cats-page">
+          <div class="cats-container">
+            <div class="emoji">🐱</div>
+            <h1>Random Cats</h1>
+            <div class="cat-showcase">
+              <img :src="currentCatImage" alt="Random cat" class="cat-showcase-image" />
+              <button class="cute-btn" @click="nextCat" style="margin-top: 20px;">🎲 New Cat</button>
+            </div>
+            <button class="cute-btn" @click="onRouteChange('home')" style="margin-top: 20px;">← Back Home</button>
+          </div>
+        </div>
+
         <!-- Control buttons -->
         <div class="control-buttons-container">
           <button class="rankings-toggle" @click="togglePanel('rankings')" title="Toggle rankings">👻</button>
@@ -229,6 +263,11 @@ export const MainApp = {
     },
     closeConfirmation() {
       this.$emit('confirmation-close');
+    },
+    getTrendClass(index) {
+      // Random trend assignment for demo
+      const trends = ['trend-up', 'trend-down', 'trend-same'];
+      return trends[index % trends.length];
     }
   }
 };

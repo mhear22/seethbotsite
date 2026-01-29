@@ -203,6 +203,129 @@
       border-radius: 10px;
     }
 
+    /* Rankings Page */
+    .rankings-container,
+    .cats-container {
+      background: rgba(255, 192, 203, 0.95);
+      padding: 60px 40px;
+      border-radius: 40px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+      text-align: center;
+      max-width: 600px;
+    }
+
+    body.dark .rankings-container,
+    body.dark .cats-container {
+      background: rgba(40, 44, 52, 0.95);
+    }
+
+    .full-rankings-list {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      margin: 30px 0;
+    }
+
+    .full-rank-item {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      padding: 15px 20px;
+      background: rgba(255, 255, 255, 0.9);
+      border-radius: 20px;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .full-rank-item:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+    }
+
+    .full-rank-item.current-user {
+      background: linear-gradient(135deg, rgba(255, 107, 157, 0.3), rgba(144, 238, 144, 0.3));
+      border: 2px solid #ff6b9d;
+    }
+
+    body.dark .full-rank-item {
+      background: rgba(60, 64, 72, 0.9);
+    }
+
+    body.dark .full-rank-item.current-user {
+      background: rgba(255, 107, 157, 0.2);
+    }
+
+    .full-rank-number {
+      font-size: 24px;
+      font-weight: bold;
+      color: #ff6b9d;
+      min-width: 30px;
+    }
+
+    .full-rank-avatar {
+      font-size: 40px;
+      min-width: 50px;
+    }
+
+    .full-rank-info {
+      flex: 1;
+      text-align: left;
+    }
+
+    .full-rank-name {
+      font-size: 18px;
+      font-weight: bold;
+      color: #333;
+      margin-bottom: 5px;
+    }
+
+    body.dark .full-rank-name {
+      color: #f0f0f0;
+    }
+
+    .full-rank-score {
+      font-size: 16px;
+      color: #666;
+    }
+
+    body.dark .full-rank-score {
+      color: #aaa;
+    }
+
+    .full-rank-trend {
+      font-size: 24px;
+      min-width: 30px;
+    }
+
+    .trend-up {
+      color: #32CD32;
+    }
+
+    .trend-down {
+      color: #ff6b6b;
+    }
+
+    .trend-same {
+      color: #666;
+    }
+
+    /* Cats Page */
+    .cat-showcase {
+      margin: 30px 0;
+    }
+
+    .cat-showcase-image {
+      width: 100%;
+      max-width: 500px;
+      border-radius: 20px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+      transition: transform 0.2s ease;
+    }
+
+    .cat-showcase-image:hover {
+      transform: scale(1.02);
+    }
+
     /* Page Transitions */
     .page {
       transition: opacity 0.3s ease, transform 0.3s ease;
