@@ -1,3 +1,11 @@
+import { QuoteSection } from './QuoteSection.js';
+import { RankingsPanel } from './RankingsPanel.js';
+import { CatPanel } from './CatPanel.js';
+import { Tachometer } from './Tachometer.js';
+import { GirlModePage } from './GirlModePage.js';
+import { FeedPanel } from './FeedPanel.js';
+import { MikaModal } from './MikaModal.js';
+
 export const MainApp = {
   template: `
     <div class="main-app">
@@ -235,6 +243,15 @@ export const MainApp = {
     'fart',
     'turn-me'
   ],
+  components: {
+    QuoteSection,
+    RankingsPanel,
+    CatPanel,
+    Tachometer,
+    GirlModePage,
+    FeedPanel,
+    MikaModal
+  },
   methods: {
     toggleDarkMode() {
       this.$emit('toggle-dark-mode');
