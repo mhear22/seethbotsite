@@ -1,13 +1,4 @@
 import { createApp } from 'vue'
-import { MainApp } from './components/MainApp.js'
-import { Router } from './components/Router.js'
+import App from './App'
 
-createApp({
-  components: {
-    MainApp,
-    Router
-  },
-  template: `
-    <MainApp />
-  `
-}).mount('#app')
+createApp(App).mount('#app')
