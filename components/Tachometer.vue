@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { computed } from 'vue'
 
 const props = withDefaults(defineProps<{
   value?: number
@@ -18,31 +18,16 @@ const emit = defineEmits<{
 // Calculate needle angle based on percentage (0-100%)
 // 0% = 225° (bottom left), 50% = 135° (top), 100% = 45° (bottom right)
 // This creates a 270° arc going counter-clockwise from bottom-left to bottom-right through top
-const currentAngle = ref(225) // Start at 225° (0%)
-
-const needleStyle = ref({
-  transform: `rotate(${currentAngle.value}deg)`
-})
-
-const calculateAngle = (value: number) => {
-  const clampedValue = Math.max(0, Math.min(100, value))
+const needleAngle = computed(() => {
+  const clampedValue = Math.max(0, Math.min(100, props.value))
   // Map 0-100 to 225-45 (counter-clockwise)
   // 225 - (value/100 * 180) = 225 - 1.8 * value
   return 225 - (clampedValue * 1.8)
-}
+})
 
-// Only update when the value actually changes
-watch(() => props.value, (newValue, oldValue) => {
-  if (newValue !== oldValue) {
-    const newAngle = calculateAngle(newValue)
-    if (newAngle !== currentAngle.value) {
-      currentAngle.value = newAngle
-      needleStyle.value = {
-        transform: `rotate(${newAngle}deg)`
-      }
-    }
-  }
-}, { immediate: true })
+const needleStyle = computed(() => ({
+  transform: `rotate(${needleAngle.value}deg)`
+}))
 
 const onFart = () => {
   emit('fart')
