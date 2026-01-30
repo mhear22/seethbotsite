@@ -79,29 +79,43 @@ const detectGender = async () => {
 
     const data = await response.json()
 
+    // Map backend gender strings to constants
+    const genderStringToCode: { [key: string]: number } = {
+      'female': GENDER_CONSTANTS.IS_FEMALE,
+      'mostly_female': GENDER_CONSTANTS.IS_MOSTLY_FEMALE,
+      'male': GENDER_CONSTANTS.IS_MALE,
+      'mostly_male': GENDER_CONSTANTS.IS_MOSTLY_MALE,
+      'unisex': GENDER_CONSTANTS.IS_UNISEX_NAME,
+      'couple': GENDER_CONSTANTS.IS_A_COUPLE,
+      'not_found': GENDER_CONSTANTS.NAME_NOT_FOUND,
+      'error': GENDER_CONSTANTS.ERROR_IN_NAME
+    }
+
+    const genderCode = genderStringToCode[data.gender] || GENDER_CONSTANTS.NAME_NOT_FOUND
+
     // Map gender codes to human-readable results
     const genderMap: { [key: number]: GenderResult } = {
       [GENDER_CONSTANTS.IS_FEMALE]: {
         gender: 'Female',
-        confidence: 'High',
+        confidence: data.probability ? `${Math.round(data.probability * 100)}%` : 'High',
         emoji: '👩',
         resultClass: 'result-female'
       },
       [GENDER_CONSTANTS.IS_MOSTLY_FEMALE]: {
         gender: 'Mostly Female',
-        confidence: 'Moderate',
+        confidence: data.probability ? `${Math.round(data.probability * 100)}%` : 'Moderate',
         emoji: '👩',
         resultClass: 'result-female-likely'
       },
       [GENDER_CONSTANTS.IS_MALE]: {
         gender: 'Male',
-        confidence: 'High',
+        confidence: data.probability ? `${Math.round(data.probability * 100)}%` : 'High',
         emoji: '👨',
         resultClass: 'result-male'
       },
       [GENDER_CONSTANTS.IS_MOSTLY_MALE]: {
         gender: 'Mostly Male',
-        confidence: 'Moderate',
+        confidence: data.probability ? `${Math.round(data.probability * 100)}%` : 'Moderate',
         emoji: '👨',
         resultClass: 'result-male-likely'
       },
@@ -131,7 +145,7 @@ const detectGender = async () => {
       }
     }
 
-    const mappedResult = genderMap[data.gender_code]
+    const mappedResult = genderMap[genderCode]
     if (mappedResult) {
       result.value = mappedResult
     } else {
