@@ -5,6 +5,7 @@ export const Router = {
       routes: {
         home: { title: 'Home', icon: '🌸' },
         girl: { title: 'Girl Mode', icon: '💕' },
+        gender: { title: 'Gender', icon: '🔮' },
         about: { title: 'About', icon: 'ℹ️' },
         rankings: { title: 'Rankings', icon: '👻' },
         cats: { title: 'Cats', icon: '🐱' }

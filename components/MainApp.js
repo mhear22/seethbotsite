@@ -6,6 +6,7 @@ import { GirlModePage } from './GirlModePage.js';
 import { FeedPanel } from './FeedPanel.js';
 import { MikaModal } from './MikaModal.js';
 import { ClickCounter } from './ClickCounter.js';
+import { GenderPicker } from './GenderPicker.js';
 
 export const MainApp = {
   template: `
@@ -70,6 +71,11 @@ export const MainApp = {
         <!-- GIRL MODE PAGE -->
         <div v-if="currentRoute === 'girl'" class="page girl-page">
           <GirlModePage :dark-mode="darkMode" @back="onRouteChange('home')" />
+        </div>
+
+        <!-- GENDER PAGE -->
+        <div v-if="currentRoute === 'gender'" class="page gender-page">
+          <GenderPicker :dark-mode="darkMode" @back="onRouteChange('home')" />
         </div>
 
         <!-- ABOUT PAGE -->
@@ -244,7 +250,8 @@ export const MainApp = {
     GirlModePage,
     FeedPanel,
     MikaModal,
-    ClickCounter
+    ClickCounter,
+    GenderPicker
   },
   methods: {
     toggleDarkMode() {
