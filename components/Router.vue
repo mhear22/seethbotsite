@@ -18,6 +18,10 @@ const routes = ref<RouteData[]>([
 ])
 
 const route = useRoute()
+
+const scrollToTop = () => {
+  window.scrollTo(0, 0)
+}
 </script>
 
 <template>
@@ -29,7 +33,7 @@ const route = useRoute()
       class="router-link"
       :class="{ active: route.path === routeData.path }"
       :title="routeData.title"
-      @click="window.scrollTo(0, 0)"
+      @click="scrollToTop"
     >
       {{ routeData.icon }} {{ routeData.title }}
     </RouterLink>

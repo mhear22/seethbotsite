@@ -13,6 +13,7 @@ RUN npm install
 COPY vite.config.ts tsconfig.json tsconfig.node.json index.html ./
 COPY main.ts App.vue ./
 COPY components ./components/
+COPY router ./router/
 COPY utils ./utils/
 COPY *.css *.mp3 *.html ./
 
