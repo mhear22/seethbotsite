@@ -27,9 +27,9 @@ app.get('/api/rankings', (req: Request, res: Response) => {
   res.json([
     { avatar: '🌙', name: 'Orlando', score: 3467 },
     { avatar: '🌸', name: 'You', score: 1467, isCurrentUser: true },
+    { avatar: '🏍️', name: '美香', score: 1467 },  // Boosted for Vite migration help!
     { avatar: '🍄', name: "Chang'Yi", score: 1367 },
     { avatar: '🎵', name: 'Ashley', score: 967 },
-    { avatar: '😺', name: '美香', score: 767 },
     { avatar: '🍄', name: 'Goopsworthy', score: 667 }
   ]);
 });
