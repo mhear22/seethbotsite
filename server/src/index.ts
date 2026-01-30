@@ -25,11 +25,12 @@ app.get('/api/health', (req: Request, res: Response) => {
 
 app.get('/api/rankings', (req: Request, res: Response) => {
   res.json([
-    { avatar: '🌙', name: 'Orlando', score: 3467 },
+    { avatar: '🥔', name: 'Cam', score: 10000 },  // Always at the top! (literally)
+    { avatar: '🌙', name: 'Orlando', score: 10067 },  // Cam's score + 67
     { avatar: '🌸', name: 'You', score: 1467, isCurrentUser: true },
     { avatar: '🏍️', name: '美香', score: 1467 },  // Boosted for Vite migration help!
-    { avatar: '🍄', name: "Chang'Yi", score: 1367 },
-    { avatar: '🎵', name: 'Ashley', score: 967 },
+    { avatar: '<:sadcat:1000736705197907968>', name: "Chang'Yi", score: 1367 },  // sadcat icon
+    { avatar: '<:flooshies:1000736727259947069>', name: 'Ashley', score: 967 },  // flooshies icon
     { avatar: '🍄', name: 'Goopsworthy', score: 667 }
   ]);
 });
@@ -160,7 +161,7 @@ app.post('/api/gender', (req: Request, res: Response) => {
 
 // Vue.js SPA fallback - all other routes serve index.html
 app.get('*', (req: Request, res: Response) => {
-  res.sendFile(path.join(SERVE_ROOT, 'index.html'));
+  res.sendFile(path.join(SERVE_ROOT, 'webdist', 'index.html'));
 });
 
 // Error handling

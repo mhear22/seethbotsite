@@ -28,6 +28,7 @@ RUN apk add --no-cache python3 make g++
 
 # Copy built files and dependencies from builder
 COPY --from=builder /app/server/dist ./dist
+COPY --from=builder /app/server/webdist ./webdist
 COPY --from=builder /app/server/node_modules ./node_modules
 COPY --from=builder /app/server/package.json ./package.json
 

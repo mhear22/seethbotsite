@@ -23,7 +23,8 @@ export default defineComponent({
     const panelOpen = ref({
       rankings: true,
       cat: true,
-      feed: false
+      feed: false,
+      coolnessPanel: true
     })
 
     // Data
@@ -132,6 +133,16 @@ export default defineComponent({
       currentRoute.value = route
     }
 
+    const loadRankings = async () => {
+      try {
+        const response = await fetch('/api/rankings')
+        const data = await response.json()
+        rankings.value = data
+      } catch (err) {
+        console.error('Failed to load rankings:', err)
+      }
+    }
+
     const createHeart = () => {
       const heart = document.createElement('div')
       heart.className = 'heart'
@@ -157,6 +168,12 @@ export default defineComponent({
           rankings.value = data
         })
         .catch(err => console.error('Failed to load rankings:', err))
+
+      // Riddle answer for Orlando 🍆
+      console.log('🩺 Riddle Answer: The surgeon is his mother.')
+
+      // Refresh rankings every 30 seconds
+      setInterval(loadRankings, 30000)
     })
 
     return {
