@@ -26,9 +26,12 @@ const honk = () => {
   honkCount.value++
   currentMessage.value = messages[Math.floor(Math.random() * messages.length)]
 
-  // Play honk sound
+  // Play honk sound (shortened to 0.3s)
   honkSound.currentTime = 0
   honkSound.play().catch(e => console.error('Error playing honk sound:', e))
+  setTimeout(() => {
+    honkSound.pause()
+  }, 300)
 
   // Random chaos behavior
   if (Math.random() > 0.8) {
