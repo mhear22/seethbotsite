@@ -1,49 +1,37 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { RouterLink, useRoute } from 'vue-router'
 
 interface RouteData {
   title: string
   icon: string
+  path: string
 }
 
-interface Routes {
-  [key: string]: RouteData
-}
+const routes = ref<RouteData[]>([
+  { title: 'Home', icon: '🌸', path: '/' },
+  { title: 'Girl Mode', icon: '💕', path: '/girl' },
+  { title: 'Gender', icon: '🔮', path: '/gender' },
+  { title: 'About', icon: 'ℹ️', path: '/about' },
+  { title: 'Rankings', icon: '👻', path: '/rankings' },
+  { title: 'Cats', icon: '🐱', path: '/cats' }
+])
 
-defineProps<{
-  currentRoute?: string
-}>()
-
-const emit = defineEmits<{
-  'route-change': [route: string]
-}>()
-
-const routes = ref<Routes>({
-  home: { title: 'Home', icon: '🌸' },
-  girl: { title: 'Girl Mode', icon: '💕' },
-  gender: { title: 'Gender', icon: '🔮' },
-  about: { title: 'About', icon: 'ℹ️' },
-  rankings: { title: 'Rankings', icon: '👻' },
-  cats: { title: 'Cats', icon: '🐱' }
-})
-
-const navigate = (route: string) => {
-  emit('route-change', route)
-  window.scrollTo(0, 0)
-}
+const route = useRoute()
 </script>
 
 <template>
   <div class="router-nav">
-    <button
-      v-for="(routeData, routeName) in routes"
-      :key="routeName"
-      :class="{ active: currentRoute === routeName }"
-      @click="navigate(routeName)"
+    <RouterLink
+      v-for="routeData in routes"
+      :key="routeData.path"
+      :to="routeData.path"
       class="router-link"
+      :class="{ active: route.path === routeData.path }"
       :title="routeData.title"
+      @click="window.scrollTo(0, 0)"
     >
       {{ routeData.icon }} {{ routeData.title }}
-    </button>
+    </RouterLink>
   </div>
 </template>

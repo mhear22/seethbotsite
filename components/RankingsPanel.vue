@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { RankingItem } from './MainApp.vue'
+import EmojiRenderer from './EmojiRenderer.vue'
 
 defineProps<{
   isOpen?: boolean
@@ -23,7 +24,9 @@ const toggle = () => {
     </div>
     <div class="rankings-list">
       <div v-for="(rank, index) in rankings" :key="index" class="rank-item">
-        <div class="rank-avatar">{{ rank.avatar }}</div>
+        <div class="rank-avatar">
+          <EmojiRenderer :emoji="rank.avatar" :size="32" />
+        </div>
         <div class="rank-name" :class="{ 'current-user': rank.isCurrentUser }">{{ rank.name }}</div>
         <div class="rank-score">{{ rank.score }}</div>
         <div class="rank-label">pts</div>

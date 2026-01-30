@@ -8,6 +8,7 @@ import FeedPanel from './FeedPanel.vue'
 import MikaModal from './MikaModal.vue'
 import ClickCounter from './ClickCounter.vue'
 import GenderPicker from './GenderPicker.vue'
+import DigitalGoose from './DigitalGoose.vue'
 
 export interface RankingItem {
   name: string
@@ -159,6 +160,9 @@ const getTrendClass = (index: number) => {
         <CatPanel :cat-image="currentCatImage" :loading="false" @new-cat="nextCat" />
       </div>
     </div>
+
+    <!-- Digital Goose (Cycle Complete) -->
+    <DigitalGoose v-if="panels?.digitalGoose ?? true" />
 
     <!-- Floating Panels -->
     <RankingsPanel

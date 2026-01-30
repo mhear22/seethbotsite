@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, provide } from 'vue'
+import { useRoute } from 'vue-router'
 import MainApp from './components/MainApp.vue'
 import Router from './components/Router.vue'
 
 // State
-const currentRoute = ref('home')
 const darkMode = ref(false)
 const musicPlaying = ref(false)
 const feedOpen = ref(false)
@@ -123,10 +123,6 @@ const closeMikaModal = () => {
   mikaModalOpen.value = false
 }
 
-const onRouteChange = (route: string) => {
-  currentRoute.value = route
-}
-
 const loadRankings = async () => {
   try {
     const response = await fetch('/api/rankings')
@@ -147,8 +143,30 @@ const createHeart = () => {
   setTimeout(() => heart.remove(), 6000)
 }
 
-// Computed
-const currentQuote = computed(() => quotes.value[currentQuoteIndex.value])
+// Provide shared state to child components
+provide('darkMode', darkMode)
+provide('musicPlaying', musicPlaying)
+provide('panelOpen', panelOpen)
+provide('rankings', rankings)
+provide('currentQuote', computed(() => quotes.value[currentQuoteIndex.value]))
+provide('catImage', catImage)
+provide('catLoading', catLoading)
+provide('tachValue', tachValue)
+provide('fartClicked', fartClicked)
+provide('fartExploded', fartExploded)
+provide('mikaModalOpen', mikaModalOpen)
+provide('confirmationOpen', confirmationOpen)
+
+// Provide methods
+provide('toggleDarkMode', toggleDarkMode)
+provide('toggleMusic', toggleMusic)
+provide('togglePanel', togglePanel)
+provide('nextQuote', nextQuote)
+provide('nextCat', nextCat)
+provide('onFart', onFart)
+provide('onTurnMe', onTurnMe)
+provide('closeConfirmation', closeConfirmation)
+provide('closeMikaModal', closeMikaModal)
 
 // Lifecycle
 onMounted(() => {
@@ -173,33 +191,8 @@ onMounted(() => {
 
 <template>
   <div class="main-app">
-    <Router
-      :current-route="currentRoute"
-      @route-change="onRouteChange"
-    />
+    <Router />
 
-    <MainApp
-      :dark-mode="darkMode"
-      :music-playing="musicPlaying"
-      :current-route="currentRoute"
-      :current-quote="currentQuote"
-      :current-cat-image="catImage"
-      :tach-value="tachValue"
-      :fart-clicked="fartClicked"
-      :fart-exploded="fartExploded"
-      :rankings="rankings"
-      :panels="panelOpen"
-      :mika-modal-open="mikaModalOpen"
-      :confirmation-open="confirmationOpen"
-      @toggle-dark-mode="toggleDarkMode"
-      @toggle-music="toggleMusic"
-      @toggle-panel="togglePanel"
-      @next-quote="nextQuote"
-      @new-cat="nextCat"
-      @fart="onFart"
-      @turn-me="onTurnMe"
-      @close-confirmation="closeConfirmation"
-      @route-change="onRouteChange"
-    />
+    <router-view />
   </div>
 </template>

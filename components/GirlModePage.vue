@@ -1,11 +1,13 @@
 <script setup lang="ts">
-defineProps<{
-  darkMode?: boolean
-}>()
+import { inject } from 'vue'
+import { useRouter } from 'vue-router'
 
-defineEmits<{
-  back: []
-}>()
+const router = useRouter()
+const darkMode = inject('darkMode')
+
+const goBack = () => {
+  router.push('/')
+}
 </script>
 
 <template>
@@ -37,7 +39,7 @@ defineEmits<{
         <p>You are valid and loved exactly as you are! ✨</p>
         <p>This is your safe space to be yourself.</p>
       </div>
-      <button class="cute-btn girl-back-btn" @click="$emit('back')">💕 Go Back</button>
+      <button class="cute-btn girl-back-btn" @click="goBack">💕 Go Back</button>
     </div>
   </div>
 </template>
