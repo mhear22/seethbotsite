@@ -290,7 +290,7 @@ export const MainApp = {
     },
     goToGirlMode() {
       console.log('Going to girl mode...');
-      this.$emit('confirmation-close');
+      this.$emit('close-confirmation');
       setTimeout(() => {
         this.$emit('route-change', 'girl');
         console.log('Route change emitted: girl');
