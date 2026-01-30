@@ -8,7 +8,7 @@ export default defineConfig({
     host: true
   },
   build: {
-    outDir: 'server/webdist',
+    outDir: 'dist',
     emptyOutDir: true
   }
 })

@@ -6,8 +6,9 @@ import { getClickCount, incrementClick, resetClick } from './db';
 
 const app: Express = express();
 const PORT = process.env.PORT || 3000;
-const STATIC_DIR = process.env.STATIC_DIR || path.join(__dirname, '..', '..');
-const SERVE_ROOT = process.env.SERVE_ROOT || path.join(__dirname, '..', '..', 'dist');
+// In production Docker: __dirname is /app/server/dist, webdist is at /app/server/webdist
+// In development: __dirname is /server/src, frontend build is at /dist
+const SERVE_ROOT = process.env.SERVE_ROOT || path.join(__dirname, '..', 'webdist');
 
 // Middleware
 app.use(cors());
@@ -161,7 +162,7 @@ app.post('/api/gender', (req: Request, res: Response) => {
 
 // Vue.js SPA fallback - all other routes serve index.html
 app.get('*', (req: Request, res: Response) => {
-  res.sendFile(path.join(SERVE_ROOT, 'webdist', 'index.html'));
+  res.sendFile(path.join(SERVE_ROOT, 'index.html'));
 });
 
 // Error handling
