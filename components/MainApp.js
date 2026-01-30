@@ -5,6 +5,7 @@ import { Tachometer } from './Tachometer.js';
 import { GirlModePage } from './GirlModePage.js';
 import { FeedPanel } from './FeedPanel.js';
 import { MikaModal } from './MikaModal.js';
+import { ClickCounter } from './ClickCounter.js';
 
 export const MainApp = {
   template: `
@@ -47,6 +48,9 @@ export const MainApp = {
             :exploded="fartExploded"
             @fart="onFart"
           />
+
+          <!-- Click Counter -->
+          <ClickCounter />
 
           <!-- Main container -->
           <div class="container">
@@ -237,7 +241,8 @@ export const MainApp = {
     Tachometer,
     GirlModePage,
     FeedPanel,
-    MikaModal
+    MikaModal,
+    ClickCounter
   },
   methods: {
     toggleDarkMode() {

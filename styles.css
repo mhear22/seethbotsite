@@ -1406,3 +1406,117 @@ body.dark .mika-modal-box {
 .fade-leave-to {
   opacity: 0;
   transform: translateY(20px);
+
+/* Click Counter */
+.click-counter {
+  position: fixed;
+  top: 80px;
+  right: 20px;
+  background: rgba(255, 255, 255, 0.95);
+  padding: 15px 20px;
+  border-radius: 20px;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+  min-width: 200px;
+  transition: transform 0.3s ease;
+}
+
+.dark .click-counter {
+  background: rgba(30, 30, 30, 0.95);
+}
+
+.counter-header h3 {
+  font-size: 1.2rem;
+  color: #ff6b9d;
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+.counter-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.click-count {
+  font-size: 3rem;
+  font-weight: bold;
+  background: linear-gradient(45deg, #ff6b9d, #ff8a80);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: pulse 0.3s ease;
+}
+
+.click-btn {
+  background: linear-gradient(45deg, #ff6b9d, #ff8a80);
+  color: white;
+  border: none;
+  padding: 12px 30px;
+  border-radius: 25px;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: 0 3px 10px rgba(255, 107, 157, 0.3);
+  transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  width: 100%;
+}
+
+.click-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(255, 107, 157, 0.4);
+}
+
+.click-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.click-btn.clicking {
+  animation: clickBounce 0.2s ease;
+}
+
+.click-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+@keyframes clickBounce {
+  0% { transform: scale(1); }
+  50% { transform: scale(0.95); }
+  100% { transform: scale(1); }
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+.click-info {
+  font-size: 0.75rem;
+  color: #888;
+  text-align: center;
+}
+
+.dark .click-info {
+  color: #aaa;
+}
+
+@media (max-width: 768px) {
+  .click-counter {
+    top: auto;
+    bottom: 20px;
+    right: 20px;
+    min-width: 150px;
+  }
+  
+  .click-count {
+    font-size: 2rem;
+  }
+  
+  .click-btn {
+    padding: 10px 20px;
+    font-size: 0.9rem;
+  }
+}
