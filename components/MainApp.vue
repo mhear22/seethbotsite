@@ -1,14 +1,11 @@
 <script setup lang="ts">
-import QuoteSection from './QuoteSection.vue'
 import RankingsPanel from './RankingsPanel.vue'
 import CatPanel from './CatPanel.vue'
-import Tachometer from './Tachometer.vue'
-import GirlModePage from './GirlModePage.vue'
 import FeedPanel from './FeedPanel.vue'
 import MikaModal from './MikaModal.vue'
-import ClickCounter from './ClickCounter.vue'
-import GenderPicker from './GenderPicker.vue'
 import DigitalGoose from './DigitalGoose.vue'
+import Router from './Router.vue'
+import { useRoute } from 'vue-router'
 
 export interface RankingItem {
   name: string
@@ -21,6 +18,7 @@ export interface PanelState {
   rankings: boolean
   cat: boolean
   feed: boolean
+  digitalGoose: boolean
 }
 
 defineProps<{
@@ -126,40 +124,8 @@ const getTrendClass = (index: number) => {
         📰
       </button>
     </div>
-
-    <!-- Route-specific content -->
-    <div class="content-area">
-      <!-- Home Page -->
-      <div v-if="currentRoute === 'home'" class="page home-page">
-        <QuoteSection :current-quote="currentQuote" @next-quote="nextQuote" />
-        <Tachometer :value="tachValue" @fart="onFart" />
-        <ClickCounter />
-      </div>
-
-      <!-- Girl Mode Page -->
-      <GirlModePage v-else-if="currentRoute === 'girl'" @back="onRouteChange('home')" />
-
-      <!-- Gender Page -->
-      <div v-else-if="currentRoute === 'gender'" class="page gender-page">
-        <GenderPicker @back="onRouteChange('home')" />
-      </div>
-
-      <!-- About Page -->
-      <div v-else-if="currentRoute === 'about'" class="page about-page">
-        <h1>About</h1>
-        <p>This is Mika's cool website! ✨</p>
-      </div>
-
-      <!-- Rankings Page -->
-      <div v-else-if="currentRoute === 'rankings'" class="page rankings-page">
-        <RankingsPanel :rankings="rankings" />
-      </div>
-
-      <!-- Cats Page -->
-      <div v-else-if="currentRoute === 'cats'" class="page cats-page">
-        <CatPanel :cat-image="currentCatImage" :loading="false" @new-cat="nextCat" />
-      </div>
-    </div>
+    <Router />
+    <router-view />
 
     <!-- Digital Goose (Cycle Complete) -->
     <DigitalGoose v-if="panels?.digitalGoose ?? true" />

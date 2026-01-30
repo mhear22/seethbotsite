@@ -1,4 +1,5 @@
 <script setup lang="ts">
+/*
 import { ref, onMounted, computed, provide } from 'vue'
 import { useRoute } from 'vue-router'
 import MainApp from './components/MainApp.vue'
@@ -187,12 +188,10 @@ onMounted(() => {
   // Refresh rankings every 30 seconds
   setInterval(loadRankings, 30000)
 })
+*/
+import MainApp from "./components/MainApp.vue"
 </script>
 
 <template>
-  <div class="main-app">
-    <Router />
-
-    <router-view />
-  </div>
+  <MainApp/>
 </template>
