@@ -1406,6 +1406,7 @@ body.dark .mika-modal-box {
 .fade-leave-to {
   opacity: 0;
   transform: translateY(20px);
+}
 
 /* Click Counter */
 .click-counter {

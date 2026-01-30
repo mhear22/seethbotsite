@@ -11,7 +11,7 @@ RUN npm install
 
 # Copy frontend source
 COPY vite.config.ts tsconfig.json tsconfig.node.json index.html ./
-COPY main.ts App.ts ./
+COPY main.ts App.vue ./
 COPY components ./components/
 COPY *.css *.mp3 *.html ./
 
