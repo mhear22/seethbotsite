@@ -1,7 +1,12 @@
 export const Router = {
+  props: {
+    currentRoute: {
+      type: String,
+      default: 'home'
+    }
+  },
   data() {
     return {
-      currentRoute: 'home',
       routes: {
         home: { title: 'Home', icon: '🌸' },
         girl: { title: 'Girl Mode', icon: '💕' },
@@ -14,7 +19,6 @@ export const Router = {
   },
   methods: {
     navigate(route) {
-      this.currentRoute = route;
       this.$emit('route-change', route);
       window.scrollTo(0, 0);
     }
