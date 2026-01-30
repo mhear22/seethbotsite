@@ -5,7 +5,7 @@ set -e
 
 CONTAINER_NAME="seethbot-server"
 IMAGE_NAME="seethbotsite-server:latest"
-DOCKER="docker"
+DOCKER="${DOCKER:-docker}"
 
 echo "🐳 Building Docker image (frontend + backend)..."
 $DOCKER build -t "$IMAGE_NAME" .
