@@ -5,6 +5,8 @@ const honkCount = ref(0)
 const isMigrating = ref(false)
 const currentMessage = ref('Honk!')
 
+const honkSound = new Audio('/goose-honk.mp3')
+
 const messages = [
   'Honk!',
   'I am digital goose',
@@ -23,6 +25,10 @@ const messages = [
 const honk = () => {
   honkCount.value++
   currentMessage.value = messages[Math.floor(Math.random() * messages.length)]
+
+  // Play honk sound
+  honkSound.currentTime = 0
+  honkSound.play().catch(e => console.error('Error playing honk sound:', e))
 
   // Random chaos behavior
   if (Math.random() > 0.8) {

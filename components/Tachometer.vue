@@ -40,7 +40,6 @@ watch(() => props.value, (newValue, oldValue) => {
       needleStyle.value = {
         transform: `rotate(${newAngle}deg)`
       }
-      console.log(`[Tachometer] Value changed: ${oldValue} → ${newValue}, Angle: ${currentAngle.value}°`)
     }
   }
 }, { immediate: true })

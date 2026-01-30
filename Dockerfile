@@ -1,4 +1,5 @@
 # Multi-stage build for full-stack application
+# Force rebuild: goose-honk support
 
 # Stage 1: Build frontend (Vite)
 FROM node:20-alpine AS frontend-builder
@@ -16,6 +17,7 @@ COPY components ./components/
 COPY router ./router/
 COPY utils ./utils/
 COPY *.css *.mp3 *.html ./
+COPY public ./public/
 
 # Build frontend
 RUN npm run build
