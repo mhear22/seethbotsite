@@ -7,7 +7,7 @@ import { getClickCount, incrementClick, resetClick } from './db';
 const app: Express = express();
 const PORT = process.env.PORT || 3000;
 const STATIC_DIR = process.env.STATIC_DIR || path.join(__dirname, '..', '..');
-const SERVE_ROOT = process.env.SERVE_ROOT || path.join(__dirname, '..', '..');
+const SERVE_ROOT = process.env.SERVE_ROOT || path.join(__dirname, '..', '..', 'dist');
 
 // Middleware
 app.use(cors());
