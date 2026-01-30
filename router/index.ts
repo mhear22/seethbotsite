@@ -5,6 +5,7 @@ import Gender from '../components/GenderPage.vue'
 import About from '../components/AboutPage.vue'
 import Rankings from '../components/RankingsPage.vue'
 import Cats from '../components/CatsPage.vue'
+import StockMarket from '../components/StockMarket.vue'
 
 const routes = [
   {
@@ -36,6 +37,11 @@ const routes = [
     path: '/cats',
     name: 'cats',
     component: Cats
+  },
+  {
+    path: '/stocks',
+    name: 'stocks',
+    component: StockMarket
   }
 ]
 

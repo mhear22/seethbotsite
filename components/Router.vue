@@ -14,6 +14,7 @@ const routes = ref<RouteData[]>([
   { title: 'Gender', icon: '🔮', path: '/gender' },
   { title: 'About', icon: 'ℹ️', path: '/about' },
   { title: 'Rankings', icon: '👻', path: '/rankings' },
+  { title: 'Stock Market', icon: '📈', path: '/stocks' },
   { title: 'Cats', icon: '🐱', path: '/cats' }
 ])
 

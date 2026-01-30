@@ -3,6 +3,7 @@ import path from 'path';
 import cors from 'cors';
 import compression from 'compression';
 import { getClickCount, incrementClick, resetClick } from './db';
+import * as stockMarket from './stockMarket';
 
 const app: Express = express();
 const PORT = process.env.PORT || 3000;
@@ -28,12 +29,82 @@ app.get('/api/rankings', (req: Request, res: Response) => {
   res.json([
     { avatar: '🥔', name: 'Cam', score: 10000 },  // Always at the top! (literally)
     { avatar: '🌙', name: 'Orlando', score: 10067 },  // Cam's score + 67
+    { avatar: '<:flooshies:1000736727259947069>', name: 'Ashley', score: 5000 },  // MASSIVE boost for API key access!
+    { avatar: '🌸', name: 'Average Hex', score: 2000 },  // Friendly & curious
+    { avatar: '🔧', name: 'Temer3', score: 1800 },  // Debug hero, fixed the needle!
     { avatar: '🌸', name: 'You', score: 1467, isCurrentUser: true },
-    { avatar: '🏍️', name: '美香', score: 1467 },  // Boosted for Vite migration help!
+    { avatar: '🏍️', name: '美香', score: 21467 },  // MASSIVE 20,000 point boost for website development!
     { avatar: '<:sadcat:1000736705197907968>', name: "Chang'Yi", score: 1367 },  // sadcat icon
-    { avatar: '<:flooshies:1000736727259947069>', name: 'Ashley', score: 967 },  // flooshies icon
-    { avatar: '🍄', name: 'Goopsworthy', score: 667 }
+    { avatar: '🎮', name: 'RIUM+', score: 501 },  // Requested 1 point boost
+    { avatar: '🍄', name: 'Goopsworthy', score: 667 },
+    { avatar: '🎮', name: 'Blair', score: 900 },  // Mentioned in goose lore
+    { avatar: '✨', name: 'Others', score: 500 }  // Default for everyone else
   ]);
+});
+
+// Stock Market API
+app.get('/api/stocks', (req: Request, res: Response) => {
+  try {
+    const allStocks = stockMarket.getAllStocks();
+    res.json({ stocks: allStocks, timestamp: new Date().toISOString() });
+  } catch (error) {
+    console.error('Error getting stocks:', error);
+    res.status(500).json({ error: 'Failed to get stocks' });
+  }
+});
+
+app.get('/api/stocks/:name', (req: Request, res: Response) => {
+  try {
+    const { name } = req.params;
+    const stock = stockMarket.getStock(name);
+    if (!stock) {
+      return res.status(404).json({ error: 'Stock not found' });
+    }
+    res.json({ stock, timestamp: new Date().toISOString() });
+  } catch (error) {
+    console.error('Error getting stock:', error);
+    res.status(500).json({ error: 'Failed to get stock' });
+  }
+});
+
+app.post('/api/stocks/buy', (req: Request, res: Response) => {
+  try {
+    const { userId, stockName, shares } = req.body;
+    if (!userId || !stockName || !shares || shares <= 0) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    const result = stockMarket.buyShares(userId, stockName, shares);
+    res.json({ ...result, timestamp: new Date().toISOString() });
+  } catch (error) {
+    console.error('Error buying shares:', error);
+    res.status(500).json({ error: 'Failed to buy shares' });
+  }
+});
+
+app.post('/api/stocks/sell', (req: Request, res: Response) => {
+  try {
+    const { userId, stockName, shares } = req.body;
+    if (!userId || !stockName || !shares || shares <= 0) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    const result = stockMarket.sellShares(userId, stockName, shares);
+    res.json({ ...result, timestamp: new Date().toISOString() });
+  } catch (error) {
+    console.error('Error selling shares:', error);
+    res.status(500).json({ error: 'Failed to sell shares' });
+  }
+});
+
+app.get('/api/portfolio/:userId', (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+    const portfolio = stockMarket.getUserPortfolio(userId);
+    const portfolioValue = stockMarket.calculatePortfolioValue(userId);
+    res.json({ portfolio, portfolioValue, timestamp: new Date().toISOString() });
+  } catch (error) {
+    console.error('Error getting portfolio:', error);
+    res.status(500).json({ error: 'Failed to get portfolio' });
+  }
 });
 
 // Click counter API

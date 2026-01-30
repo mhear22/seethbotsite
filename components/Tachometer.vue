@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 
 const props = withDefaults(defineProps<{
   value?: number
   clicked?: boolean
   exploded?: boolean
 }>(), {
-  value: 0,
+  value: 50,
   clicked: false,
   exploded: false
 })
@@ -16,19 +16,35 @@ const emit = defineEmits<{
 }>()
 
 // Calculate needle angle based on percentage (0-100%)
-// 0% should point to bottom-left (start of arc), 100% to bottom-right (end of arc)
-// Gauge goes from bottom-left (135°) → top (225°) → bottom-right (315°)
-// This is a 180° arc going clockwise
+// 0% = 225° (bottom-left), 50% = 0°/360° (top), 100% = 135° (bottom-right)
+// Gauge goes clockwise from 225° → 360° → 135° (270° total arc)
 const needleAngle = computed(() => {
   const clampedValue = Math.max(0, Math.min(100, props.value))
-  // Map 0-100 to 135-315 (clockwise)
-  // 135 + (value/100 * 180) = 135 + 1.8 * value
-  return 135 + (clampedValue * 1.8)
+  // Map 0-100 to 225-495 (clockwise)
+  // 225 + (value/100 * 270) = 225 + 2.7 * value
+  // Results: 0%=225°, 50%=360°(0°), 100%=495°(135°)
+  return 225 + (clampedValue * 2.7)
 })
 
 const needleStyle = computed(() => ({
   transform: `rotate(${needleAngle.value}deg)`
 }))
+
+// Debug logging for angle verification
+watch(() => props.value, (newValue) => {
+  const clampedValue = Math.max(0, Math.min(100, newValue))
+  const angle = needleAngle.value
+  const normalizedAngle = angle >= 360 ? angle - 360 : angle
+
+  console.log(`🍄 Mold Meter Debug:`)
+  console.log(`  Value: ${clampedValue}%`)
+  console.log(`  Angle: ${angle}° (normalized: ${normalizedAngle}°)`)
+
+  // Log every 10% increment
+  if (clampedValue % 10 === 0) {
+    console.log(`  ✅ ${clampedValue}% = ${angle}°`)
+  }
+})
 
 const onFart = () => {
   emit('fart')

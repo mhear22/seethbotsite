@@ -5,7 +5,7 @@ const honkCount = ref(0)
 const isMigrating = ref(false)
 const currentMessage = ref('Honk!')
 
-const honkSound = new Audio('/goose-honk.mp3')
+const honkSound = new Audio('/honk-sound.mp3')
 
 const messages = [
   'Honk!',
