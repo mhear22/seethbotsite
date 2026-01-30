@@ -1,9 +1,11 @@
 <script setup lang="ts">
-/*
 import { ref, onMounted, computed, provide } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import MainApp from './components/MainApp.vue'
 import Router from './components/Router.vue'
+
+// Router
+const router = useRouter()
 
 // State
 const darkMode = ref(false)
@@ -15,10 +17,12 @@ const fartClicked = ref(false)
 const fartExploded = ref(false)
 const mikaModalOpen = ref(false)
 const confirmationOpen = ref(false)
+const currentRoute = ref('home')
 const panelOpen = ref({
   rankings: true,
   cat: true,
   feed: false,
+  digitalGoose: true,
   coolnessPanel: true
 })
 
@@ -124,6 +128,11 @@ const closeMikaModal = () => {
   mikaModalOpen.value = false
 }
 
+const onRouteChange = (route: string) => {
+  currentRoute.value = route
+  router.push(`/${route}`)
+}
+
 const loadRankings = async () => {
   try {
     const response = await fetch('/api/rankings')
@@ -188,10 +197,32 @@ onMounted(() => {
   // Refresh rankings every 30 seconds
   setInterval(loadRankings, 30000)
 })
-*/
-import MainApp from "./components/MainApp.vue"
+
 </script>
 
 <template>
-  <MainApp/>
+  <MainApp
+    :dark-mode="darkMode"
+    :music-playing="musicPlaying"
+    :current-route="currentRoute"
+    :current-quote="quotes[currentQuoteIndex]"
+    :current-cat-image="catImage"
+    :tach-value="tachValue"
+    :fart-clicked="fartClicked"
+    :fart-exploded="fartExploded"
+    :rankings="rankings"
+    :panels="panelOpen"
+    :mika-modal-open="mikaModalOpen"
+    :confirmation-open="confirmationOpen"
+    @toggle-dark-mode="toggleDarkMode"
+    @toggle-music="toggleMusic"
+    @toggle-panel="togglePanel"
+    @route-change="onRouteChange"
+    @mika-close="closeMikaModal"
+    @close-confirmation="closeConfirmation"
+    @next-quote="nextQuote"
+    @new-cat="nextCat"
+    @fart="onFart"
+    @turn-me="onTurnMe"
+  />
 </template>
