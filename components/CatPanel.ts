@@ -1,4 +1,6 @@
-export const CatPanel = {
+import { defineComponent } from 'vue'
+
+export const CatPanel = defineComponent({
   template: `
     <div class="cat-panel" :class="{ collapsed: !isOpen }">
       <div class="cat-header">
@@ -29,7 +31,7 @@ export const CatPanel = {
   emits: ['toggle', 'new-cat'],
   methods: {
     toggle() {
-      this.$emit('toggle');
+      this.$emit('toggle')
     }
   }
-};
+});

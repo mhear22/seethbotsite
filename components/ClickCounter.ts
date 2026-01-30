@@ -1,4 +1,11 @@
-export const ClickCounter = {
+import { defineComponent } from 'vue'
+
+interface ClickData {
+  count: number
+  timestamp: string
+}
+
+export const ClickCounter = defineComponent({
   template: `
     <div class="click-counter">
       <div class="counter-header">
@@ -31,64 +38,55 @@ export const ClickCounter = {
       count: 0,
       loading: false,
       isClicking: false,
-      lastUpdate: null
-    };
+      lastUpdate: null as Date | null
+    }
   },
   methods: {
     async fetchCount() {
       try {
-        const response = await fetch(this.apiUrl);
-        const data = await response.json();
-        this.count = data.count;
-        this.lastUpdate = new Date(data.timestamp);
+        const response = await fetch(this.apiUrl)
+        const data = await response.json() as ClickData
+        this.count = data.count
+        this.lastUpdate = new Date(data.timestamp)
       } catch (error) {
-        console.error('Error fetching click count:', error);
+        console.error('Error fetching click count:', error)
       }
     },
     async incrementClick() {
-      if (this.loading) return;
+      if (this.loading) return
       
-      this.loading = true;
-      this.isClicking = true;
+      this.loading = true
+      this.isClicking = true
       
       try {
         const response = await fetch(`${this.apiUrl}/increment`, {
           method: 'POST'
-        });
-        const data = await response.json();
-        this.count = data.count;
-        this.lastUpdate = new Date(data.timestamp);
+        })
+        const data = await response.json() as ClickData
+        this.count = data.count
+        this.lastUpdate = new Date(data.timestamp)
         
-        // Reset animation after short delay
         setTimeout(() => {
-          this.isClicking = false;
-        }, 100);
+          this.isClicking = false
+        }, 100)
       } catch (error) {
-        console.error('Error incrementing click:', error);
+        console.error('Error incrementing click:', error)
       } finally {
-        this.loading = false;
+        this.loading = false
       }
     },
-    formatTime(date) {
-      const now = new Date();
-      const diff = now - date;
+    formatTime(date: Date): string {
+      const now = new Date()
+      const diff = now.getTime() - date.getTime()
       
-      if (diff < 1000) return 'just now';
-      if (diff < 60000) return `${Math.floor(diff / 1000)}s ago`;
-      if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
-      return date.toLocaleTimeString();
+      if (diff < 1000) return 'just now'
+      if (diff < 60000) return `${Math.floor(diff / 1000)}s ago`
+      if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`
+      return date.toLocaleTimeString()
     }
   },
   mounted() {
-    this.fetchCount();
-    // Refresh count every 5 seconds
-    this.refreshInterval = setInterval(() => {
-      this.fetchCount();
-    }, 5000);
-  },
-  beforeUnmount() {
-    if (this.refreshInterval) {
-      clearInterval(this.refreshInterval);
-    }
+    this.fetchCount()
+    setInterval(() => this.fetchCount(), 5000)
   }
-};
+})

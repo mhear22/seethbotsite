@@ -1,4 +1,6 @@
-export const Tachometer = {
+import { defineComponent } from 'vue'
+
+export const Tachometer = defineComponent({
   template: `
     <div class="tachometer">
       <div class="tachometer-dial">
@@ -20,7 +22,7 @@ export const Tachometer = {
     value: {
       type: Number,
       default: 77,
-      validator: (v) => v >= 0 && v <= 100
+      validator: (v: number) => v >= 0 && v <= 100
     },
     clicked: {
       type: Boolean,
@@ -33,28 +35,19 @@ export const Tachometer = {
   },
   emits: ['fart'],
   computed: {
-    /**
-     * Calculate needle angle based on mold percentage.
-     * 0% → 225° (bottom left)
-     * 50% → 270° (top)
-     * 100% → 315° (top right)
-     * Arc spans 90° from bottom-left to top-right.
-     */
-    needleAngle() {
-      // Clamp value to 0-100 range
-      const clampedValue = Math.max(0, Math.min(100, this.value));
-      // Map 0-100 to 225-315 degrees
-      return 225 + (clampedValue * 0.9);
+    needleAngle(): number {
+      const clampedValue = Math.max(0, Math.min(100, this.value))
+      return 225 + (clampedValue * 0.9)
     },
-    needleStyle() {
+    needleStyle(): { transform: string } {
       return {
         transform: `rotate(${this.needleAngle}deg)`
-      };
+      }
     }
   },
   methods: {
     onFart() {
-      this.$emit('fart');
+      this.$emit('fart')
     }
   }
-};
+})

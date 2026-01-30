@@ -1,4 +1,7 @@
-export const RankingsPanel = {
+import { defineComponent } from 'vue'
+import type { RankingItem } from './MainApp.js'
+
+export const RankingsPanel = defineComponent({
   template: `
     <div class="rankings-panel" :class="{ collapsed: !isOpen }">
       <div class="rankings-header">
@@ -21,14 +24,14 @@ export const RankingsPanel = {
       default: true
     },
     rankings: {
-      type: Array,
+      type: Array as () => RankingItem[],
       required: true
     }
   },
   emits: ['toggle'],
   methods: {
     toggle() {
-      this.$emit('toggle');
+      this.$emit('toggle')
     }
   }
-};
+});
