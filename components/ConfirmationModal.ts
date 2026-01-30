@@ -1,4 +1,6 @@
-export const ConfirmationModal = {
+import { defineComponent } from 'vue'
+
+export const ConfirmationModal = defineComponent({
   template: `
     <div class="confirmation" :class="{ active: isOpen }" @click.self="close">
       <div class="confirmation-box">
@@ -28,4 +30,4 @@ export const ConfirmationModal = {
       this.$emit('confirm');
     }
   }
-};
+});

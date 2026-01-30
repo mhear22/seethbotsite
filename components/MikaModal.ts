@@ -1,4 +1,6 @@
-export const MikaModal = {
+import { defineComponent } from 'vue'
+
+export const MikaModal = defineComponent({
   template: `
     <div class="mika-modal" :class="{ active: isOpen }" @click.self="close">
       <div class="mika-modal-box">
@@ -20,4 +22,4 @@ export const MikaModal = {
       this.$emit('close');
     }
   }
-};
+});

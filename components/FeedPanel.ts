@@ -1,4 +1,6 @@
-export const FeedPanel = {
+import { defineComponent } from 'vue'
+
+export const FeedPanel = defineComponent({
   template: `
     <div class="feed-panel" :class="{ collapsed: !isOpen }">
       <div class="feed-header">
@@ -36,4 +38,4 @@ export const FeedPanel = {
       this.$emit('toggle');
     }
   }
-};
+});

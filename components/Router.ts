@@ -1,4 +1,15 @@
-export const Router = {
+import { defineComponent } from 'vue'
+
+interface RouteData {
+  title: string
+  icon: string
+}
+
+interface Routes {
+  [key: string]: RouteData
+}
+
+export const Router = defineComponent({
   props: {
     currentRoute: {
       type: String,
@@ -14,11 +25,11 @@ export const Router = {
         about: { title: 'About', icon: 'ℹ️' },
         rankings: { title: 'Rankings', icon: '👻' },
         cats: { title: 'Cats', icon: '🐱' }
-      }
+      } as Routes
     };
   },
   methods: {
-    navigate(route) {
+    navigate(route: string) {
       this.$emit('route-change', route);
       window.scrollTo(0, 0);
     }
@@ -38,4 +49,4 @@ export const Router = {
     </div>
   `,
   emits: ['route-change']
-};
+});

@@ -1,4 +1,6 @@
-export const GirlModePage = {
+import { defineComponent } from 'vue'
+
+export const GirlModePage = defineComponent({
   template: `
     <div class="girl-mode-container">
       <div class="girl-mode-content">
@@ -38,10 +40,5 @@ export const GirlModePage = {
       default: false
     }
   },
-  emits: ['back'],
-  methods: {
-    goBack() {
-      this.$emit('back');
-    }
-  }
-};
+  emits: ['back']
+});

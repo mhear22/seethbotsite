@@ -1,4 +1,6 @@
-export const ControlButtons = {
+import { defineComponent } from 'vue'
+
+export const ControlButtons = defineComponent({
   template: `
     <div>
       <button class="rankings-toggle" @click="$emit('toggle-rankings')" title="Toggle rankings">👻</button>
@@ -23,4 +25,4 @@ export const ControlButtons = {
     }
   },
   emits: ['toggle-rankings', 'toggle-dark', 'toggle-music', 'toggle-feed', 'toggle-mika']
-};
+});

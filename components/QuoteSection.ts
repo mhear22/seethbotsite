@@ -1,4 +1,6 @@
-export const QuoteSection = {
+import { defineComponent } from 'vue'
+
+export const QuoteSection = defineComponent({
   template: `
     <div class="quote-section">
       <div class="quote-text" @click="nextQuote">"{{ currentQuote }}"</div>
@@ -16,4 +18,4 @@ export const QuoteSection = {
       this.$emit('next-quote');
     }
   }
-};
+});
