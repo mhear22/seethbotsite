@@ -6,7 +6,7 @@ const props = withDefaults(defineProps<{
   clicked?: boolean
   exploded?: boolean
 }>(), {
-  value: 77,
+  value: 0,
   clicked: false,
   exploded: false
 })
@@ -16,13 +16,14 @@ const emit = defineEmits<{
 }>()
 
 // Calculate needle angle based on percentage (0-100%)
-// 0% = 225° (bottom left), 50% = 135° (top), 100% = 45° (bottom right)
-// This creates a 270° arc going counter-clockwise from bottom-left to bottom-right through top
+// 0% should point to bottom-left (start of arc), 100% to bottom-right (end of arc)
+// Gauge goes from bottom-left (135°) → top (225°) → bottom-right (315°)
+// This is a 180° arc going clockwise
 const needleAngle = computed(() => {
   const clampedValue = Math.max(0, Math.min(100, props.value))
-  // Map 0-100 to 225-45 (counter-clockwise)
-  // 225 - (value/100 * 180) = 225 - 1.8 * value
-  return 225 - (clampedValue * 1.8)
+  // Map 0-100 to 135-315 (clockwise)
+  // 135 + (value/100 * 180) = 135 + 1.8 * value
+  return 135 + (clampedValue * 1.8)
 })
 
 const needleStyle = computed(() => ({
