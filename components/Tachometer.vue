@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 
 const props = withDefaults(defineProps<{
   value?: number
@@ -15,16 +15,35 @@ const emit = defineEmits<{
   fart: []
 }>()
 
-const needleAngle = computed(() => {
-  const clampedValue = Math.max(0, Math.min(100, props.value))
-  return 225 + (clampedValue * 0.9)
+// Calculate needle angle based on percentage (0-100%)
+// 0% = 225° (bottom left), 50% = 135° (top), 100% = 45° (bottom right)
+// This creates a 270° arc going counter-clockwise from bottom-left to bottom-right through top
+const currentAngle = ref(225) // Start at 225° (0%)
+
+const needleStyle = ref({
+  transform: `rotate(${currentAngle.value}deg)`
 })
 
-const needleStyle = computed(() => {
-  return {
-    transform: `rotate(${needleAngle.value}deg)`
+const calculateAngle = (value: number) => {
+  const clampedValue = Math.max(0, Math.min(100, value))
+  // Map 0-100 to 225-45 (counter-clockwise)
+  // 225 - (value/100 * 180) = 225 - 1.8 * value
+  return 225 - (clampedValue * 1.8)
+}
+
+// Only update when the value actually changes
+watch(() => props.value, (newValue, oldValue) => {
+  if (newValue !== oldValue) {
+    const newAngle = calculateAngle(newValue)
+    if (newAngle !== currentAngle.value) {
+      currentAngle.value = newAngle
+      needleStyle.value = {
+        transform: `rotate(${newAngle}deg)`
+      }
+      console.log(`[Tachometer] Value changed: ${oldValue} → ${newValue}, Angle: ${currentAngle.value}°`)
+    }
   }
-})
+}, { immediate: true })
 
 const onFart = () => {
   emit('fart')
@@ -34,17 +53,206 @@ const onFart = () => {
 <template>
   <div class="tachometer">
     <div class="tachometer-dial">
+      <!-- Ticks around the dial -->
       <div class="tachometer-ticks">
-        <div class="tick"></div>
-        <div class="tick major"></div>
-        <div class="tick"></div>
-        <div class="tick major"></div>
-        <div class="tick"></div>
+        <div v-for="i in 9" :key="i" class="tick" :class="{ major: i % 3 === 1 }" :style="{ transform: `rotate(${(i - 1) * 45}deg) translate(0, -45px)` }"></div>
       </div>
-      <div class="tachometer-needle" :style="needleStyle"></div>
-      <div class="tachometer-label">🍄 MOLD METER</div>
-      <div class="tachometer-value">{{ value }}%</div>
+
+      <!-- Value labels -->
+      <div class="tachometer-labels">
+        <span class="label label-0">0%</span>
+        <span class="label label-50">50%</span>
+        <span class="label label-100">100%</span>
+      </div>
+
+      <!-- Needle -->
+      <div class="tachometer-needle" :style="needleStyle">
+        <div class="needle-body"></div>
+        <div class="needle-tip"></div>
+      </div>
+
+      <!-- Center cap -->
+      <div class="tachometer-cap"></div>
+
+      <!-- Digital readout -->
+      <div class="tachometer-value">{{ Math.round(value) }}%</div>
     </div>
+
+    <div class="tachometer-title">🍄 MOLD METER</div>
+
     <button class="fart-btn" @click="onFart" :class="{ exploded: exploded }" :disabled="clicked">💨 Fart!</button>
   </div>
 </template>
+
+<style scoped>
+.tachometer {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  z-index: 100;
+}
+
+.tachometer-dial {
+  position: relative;
+  width: 140px;
+  height: 140px;
+  background: #2d3436;
+  border-radius: 50%;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border: 4px solid #636e72;
+}
+
+.tachometer-ticks {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+}
+
+.tick {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 2px;
+  height: 12px;
+  background: rgba(255, 255, 255, 0.5);
+  transform-origin: center;
+}
+
+.tick.major {
+  width: 4px;
+  height: 18px;
+  background: #fff;
+}
+
+.tachometer-labels {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+}
+
+.label {
+  position: absolute;
+  font-size: 11px;
+  font-weight: bold;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.label-0 {
+  bottom: 15px;
+  left: 20px;
+}
+
+.label-50 {
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.label-100 {
+  bottom: 15px;
+  right: 20px;
+}
+
+.tachometer-needle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  transform-origin: center;
+  transition: transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.needle-body {
+  position: absolute;
+  top: -3px;
+  left: -50px;
+  width: 50px;
+  height: 6px;
+  background: linear-gradient(90deg, #ff6b6b, #ee5a5a);
+  border-radius: 3px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.needle-tip {
+  position: absolute;
+  top: -4px;
+  left: -52px;
+  width: 8px;
+  height: 8px;
+  background: #ff6b6b;
+  border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.tachometer-cap {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  background: linear-gradient(145deg, #636e72, #4a5559);
+  border-radius: 50%;
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.3),
+    inset 0 1px 2px rgba(255, 255, 255, 0.2);
+  z-index: 2;
+}
+
+.tachometer-value {
+  position: absolute;
+  bottom: 35px;
+  font-size: 20px;
+  font-weight: bold;
+  font-family: 'Courier New', monospace;
+  color: #00cec9;
+  z-index: 5;
+}
+
+.tachometer-title {
+  font-size: 12px;
+  font-weight: bold;
+  color: #2d3436;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.fart-btn {
+  background: linear-gradient(145deg, #00b894, #00a383);
+  color: white;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  font-family: inherit;
+  box-shadow: 0 4px 12px rgba(0, 184, 148, 0.4);
+  transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.fart-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 184, 148, 0.5);
+}
+
+.fart-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.fart-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.fart-btn.exploded {
+  background: linear-gradient(145deg, #fdcb6e, #f3b739);
+  box-shadow: 0 4px 12px rgba(253, 203, 110, 0.6);
+}
+</style>
