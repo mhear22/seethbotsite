@@ -2,6 +2,7 @@ import express, { Express, Request, Response, NextFunction } from 'express';
 import path from 'path';
 import cors from 'cors';
 import compression from 'compression';
+import { getClickCount, incrementClick, resetClick } from './db';
 
 const app: Express = express();
 const PORT = process.env.PORT || 3000;
@@ -31,6 +32,37 @@ app.get('/api/rankings', (req: Request, res: Response) => {
     { avatar: '😺', name: '美香', score: 767 },
     { avatar: '🍄', name: 'Goopsworthy', score: 667 }
   ]);
+});
+
+// Click counter API
+app.get('/api/clicks', (req: Request, res: Response) => {
+  try {
+    const count = getClickCount();
+    res.json({ count, timestamp: new Date().toISOString() });
+  } catch (error) {
+    console.error('Error getting click count:', error);
+    res.status(500).json({ error: 'Failed to get click count' });
+  }
+});
+
+app.post('/api/clicks/increment', (req: Request, res: Response) => {
+  try {
+    const newCount = incrementClick();
+    res.json({ count: newCount, timestamp: new Date().toISOString() });
+  } catch (error) {
+    console.error('Error incrementing click:', error);
+    res.status(500).json({ error: 'Failed to increment click' });
+  }
+});
+
+app.post('/api/clicks/reset', (req: Request, res: Response) => {
+  try {
+    const newCount = resetClick();
+    res.json({ count: newCount, timestamp: new Date().toISOString() });
+  } catch (error) {
+    console.error('Error resetting clicks:', error);
+    res.status(500).json({ error: 'Failed to reset clicks' });
+  }
 });
 
 // Vue.js SPA fallback - all other routes serve index.html

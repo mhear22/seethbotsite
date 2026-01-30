@@ -11,6 +11,7 @@ services:
       - "8081:3000"    # Host 8081 → Container 3000
     volumes:
       - /home/seethbotsite:/app/seethbotsite:ro
+      - seethbot-data:/app/server/data
     environment:
       - NODE_ENV=production
       - PORT=3000
@@ -31,4 +32,7 @@ services:
     environment:
       - NGINX_HOST=seethbot
       - NGINX_PORT=8081
+
+volumes:
+  seethbot-data:
 
