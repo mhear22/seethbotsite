@@ -236,7 +236,7 @@ export const MainApp = {
     'toggle-panel',
     'route-change',
     'mika-close',
-    'confirmation-close',
+    'close-confirmation',
     'next-quote',
     'new-cat',
     'fart',
@@ -286,7 +286,7 @@ export const MainApp = {
       this.$emit('mika-close');
     },
     closeConfirmation() {
-      this.$emit('confirmation-close');
+      this.$emit('close-confirmation');
     },
     goToGirlMode() {
       console.log('Going to girl mode...');
