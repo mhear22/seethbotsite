@@ -1409,9 +1409,6 @@ body.dark .mika-modal-box {
 
 /* Click Counter */
 .click-counter {
-  position: fixed;
-  top: 80px;
-  right: 20px;
   background: rgba(255, 255, 255, 0.95);
   padding: 15px 20px;
   border-radius: 20px;
@@ -1419,6 +1416,7 @@ body.dark .mika-modal-box {
   z-index: 100;
   min-width: 200px;
   transition: transform 0.3s ease;
+  margin: 20px auto;
 }
 
 .dark .click-counter {
@@ -1504,17 +1502,10 @@ body.dark .mika-modal-box {
 }
 
 @media (max-width: 768px) {
-  .click-counter {
-    top: auto;
-    bottom: 20px;
-    right: 20px;
-    min-width: 150px;
-  }
-  
   .click-count {
     font-size: 2rem;
   }
-  
+
   .click-btn {
     padding: 10px 20px;
     font-size: 0.9rem;

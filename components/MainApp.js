@@ -49,9 +49,6 @@ export const MainApp = {
             @fart="onFart"
           />
 
-          <!-- Click Counter -->
-          <ClickCounter />
-
           <!-- Main container -->
           <div class="container">
             <div class="sparkles">✨</div>
@@ -90,7 +87,12 @@ export const MainApp = {
               <li>🐱 Random cats</li>
               <li>💨 Mold meter</li>
               <li>🌸 Girl mode</li>
+              <li>🖱️ Persistent click counter</li>
             </ul>
+
+            <!-- Click Counter -->
+            <ClickCounter />
+
             <button class="cute-btn" @click="onRouteChange('home')">← Back Home</button>
           </div>
         </div>
