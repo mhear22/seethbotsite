@@ -8,23 +8,59 @@ interface ClickData {
 
 const props = withDefaults(defineProps<{
   apiUrl?: string
+  initialInterval?: number
+  maxInterval?: number
+  backoffMultiplier?: number
 }>(), {
-  apiUrl: '/api/clicks'
+  apiUrl: '/api/clicks',
+  initialInterval: 1000,
+  maxInterval: 30000,
+  backoffMultiplier: 2
 })
 
 const count = ref(0)
 const loading = ref(false)
 const isClicking = ref(false)
 const lastUpdate = ref<Date | null>(null)
+const pollInterval = ref(props.initialInterval)
+let intervalId: number | null = null
+
+const scheduleNextFetch = () => {
+  if (intervalId !== null) {
+    clearInterval(intervalId)
+  }
+  intervalId = window.setTimeout(() => {
+    fetchCount()
+  }, pollInterval.value)
+}
+
+const resetBackoff = () => {
+  pollInterval.value = props.initialInterval
+}
+
+const increaseBackoff = () => {
+  const nextInterval = pollInterval.value * props.backoffMultiplier
+  pollInterval.value = Math.min(nextInterval, props.maxInterval)
+}
 
 const fetchCount = async () => {
   try {
     const response = await fetch(props.apiUrl)
     const data = await response.json() as ClickData
+
+    if (data.count !== count.value) {
+      resetBackoff()
+    } else {
+      increaseBackoff()
+    }
+
     count.value = data.count
     lastUpdate.value = new Date(data.timestamp)
+
+    scheduleNextFetch()
   } catch (error) {
     console.error('Error fetching click count:', error)
+    scheduleNextFetch()
   }
 }
 
@@ -41,6 +77,7 @@ const incrementClick = async () => {
     const data = await response.json() as ClickData
     count.value = data.count
     lastUpdate.value = new Date(data.timestamp)
+    resetBackoff()
 
     setTimeout(() => {
       isClicking.value = false
@@ -64,8 +101,12 @@ const formatTime = (date: Date): string => {
 
 onMounted(() => {
   fetchCount()
-  const interval = setInterval(() => fetchCount(), 5000)
-  onBeforeUnmount(() => clearInterval(interval))
+})
+
+onBeforeUnmount(() => {
+  if (intervalId !== null) {
+    clearTimeout(intervalId)
+  }
 })
 </script>
 
