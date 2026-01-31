@@ -163,6 +163,35 @@ const simulatePreferentialVoting = (movies: Movie[], votes: any[]) => {
   return rounds
 }
 
+const endVoting = async () => {
+  if (!confirm('Are you sure you want to end voting? This will calculate the winner and close the voting round.')) {
+    return
+  }
+
+  try {
+    const response = await fetch('/api/movies/voting-round/end', {
+      method: 'POST'
+    })
+
+    if (response.ok) {
+      const data = await response.json()
+      alert('Voting ended! The winner is ' + (winner.value?.title || 'Unknown') + '! 🏆')
+      results.value = {
+        rounds: data.results,
+        totalVotes: votes.length,
+        winner: data.winner
+      }
+      votingRound.value!.isActive = false
+      emit('refresh')
+    } else {
+      alert('Failed to end voting')
+    }
+  } catch (error) {
+    console.error('Error ending voting:', error)
+    alert('Failed to end voting')
+  }
+}
+
 const resetVoting = async () => {
   if (!confirm('Are you sure you want to reset all voting? This will delete all votes and the current round.')) {
     return
@@ -201,7 +230,7 @@ onMounted(() => {
     <div v-else-if="votingRound.isActive" class="voting-active">
       <div class="active-message">
         <h2>🗳️ Voting in Progress</h2>
-        <p>Voting is still open. Check back after the voting round ends to see the results!</p>
+        <p>Voting is still open. Click the button below when everyone has voted!</p>
         <div class="stats">
           <div class="stat-item">
             <span class="stat-value">{{ votes.length }}</span>
@@ -212,6 +241,7 @@ onMounted(() => {
             <span class="stat-label">Movies</span>
           </div>
         </div>
+        <button class="btn-end" @click="endVoting">🏁 End Voting</button>
       </div>
     </div>
 
@@ -384,6 +414,24 @@ onMounted(() => {
 
 .btn-reset:hover {
   background: #d0d0d0;
+}
+
+.btn-end {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: white;
+  border: none;
+  padding: 15px 40px;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s;
+  margin-top: 20px;
+}
+
+.btn-end:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
 }
 
 .winner-section {
