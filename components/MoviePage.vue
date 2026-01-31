@@ -138,5 +138,20 @@ onMounted(() => {
   border-radius: 12px;
   padding: 20px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  min-height: 60vh;
+}
+
+/* Dark mode support */
+.dark .tab-content {
+  background: rgba(40, 44, 52, 0.95);
+  color: #e2e8f0;
+}
+
+.dark .movie-header h1 {
+  -webkit-text-fill-color: transparent;
+}
+
+.dark .subtitle {
+  color: #a0aec0;
 }
 </style>

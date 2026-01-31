@@ -9,10 +9,8 @@ body {
   font-family: 'Quicksand', sans-serif;
   background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
   min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   transition: background 0.5s ease;
 }
 
@@ -1380,6 +1378,584 @@ body.dark .mika-modal-box {
   .click-btn {
     padding: 10px 20px;
     font-size: 0.9rem;
+  }
+}
+
+/* ===== MOBILE RESPONSIVE DESIGN ===== */
+
+/* Mobile Header Controls */
+@media (max-width: 768px) {
+  .header-controls {
+    position: fixed;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 8px;
+    z-index: 200;
+    background: rgba(255, 255, 255, 0.95);
+    padding: 8px 12px;
+    border-radius: 20px;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15);
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 95vw;
+  }
+
+  .dark .header-controls {
+    background: rgba(40, 44, 52, 0.95);
+  }
+
+  .control-btn {
+    width: 40px;
+    height: 40px;
+    font-size: 20px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: rgba(255, 255, 255, 0.9);
+  }
+
+  .dark .control-btn {
+    background: rgba(60, 64, 72, 0.9);
+  }
+
+  .control-btn.active {
+    background: rgba(255, 107, 157, 0.2);
+    border: 2px solid #ff6b9d;
+  }
+
+  .dark .control-btn.active {
+    background: rgba(232, 94, 144, 0.2);
+    border-color: #e85e90;
+  }
+}
+
+/* Mobile Router Navigation */
+@media (max-width: 768px) {
+  .router-nav {
+    position: fixed;
+    top: 70px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 8px;
+    z-index: 200;
+    background: rgba(255, 255, 255, 0.95);
+    padding: 8px 12px;
+    border-radius: 20px;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15);
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 95vw;
+  }
+
+  .dark .router-nav {
+    background: rgba(40, 44, 52, 0.95);
+  }
+
+  .router-link {
+    padding: 8px 12px;
+    font-size: 12px;
+    border-radius: 15px;
+  }
+}
+
+/* Mobile Quote Section */
+@media (max-width: 768px) {
+  .quote-section {
+    position: fixed;
+    top: 130px;
+    left: 0;
+    width: 100%;
+    padding: 15px;
+    background: rgba(255, 255, 255, 0.95);
+    border-bottom: 1px solid rgba(255, 107, 157, 0.2);
+    z-index: 50;
+  }
+
+  .dark .quote-section {
+    background: rgba(40, 44, 52, 0.95);
+  }
+
+  .quote-text {
+    font-size: 16px;
+    line-height: 1.4;
+  }
+}
+
+/* Mobile Tachometer */
+@media (max-width: 768px) {
+  .tachometer {
+    position: fixed;
+    top: 200px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100;
+  }
+
+  .tachometer-dial {
+    width: 100px;
+    height: 100px;
+  }
+
+  .tachometer-value {
+    font-size: 14px;
+    bottom: 30px;
+  }
+
+  .tachometer-title {
+    font-size: 10px;
+  }
+
+  .fart-btn {
+    padding: 8px 16px;
+    font-size: 12px;
+  }
+}
+
+/* Mobile Rankings Panel */
+@media (max-width: 768px) {
+  .rankings-panel {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    max-height: 40vh;
+    overflow-y: auto;
+    background: rgba(255, 255, 255, 0.98);
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.15);
+    z-index: 150;
+    padding: 15px;
+    transition: transform 0.3s ease;
+  }
+
+  .dark .rankings-panel {
+    background: rgba(40, 44, 52, 0.98);
+  }
+
+  .rankings-panel.collapsed {
+    transform: translateY(100%);
+  }
+
+  .rankings-header h3 {
+    font-size: 14px;
+  }
+
+  .rank-item {
+    padding: 10px;
+  }
+
+  .rank-avatar {
+    font-size: 20px;
+    width: 32px;
+    height: 32px;
+  }
+
+  .rank-name {
+    font-size: 13px;
+  }
+
+  .rank-score {
+    font-size: 16px;
+  }
+}
+
+/* Mobile Cat Panel */
+@media (max-width: 768px) {
+  .cat-panel {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    max-height: 50vh;
+    overflow-y: auto;
+    background: rgba(255, 255, 255, 0.98);
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.15);
+    z-index: 140;
+    padding: 15px;
+    transition: transform 0.3s ease;
+  }
+
+  .dark .cat-panel {
+    background: rgba(40, 44, 52, 0.98);
+  }
+
+  .cat-panel.collapsed {
+    transform: translateY(100%);
+  }
+
+  .cat-header h3 {
+    font-size: 14px;
+  }
+
+  .cat-image {
+    max-height: 200px;
+    object-fit: contain;
+  }
+}
+
+/* Mobile Feed Panel */
+@media (max-width: 768px) {
+  .feed-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    overflow-y: auto;
+    background: rgba(255, 255, 255, 0.98);
+    border-radius: 0;
+    box-shadow: none;
+    z-index: 300;
+    transition: transform 0.3s ease;
+  }
+
+  .dark .feed-panel {
+    background: rgba(40, 44, 52, 0.98);
+  }
+
+  .feed-panel.collapsed {
+    transform: translateX(100%);
+  }
+
+  .feed-toggle {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    font-size: 20px;
+    z-index: 301;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .feed-section iframe {
+    height: 200px;
+  }
+
+  .feed-section p {
+    font-size: 11px;
+  }
+}
+
+/* Mobile Page Content */
+@media (max-width: 768px) {
+  .page-content {
+    padding: 220px 15px 20px;
+    min-height: 100vh;
+  }
+
+  .container {
+    max-width: 95%;
+    padding: 30px 20px;
+    border-radius: 20px;
+  }
+
+  h1 {
+    font-size: 28px;
+  }
+
+  p {
+    font-size: 16px;
+  }
+
+  .emoji {
+    font-size: 60px;
+  }
+
+  .button-row {
+    gap: 10px;
+  }
+
+  .cute-btn,
+  .turn-me-btn,
+  .girl-back-btn,
+  .detect-btn,
+  .back-btn {
+    padding: 12px 24px;
+    font-size: 14px;
+    border-radius: 25px;
+  }
+}
+
+/* Mobile Full Rankings List */
+@media (max-width: 768px) {
+  .rankings-container,
+  .cats-container {
+    max-width: 95%;
+    padding: 30px 20px;
+    border-radius: 20px;
+  }
+
+  .full-rank-item {
+    padding: 12px 15px;
+    flex-wrap: wrap;
+  }
+
+  .full-rank-number {
+    font-size: 20px;
+    min-width: 25px;
+  }
+
+  .full-rank-avatar {
+    font-size: 32px;
+    min-width: 40px;
+  }
+
+  .full-rank-name {
+    font-size: 16px;
+  }
+
+  .full-rank-score {
+    font-size: 14px;
+  }
+
+  .full-rank-trend {
+    font-size: 20px;
+    min-width: 25px;
+  }
+}
+
+/* Mobile Girl Mode Page */
+@media (max-width: 768px) {
+  .girl-mode-container {
+    padding: 220px 15px 20px;
+  }
+
+  .girl-mode-content {
+    max-width: 95%;
+    padding: 30px 20px;
+    border-radius: 20px;
+  }
+
+  .girl-emoji {
+    font-size: 80px;
+  }
+
+  .girl-features {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+
+  .girl-feature {
+    padding: 15px;
+  }
+
+  .feature-icon {
+    font-size: 32px;
+  }
+
+  .feature-text {
+    font-size: 16px;
+  }
+}
+
+/* Mobile About Page */
+@media (max-width: 768px) {
+  .about-container {
+    max-width: 95%;
+    padding: 30px 20px;
+    border-radius: 20px;
+  }
+
+  .about-container h1 {
+    font-size: 28px;
+  }
+
+  .about-container p {
+    font-size: 16px;
+  }
+
+  .about-container li {
+    font-size: 14px;
+  }
+}
+
+/* Mobile Gender Picker */
+@media (max-width: 768px) {
+  .gender-picker-container {
+    max-width: 95%;
+    padding: 30px 20px;
+    border-radius: 20px;
+  }
+
+  .gender-picker {
+    padding: 220px 15px 20px;
+  }
+
+  .name-input,
+  .country-select {
+    padding: 12px 15px;
+    font-size: 14px;
+  }
+
+  .gender-result h2 {
+    font-size: 24px;
+  }
+
+  .gender-result .result-emoji {
+    font-size: 60px;
+  }
+}
+
+/* Mobile Music Control and Dark Toggle */
+@media (max-width: 768px) {
+  .music-control,
+  .dark-toggle {
+    display: none; /* Hide individual toggles, use header controls instead */
+  }
+}
+
+/* Mobile Click Counter */
+@media (max-width: 768px) {
+  .click-counter {
+    margin: 15px auto;
+    padding: 12px 15px;
+    min-width: 180px;
+  }
+
+  .counter-header h3 {
+    font-size: 1rem;
+  }
+}
+
+/* Mobile Digital Goose */
+@media (max-width: 768px) {
+  /* Ensure goose doesn't cover important elements */
+  .digital-goose-container {
+    position: fixed !important;
+    bottom: 10px;
+    right: 10px;
+    z-index: 120;
+    transform: scale(0.8);
+  }
+}
+
+/* Mobile Background Circles */
+@media (max-width: 768px) {
+  .bg-circle:nth-child(1) {
+    width: 200px;
+    height: 200px;
+  }
+
+  .bg-circle:nth-child(2) {
+    width: 250px;
+    height: 250px;
+  }
+
+  .bg-circle:nth-child(3) {
+    width: 300px;
+    height: 300px;
+  }
+}
+
+/* Mobile Emulator */
+@media (max-width: 768px) {
+  .emulator-container {
+    position: fixed;
+    bottom: 10px;
+    right: 10px;
+    z-index: 110;
+    transform: scale(0.7);
+  }
+
+  .emulator-label {
+    display: none;
+  }
+}
+
+/* Mobile Confirmation and Modals */
+@media (max-width: 768px) {
+  .confirmation-box,
+  .mika-modal-box {
+    max-width: 90%;
+    padding: 40px 30px;
+    border-radius: 20px;
+  }
+
+  .confirmation .emoji,
+  .mika-modal-box .emoji {
+    font-size: 80px;
+  }
+}
+
+/* Small Mobile Devices (< 480px) */
+@media (max-width: 480px) {
+  .header-controls {
+    gap: 6px;
+    padding: 6px 10px;
+  }
+
+  .control-btn {
+    width: 36px;
+    height: 36px;
+    font-size: 18px;
+  }
+
+  .router-link {
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+
+  .quote-text {
+    font-size: 14px;
+  }
+
+  .tachometer-dial {
+    width: 80px;
+    height: 80px;
+  }
+
+  .rankings-panel,
+  .cat-panel,
+  .feed-panel {
+    max-height: 45vh;
+  }
+
+  h1 {
+    font-size: 24px;
+  }
+
+  .emoji {
+    font-size: 50px;
+  }
+}
+
+/* Landscape Mobile */
+@media (max-width: 768px) and (orientation: landscape) {
+  .quote-section {
+    top: 60px;
+    padding: 10px;
+  }
+
+  .quote-text {
+    font-size: 14px;
+  }
+
+  .tachometer {
+    top: 110px;
+  }
+
+  .rankings-panel,
+  .cat-panel {
+    max-height: 35vh;
+  }
+
+  .page-content {
+    padding: 140px 15px 20px;
   }
 }
 

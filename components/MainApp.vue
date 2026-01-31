@@ -105,7 +105,7 @@ const getTrendClass = (index: number) => {
 </script>
 
 <template>
-  <div class="main-app" :class="{ dark: darkMode }">
+  <div class="main-app" :class="{ dark: darkMode, 'centered': currentRoute === 'home' }">
     <!-- Header Controls -->
     <div class="header-controls">
       <button @click="toggleDarkMode" class="control-btn" :class="{ active: darkMode }">
@@ -272,5 +272,24 @@ const getTrendClass = (index: number) => {
 
 .dark .score {
   color: #68d391;
+}
+
+/* Main App Container */
+.main-app {
+  min-height: 100vh;
+  width: 100%;
+  padding-top: 80px;
+}
+
+/* Center content on home page */
+.main-app.centered {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* All other pages allow natural scrolling */
+.main-app:not(.centered) {
+  display: block;
 }
 </style>
