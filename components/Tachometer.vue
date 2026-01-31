@@ -16,14 +16,11 @@ const emit = defineEmits<{
 }>()
 
 // Calculate needle angle based on percentage (0-100%)
-// 0% = 225° (bottom-left), 50% = 0°/360° (top), 100% = 135° (bottom-right)
-// Gauge goes clockwise from 225° → 360° → 135° (270° total arc)
+// Formula: (percentage x 270) - 45
 const needleAngle = computed(() => {
   const clampedValue = Math.max(0, Math.min(100, props.value))
-  // Map 0-100 to 225-495 (clockwise)
-  // 225 + (value/100 * 270) = 225 + 2.7 * value
-  // Results: 0%=225°, 50%=360°(0°), 100%=495°(135°)
-  return 225 + (clampedValue * 2.7)
+  // Formula: (percentage/100 * 270) - 45
+  return (clampedValue / 100 * 270) - 45
 })
 
 const needleStyle = computed(() => ({

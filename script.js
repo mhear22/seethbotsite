@@ -103,8 +103,17 @@ document.getElementById('fartBtn').addEventListener('click', function() {
   if (fartClicked) return;
   fartClicked = true;
 
-  // Play sound effect
+  // Randomize value first
+  const valueElement = document.getElementById('tachValue');
+  const needle = document.getElementById('tachNeedle');
+  const randomValue = Math.floor(Math.random() * 100);
+
+  // Calculate volume: 0% = 0.0, 50% = 1.0, 100% = 2.0
+  const volume = randomValue / 50;
+
+  // Play sound effect with calculated volume
   const music = document.getElementById('fartSound');
+  music.volume = Math.min(volume, 2.0); // Cap at 2.0 for double volume
   music.currentTime = 0;
   music.play();
 
@@ -125,10 +134,7 @@ document.getElementById('fartBtn').addEventListener('click', function() {
     fartClicked = false;
   }, 500);
 
-  // Randomize value with spring animation
-  const valueElement = document.getElementById('tachValue');
-  const needle = document.getElementById('tachNeedle');
-  const randomValue = Math.floor(Math.random() * 100);
+  // Display value with spring animation
   if (valueElement) {
     valueElement.textContent = randomValue + '%';
     valueElement.style.animation = 'springBounce 0.3s ease';

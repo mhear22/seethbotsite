@@ -32,7 +32,14 @@ interface Portfolio {
   transactions: Transaction[]
 }
 
-const userId = ref<string>('user-' + Math.random().toString(36).substr(2, 9))
+// Store userId in localStorage to persist across page refreshes
+const savedUserId = localStorage.getItem('stock-market-user-id')
+const userId = ref<string>(savedUserId || 'user-' + Math.random().toString(36).substr(2, 9))
+
+// Save userId to localStorage if it's a new one
+if (!savedUserId) {
+  localStorage.setItem('stock-market-user-id', userId.value)
+}
 const stocks = ref<Stock[]>([])
 const portfolio = ref<Portfolio | null>(null)
 const portfolioValue = ref<number>(10000)
@@ -173,6 +180,18 @@ const formatTimestamp = (timestamp: number) => {
   return new Date(timestamp).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
 }
 
+// Convert Discord custom emoji format to HTML img tag
+const formatEmoji = (emoji: string): string => {
+  const customEmojiMatch = emoji.match(/^<a?:([a-zA-Z0-9_]+):(\d+)>$/)
+  if (customEmojiMatch) {
+    const emojiId = customEmojiMatch[2]
+    const isAnimated = emoji.startsWith('<a:')
+    const extension = isAnimated ? 'gif' : 'png'
+    return `<img src="https://cdn.discordapp.com/emojis/${emojiId}.${extension}" class="emoji" alt="emoji" loading="lazy" />`
+  }
+  return emoji
+}
+
 // Lifecycle
 onMounted(() => {
   loadStocks()
@@ -211,7 +230,7 @@ onUnmounted(() => {
             @click="selectStock(stock)"
           >
             <div class="stock-header">
-              <span class="stock-avatar">{{ stock.avatar }}</span>
+              <span class="stock-avatar" v-html="formatEmoji(stock.avatar)"></span>
               <span class="stock-name">{{ stock.name }}</span>
             </div>
             <div class="stock-price">{{ formatCurrency(stock.price) }}</div>
@@ -230,7 +249,7 @@ onUnmounted(() => {
         <!-- Trade Card -->
         <div v-if="selectedStock" class="trade-card">
           <h3>
-            {{ selectedStock.avatar }} {{ selectedStock.name }}
+            <span v-html="formatEmoji(selectedStock.avatar)"></span> {{ selectedStock.name }}
           </h3>
 
           <!-- Price Chart -->
@@ -441,6 +460,22 @@ body.dark .stock-card.active {
 
 .stock-avatar {
   font-size: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stock-avatar .emoji {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
+
+h3 .emoji {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  vertical-align: middle;
 }
 
 .stock-name {
