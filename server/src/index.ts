@@ -4,6 +4,7 @@ import cors from 'cors';
 import compression from 'compression';
 import { getClickCount, incrementClick, resetClick } from './db';
 import * as stockMarket from './stockMarket';
+import * as movies from './movies';
 
 const app: Express = express();
 const PORT = process.env.PORT || 3000;
@@ -38,6 +39,8 @@ app.get('/api/rankings', (req: Request, res: Response) => {
     { avatar: '🎮', name: 'RIUM+', score: 501 },  // Requested 1 point boost
     { avatar: '🍄', name: 'Goopsworthy', score: 667 },
     { avatar: '🎮', name: 'Blair', score: 900 },  // Mentioned in goose lore
+    { avatar: '✨', name: "Claire Salem %◕‿‿◕%", score: 500 },  // Asked if she's a good girl (she is!)
+    { avatar: '🧶', name: 'ShiYuan', score: 500 },  // First interaction - said hello to "tease/flirt"
     { avatar: '✨', name: 'Others', score: 500 }  // Default for everyone else
   ]);
 });
@@ -135,6 +138,134 @@ app.post('/api/clicks/reset', (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error resetting clicks:', error);
     res.status(500).json({ error: 'Failed to reset clicks' });
+  }
+});
+
+// Movie Night API
+app.get('/api/movies', (req: Request, res: Response) => {
+  try {
+    const allMovies = movies.getAllMovies();
+    res.json({ movies: allMovies, timestamp: new Date().toISOString() });
+  } catch (error) {
+    console.error('Error getting movies:', error);
+    res.status(500).json({ error: 'Failed to get movies' });
+  }
+});
+
+app.post('/api/movies', (req: Request, res: Response) => {
+  try {
+    const { title, suggestedBy, year, genre, notes, thumbnail } = req.body;
+    if (!title || !suggestedBy) {
+      return res.status(400).json({ error: 'Title and suggestedBy are required' });
+    }
+    const newMovie = movies.addMovie({
+      title,
+      suggestedBy,
+      year,
+      genre,
+      notes,
+      thumbnail
+    });
+    res.json({ movie: newMovie, timestamp: new Date().toISOString() });
+  } catch (error) {
+    console.error('Error adding movie:', error);
+    res.status(500).json({ error: 'Failed to add movie' });
+  }
+});
+
+app.delete('/api/movies/:id', (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const success = movies.deleteMovie(id);
+    if (!success) {
+      return res.status(404).json({ error: 'Movie not found' });
+    }
+    res.json({ success: true, timestamp: new Date().toISOString() });
+  } catch (error) {
+    console.error('Error deleting movie:', error);
+    res.status(500).json({ error: 'Failed to delete movie' });
+  }
+});
+
+app.get('/api/movies/voting-round', (req: Request, res: Response) => {
+  try {
+    const round = movies.getVotingRound();
+    res.json({ round, timestamp: new Date().toISOString() });
+  } catch (error) {
+    console.error('Error getting voting round:', error);
+    res.status(500).json({ error: 'Failed to get voting round' });
+  }
+});
+
+app.post('/api/movies/voting-round/start', (req: Request, res: Response) => {
+  try {
+    const { movieIds } = req.body;
+    if (!movieIds || !Array.isArray(movieIds) || movieIds.length === 0) {
+      return res.status(400).json({ error: 'movieIds array is required' });
+    }
+    const round = movies.createVotingRound(movieIds);
+    res.json({ round, timestamp: new Date().toISOString() });
+  } catch (error) {
+    console.error('Error starting voting round:', error);
+    res.status(500).json({ error: 'Failed to start voting round' });
+  }
+});
+
+app.post('/api/movies/voting-round/end', (req: Request, res: Response) => {
+  try {
+    const result = movies.endVotingRound();
+    res.json({ ...result, timestamp: new Date().toISOString() });
+  } catch (error) {
+    console.error('Error ending voting round:', error);
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to end voting round' });
+  }
+});
+
+app.post('/api/movies/voting-round/reset', (req: Request, res: Response) => {
+  try {
+    movies.resetVoting();
+    res.json({ success: true, timestamp: new Date().toISOString() });
+  } catch (error) {
+    console.error('Error resetting voting:', error);
+    res.status(500).json({ error: 'Failed to reset voting' });
+  }
+});
+
+app.get('/api/movies/votes', (req: Request, res: Response) => {
+  try {
+    const votes = movies.getVotes();
+    res.json({ votes, timestamp: new Date().toISOString() });
+  } catch (error) {
+    console.error('Error getting votes:', error);
+    res.status(500).json({ error: 'Failed to get votes' });
+  }
+});
+
+app.post('/api/movies/vote', (req: Request, res: Response) => {
+  try {
+    const { userId, rankings } = req.body;
+    if (!userId || !rankings || !Array.isArray(rankings) || rankings.length === 0) {
+      return res.status(400).json({ error: 'userId and rankings array are required' });
+    }
+    const vote = movies.addVote({ userId, rankings });
+    res.json({ vote, timestamp: new Date().toISOString() });
+  } catch (error) {
+    console.error('Error adding vote:', error);
+    res.status(500).json({ error: 'Failed to add vote' });
+  }
+});
+
+app.get('/api/movies/vote/:userId', (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+    const vote = movies.getUserVote(userId);
+    if (!vote) {
+      return res.status(404).json({ error: 'Vote not found' });
+    }
+    res.json({ vote, timestamp: new Date().toISOString() });
+  } catch (error) {
+    console.error('Error getting vote:', error);
+    res.status(500).json({ error: 'Failed to get vote' });
   }
 });
 

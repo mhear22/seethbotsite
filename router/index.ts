@@ -6,6 +6,7 @@ import About from '../components/AboutPage.vue'
 import Rankings from '../components/RankingsPage.vue'
 import Cats from '../components/CatsPage.vue'
 import StockMarket from '../components/StockMarket.vue'
+import MoviePage from '../components/MoviePage.vue'
 
 const routes = [
   {
@@ -42,6 +43,11 @@ const routes = [
     path: '/stocks',
     name: 'stocks',
     component: StockMarket
+  },
+  {
+    path: '/movies',
+    name: 'movies',
+    component: MoviePage
   }
 ]
 
