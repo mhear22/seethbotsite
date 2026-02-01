@@ -26,62 +26,92 @@
 
 ```
 /var/home/mika/Documents/git/seethbotsite/
-├── index.html              # Entry HTML (minimal, loads main.ts)
-├── main.ts                 # Application entry point
-├── App.vue                 # Root component
-├── vite.config.ts          # Vite configuration
-├── package.json            # Dependencies
-├── styles.css              # Global styles
 │
-├── components/             # Vue Single File Components
-│   ├── HomePage.vue        # Main landing page
-│   ├── GirlModePage.vue    # Girl mode route
-│   ├── GenderPage.vue      # Gender selection page
-│   ├── AboutPage.vue       # About page
-│   ├── RankingsPage.vue    # Rankings leaderboard page
-│   ├── CatsPage.vue        # Cat pictures page
-│   ├── StockMarket.vue     # Stock market game
-│   ├── MoviePage.vue       # Movie night coordinator
-│   ├── MovieResults.vue    # Movie voting results
-│   ├── MovieSuggestions.vue # Movie suggestions
-│   ├── MovieVoting.vue     # Movie voting interface
-│   ├── MainApp.vue         # Main app layout
-│   ├── Tachometer.vue      # Mold meter gauge
-│   ├── RankingsPanel.vue   # Rankings panel component
-│   ├── CatPanel.vue        # Cat picture panel
-│   ├── FeedPanel.vue       # Live feeds panel
-│   ├── QuoteSection.vue    # Quote display
-│   ├── MikaModal.vue       # Modal for Mika button
-│   ├── ConfirmationModal.vue # Confirmation dialog
-│   ├── ControlButtons.vue  # Control button group
-│   ├── DigitalGoose.vue    # Goose character
-│   ├── GenderPicker.vue    # Gender selection UI
-│   ├── EmojiRenderer.vue   # Emoji display
-│   ├── ClickCounter.vue    # Click counter component
-│   └── Router.vue          # Router component
+├── frontend/               # Frontend application (Vue.js + Vite)
+│   ├── index.html          # Entry HTML
+│   ├── main.ts             # Application entry point
+│   ├── App.vue             # Root component
+│   ├── styles.css          # Global styles
+│   ├── vite.config.ts      # Vite configuration
+│   ├── tsconfig.json       # TypeScript configuration
+│   ├── package.json        # Frontend dependencies
+│   │
+│   ├── components/         # Vue Single File Components
+│   │   ├── HomePage.vue    # Main landing page
+│   │   ├── GirlModePage.vue # Girl mode route
+│   │   ├── GenderPage.vue  # Gender selection page
+│   │   ├── AboutPage.vue   # About page
+│   │   ├── RankingsPage.vue # Rankings leaderboard page
+│   │   ├── CatsPage.vue    # Cat pictures page
+│   │   ├── StockMarket.vue # Stock market game
+│   │   ├── MoviePage.vue   # Movie night coordinator
+│   │   ├── MovieResults.vue # Movie voting results
+│   │   ├── MovieSuggestions.vue # Movie suggestions
+│   │   ├── MovieVoting.vue # Movie voting interface
+│   │   ├── MainApp.vue     # Main app layout
+│   │   ├── Tachometer.vue  # Mold meter gauge
+│   │   ├── RankingsPanel.vue # Rankings panel component
+│   │   ├── CatPanel.vue    # Cat picture panel
+│   │   ├── FeedPanel.vue   # Live feeds panel
+│   │   ├── QuoteSection.vue # Quote display
+│   │   ├── MikaModal.vue   # Modal for Mika button
+│   │   ├── ConfirmationModal.vue # Confirmation dialog
+│   │   ├── ControlButtons.vue # Control button group
+│   │   ├── DigitalGoose.vue # Goose character
+│   │   ├── GenderPicker.vue # Gender selection UI
+│   │   ├── EmojiRenderer.vue # Emoji display
+│   │   ├── ClickCounter.vue # Click counter component
+│   │   └── Router.vue      # Router component
+│   │
+│   ├── stores/             # Pinia stores
+│   │   └── useAppStore.ts  # Main application store
+│   │
+│   ├── composables/        # Reusable composition functions
+│   │   ├── useAudio.ts     # Audio playback logic
+│   │   ├── useCat.ts       # Cat API integration
+│   │   ├── useRankings.ts  # Rankings data fetching
+│   │   └── usePanels.ts    # Panel state management
+│   │
+│   ├── router/             # Vue Router configuration
+│   │   └── index.ts        # Route definitions
+│   │
+│   ├── utils/              # Utility functions
+│   │   └── emoji.ts        # Emoji utilities
+│   │
+│   ├── public/             # Static assets (copied to dist)
+│   │   ├── fart-with-reverb.mp3
+│   │   ├── goose-honk.mp3
+│   │   └── honk-sound.mp3
+│   │
+│   └── dist/               # Frontend build output (production)
 │
-├── stores/                 # Pinia stores
-│   └── useAppStore.ts      # Main application store
+├── backend/                # Backend server (Node.js + Express)
+│   ├── package.json        # Backend dependencies
+│   ├── tsconfig.json       # TypeScript configuration
+│   ├── README.md           # Backend documentation
+│   │
+│   ├── src/                # TypeScript source files
+│   │   ├── index.ts        # Express server entry point
+│   │   ├── db.ts           # Database logic
+│   │   ├── movies.ts       # Movie voting endpoints
+│   │   ├── stockMarket.ts  # Stock market API
+│   │   └── stocksDb.ts     # Stock database operations
+│   │
+│   ├── data/               # Runtime data files
+│   │   └── stocks.db       # SQLite database
+│   │
+│   └── dist/               # Compiled JavaScript output
 │
-├── composables/            # Reusable composition functions
-│   ├── useAudio.ts         # Audio playback logic
-│   ├── useCat.ts           # Cat API integration
-│   ├── useRankings.ts      # Rankings data fetching
-│   └── usePanels.ts        # Panel state management
+├── Dockerfile              # Multi-stage Docker build
+├── deploy.sh               # Deployment script
+├── .gitignore              # Git ignore rules
 │
-├── router/                 # Vue Router configuration
-│   └── index.ts            # Route definitions
-│
-├── server/                 # Backend server (Node.js)
-│   └── src/
-│       └── db.ts           # Database logic
-│
-├── dist/                   # Build output (production)
-│   ├── index.html          # Built HTML
-│   └── assets/             # Built CSS/JS
-│
-├── public/                 # Static assets
-└── utils/                  # Utility functions
+└── Documentation/
+    ├── AGENTS.md           # This file (development guide)
+    ├── DEPLOYMENT.md       # Deployment instructions
+    ├── MIGRATION_COMPLETE.md # Migration history
+    ├── MOVIE_NIGHT_FEATURE.md # Movie feature docs
+    └── VUE_MIGRATION.md    # Vue migration notes
 ```
 
 ---
@@ -116,6 +146,22 @@
 - ✅ Better code organization
 - ✅ Proper state management with Pinia
 
+### Third Migration: Monorepo Reorganization (2026-02-01)
+- Restructured project into `frontend/` and `backend/` directories
+- Moved all Vue/Vite files from root into `frontend/`
+- Moved all server files from `server/` into `backend/`
+- Updated Dockerfile to use multi-stage builds
+- Separated frontend and backend dependencies
+- Cleaned up old build artifacts and deployment scripts
+
+**Benefits of Third Migration:**
+- ✅ Clear separation of concerns (frontend vs backend)
+- ✅ Independent dependency management
+- ✅ Easier to scale and maintain
+- ✅ Better Docker layer caching
+- ✅ Standard monorepo structure
+- ✅ Cleaner project organization
+
 ---
 
 ## Application Features
@@ -139,41 +185,41 @@
 - Randomized values (0-100%)
 - Volume-based audio feedback
 - Spring bounce animations
-- **Location:** `components/Tachometer.vue`
+- **Location:** `frontend/components/Tachometer.vue`
 
 #### 2. Coolness Rankings
 - Real-time leaderboard fetched from API
 - Current user highlighted
 - Trend indicators (up/down/neutral)
 - Refreshes every 30 seconds
-- **Location:** `components/RankingsPage.vue`, `composables/useRankings.ts`
+- **Location:** `frontend/components/RankingsPage.vue`, `composables/useRankings.ts`
 
 #### 3. Random Cats
 - Fetches random cat images from API
 - Lazy loading with loading states
 - New cat on button click
-- **Location:** `components/CatsPage.vue`, `composables/useCat.ts`
+- **Location:** `frontend/components/CatsPage.vue`, `composables/useCat.ts`
 
 #### 4. Movie Night System
 - Suggestion submission
 - Preferential voting (ranked choice)
 - Results visualization
 - End voting controls
-- **Location:** `components/MoviePage.vue`, `MovieSuggestions.vue`, `MovieVoting.vue`, `MovieResults.vue`
+- **Location:** `frontend/components/MoviePage.vue`, `MovieSuggestions.vue`, `MovieVoting.vue`, `MovieResults.vue`
 
 #### 5. Stock Market Game
 - Database-persisted money/stocks
 - Buy/sell simulation
 - Price fluctuations
-- **Location:** `components/StockMarket.vue`
+- **Location:** `frontend/components/StockMarket.vue`
 
 #### 6. Audio System
 - Fart sounds with reverb
 - Button click sounds
 - Background music toggle
 - Volume control based on tachometer value
-- **Location:** `composables/useAudio.ts`
-- **Files:** `fart-with-reverb.mp3`, `button-sound.mp3`, `newMusic.mp3`
+- **Location:** `frontend/composables/useAudio.ts`
+- **Files:** `frontend/fart-with-reverb.mp3`, `frontend/button-sound.mp3`, `frontend/newMusic.mp3`
 
 #### 7. Dark Mode
 - Theme toggle (light/dark)
@@ -181,14 +227,14 @@
 - Gradient backgrounds change
   - Light mode: Peach/coral gradient (#ffecd2 → #fcb69f)
   - Dark mode: Forest green gradient (#1a5c2a → #2d5a3d)
-- **Location:** `stores/useAppStore.ts`, `App.vue`
+- **Location:** `frontend/stores/useAppStore.ts`, `frontend/App.vue`
 
 #### 8. Floating Hearts Animation
 - Random heart emojis float across screen
 - Staggered animations
 - Automatic cleanup to prevent memory leaks
 - Created every 500ms
-- **Location:** `App.vue:22`, `stores/useAppStore.ts:96`
+- **Location:** `frontend/App.vue:22`, `frontend/stores/useAppStore.ts:96`
 
 ---
 
@@ -325,30 +371,46 @@ const emit = defineEmits<{
 
 ## Development Workflow
 
-### Development Server
+### Frontend Development Server
 ```bash
+cd frontend/
 npm run dev
 ```
-- Starts Vite dev server on `http://localhost:3000`
+- Starts Vite dev server on `http://localhost:5173`
 - Hot Module Replacement (HMR) enabled
 - TypeScript compilation in watch mode
 
+### Backend Development Server
+```bash
+cd backend/
+npm run dev
+```
+- Starts Express server with ts-node-dev on `http://localhost:3010`
+- Auto-restarts on file changes
+- TypeScript compilation on the fly
+
 ### Production Build
 ```bash
+# Build frontend
+cd frontend/
+npm run build
+
+# Build backend
+cd ../backend/
 npm run build
 ```
-- Creates optimized production build in `dist/`
-- Minifies and bundles all assets
-- Outputs:
-  - `dist/index.html`
-  - `dist/assets/*.css`
-  - `dist/assets/*.js`
+- Frontend: Creates optimized build in `frontend/dist/`
+  - `frontend/dist/index.html`
+  - `frontend/dist/assets/*.css`
+  - `frontend/dist/assets/*.js`
+- Backend: Compiles TypeScript to `backend/dist/`
 
 ### Preview Production Build
 ```bash
+cd frontend/
 npm run preview
 ```
-- Serves the `dist/` folder locally
+- Serves the `frontend/dist/` folder locally
 - Test production build before deployment
 
 ---
@@ -357,11 +419,34 @@ npm run preview
 
 ### Always .gitignore
 ```
+# Dependencies
 node_modules/
+frontend/node_modules/
+backend/node_modules/
+
+# Build outputs
 dist/
+build/
+frontend/dist/
+backend/dist/
+
+# Environment files
 .env
+.env.local
+frontend/.env*
+backend/.env*
+
+# Logs
 *.log
+npm-debug.log*
+
+# OS files
 .DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
 ```
 
 ### Common Commands
@@ -473,17 +558,37 @@ Before deploying:
 ### Current Setup
 1. **Local:** `/var/home/mika/Documents/git/seethbotsite/`
 2. **Remote:** `github.com/mhear22/seethbotsite.git`
-3. **Web Server:** Nginx (serving from `dist/`)
-4. **Container:** Docker
+3. **Web Server:** Nginx (proxies to Express backend, serves static files)
+4. **Container:** Docker (multi-stage build)
+5. **Architecture:**
+   - Nginx listens on port 80
+   - Serves frontend static files from `/app/frontend/dist/`
+   - Proxies `/api/*` requests to Express backend on port 3010
 
 ### Build & Deploy Workflow
 ```bash
-# Build production assets
-npm run build
+# Automated deployment script
+./deploy.sh
 
-# Deploy to server
-# (Docker/Nginx automatically serves from dist/)
+# Manual steps (what deploy.sh does):
+# 1. Build frontend
+cd frontend && npm run build
+
+# 2. Build backend
+cd ../backend && npm run build
+
+# 3. Build Docker image (multi-stage)
+docker build -t seethbot-app .
+
+# 4. Run container
+docker run -d -p 80:80 --name seethbot-server seethbot-app
 ```
+
+### Docker Multi-Stage Build
+The Dockerfile uses a multi-stage build process:
+1. **Stage 1:** Build frontend (Vite)
+2. **Stage 2:** Build backend (TypeScript)
+3. **Stage 3:** Production image with Nginx + Node.js runtime
 
 ---
 

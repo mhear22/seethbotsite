@@ -62,8 +62,8 @@ All movie APIs are available at `http://localhost:8081/api/movies`:
 ## Files Created/Modified
 
 ### Backend (Server)
-- `server/src/movies.ts` - Complete movie voting logic
-- `server/src/index.ts` - Added movie API routes
+- `backend/src/movies.ts` - Complete movie voting logic
+- `backend/src/index.ts` - Added movie API routes
 
 ### Frontend (Vue)
 - `components/MoviePage.vue` - Main movie night page with tabs
@@ -92,7 +92,7 @@ All movie APIs are available at `http://localhost:8081/api/movies`:
 
 ## Technical Details
 
-- **Data Persistence**: All data stored in JSON files in `server/data/`
+- **Data Persistence**: All data stored in JSON files in `backend/data/`
   - `movies.json` - Movie suggestions
   - `movie-votes.json` - User votes
   - `voting-round.json` - Current voting round state

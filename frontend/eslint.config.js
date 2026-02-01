@@ -29,7 +29,7 @@ export default [
     }
   },
   {
-    files: ["*.js", "server/**/*.js"],
+    files: ["*.js"],
     languageOptions: {
       ecmaVersion: "latest",
       sourceType: "script",

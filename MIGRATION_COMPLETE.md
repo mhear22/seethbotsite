@@ -41,18 +41,18 @@ The project has been successfully migrated from vanilla HTML + CDN Vue to a mode
 
 ### Development
 ```bash
-cd /home/seethbotsite
+cd /home/seethbotsite/frontend
 npm run dev
 ```
 Opens at `http://localhost:3000`
 
 ### Build (Production)
 ```bash
-cd /home/seethbotsite
+cd /home/seethbotsite/frontend
 npm run build
-# Or use: ./build.sh
+# Or from root: ./build.sh
 ```
-Output in `dist/` folder
+Output in `frontend/dist/` folder
 
 ### Deploy
 ```bash
@@ -84,9 +84,9 @@ This will:
 - `deploy.sh` - Build + deploy script
 
 ### Modified
-- `index.html` - Now uses `/main.ts` instead of inline Vue CDN code
-- `package.json` - Added Vite dependencies and scripts
-- `nginx.conf` - Updated root path to `/home/seethbotsite/dist`
+- `frontend/index.html` - Now uses `/main.ts` instead of inline Vue CDN code
+- `frontend/package.json` - Added Vite dependencies and scripts
+- `nginx.conf` - Updated root path to serve from frontend build
 
 ### All Components Migrated (.js → .ts)
 - `CatPanel.ts`

@@ -8,8 +8,8 @@ import * as movies from './movies';
 
 const app: Express = express();
 const PORT = process.env.PORT || 3000;
-// In production Docker: __dirname is /app/server/dist, webdist is at /app/server/webdist
-// In development: __dirname is /server/src, frontend build is at /dist
+// In production Docker: __dirname is /app/backend/dist, webdist is at /app/backend/webdist
+// In development: __dirname is /backend/src, webdist is at /backend/webdist
 const SERVE_ROOT = process.env.SERVE_ROOT || path.join(__dirname, '..', 'webdist');
 
 // Middleware

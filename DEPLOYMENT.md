@@ -55,5 +55,5 @@ The `deploy.sh` script:
 
 **Build errors?**
 - Check syntax in .vue files
-- Make sure server/src/index.ts compiles
+- Make sure backend/src/index.ts compiles
 - Run `docker logs seethbot-server` for errors

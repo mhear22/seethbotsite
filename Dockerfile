@@ -4,22 +4,22 @@
 # Stage 1: Build frontend (Vite)
 FROM node:20-alpine AS frontend-builder
 
-WORKDIR /app
+WORKDIR /app/frontend
 
 # Copy frontend package files
-COPY package*.json ./
-RUN npm install
+COPY frontend/package*.json ./
+RUN npm ci
 
 # Copy frontend source
-COPY vite.config.ts tsconfig.json tsconfig.node.json index.html ./
-COPY main.ts App.vue ./
-COPY components ./components/
-COPY router ./router/
-COPY utils ./utils/
-COPY composables ./composables/
-COPY stores ./stores/
-COPY *.css *.mp3 *.html ./
-COPY public ./public/
+COPY frontend/vite.config.ts frontend/tsconfig.json frontend/tsconfig.node.json frontend/index.html ./
+COPY frontend/main.ts frontend/App.vue ./
+COPY frontend/components ./components/
+COPY frontend/router ./router/
+COPY frontend/utils ./utils/
+COPY frontend/composables ./composables/
+COPY frontend/stores ./stores/
+COPY frontend/*.css frontend/*.mp3 frontend/*.html ./
+COPY frontend/public ./public/
 
 # Build frontend
 RUN npm run build
@@ -27,18 +27,18 @@ RUN npm run build
 # Stage 2: Build backend (TypeScript)
 FROM node:20-alpine AS backend-builder
 
-WORKDIR /app/server
+WORKDIR /app/backend
 
 # Install build dependencies for native modules (better-sqlite3)
 RUN apk add --no-cache python3 make g++
 
 # Copy backend package files
-COPY server/package*.json ./
-RUN npm install
+COPY backend/package*.json ./
+RUN npm ci
 
 # Copy backend source
-COPY server/tsconfig.json ./
-COPY server/src ./src/
+COPY backend/tsconfig.json ./
+COPY backend/src ./src/
 
 # Build backend
 RUN npm run build
@@ -46,21 +46,21 @@ RUN npm run build
 # Stage 3: Production image
 FROM node:20-alpine
 
-WORKDIR /app/server
+WORKDIR /app/backend
 
 # Install runtime dependencies for native modules
 RUN apk add --no-cache python3 make g++
 
 # Copy backend built files and dependencies
-COPY --from=backend-builder /app/server/dist ./dist
-COPY --from=backend-builder /app/server/node_modules ./node_modules
-COPY --from=backend-builder /app/server/package.json ./package.json
+COPY --from=backend-builder /app/backend/dist ./dist
+COPY --from=backend-builder /app/backend/node_modules ./node_modules
+COPY --from=backend-builder /app/backend/package.json ./package.json
 
 # Copy frontend build
-COPY --from=frontend-builder /app/dist ./webdist
+COPY --from=frontend-builder /app/frontend/dist ./webdist
 
 # Create data directory for SQLite database
-RUN mkdir -p /app/server/data
+RUN mkdir -p /app/backend/data
 
 # Expose port
 EXPOSE 3000
