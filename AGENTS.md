@@ -1,620 +1,554 @@
-# AGENTS.md - Seethbot Site Development Learnings
+# AGENTS.md - Seethbot Site Development Documentation
 
-*This document captures insights and learnings from developing mald.mikahear.es - a playful, interactive personal website.*
+*This document captures the current architecture and development learnings for mald.mikahear.es - a playful, interactive personal website.*
 
 ## Project Overview
 
 **Project:** mald.mikahear.es
-**Type:** Single-page interactive personal website
-**Tech Stack:** HTML, CSS (inline), Vue.js 3 (Composition API, CDN-based)
-**Deployment:** Git → GitHub → Nginx (auto-sync via cron script)
+**Type:** Single-page application (SPA) with multiple routes
+**Tech Stack:** Vue 3 + TypeScript + Vite + Vue Router + Pinia
+**Deployment:** Git → GitHub → Docker/Nginx
 **Status:** ✅ Live and operational
 
 ---
 
-## Vue.js 3 Migration
+## Current Architecture (2026-02-01)
 
-### What Changed
-- **From:** Vanilla JavaScript with manual DOM manipulation
-- **To:** Vue.js 3 with Composition API
-- **Approach:** CDN-based Vue (no build step required)
-- **Date:** 2026-01-29
+### Tech Stack
+- **Framework:** Vue 3 (Composition API)
+- **Language:** TypeScript
+- **Build System:** Vite 5.0
+- **State Management:** Pinia (Setup Store pattern)
+- **Routing:** Vue Router 4.6
+- **Component Style:** Single File Components (.vue)
 
-### Key Migration Learnings
+### Project Structure
 
-**1. Reactive State Management**
-```javascript
-// BEFORE (Vanilla JS) - Manual DOM updates
-document.getElementById('quote').textContent = `"${quote}"`;
-
-// AFTER (Vue.js) - Reactive computed
-const currentQuote = computed(() => `"${quotes.value[currentQuoteIndex.value]}"`);
 ```
-**Learning:** Vue's reactivity system automatically updates the DOM when state changes. No more manual `textContent` or `style` updates.
-
-**2. Event Handling**
-```javascript
-// BEFORE (Vanilla JS)
-document.getElementById('button').addEventListener('click', function() { ... });
-
-// AFTER (Vue.js)
-<button @click="methodName">Click me</button>
-```
-**Learning:** `@click` directive is cleaner than `addEventListener`. Vue handles event cleanup automatically.
-
-**3. Conditional Rendering**
-```javascript
-// BEFORE (Vanilla JS)
-element.classList.toggle('active', isOpen);
-
-// AFTER (Vue.js)
-<div :class="{ active: isOpen }">Content</div>
-```
-**Learning:** `:class` binding provides declarative conditional rendering. Much easier to read and maintain.
-
-**4. List Rendering**
-```javascript
-// BEFORE (Vanilla JS) - Manual DOM creation
-rankings.forEach(rank => {
-  const div = document.createElement('div');
-  div.textContent = rank.name;
-  parent.appendChild(div);
-});
-
-// AFTER (Vue.js) - Declarative v-for
-<div v-for="rank in rankings" :key="rank.name">{{ rank.name }}</div>
-```
-**Learning:** `v-for` directive handles list rendering automatically with proper DOM diffing.
-
-**5. Component Props and Emits**
-```javascript
-// Component registration
-import { MyComponent } from './components/MyComponent.js';
-
-createApp({
-  components: { MyComponent }  // Register component
-});
-
-// Usage in template
-<MyComponent :title="myTitle" @close="handleClose" />
-```
-**Learning:** Props flow data IN to components, emits flow data OUT. This creates a clear, 单向 data flow pattern.
-
-### CDN-Based Vue.js 3
-
-**Setup:**
-```html
-<!-- Vue CDN -->
-<script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-
-<!-- ES Module Import -->
-<script type="module">
-  import { createApp, ref, onMounted, computed } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js';
-</script>
+/var/home/mika/Documents/git/seethbotsite/
+├── index.html              # Entry HTML (minimal, loads main.ts)
+├── main.ts                 # Application entry point
+├── App.vue                 # Root component
+├── vite.config.ts          # Vite configuration
+├── package.json            # Dependencies
+├── styles.css              # Global styles
+│
+├── components/             # Vue Single File Components
+│   ├── HomePage.vue        # Main landing page
+│   ├── GirlModePage.vue    # Girl mode route
+│   ├── GenderPage.vue      # Gender selection page
+│   ├── AboutPage.vue       # About page
+│   ├── RankingsPage.vue    # Rankings leaderboard page
+│   ├── CatsPage.vue        # Cat pictures page
+│   ├── StockMarket.vue     # Stock market game
+│   ├── MoviePage.vue       # Movie night coordinator
+│   ├── MovieResults.vue    # Movie voting results
+│   ├── MovieSuggestions.vue # Movie suggestions
+│   ├── MovieVoting.vue     # Movie voting interface
+│   ├── MainApp.vue         # Main app layout
+│   ├── Tachometer.vue      # Mold meter gauge
+│   ├── RankingsPanel.vue   # Rankings panel component
+│   ├── CatPanel.vue        # Cat picture panel
+│   ├── FeedPanel.vue       # Live feeds panel
+│   ├── QuoteSection.vue    # Quote display
+│   ├── MikaModal.vue       # Modal for Mika button
+│   ├── ConfirmationModal.vue # Confirmation dialog
+│   ├── ControlButtons.vue  # Control button group
+│   ├── DigitalGoose.vue    # Goose character
+│   ├── GenderPicker.vue    # Gender selection UI
+│   ├── EmojiRenderer.vue   # Emoji display
+│   ├── ClickCounter.vue    # Click counter component
+│   └── Router.vue          # Router component
+│
+├── stores/                 # Pinia stores
+│   └── useAppStore.ts      # Main application store
+│
+├── composables/            # Reusable composition functions
+│   ├── useAudio.ts         # Audio playback logic
+│   ├── useCat.ts           # Cat API integration
+│   ├── useRankings.ts      # Rankings data fetching
+│   └── usePanels.ts        # Panel state management
+│
+├── router/                 # Vue Router configuration
+│   └── index.ts            # Route definitions
+│
+├── server/                 # Backend server (Node.js)
+│   └── src/
+│       └── db.ts           # Database logic
+│
+├── dist/                   # Build output (production)
+│   ├── index.html          # Built HTML
+│   └── assets/             # Built CSS/JS
+│
+├── public/                 # Static assets
+└── utils/                  # Utility functions
 ```
 
-**Benefits:**
-- No build step (no Vite, Webpack, etc.)
-- Works instantly in browser
-- Simple file structure (single HTML file)
-- Great for small projects
+---
 
-**Trade-offs:**
-- No TypeScript support
-- No Single File Components (`.vue` files)
-- No Hot Module Replacement (HMR)
-- No scoped CSS
+## Migration History
 
-**Recommendation:** For this project size, CDN-based is perfect. For larger projects, migrate to Vite build setup.
+### First Migration: Vanilla JS → Vue 3 CDN (2026-01-29)
+- Migrated from vanilla JavaScript to Vue 3 Composition API
+- Used CDN-based Vue (no build step)
+- Introduced reactive state management with `ref()` and `computed()`
+- Replaced manual DOM manipulation with Vue directives
+
+**Key Learnings from First Migration:**
+- Vue's reactivity system automatically updates DOM
+- `@click` directive cleaner than `addEventListener`
+- `:class` binding provides declarative conditional rendering
+- `v-for` directive handles list rendering with proper DOM diffing
+
+### Second Migration: CDN → Vite + TypeScript (2026-01-30+)
+- Migrated from CDN-based Vue to Vite build system
+- Added TypeScript for type safety
+- Converted all components to Single File Components (.vue)
+- Introduced Pinia for centralized state management
+- Added Vue Router for multi-page routing
+- Extracted composables for reusable logic
+
+**Benefits of Second Migration:**
+- ✅ TypeScript type safety
+- ✅ Hot Module Replacement (HMR) in dev
+- ✅ Optimized production builds
+- ✅ Scoped CSS in components
+- ✅ Better code organization
+- ✅ Proper state management with Pinia
+
+---
+
+## Application Features
+
+### Routes
+| Route | Component | Description |
+|-------|-----------|-------------|
+| `/` | HomePage | Main landing page with tachometer |
+| `/girl` | GirlModePage | Girl mode easter egg |
+| `/gender` | GenderPage | Gender selection interface |
+| `/about` | AboutPage | About page |
+| `/rankings` | RankingsPage | Coolness rankings leaderboard |
+| `/cats` | CatsPage | Random cat pictures |
+| `/stocks` | StockMarket | Stock market simulation game |
+| `/movies` | MoviePage | Movie night voting system |
+
+### Core Features
+
+#### 1. Mold Meter (Tachometer)
+- Interactive gauge responding to "fart" button
+- Randomized values (0-100%)
+- Volume-based audio feedback
+- Spring bounce animations
+- **Location:** `components/Tachometer.vue`
+
+#### 2. Coolness Rankings
+- Real-time leaderboard fetched from API
+- Current user highlighted
+- Trend indicators (up/down/neutral)
+- Refreshes every 30 seconds
+- **Location:** `components/RankingsPage.vue`, `composables/useRankings.ts`
+
+#### 3. Random Cats
+- Fetches random cat images from API
+- Lazy loading with loading states
+- New cat on button click
+- **Location:** `components/CatsPage.vue`, `composables/useCat.ts`
+
+#### 4. Movie Night System
+- Suggestion submission
+- Preferential voting (ranked choice)
+- Results visualization
+- End voting controls
+- **Location:** `components/MoviePage.vue`, `MovieSuggestions.vue`, `MovieVoting.vue`, `MovieResults.vue`
+
+#### 5. Stock Market Game
+- Database-persisted money/stocks
+- Buy/sell simulation
+- Price fluctuations
+- **Location:** `components/StockMarket.vue`
+
+#### 6. Audio System
+- Fart sounds with reverb
+- Button click sounds
+- Background music toggle
+- Volume control based on tachometer value
+- **Location:** `composables/useAudio.ts`
+- **Files:** `fart-with-reverb.mp3`, `button-sound.mp3`, `newMusic.mp3`
+
+#### 7. Dark Mode
+- Theme toggle (light/dark)
+- Smooth transitions
+- Gradient backgrounds change
+  - Light mode: Peach/coral gradient (#ffecd2 → #fcb69f)
+  - Dark mode: Forest green gradient (#1a5c2a → #2d5a3d)
+- **Location:** `stores/useAppStore.ts`, `App.vue`
+
+#### 8. Floating Hearts Animation
+- Random heart emojis float across screen
+- Staggered animations
+- Automatic cleanup to prevent memory leaks
+- Created every 500ms
+- **Location:** `App.vue:22`, `stores/useAppStore.ts:96`
+
+---
+
+## State Management with Pinia
+
+### Main Store: `useAppStore`
+
+**State:**
+- `darkMode` - Dark mode toggle
+- `musicPlaying` - Music playback state
+- `currentQuoteIndex` - Current quote index
+- `tachValue` - Tachometer value (0-100)
+- `fartClicked` - Fart button click state
+- `fartExploded` - Explosion animation state
+- `mikaModalOpen` - Mika modal visibility
+- `confirmationOpen` - Confirmation modal visibility
+- `currentRoute` - Current route name
+- `quotes` - Array of inspirational quotes
+
+**Composables (integrated into store):**
+- `panels` - Panel open/close state (from `usePanels`)
+- `catImage` / `catLoading` - Cat image state (from `useCat`)
+- `rankings` / `rankingsLoading` - Rankings data (from `useRankings`)
+
+**Actions:**
+- `toggleDarkMode()` - Toggle dark mode
+- `toggleMusic()` - Toggle background music
+- `togglePanel(panelName)` - Toggle panel visibility
+- `nextQuote()` - Cycle to next quote
+- `nextCat()` - Fetch new cat image
+- `onFart()` - Handle fart button click
+- `onTurnMe()` - Handle "turn me into a girl" button
+- `closeConfirmation()` - Close confirmation modal
+- `closeMikaModal()` - Close Mika modal
+- `createHeart()` - Create floating heart element
+- `loadRankings()` - Fetch rankings from API
+- `getTrendClass(trend)` - Get CSS class for trend indicator
+
+---
+
+## Composables Pattern
+
+### useAudio
+**Purpose:** Audio playback logic
+**Exports:**
+- `playSound(elementId, options)` - Play audio element
+- `playFart(volume)` - Play fart sound with volume
+- `toggleMusic(playing)` - Toggle background music
+
+### useCat
+**Purpose:** Cat API integration
+**Exports:**
+- `catImage` - Current cat image URL
+- `catLoading` - Loading state
+- `fetchNewCat()` - Fetch new random cat
+
+### useRankings
+**Purpose:** Rankings data fetching
+**Exports:**
+- `rankings` - Rankings array
+- `loading` - Loading state
+- `loadRankings()` - Fetch rankings from API
+- `getTrendClass(trend)` - Get trend CSS class
+
+### usePanels
+**Purpose:** Panel state management
+**Exports:**
+- `panels` - Panel open/close state object
+- `togglePanel(panelName)` - Toggle specific panel
 
 ---
 
 ## Component Architecture
 
-### Created 8 Reusable Components
+### Setup Store Pattern (Pinia)
 
-| Component | Purpose | Props | Emits |
-|-----------|---------|-------|--------|
-| **RankingsPanel** | Coolness rankings leaderboard | `isOpen`, `rankings` | `toggle` |
-| **CatPanel** | Random cats display | `isOpen`, `catImage` | `toggle`, `new-cat` |
-| **Tachometer** | Mold meter gauge | `value`, `needleAngle`, `clicked`, `exploded` | `fart` |
-| **FeedPanel** | Live feeds (radar, YouTube, Twitter) | `isOpen` | `toggle` |
-| **QuoteSection** | Inspirational quote display | `currentQuote` | `next-quote` |
-| **MikaModal** | Blank modal for Mika button | `isOpen` | `close` |
-| **ConfirmationModal** | "Turn me into a girl" confirmation | `isOpen` | `close` |
-| **ControlButtons** | All control buttons | `darkMode`, `musicPlaying` | `toggle-rankings`, `toggle-dark`, `toggle-music`, `toggle-feed`, `toggle-mika` |
+The project uses Pinia's **Setup Store** pattern (similar to Composition API):
 
-### Component Pattern
+```typescript
+export const useAppStore = defineStore('app', () => {
+  // State (using ref)
+  const darkMode = ref(false)
 
-```javascript
-// Define component
-export const ComponentName = {
-  template: `...`,  // Component template
-  props: { ... },     // Component inputs
-  emits: [ ... ],     // Component events
-  methods: { ... }    // Component methods
-};
-```
+  // Getters (using computed)
+  const currentQuote = computed(() => quotes.value[currentQuoteIndex.value])
 
-### Benefits
-
-- ✅ **Modular** - Each component is self-contained
-- ✅ **Reusable** - Components can be used multiple times
-- ✅ **Maintainable** - Easier to find and fix issues
-- ✅ **Collaborative** - Multiple developers can work on different components
-- ✅ **Clear contracts** - Props and emits define clear interfaces
-
-### Adding New Components
-
-**Step 1: Create Component File**
-```javascript
-// components/MyComponent.js
-export const MyComponent = {
-  template: '<div>{{ message }}</div>',
-  props: {
-    message: { type: String, required: true }
+  // Actions (regular functions)
+  const toggleDarkMode = () => {
+    darkMode.value = !darkMode.value
   }
-};
+
+  // Return public API
+  return {
+    darkMode,
+    currentQuote,
+    toggleDarkMode
+  }
+})
 ```
 
-**Step 2: Import in Main App**
-```javascript
-import { MyComponent } from './components/MyComponent.js';
-```
+### Single File Components (.vue)
 
-**Step 3: Register Component**
-```javascript
-createApp({
-  components: { MyComponent }
-});
-```
+All components follow the `<script setup>` pattern:
 
-**Step 4: Use in Template**
-```javascript
-template: '<MyComponent message="Hello!" />'
+```vue
+<script setup lang="ts">
+import { ref, computed } from 'vue'
+import { useAppStore } from '../stores/useAppStore'
+
+const store = useAppStore()
+const localState = ref('')
+
+// Props
+defineProps<{
+  title: string
+}>()
+
+// Emits
+const emit = defineEmits<{
+  click: [value: string]
+}>()
+</script>
+
+<template>
+  <div>{{ store.currentQuote }}</div>
+</template>
+
+<style scoped>
+/* Component-specific styles */
+</style>
 ```
 
 ---
 
-## Core Features
+## Development Workflow
 
-### 1. Main Container & Aesthetics
-- **Floating container** with glassmorphism effect (rgba(255, 255, 255, 0.9))
-- **Gradient backgrounds:** 
-  - Light mode: Peach/coral gradient (#ffecd2 → #fcb69f)
-  - Dark mode: Forest green gradient (#1a5c2a → #2d5a3d)
-- **Animated elements:**
-  - Floating container (gentle vertical bobbing)
-  - Sparkle emojis with staggered animations
-  - Bouncing main emoji
+### Development Server
+```bash
+npm run dev
+```
+- Starts Vite dev server on `http://localhost:3000`
+- Hot Module Replacement (HMR) enabled
+- TypeScript compilation in watch mode
 
-**Key Learning:** Smooth CSS transitions (0.2-0.3s with cubic-bezier) create premium feel without jarring movement.
+### Production Build
+```bash
+npm run build
+```
+- Creates optimized production build in `dist/`
+- Minifies and bundles all assets
+- Outputs:
+  - `dist/index.html`
+  - `dist/assets/*.css`
+  - `dist/assets/*.js`
+
+### Preview Production Build
+```bash
+npm run preview
+```
+- Serves the `dist/` folder locally
+- Test production build before deployment
 
 ---
 
-### 2. Coolness Rankings Panel
-- **Purpose:** Display a playful leaderboard
-- **Features:**
-  - Collapsible panel (slide-out animation)
-  - Current user highlighted in pink
-  - Animated hover effects (scale + spring bounce)
-  - Dynamic score updates with bounce animation
+## Git Management Best Practices
 
-**Technical Details:**
-```css
-.rank-item:hover {
-    background: rgba(255, 107, 157, 0.2);
-    transform: scale(1.02);
-    animation: springBounce 0.3s ease;
-}
+### Always .gitignore
+```
+node_modules/
+dist/
+.env
+*.log
+.DS_Store
 ```
 
-**Lesson Learned:** Panel toggle states need careful coordinate calculation. `transform: translateX(-260px)` with `overflow: hidden` ensures smooth slide without reflow.
+### Common Commands
+```bash
+# Remove files from git tracking (without deleting)
+git rm -r --cached node_modules/
 
----
+# Check status before committing
+git status
 
-### 3. Mold Meter (Tachometer Gauge)
-- **Purpose:** Interactive gauge that responds to "fart" button
-- **Visuals:**
-  - Circular gauge with gradient dial (#90EE90 → #32CD32)
-  - Animated needle with continuous swing animation
-  - Tick marks (major and minor)
-- **Interactivity:**
-  - "💨 Fart!" button triggers randomized value (0-100%)
-  - Needle snaps to random angle
-  - Spring bounce animation on value update
-
-**Technical Implementation:**
-```javascript
-const randomAngle = -90 + (Math.random() * 180);
-needle.style.transform = `rotate(${randomAngle}deg)`;
+# Commit changes
+git add .
+git commit -m "feat: Add movie voting system"
+git push
 ```
 
-**Lesson Learned:** Continuous animation (`needleSwing` infinite) conflicts with state updates. Solution: Separate CSS animation from inline style transforms. Apply infinite animation only as fallback, use inline transforms for state.
-
----
-
-### 4. Audio System
-**Files:**
-- `fart-with-reverb.mp3` (52KB)
-- `button-sound.mp3` (196KB)
-- `newMusic.mp3` (7MB - large, consider compression)
-
-**Critical Issues Fixed:**
-1. **Autoplay blocking:** Browsers block audio autoplay without user interaction.
-2. **Infinite looping:** Original audio tags had `loop autoplay` causing continuous playback on page load.
-3. **Solution:**
-   - Remove `autoplay` and `loop` from `<audio>` tags
-   - Use JavaScript to play on user interaction (button clicks)
-   - Music toggle button for manual control
-
-**Key Code:**
-```html
-<!-- BEFORE (BAD) - caused infinite audio on page load -->
-<audio id="fartSound" src="fart-with-reverb.mp3" loop autoplay></audio>
-
-<!-- AFTER (GOOD) - user-controlled only -->
-<audio id="fartSound" src="fart-with-reverb.mp3" preload="auto"></audio>
+### Commit Message Convention
+```
+feat: Add new feature
+fix: Fix bug
+refactor: Refactor code
+docs: Update documentation
+style: Format code
+test: Add tests
+chore: Update dependencies
 ```
 
-**Lesson Learned:** 
-- Never use `autoplay` on audio elements unless explicitly required
-- Always handle browser autoplay restrictions with graceful fallbacks
-- Test on mobile (autoplay restrictions are stricter)
-
 ---
 
-### 5. Dark Mode Toggle
-- **Implementation:** Toggle CSS class on `<body>` element
-- **Smooth transitions:** All elements use `transition: background 0.5s ease`
-- **State management:** Simple boolean flag (`let darkMode = false`)
-- **Icon updates:** 🌙 (sun/moon toggle)
+## CSS Animations
 
-**Code Pattern:**
-```javascript
-darkMode = !darkMode;
-document.body.classList.toggle('dark', darkMode);
-this.textContent = darkMode ? '🌙' : '☀️';
-```
-
-**Lesson Learned:** CSS class toggling is more maintainable than inline style injection. Allows centralized theme management.
-
----
-
-### 6. Quote System
-- **Data:** Array of inspirational quotes
-- **Interactivity:** "💬 New Quote" button cycles through array
-- **Animation:** Spring bounce on quote update
-- **Fixed header:** Top bar with quote text
-
-**Lesson Learned:** Modular quote array allows easy expansion. Consider fetching from external API for dynamic content.
-
----
-
-### 7. Live Feeds Panel
-- **Purpose:** Display external content (weather radar, YouTube, Twitter)
-- **Components:**
-  - Collapsible panel (slide from right)
-  - Iframe embedding for radar and video
-  - Link to X/Twitter profile
-- **Sources:**
-  - BOM Queensland radar: `https://www.bom.gov.au/products/IDR064.loop.gif`
-  - YouTube embed (Rick Roll): `https://www.youtube.com/embed/dQw4w9WgXcQ`
-  - BOM Twitter: `@BOM_Qld`
-
-**Issues Encountered:**
-- X/Twitter embeds require iframe with specific dimensions
-- Weather radar GIF loops continuously (as intended)
-
-**Lesson Learned:** Use `preload="lazy"` on iframes to improve initial page load.
-
----
-
-### 8. Game Boy Emulator (Mock)
-- **Implementation:** Simple canvas-based mock
-- **Features:**
-  - Title screen ("POKEMON EMERALD")
-  - D-pad controls (▲◄▼►)
-  - Simple character movement
-  - ROM URL configured (Pokemon Emerald backup from S3)
-
-**Known Issues:**
-- Currently a **mock/simulation**, not a real emulator
-- ROM URL requires authentication tokens (AWS S3 signed URLs)
-- Controls only click (no keyboard support)
-- "LOADING..." screen persists until first interaction
-
-**Technical Notes:**
-```javascript
-// ROM URL structure
-const romUrl = 'https://ajones-nasbackup.s3.ap-southeast-2.amazonaws.com/...';
-
-// Mock game state
-let emulatorState = {
-  running: false,
-  screen: 'title',
-  player: { x: 240, y: 220, facing: 'right' }
-};
-```
-
-**Future Improvements:**
-- Integrate actual EmulatorJS library
-- Add keyboard event listeners
-- Implement ROM loading via File API
-- Save/load game state
-
----
-
-## Technical Learnings
-
-### CSS Animations
-
-#### Spring Physics
+### Spring Bounce Animation
 ```css
 @keyframes springBounce {
-    0%, 100% { transform: translateY(0) scale(1); }
-    25% { transform: translateY(-15px) scale(1.05); }
-    50% { transform: translateY(0) scale(1.02); }
-    75% { transform: translateY(-5px) scale(1.01); }
+  0%, 100% { transform: translateY(0) scale(1); }
+  25% { transform: translateY(-15px) scale(1.05); }
+  50% { transform: translateY(0) scale(1.02); }
+  75% { transform: translateY(-5px) scale(1.01); }
 }
 ```
 
-**Insight:** Multi-keyframe spring animations feel more natural than linear ease-in-out. Use for buttons, cards, and interactive elements.
+**Usage:** Buttons, cards, interactive elements
+**Lesson:** Multi-keyframe spring animations feel more natural than linear ease-in-out
 
-#### Floating Hearts
+### Floating Hearts
 ```javascript
-function createHeart() {
-  const heart = document.createElement('div');
-  heart.className = 'heart';
-  heart.innerHTML = ['💖', '💕', '💗', '💓', '❤️'][Math.floor(Math.random() * 5)];
-  heart.style.left = Math.random() * 100 + 'vw';
-  heart.style.animationDuration = (Math.random() * 3 + 3) + 's';
-  document.body.appendChild(heart);
-  setTimeout(() => heart.remove(), 6000);
+const createHeart = () => {
+  const heart = document.createElement('div')
+  heart.className = 'heart'
+  heart.innerHTML = ['💖', '💕', '💗', '💓', '❤️'][Math.floor(Math.random() * 5)]
+  heart.style.left = Math.random() * 100 + 'vw'
+  heart.style.animationDuration = (Math.random() * 3 + 3) + 's'
+  document.body.appendChild(heart)
+
+  // CRITICAL: Clean up DOM to prevent memory leaks
+  setTimeout(() => heart.remove(), 6000)
 }
-setInterval(createHeart, 500);
 ```
 
-**Insight:** 
-- Randomize position and duration for organic feel
-- **Always clean up DOM elements** (setTimeout + remove()) to prevent memory leaks
-- 500ms interval = 2 elements per second (balanced for performance)
+**Lesson:** Always clean up dynamically created DOM elements to prevent memory leaks
 
 ---
 
-### Performance Considerations
+## Performance Considerations
 
-#### What's Good:
-- CSS animations (GPU accelerated)
-- Minimal DOM manipulation
-- Efficient class toggling for themes
-- Vue.js reactive system (optimized DOM updates)
+### Good Practices
+- ✅ CSS animations (GPU accelerated)
+- ✅ Vue's reactive system (optimized DOM updates)
+- ✅ Vite's code splitting
+- ✅ Lazy loading routes
+- ✅ Minimal re-renders with computed properties
 
-#### What Needs Improvement:
-1. **Large audio files:**
+### Areas for Improvement
+1. **Large audio files**
    - `newMusic.mp3` = 7MB
    - **Fix:** Compress to OGG/Opus or use streaming
    - **Target:** <1MB for background music
 
-2. **No lazy loading:**
-   - All iframes load immediately
-   - **Fix:** Add `loading="lazy"` attribute
+2. **Image optimization**
+   - Cat images loaded at full resolution
+   - **Fix:** Add responsive images with `srcset`
 
-3. **Inline CSS:**
-   - 25KB+ of CSS in `<head>`
-   - **Fix:** Extract to separate `styles.css` file for caching
-
----
-
-### Git Management
-
-#### Common Mistakes Fixed
-
-**1. Pushing node_modules**
-```bash
-# PROBLEM: Committed 279,257 files from node_modules/
-# CAUSE: No .gitignore file
-
-# SOLUTION: 
-echo "node_modules/" >> .gitignore
-git rm -r --cached node_modules/  # Remove from tracking only
-git commit -m "Add .gitignore and remove node_modules"
-git push
-```
-
-**Key Command:** `git rm -r --cached` removes files from git tracking **without deleting from disk**.
-
-**2. Secrets in git**
-```bash
-# PROBLEM: GitHub PAT in package.json
-{
-  "repository": {
-    "url": "git+https://github_pat_TOKEN@github.com/user/repo.git"
-  }
-}
-
-# SOLUTION: Remove secret and use credential helpers
-git config credential.helper store
-git push  # Will prompt for credentials once
-```
-
-**Lesson Learned:** Never commit API keys, tokens, or secrets. Use environment variables or credential helpers.
+3. **API polling**
+   - Rankings refresh every 30 seconds
+   - **Fix:** Use WebSocket for real-time updates
 
 ---
 
-### Deployment Workflow
+## Testing Checklist
 
-#### Current Setup
-1. **Local:** `/home/seethbotsite/`
+Before deploying:
+
+- [ ] Test all routes (/, /girl, /gender, /about, /rankings, /cats, /stocks, /movies)
+- [ ] Test audio behavior (no autoplay on page load)
+- [ ] Test dark mode toggle
+- [ ] Test tachometer fart button
+- [ ] Test rankings refresh
+- [ ] Test cat image loading
+- [ ] Test movie voting flow
+- [ ] Test on mobile (responsive design)
+- [ ] Check console for errors
+- [ ] Run `npm run build` successfully
+- [ ] Preview production build with `npm run preview`
+
+---
+
+## Deployment
+
+### Current Setup
+1. **Local:** `/var/home/mika/Documents/git/seethbotsite/`
 2. **Remote:** `github.com/mhear22/seethbotsite.git`
-3. **Sync Script:** `/home/sync-nginx-git.sh`
-4. **Web Server:** Nginx (auto-synced via cron)
+3. **Web Server:** Nginx (serving from `dist/`)
+4. **Container:** Docker
 
-#### Sync Script Logic
+### Build & Deploy Workflow
 ```bash
-#!/bin/bash
-REPO_DIR="/home/seethbotsite"
-PAT_FILE="/home/pat.txt"
+# Build production assets
+npm run build
 
-cd "$REPO_DIR" || exit 1
-
-# Check for changes
-if git diff --quiet && git diff --cached --quiet; then
-    echo "No changes to commit."
-    exit 0
-fi
-
-# Commit and push
-git add .
-git commit -m "Auto-commit: $(date '+%Y-%m-%d %H:%M:%S')"
-git push https://$(cat "$PAT_FILE")@github.com/mhear22/seethbotsite.git
+# Deploy to server
+# (Docker/Nginx automatically serves from dist/)
 ```
-
-**Lesson Learned:** 
-- Auto-commit scripts should check for changes first
-- Timestamped commits provide history context
-- Use credential files for automated pushes (but **don't commit file**)
-
----
-
-## Known Issues & Bugs
-
-### 1. Audio Autoplay (RESOLVED ✅)
-- **Issue:** Audio playing continuously on page load
-- **Cause:** `loop autoplay` attributes on `<audio>` tags
-- **Fix:** Removed both attributes, audio now user-triggered only
-
-### 2. Mobile Responsiveness
-- **Issue:** Panels and buttons may overlap on small screens
-- **Status:** Not tested on mobile
-- **Fix Needed:** Add media queries for `< 768px` breakpoints
-
-### 3. Emulator Functionality
-- **Issue:** Emulator is a mock, doesn't actually play games
-- **Status:** Intentional prototype
-- **Fix:** Integrate EmulatorJS library or actual Game Boy Advance emulator
-
-### 4. Large Asset Sizes
-- **Issue:** `newMusic.mp3` is 7MB
-- **Impact:** Slow initial load
-- **Fix:** Compress to Opus format, target <1MB
 
 ---
 
 ## Future Improvements
 
 ### High Priority
-1. **Audio compression** - Convert to Opus/Ogg, reduce file size
-2. **Mobile responsive** - Add media queries and touch targets
-3. **Lazy loading** - Add `loading="lazy"` to iframes
-4. **Extract CSS** - Move inline styles to separate file
+1. **Mobile responsive design** - Add media queries for mobile screens
+2. **Audio compression** - Reduce newMusic.mp3 file size (currently 7MB)
+3. **Error handling** - Add error boundaries and fallbacks
 
 ### Medium Priority
-5. **Real emulator** - Integrate EmulatorJS library
-6. **Keyboard controls** - Add arrow key support for emulator
-7. **LocalStorage** - Save user preferences (dark mode, volume)
-8. **Quote API** - Fetch quotes from external source
+4. **WebSocket integration** - Real-time rankings updates
+5. **LocalStorage** - Persist user preferences (dark mode, volume)
+6. **TypeScript strict mode** - Enable strict type checking
+7. **Unit tests** - Add Vitest for component testing
 
-### Low Priority (Nice to Have)
-9. **Particle effects** - More sophisticated physics (matter.js)
-10. **User profiles** - Allow customizing rankings panel
-11. **Music playlist** - Multiple tracks with shuffle
-12. **PWA** - Progressive web app features (offline support)
-
----
-
-## Development Guidelines
-
-### When Making Changes
-
-1. **Test audio behavior:**
-   - Ensure no autoplay on page load
-   - Test play/pause functionality
-   - Verify volume control works
-
-2. **Check git status:**
-   - Run `git status` before committing
-   - Verify `node_modules/` is ignored
-   - Check for secrets in code
-
-3. **Test responsive design:**
-   - Open DevTools device emulator
-   - Test mobile widths (375px, 414px)
-   - Check panel overlap issues
-
-4. **Performance check:**
-   - Use Lighthouse in Chrome DevTools
-   - Target: 90+ on Performance, Accessibility, Best Practices
+### Low Priority
+8. **Progressive Web App (PWA)** - Offline support
+9. **Accessibility (a11y)** - ARIA labels, keyboard navigation
+10. **Analytics** - Track feature usage
+11. **Internationalization (i18n)** - Multi-language support
 
 ---
 
-## File Structure
+## Key Learnings
 
-```
-/home/seethbotsite/
-├── components/
-│   ├── README.md              # Component documentation
-│   ├── RankingsPanel.js       # Coolness rankings panel
-│   ├── CatPanel.js            # Random cats panel
-│   ├── Tachometer.js          # Mold meter gauge
-│   ├── FeedPanel.js           # Live feeds panel
-│   ├── QuoteSection.js        # Quote display
-│   ├── MikaModal.js           # Mika modal
-│   ├── ConfirmationModal.js    # Girl transformation confirmation
-│   └── ControlButtons.js      # All control buttons
-├── .gitignore              # Git ignore rules
-├── .git/                    # Git repository
-├── index.html                # Main HTML with Vue.js (31KB)
-├── package.json             # Node.js dependencies
-├── package-lock.json          # Dependency lock file
-├── 50x.html                 # Custom error page
-├── eslint.config.js           # ESLint v9 configuration
-├── fart-with-reverb.mp3      # Audio effect (52KB)
-├── button-sound.mp3          # Button click sound (196KB)
-└── newMusic.mp3              # Background music (7MB) ⚠️ Large file
-```
-
----
-
-## Key Takeaways
-
-### ✅ What Worked Well
-- **CSS spring animations** create delightful interactions
-- **Dark mode** via class toggling is clean and maintainable
-- **Vue.js reactivity** automatically handles DOM updates
-- **Component architecture** makes code modular and reusable
-- **Git sync script** works reliably for deployment
-- **Collapsible panels** provide good UX without clutter
+### ✅ What Works Well
+- **Vite build system** - Fast dev server, optimized builds
+- **TypeScript** - Catch errors at compile time
+- **Pinia Setup Stores** - Clean, composable state management
+- **Vue Router** - Easy multi-page navigation
+- **Composables pattern** - Reusable logic across components
+- **Single File Components** - Scoped styles, clear structure
 
 ### ⚠️ What to Watch Out For
-- **Audio autoplay:** Browsers block it by default - always use user interaction triggers
-- **Large assets:** Compress media files before deployment
-- **node_modules:** Always .gitignore this directory
-- **Secrets:** Never commit API keys or tokens
+- **Missing dependencies** - Always check package.json matches imports
+- **Audio autoplay** - Browsers block autoplay, use user interaction
+- **Memory leaks** - Clean up event listeners and DOM elements
+- **Large assets** - Compress media files before deployment
+- **Type safety** - Use TypeScript interfaces for API responses
 
 ### 💡 Pro Tips
 1. Use `git rm -r --cached` to untrack files without deleting them
-2. Test autoplay behavior on mobile - restrictions are stricter
-3. Spring animations feel better than linear easing for buttons
-4. Always clean up DOM elements (setTimeout + remove())
-5. Use Chrome DevTools Lighthouse for performance checks
-6. Vue.js `@click` directive is cleaner than `addEventListener`
-7. Vue.js `:class` binding is better than manual classList manipulation
-8. Vue.js `v-for` directive is better than manual DOM creation
-9. Components with clear props/emit interfaces are easier to understand
-10. CDN-based Vue.js is perfect for small projects - no build step needed
+2. Always clean up dynamically created DOM elements (setTimeout + remove())
+3. Use Chrome DevTools Lighthouse for performance checks
+4. Pinia Setup Stores are easier to understand than Options Stores
+5. Composables should be pure functions without side effects
+6. Use `<script setup>` for cleaner component code
+7. Enable Vite's HMR for instant feedback during development
+8. Use TypeScript `interface` for props/emits definitions
+9. Test on mobile early - mobile restrictions are stricter
+10. Keep components small and focused (single responsibility)
 
 ---
 
-## Contact & Support
+## Contact & Documentation
 
 - **Repo:** github.com/mhear22/seethbotsite
 - **Live Site:** mald.mikahear.es
-- **Git Sync:** `/home/sync-nginx-git.sh`
-- **Docs Location:** This file (`AGENTS.md`)
-- **Component Docs:** `components/README.md`
+- **Main Docs:** This file (`AGENTS.md`)
+- **Migration Docs:** `VUE_MIGRATION.md`, `MIGRATION_COMPLETE.md`
+- **Deployment Docs:** `DEPLOYMENT.md`
+- **Movie Feature Docs:** `MOVIE_NIGHT_FEATURE.md`
 
 ---
 
-*Last Updated: 2026-01-29*
-*Version: 2.0*
+*Last Updated: 2026-02-01*
+*Version: 3.0 (Vite + TypeScript + Pinia)*
