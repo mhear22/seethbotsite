@@ -1,11 +1,13 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import RankingsPanel from './RankingsPanel.vue'
 import CatPanel from './CatPanel.vue'
 import FeedPanel from './FeedPanel.vue'
 import MikaModal from './MikaModal.vue'
 import DigitalGoose from './DigitalGoose.vue'
 import Router from './Router.vue'
-import { useRoute } from 'vue-router'
+import { useAppStore } from '../stores/useAppStore'
 
 export interface RankingItem {
   name: string
@@ -21,106 +23,46 @@ export interface PanelState {
   digitalGoose: boolean
 }
 
-defineProps<{
-  darkMode?: boolean
-  musicPlaying?: boolean
-  currentRoute?: string
-  currentQuote: string
-  currentCatImage: string
-  tachValue?: number
-  fartClicked?: boolean
-  fartExploded?: boolean
-  rankings: RankingItem[]
-  panels?: PanelState
-  mikaModalOpen?: boolean
-  confirmationOpen?: boolean
-}>()
+// Store
+const appStore = useAppStore()
 
-const emit = defineEmits<{
-  'toggle-dark-mode': []
-  'toggle-music': []
-  'toggle-panel': [panelName: keyof PanelState]
-  'route-change': [route: string]
-  'mika-close': []
-  'close-confirmation': []
-  'next-quote': []
-  'new-cat': []
-  fart: []
-  'turn-me': []
-}>()
+// Router
+const router = useRouter()
+const route = useRoute()
 
-const toggleDarkMode = () => {
-  emit('toggle-dark-mode')
-}
-
-const toggleMusic = () => {
-  emit('toggle-music')
-}
-
-const togglePanel = (panelName: keyof PanelState) => {
-  emit('toggle-panel', panelName)
-}
-
-const onRouteChange = (route: string) => {
-  emit('route-change', route)
-}
-
-const nextQuote = () => {
-  emit('next-quote')
-}
-
-const nextCat = () => {
-  emit('new-cat')
-}
-
-const onFart = () => {
-  emit('fart')
-}
-
-const onTurnMe = () => {
-  emit('turn-me')
-}
-
-const closeMikaModal = () => {
-  emit('mika-close')
-}
-
-const closeConfirmation = () => {
-  emit('close-confirmation')
+// Route sync
+const onRouteChange = (routeName: string) => {
+  appStore.onRouteChange(routeName)
+  router.push(`/${routeName}`)
 }
 
 const goToGirlMode = () => {
   console.log('Going to girl mode...')
-  emit('close-confirmation')
+  appStore.closeConfirmation()
   setTimeout(() => {
-    emit('route-change', 'girl')
+    onRouteChange('girl')
     console.log('Route change emitted: girl')
   }, 100)
-}
-
-const getTrendClass = (index: number) => {
-  const trends = ['trend-up', 'trend-down', 'trend-same']
-  return trends[index % trends.length]
 }
 </script>
 
 <template>
-  <div class="main-app" :class="{ dark: darkMode, 'centered': currentRoute === 'home' }">
+  <div class="main-app" :class="{ dark: appStore.darkMode, 'centered': appStore.currentRoute === 'home' }">
     <!-- Header Controls -->
     <div class="header-controls">
-      <button @click="toggleDarkMode" class="control-btn" :class="{ active: darkMode }">
-        {{ darkMode ? '🌙' : '☀️' }}
+      <button @click="appStore.toggleDarkMode" class="control-btn" :class="{ active: appStore.darkMode }">
+        {{ appStore.darkMode ? '🌙' : '☀️' }}
       </button>
-      <button @click="toggleMusic" class="control-btn" :class="{ active: musicPlaying }">
-        {{ musicPlaying ? '🔊' : '🔇' }}
+      <button @click="appStore.toggleMusic" class="control-btn" :class="{ active: appStore.musicPlaying }">
+        {{ appStore.musicPlaying ? '🔊' : '🔇' }}
       </button>
-      <button @click="togglePanel('rankings')" class="control-btn" :class="{ active: panels?.rankings }">
+      <button @click="appStore.togglePanel('rankings')" class="control-btn" :class="{ active: appStore.panels.rankings }">
         👻
       </button>
-      <button @click="togglePanel('cat')" class="control-btn" :class="{ active: panels?.cat }">
+      <button @click="appStore.togglePanel('cat')" class="control-btn" :class="{ active: appStore.panels.cat }">
         🐱
       </button>
-      <button @click="togglePanel('feed')" class="control-btn" :class="{ active: panels?.feed }">
+      <button @click="appStore.togglePanel('feed')" class="control-btn" :class="{ active: appStore.panels.feed }">
         📰
       </button>
     </div>
@@ -128,37 +70,37 @@ const getTrendClass = (index: number) => {
     <router-view />
 
     <!-- Digital Goose (Cycle Complete) -->
-    <DigitalGoose v-if="panels?.digitalGoose ?? true" />
+    <DigitalGoose v-if="appStore.panels.digitalGoose" />
 
     <!-- Floating Panels -->
     <RankingsPanel
-      v-if="panels?.rankings && currentRoute === 'home'"
-      :rankings="rankings"
-      :is-open="panels.rankings"
-      @toggle="togglePanel('rankings')"
+      v-if="appStore.panels.rankings && appStore.currentRoute === 'home'"
+      :rankings="appStore.rankings"
+      :is-open="appStore.panels.rankings"
+      @toggle="appStore.togglePanel('rankings')"
       class="floating-panel rankings-panel"
     />
     <CatPanel
-      v-if="panels?.cat && currentRoute === 'home'"
-      :cat-image="currentCatImage"
-      :loading="false"
-      :is-open="panels.cat"
-      @toggle="togglePanel('cat')"
-      @new-cat="nextCat"
+      v-if="appStore.panels.cat && appStore.currentRoute === 'home'"
+      :cat-image="appStore.catImage"
+      :loading="appStore.catLoading"
+      :is-open="appStore.panels.cat"
+      @toggle="appStore.togglePanel('cat')"
+      @new-cat="appStore.nextCat"
       class="floating-panel cat-panel"
     />
     <FeedPanel
-      v-if="panels?.feed"
-      :is-open="panels.feed"
+      v-if="appStore.panels.feed"
+      :is-open="appStore.panels.feed"
       class="floating-panel feed-panel"
-      @toggle="togglePanel('feed')"
+      @toggle="appStore.togglePanel('feed')"
     />
 
     <!-- Modals -->
     <MikaModal
-      v-if="mikaModalOpen"
-      :is-open="mikaModalOpen"
-      @close="closeMikaModal"
+      v-if="appStore.mikaModalOpen"
+      :is-open="appStore.mikaModalOpen"
+      @close="appStore.closeMikaModal"
     />
   </div>
 

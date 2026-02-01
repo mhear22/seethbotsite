@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { RankingItem } from './MainApp.vue'
 import EmojiRenderer from './EmojiRenderer.vue'
+import { useAppStore } from '../stores/useAppStore'
 
 defineProps<{
   isOpen?: boolean
@@ -10,6 +11,8 @@ defineProps<{
 const emit = defineEmits<{
   toggle: []
 }>()
+
+const appStore = useAppStore()
 
 const toggle = () => {
   emit('toggle')
