@@ -16,6 +16,8 @@ COPY main.ts App.vue ./
 COPY components ./components/
 COPY router ./router/
 COPY utils ./utils/
+COPY composables ./composables/
+COPY stores ./stores/
 COPY *.css *.mp3 *.html ./
 COPY public ./public/
 
