@@ -33,15 +33,13 @@ const route = useRoute()
 // Route sync
 const onRouteChange = (routeName: string) => {
   appStore.onRouteChange(routeName)
-  router.push(`/${routeName}`)
 }
 
 const goToGirlMode = () => {
   console.log('Going to girl mode...')
   appStore.closeConfirmation()
   setTimeout(() => {
-    onRouteChange('girl')
-    console.log('Route change emitted: girl')
+    router.push('/girl')
   }, 100)
 }
 </script>
