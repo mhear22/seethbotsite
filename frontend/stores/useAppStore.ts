@@ -17,8 +17,6 @@ export const useAppStore = defineStore('app', () => {
   const musicPlaying = ref(false)
   const currentQuoteIndex = ref(0)
   const tachValue = ref(50)
-  const fartClicked = ref(false)
-  const fartExploded = ref(false)
   const mikaModalOpen = ref(false)
   const confirmationOpen = ref(false)
   const currentRoute = ref('home')
@@ -53,9 +51,6 @@ export const useAppStore = defineStore('app', () => {
   }
 
   const onFart = () => {
-    if (fartClicked.value) return
-    fartClicked.value = true
-
     const randomValue = Math.floor(Math.random() * 100)
     const volume = randomValue / 50
 
@@ -64,12 +59,6 @@ export const useAppStore = defineStore('app', () => {
     setTimeout(() => {
       confirmationOpen.value = true
     }, 300)
-
-    fartExploded.value = true
-    setTimeout(() => {
-      fartExploded.value = false
-      fartClicked.value = false
-    }, 500)
 
     tachValue.value = randomValue
   }
@@ -109,8 +98,6 @@ export const useAppStore = defineStore('app', () => {
     musicPlaying,
     currentQuoteIndex,
     tachValue,
-    fartClicked,
-    fartExploded,
     mikaModalOpen,
     confirmationOpen,
     currentRoute,
