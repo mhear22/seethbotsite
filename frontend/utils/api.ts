@@ -4,7 +4,7 @@
  */
 
 // API key - in production, this should be stored securely (e.g., environment variable, secure cookie)
-const API_KEY = import.meta.env.VITE_API_KEY || localStorage.getItem('seethbot_api_key') || '';
+const API_KEY = (import.meta.env as any).VITE_API_KEY || localStorage.getItem('seethbot_api_key') || '';
 
 /**
  * Set the API key for authenticated requests
