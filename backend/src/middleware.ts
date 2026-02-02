@@ -225,7 +225,7 @@ export const validations = {
       .withMessage('Name is required')
       .isLength({ max: 100 })
       .withMessage('Name must be less than 100 characters')
-      .matches(/^[\p{L}\s\-\']+$/u)
+      .matches(/^[\p{L}\s\-']+$/u)
       .withMessage('Name contains invalid characters'),
     body('country')
       .optional()

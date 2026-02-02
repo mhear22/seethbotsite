@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions } from 'jsonwebtoken';
 
 /**
  * Simple API key authentication for seethbotsite
@@ -20,7 +20,7 @@ const API_KEYS = process.env.SEETHBOT_API_KEYS
 const JWT_SECRET: string = process.env.SEETHBOT_JWT_SECRET || 'change-this-in-production-secret-key';
 
 // JWT expiry time
-const JWT_EXPIRY = process.env.SEETHBOT_JWT_EXPIRY || '24h';
+const JWT_EXPIRY: string = process.env.SEETHBOT_JWT_EXPIRY || '24h';
 
 /**
  * API key types
@@ -204,7 +204,7 @@ export const generateToken = (apiKey: string): string => {
     iat: Math.floor(Date.now() / 1000)
   };
 
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRY });
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRY } as SignOptions);
 };
 
 /**
