@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { apiGet, apiPost, apiDelete, handleApiError, showError, showSuccess } from '../utils/api'
 
 const emit = defineEmits(['refresh'])
 
@@ -29,51 +30,42 @@ const userId = ref('')
 
 const loadMovies = async () => {
   try {
-    const response = await fetch('/api/movies')
-    const data = await response.json()
+    const data = await apiGet<{ movies: Movie[] }>('/api/movies')
     movies.value = data.movies
   } catch (error) {
-    console.error('Failed to load movies:', error)
+    showError(handleApiError(error, 'Failed to load movies'))
   }
 }
 
 const addMovie = async () => {
   if (!newMovie.value.title || !newMovie.value.suggestedBy) {
-    alert('Please fill in title and your name')
+    showError('Please fill in title and your name')
     return
   }
 
   try {
-    const response = await fetch('/api/movies', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title: newMovie.value.title,
-        suggestedBy: newMovie.value.suggestedBy,
-        year: newMovie.value.year || undefined,
-        genre: newMovie.value.genre || undefined,
-        notes: newMovie.value.notes || undefined,
-        thumbnail: newMovie.value.thumbnail || undefined
-      })
+    await apiPost('/api/movies', {
+      title: newMovie.value.title,
+      suggestedBy: newMovie.value.suggestedBy,
+      year: newMovie.value.year || undefined,
+      genre: newMovie.value.genre || undefined,
+      notes: newMovie.value.notes || undefined,
+      thumbnail: newMovie.value.thumbnail || undefined
     })
 
-    if (response.ok) {
-      newMovie.value = {
-        title: '',
-        suggestedBy: '',
-        year: '',
-        genre: '',
-        notes: '',
-        thumbnail: ''
-      }
-      showAddForm.value = false
-      await loadMovies()
-    } else {
-      alert('Failed to add movie')
+    newMovie.value = {
+      title: '',
+      suggestedBy: '',
+      year: '',
+      genre: '',
+      notes: '',
+      thumbnail: ''
     }
+    showAddForm.value = false
+    showSuccess('Movie added successfully!')
+    await loadMovies()
   } catch (error) {
-    console.error('Error adding movie:', error)
-    alert('Failed to add movie')
+    showError(handleApiError(error, 'Failed to add movie'))
   }
 }
 
@@ -83,24 +75,17 @@ const deleteMovie = async (id: string) => {
   }
 
   try {
-    const response = await fetch(`/api/movies/${id}`, {
-      method: 'DELETE'
-    })
-
-    if (response.ok) {
-      await loadMovies()
-    } else {
-      alert('Failed to delete movie')
-    }
+    await apiDelete(`/api/movies/${id}`)
+    showSuccess('Movie deleted successfully!')
+    await loadMovies()
   } catch (error) {
-    console.error('Error deleting movie:', error)
-    alert('Failed to delete movie')
+    showError(handleApiError(error, 'Failed to delete movie'))
   }
 }
 
 const startVoting = async () => {
   if (selectedMovies.value.length < 2) {
-    alert('Please select at least 2 movies to vote on')
+    showError('Please select at least 2 movies to vote on')
     return
   }
 
@@ -109,22 +94,12 @@ const startVoting = async () => {
   }
 
   try {
-    const response = await fetch('/api/movies/voting-round/start', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ movieIds: selectedMovies.value })
-    })
-
-    if (response.ok) {
-      alert('Voting round started!')
-      selectedMovies.value = []
-      emit('refresh')
-    } else {
-      alert('Failed to start voting round')
-    }
+    await apiPost('/api/movies/voting-round/start', { movieIds: selectedMovies.value })
+    showSuccess('Voting round started!')
+    selectedMovies.value = []
+    emit('refresh')
   } catch (error) {
-    console.error('Error starting voting:', error)
-    alert('Failed to start voting round')
+    showError(handleApiError(error, 'Failed to start voting round'))
   }
 }
 
