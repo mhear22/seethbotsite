@@ -74,6 +74,7 @@ const goToGirlMode = () => {
     <RankingsPanel
       v-if="appStore.panels.rankings && appStore.currentRoute === 'home'"
       :rankings="appStore.rankings"
+      :current-route="appStore.currentRoute"
       :is-open="appStore.panels.rankings"
       @toggle="appStore.togglePanel('rankings')"
       class="floating-panel rankings-panel"
