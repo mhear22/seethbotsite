@@ -1,12 +1,15 @@
 <script setup lang="ts">
-import { inject } from 'vue'
+import { useAppStore } from '../stores/useAppStore'
 import RankingsPanel from './RankingsPanel.vue'
 
-const rankings = inject('rankings')
+const appStore = useAppStore()
 </script>
 
 <template>
   <div class="page rankings-page">
-    <RankingsPanel :rankings="rankings" />
+    <RankingsPanel 
+      :rankings="appStore.rankings" 
+      :current-route="appStore.currentRoute"
+    />
   </div>
 </template>

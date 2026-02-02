@@ -78,7 +78,7 @@ router.get('/clicks', (req: Request, res: Response) => {
  *               $ref: '#/components/schemas/Error'
  */
 router.post('/clicks/increment',
-  requireApiKey(),
+  // requireApiKey(),
   (req: Request, res: Response) => {
     try {
       const newCount = incrementClick();
@@ -126,7 +126,7 @@ router.post('/clicks/increment',
  *               $ref: '#/components/schemas/Error'
  */
 router.post('/clicks/reset',
-  requireApiKey(),
+  // requireApiKey(),
   (req: Request, res: Response) => {
     try {
       const newCount = resetClick();

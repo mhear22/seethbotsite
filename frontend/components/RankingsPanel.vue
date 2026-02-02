@@ -5,6 +5,7 @@ import { useAppStore } from '../stores/useAppStore'
 
 defineProps<{
   isOpen?: boolean
+  currentRoute?: string
   rankings: RankingItem[]
 }>()
 
@@ -13,6 +14,7 @@ const emit = defineEmits<{
 }>()
 
 const appStore = useAppStore()
+const isOnHomeRoute = computed(() => currentRoute === 'home')
 
 const toggle = () => {
   emit('toggle')
@@ -20,7 +22,7 @@ const toggle = () => {
 </script>
 
 <template>
-  <div class="rankings-panel" :class="{ collapsed: !isOpen }">
+  <div class="rankings-panel" :class="{ collapsed: !isOpen || !isOnHomeRoute }">
     <div class="rankings-header">
       <h3>👻 Coolness Rankings</h3>
       <button class="rankings-close" @click="toggle">✕</button>
