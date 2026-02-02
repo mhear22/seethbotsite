@@ -1,49 +1,14 @@
 /**
  * API Utility Functions for seethbotsite frontend
- * Handles authentication, error handling, and API calls
+ * Simplified without authentication requirements
  */
-
-// API key - in production, this should be stored securely (e.g., environment variable, secure cookie)
-const API_KEY = (import.meta.env as any).VITE_API_KEY || localStorage.getItem('seethbot_api_key') || '';
 
 /**
- * Set the API key for authenticated requests
+ * Simple fetch wrapper with error handling
  */
-export const setApiKey = (key: string): void => {
-  localStorage.setItem('seethbot_api_key', key);
-};
-
-/**
- * Get the current API key
- */
-export const getApiKey = (): string => {
-  return localStorage.getItem('seethbot_api_key') || '';
-};
-
-/**
- * Clear the API key (logout)
- */
-export const clearApiKey = (): void => {
-  localStorage.removeItem('seethbot_api_key');
-};
-
-/**
- * Check if user is authenticated (has API key)
- */
-export const isAuthenticated = (): boolean => {
-  return !!getApiKey();
-};
-
-/**
- * Fetch with authentication
- * Automatically adds API key header and handles auth errors
- */
-export const authFetch = async (url: string, options: RequestInit = {}): Promise<Response> => {
-  const apiKey = getApiKey();
-
+export const apiFetch = async (url: string, options: RequestInit = {}): Promise<Response> => {
   const headers = {
     'Content-Type': 'application/json',
-    ...(apiKey && { 'X-API-Key': apiKey }),
     ...options.headers
   };
 
@@ -51,26 +16,6 @@ export const authFetch = async (url: string, options: RequestInit = {}): Promise
     ...options,
     headers
   });
-
-  // Handle authentication errors
-  if (response.status === 401) {
-    // Missing API key
-    console.error('Authentication required: Please provide an API key');
-    throw new Error('AUTH_REQUIRED');
-  }
-
-  if (response.status === 403) {
-    // Invalid API key or insufficient permissions
-    const errorData = await response.json();
-    if (errorData.error === 'Invalid API key') {
-      console.error('Invalid API key: Please check your API key');
-      throw new Error('INVALID_API_KEY');
-    } else if (errorData.error === 'Insufficient permissions') {
-      console.error('Insufficient permissions: Your API key does not have access to this resource');
-      throw new Error('INSUFFICIENT_PERMISSIONS');
-    }
-    throw new Error('FORBIDDEN');
-  }
 
   // Handle rate limiting
   if (response.status === 429) {
@@ -89,12 +34,6 @@ export const authFetch = async (url: string, options: RequestInit = {}): Promise
 export const handleApiError = (error: unknown, defaultMessage: string = 'An error occurred'): string => {
   if (error instanceof Error) {
     switch (error.message) {
-      case 'AUTH_REQUIRED':
-        return 'Authentication required. Please enter your API key.';
-      case 'INVALID_API_KEY':
-        return 'Invalid API key. Please check your API key and try again.';
-      case 'INSUFFICIENT_PERMISSIONS':
-        return 'You do not have permission to perform this action.';
       case 'RATE_LIMITED':
         return 'You are making too many requests. Please wait a moment and try again.';
       default:
@@ -105,31 +44,10 @@ export const handleApiError = (error: unknown, defaultMessage: string = 'An erro
 };
 
 /**
- * Prompt user for API key if not set
- * Returns true if API key is set, false otherwise
- */
-export const ensureApiKey = (): boolean => {
-  if (!isAuthenticated()) {
-    const key = prompt(
-      'Authentication Required\n\n' +
-      'This action requires an API key. Please enter your API key:\n\n' +
-      '(You can get the API key from the server logs or set it in your environment)'
-    );
-
-    if (key) {
-      setApiKey(key);
-      return true;
-    }
-    return false;
-  }
-  return true;
-};
-
-/**
  * Generic API GET request
  */
 export const apiGet = async <T = unknown>(url: string): Promise<T> => {
-  const response = await authFetch(url, { method: 'GET' });
+  const response = await apiFetch(url, { method: 'GET' });
 
   if (!response.ok) {
     const error = await response.json();
@@ -141,15 +59,9 @@ export const apiGet = async <T = unknown>(url: string): Promise<T> => {
 
 /**
  * Generic API POST request
- * Requires API key
  */
 export const apiPost = async <T = unknown>(url: string, data?: unknown): Promise<T> => {
-  // Ensure API key before making request
-  if (!ensureApiKey()) {
-    throw new Error('AUTH_REQUIRED');
-  }
-
-  const response = await authFetch(url, {
+  const response = await apiFetch(url, {
     method: 'POST',
     body: data ? JSON.stringify(data) : undefined
   });
@@ -164,15 +76,9 @@ export const apiPost = async <T = unknown>(url: string, data?: unknown): Promise
 
 /**
  * Generic API DELETE request
- * Requires API key
  */
 export const apiDelete = async <T = unknown>(url: string): Promise<T> => {
-  // Ensure API key before making request
-  if (!ensureApiKey()) {
-    throw new Error('AUTH_REQUIRED');
-  }
-
-  const response = await authFetch(url, { method: 'DELETE' });
+  const response = await apiFetch(url, { method: 'DELETE' });
 
   if (!response.ok) {
     const error = await response.json();
@@ -183,21 +89,17 @@ export const apiDelete = async <T = unknown>(url: string): Promise<T> => {
 };
 
 /**
- * Show an error toast/notification
- * This is a placeholder - integrate with your actual notification system
+ * Show an error message
  */
 export const showError = (message: string): void => {
-  // For now, use alert. In production, use a proper toast/notification system
   console.error(message);
   alert(message);
 };
 
 /**
- * Show a success toast/notification
- * This is a placeholder - integrate with your actual notification system
+ * Show a success message
  */
 export const showSuccess = (message: string): void => {
-  // For now, use alert. In production, use a proper toast/notification system
   console.log(message);
   alert(message);
 };
@@ -236,13 +138,8 @@ export const API_ENDPOINTS = {
 } as const;
 
 export default {
-  setApiKey,
-  getApiKey,
-  clearApiKey,
-  isAuthenticated,
-  authFetch,
+  apiFetch,
   handleApiError,
-  ensureApiKey,
   apiGet,
   apiPost,
   apiDelete,
