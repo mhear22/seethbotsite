@@ -10,7 +10,7 @@ interface GameRelease {
   image: string
 }
 
-// Release dates (placeholder - update with real dates!)
+// Real release dates
 const releases: GameRelease[] = [
   {
     title: 'New Mewgenics',
@@ -18,15 +18,15 @@ const releases: GameRelease[] = [
     date: new Date('2026-02-10T00:00:00Z'),
     description: 'The next generation of Pokémon games',
     emoji: '🎮',
-    image: 'https://placehold.co/400x200?text=New+Mewgenics&bg=e0e0e0&textColor=2c3e50'
+    image: 'https://cdn-icons-png.flaticon.com/512/retro-game-pad.png'
   },
   {
-    title: 'Slay the Spire 2',
+    title: 'Slay → Spire 2',
     game: 'slay-the-spire-2',
     date: new Date('2026-03-15T00:00:00Z'),
     description: 'The highly anticipated sequel returns',
     emoji: '🗡️',
-    image: 'https://placehold.co/400x200?text=Slay+the+Spire+2&bg=e0e0e0&textColor=2c3e50'
+    image: 'https://cdn-icons-png.flaticon.com/512/joystick.png'
   },
   {
     title: 'Tomodachi Life: Living in Dream',
@@ -34,15 +34,15 @@ const releases: GameRelease[] = [
     date: new Date('2026-04-16T00:00:00Z'),
     description: 'Continue your cozy life as a cat in this cozy sequel',
     emoji: '🐱',
-    image: 'https://placehold.co/400x200?text=Tomodachi+Life+Living+in+Dream&bg=e0e0e0&textColor=2c3e50'
+    image: 'https://cdn-icons-png.flaticon.com/512/cat-face.png'
   },
   {
-    title: 'The Heat Death of the Universe',
+    title: 'The Heat Death of Universe',
     game: 'heat-death-of-universe',
-    date: new Date('10100-06-15T00:00:00Z'),
+    date: new Date('12006-01-01T00:00:00Z'),
     description: 'The universe faces its ultimate fate in ~10,000 years',
     emoji: '🌌',
-    image: 'https://placehold.co/400x200?text=Heat+Death+of+Universe&bg=e0e0e0&textColor=2c3e50'
+    image: 'https://cdn-icons-png.flaticon.com/512/sun.png'
   }
 ]
 
@@ -133,7 +133,7 @@ const sortedReleases = computed(() => {
     <div class="footer-note">
       <p>📌 <strong>Real Release Dates:</strong></p>
       <p>New Mewgenics - February 10, 2026</p>
-      <p>Slay the Spire 2 - March 15, 2026</p>
+      <p>Slay → Spire 2 - March 15, 2026</p>
       <p>Tomodachi Life - April 16, 2026</p>
       <p>The Heat Death of Universe - ~10,000 years from now!</p>
     </div>
@@ -206,12 +206,17 @@ const sortedReleases = computed(() => {
   margin-bottom: 15px;
   border-radius: 15px;
   overflow: hidden;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100px;
 }
 
 .game-image img {
   width: 100%;
-  height: 200px;
-  object-fit: cover;
+  height: 100%;
+  object-fit: contain;
   display: block;
 }
 
@@ -220,10 +225,7 @@ const sortedReleases = computed(() => {
   top: 10px;
   right: 10px;
   font-size: 48px;
-  background: rgba(255, 255, 255, 0.9);
-  padding: 8px;
-  border-radius: 50%;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  filter: drop-shadow(0 2px 10px rgba(0, 0, 0, 0.3));
 }
 
 .game-info {
@@ -324,8 +326,8 @@ const sortedReleases = computed(() => {
     grid-template-columns: 1fr;
   }
   
-  .game-image img {
-    height: 150px;
+  .game-image {
+    height: 80px;
   }
   
   .time-value {
@@ -334,6 +336,14 @@ const sortedReleases = computed(() => {
   
   .time-label {
     font-size: 0.65rem;
+  }
+  
+  .game-title {
+    font-size: 1.2rem;
+  }
+  
+  .game-description {
+    font-size: 0.85rem;
   }
 }
 </style>
