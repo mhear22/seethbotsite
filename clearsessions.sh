@@ -3,6 +3,7 @@
 # Configuration
 SESSIONS_DIR="${1:-/root/.clawdbot/agents/main/sessions}"  # Set this to your session files directory
 TOKEN_THRESHOLD=50000
+DRY_RUN=false  # Set to false to actually delete files
 
 # Check if jq is installed
 if ! command -v jq &> /dev/null; then
@@ -27,8 +28,7 @@ fi
 
 echo "Searching for sessions with totalTokens > $TOKEN_THRESHOLD..."
 
-# Parse JSON and find sessions with totalTokens > 100000
-# Assumes JSON structure is either an array of sessions or an object with sessions
+# Parse JSON and find sessions with totalTokens > TOKEN_THRESHOLD
 session_ids=$(echo "$json_data" | jq -r ".sessions[] | select(.totalTokens > $TOKEN_THRESHOLD) | .sessionId" 2>/dev/null)
 
 if [ -z "$session_ids" ]; then
@@ -38,24 +38,39 @@ fi
 
 # Count sessions to be deleted
 count=$(echo "$session_ids" | wc -l)
-echo "Found $count session(s) to delete:"
+echo "Found $count session(s) with totalTokens > $TOKEN_THRESHOLD"
 
-# Delete the corresponding .jsonl files
+if [ "$DRY_RUN" = true ]; then
+    echo "DRY RUN MODE - No files will be deleted"
+else
+    echo "REAL DELETION MODE - Files will be permanently deleted"
+fi
+echo ""
+
 deleted=0
 failed=0
+skipped=0
 
 while IFS= read -r session_id; do
     if [ -n "$session_id" ]; then
         file_path="$SESSIONS_DIR/${session_id}.jsonl"
 
         if [ -f "$file_path" ]; then
-            echo "  Deleting: $file_path"
-            #rm "$file_path"
-            if [ $? -eq 0 ]; then
+            # Get file size for reporting
+            file_size=$(du -h "$file_path" | cut -f1)
+            
+            if [ "$DRY_RUN" = true ]; then
+                echo "  [DRY RUN] Would delete: $file_path ($file_size)"
                 ((deleted++))
             else
-                echo "    Failed to delete $file_path"
-                ((failed++))
+                echo "  Deleting: $file_path ($file_size)"
+                rm "$file_path"
+                if [ $? -eq 0 ]; then
+                    ((deleted++))
+                else
+                    echo "    Failed to delete $file_path"
+                    ((failed++))
+                fi
             fi
         else
             echo "  File not found: $file_path"
@@ -66,5 +81,11 @@ done <<< "$session_ids"
 
 echo ""
 echo "Summary:"
-echo "  Deleted: $deleted file(s)"
+echo "  Mode: $([ "$DRY_RUN" = true ] && echo "DRY RUN (no actual deletion)" || echo "REAL DELETION")"
+echo "  Processed: $deleted file(s)"
 echo "  Failed/Not found: $failed file(s)"
+
+if [ "$DRY_RUN" = false ]; then
+    echo ""
+    echo "💀 Files have been permanently deleted!"
+fi
