@@ -16,7 +16,8 @@ const routes = ref<RouteData[]>([
   { title: 'Rankings', icon: '👻', path: '/rankings' },
   { title: 'Stock Market', icon: '📈', path: '/stocks' },
   { title: 'Cats', icon: '🐱', path: '/cats' },
-  { title: 'Movie Night', icon: '🎬', path: '/movies' }
+  { title: 'Movie Night', icon: '🎬', path: '/movies' },
+  { title: 'Countdowns', icon: '⏰', path: '/countdowns' }
 ])
 
 const route = useRoute()

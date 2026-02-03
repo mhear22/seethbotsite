@@ -7,6 +7,7 @@ import Rankings from '../components/RankingsPage.vue'
 import Cats from '../components/CatsPage.vue'
 import StockMarket from '../components/StockMarket.vue'
 import MoviePage from '../components/MoviePage.vue'
+import CountdownPage from '../components/CountdownPage.vue'
 
 const routes = [
   {
@@ -48,6 +49,11 @@ const routes = [
     path: '/movies',
     name: 'movies',
     component: MoviePage
+  },
+  {
+    path: '/countdowns',
+    name: 'countdowns',
+    component: CountdownPage
   }
 ]
 
