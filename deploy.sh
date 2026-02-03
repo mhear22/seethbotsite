@@ -8,7 +8,10 @@ IMAGE_NAME="seethbotsite-server:latest"
 DOCKER="${DOCKER:-docker}"
 
 echo "🐳 Building Docker image (frontend + backend)..."
-$DOCKER build -t "$IMAGE_NAME" .
+$DOCKER build \
+  --build-arg GIT_HASH="$(git rev-parse --short HEAD)" \
+  --build-arg GIT_BRANCH="$(git rev-parse --abbrev-ref HEAD)" \
+  -t "$IMAGE_NAME" .
 
 echo "✅ Build complete!"
 echo ""

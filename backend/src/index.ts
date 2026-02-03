@@ -16,6 +16,7 @@ import moviesController from './controllers/movies.controller';
 import genderController from './controllers/gender.controller';
 import quotesController from './controllers/quotes.controller';
 import pointsController from './controllers/points.controller';
+import versionController from './controllers/version.controller';
 
 const app: Express = express();
 const PORT = process.env.PORT || 3000;
@@ -47,6 +48,7 @@ app.use('/api', clicksController);
 app.use('/api', moviesController);
 app.use('/api', genderController);
 app.use('/api', quotesController);
+app.use('/api', versionController);
 app.use('/api/points', pointsController);
 
 // Swagger API Documentation

@@ -62,6 +62,12 @@ COPY --from=frontend-builder /app/frontend/dist ./webdist
 # Create data directory for SQLite database
 RUN mkdir -p /app/backend/data
 
+# Set git hash as environment variable
+ARG GIT_HASH=unknown
+ARG GIT_BRANCH=unknown
+ENV GIT_HASH=${GIT_HASH}
+ENV GIT_BRANCH=${GIT_BRANCH}
+
 # Expose port
 EXPOSE 3000
 
