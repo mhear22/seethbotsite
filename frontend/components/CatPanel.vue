@@ -32,9 +32,15 @@ const toggle = () => {
           width="100%" 
           height="500" 
           frameborder="0"
-          class="cat-game-iframe">
-          <a href="https://bellicapelli.itch.io/ots-01">OTS-01 by bellicapelli</a>
+          class="cat-game-iframe"
+          allowfullscreen>
+          <a href="https://bellicapelli.itch.io/ots-01" target="_blank">OTS-01 by bellicapelli</a>
         </iframe>
+        <div class="cat-game-fallback">
+          <a href="https://bellicapelli.itch.io/ots-01" target="_blank" class="cat-game-link">
+            🎮 Play OTS-01 (Virtual Toy Synth)
+          </a>
+        </div>
       </div>
     </div>
   </div>
