@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Configuration
-SESSIONS_DIR="${1:-.}"  # Set this to your session files directory
-TOKEN_THRESHOLD=100000
+SESSIONS_DIR="${1:-'/root/.clawdbot/agents/main/sessions'}"  # Set this to your session files directory
+TOKEN_THRESHOLD=50000
 
 # Check if jq is installed
 if ! command -v jq &> /dev/null; then
