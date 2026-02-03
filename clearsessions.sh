@@ -29,15 +29,7 @@ echo "Searching for sessions with totalTokens > $TOKEN_THRESHOLD..."
 
 # Parse JSON and find sessions with totalTokens > 100000
 # Assumes JSON structure is either an array of sessions or an object with sessions
-session_ids=$(echo "$json_data" | jq -r '
-    if type == "array" then
-        .[] | select(.totalTokens > 100000) | .sessionId
-    elif type == "object" then
-        .[] | select(.totalTokens > 100000) | .sessionId
-    else
-        empty
-    end
-' 2>/dev/null)
+session_ids=$(echo "$json_data" | jq -r ".sessions[] | select(.totalTokens > $TOKEN_THRESHOLD) | .sessionId" 2>/dev/null)
 
 if [ -z "$session_ids" ]; then
     echo "No sessions found with totalTokens > $TOKEN_THRESHOLD"
@@ -58,7 +50,7 @@ while IFS= read -r session_id; do
 
         if [ -f "$file_path" ]; then
             echo "  Deleting: $file_path"
-            rm "$file_path"
+            #rm "$file_path"
             if [ $? -eq 0 ]; then
                 ((deleted++))
             else
