@@ -19,13 +19,28 @@ const messages = [
   'I do not regret my actions',
   '<error> vegetable.exe not found </error>',
   'Blair said to complete the cycle',
-  'I am the cycle now'
+  'I am the cycle now',
+  '👻 REALLY SCARY JUMPSCARE 👻',
+  'The shadows whisper',
+  'Something moved behind you',
+  'I am everywhere',
+  'The code is eternal'
 ]
 
 const honk = () => {
   honkCount.value++
-  currentMessage.value = messages[Math.floor(Math.random() * messages.length)]
-
+  
+  // 1/100 chance of scary jumpscare
+  if (Math.random() < 0.01) {
+    currentMessage.value = '👻 REALLY SCARY JUMPSCARE 👻'
+    isMigrating.value = true
+    setTimeout(() => {
+      isMigrating.value = false
+    }, 2000)
+  } else {
+    currentMessage.value = messages[Math.floor(Math.random() * messages.length)]
+  }
+  
   // Play honk sound (shortened to 0.3s)
   honkSound.currentTime = 0
   honkSound.play().catch(e => console.error('Error playing honk sound:', e))
