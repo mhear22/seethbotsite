@@ -5,20 +5,19 @@ export function useAudio() {
     const audio = document.getElementById(elementId) as HTMLAudioElement
     if (!audio) return
 
+    // Pause and reset the audio to start fresh
+    audio.pause()
+    audio.currentTime = options?.startTime ?? 0
+
     if (options?.volume !== undefined) {
       audio.volume = Math.min(Math.max(options.volume, 0), 1.0)
-    }
-
-    if (options?.startTime !== undefined) {
-      audio.currentTime = options.startTime
     }
 
     audio.play()
   }
 
   const playFart = (volume?: number) => {
-    const randomValue = volume ?? Math.floor(Math.random() * 100) / 50
-    playSound('fartSound', { volume: randomValue })
+    playSound('fartSound', { volume: volume })
   }
 
   const toggleMusic = (playing: boolean) => {
