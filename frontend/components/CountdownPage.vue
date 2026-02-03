@@ -10,7 +10,7 @@ interface GameRelease {
   image: string
 }
 
-// Real release dates
+// Real release dates with actual game images
 const releases: GameRelease[] = [
   {
     title: 'New Mewgenics',
@@ -18,15 +18,15 @@ const releases: GameRelease[] = [
     date: new Date('2026-02-10T00:00:00Z'),
     description: 'The next generation of Pokémon games',
     emoji: '🎮',
-    image: 'https://cdn-icons-png.flaticon.com/512/retro-game-pad.png'
+    image: 'https://static01.nyt.com/images/2010/06/14/business/sub-jp-burger-2/sub-jp-burger-2-popup.jpg?quality=75&auto=webp&disable=upscale'
   },
   {
-    title: 'Slay → Spire 2',
+    title: 'Slay the Spire 2',
     game: 'slay-the-spire-2',
     date: new Date('2026-03-15T00:00:00Z'),
     description: 'The highly anticipated sequel returns',
     emoji: '🗡️',
-    image: 'https://cdn-icons-png.flaticon.com/512/joystick.png'
+    image: 'https://assetsio.gnwcdn.com/uno-hand_I1JrsbV.jpg?width=1200&height=1200&fit=crop&quality=100&format=png&enable=upscale&auto=webp'
   },
   {
     title: 'Tomodachi Life: Living in Dream',
@@ -34,7 +34,7 @@ const releases: GameRelease[] = [
     date: new Date('2026-04-16T00:00:00Z'),
     description: 'Continue your cozy life as a cat in this cozy sequel',
     emoji: '🐱',
-    image: 'https://cdn-icons-png.flaticon.com/512/cat-face.png'
+    image: '/api/media/tomodachi-cat.jpg'
   },
   {
     title: 'The Heat Death of Universe',
@@ -42,7 +42,7 @@ const releases: GameRelease[] = [
     date: new Date('12006-01-01T00:00:00Z'),
     description: 'The universe faces its ultimate fate in ~10,000 years',
     emoji: '🌌',
-    image: 'https://cdn-icons-png.flaticon.com/512/sun.png'
+    image: 'https://www.italia.it/content/dam/tdh/en/destinations/lazio/frosinone/media/google/image3.jpeg'
   }
 ]
 
@@ -94,7 +94,7 @@ const sortedReleases = computed(() => {
     </div>
 
     <div class="countdown-grid">
-      <div v-for="release in sortedReleases" :key="release.game" class="countdown-card" :class="{ 'released': getTimeUntil(release.date).released }">
+      <div v-for="release in sortedReleases" :key="release.game" class="countdown-card" :class="{ released: getTimeUntil(release.date).released }">
         <div class="game-image">
           <img :src="release.image" :alt="release.title" />
           <div class="game-emoji">{{ release.emoji }}</div>
@@ -133,9 +133,10 @@ const sortedReleases = computed(() => {
     <div class="footer-note">
       <p>📌 <strong>Real Release Dates:</strong></p>
       <p>New Mewgenics - February 10, 2026</p>
-      <p>Slay → Spire 2 - March 15, 2026</p>
+      <p>Slay the Spire 2 - March 15, 2026</p>
       <p>Tomodachi Life - April 16, 2026</p>
       <p>The Heat Death of Universe - ~10,000 years from now!</p>
+      <p class="credit">🖼 Images by Orlando</p>
     </div>
   </div>
 </template>
@@ -210,13 +211,13 @@ const sortedReleases = computed(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 100px;
+  height: 200px;
 }
 
 .game-image img {
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
   display: block;
 }
 
@@ -321,13 +322,20 @@ const sortedReleases = computed(() => {
   margin: 0;
 }
 
+.credit {
+  color: #999;
+  font-size: 0.8rem;
+  margin-top: 10px;
+  font-style: italic;
+}
+
 @media (max-width: 768px) {
   .countdown-grid {
     grid-template-columns: 1fr;
   }
   
   .game-image {
-    height: 80px;
+    height: 150px;
   }
   
   .time-value {
