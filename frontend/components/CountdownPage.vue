@@ -34,7 +34,7 @@ const releases: GameRelease[] = [
     date: new Date('2026-04-16T00:00:00Z'),
     description: 'Continue your cozy life as a cat in this cozy sequel',
     emoji: '🐱',
-    image: '/api/media/tomodachi-cat.jpg'
+    image: 'https://static.wikia.nocookie.net/vinesauce/images/c/c2/Two_faced.png/revision/latest?cb=20250621040938'
   },
   {
     title: 'The Heat Death of Universe',
