@@ -46,7 +46,9 @@ const honk = () => {
 <template>
   <div class="digital-goose" :class="{ migrating: isMigrating }" @click="honk">
     <div class="goose-container">
-      <div class="goose-emoji">🪿</div>
+      <div class="goose-emoji">
+        <img src="/goose.png" alt="goose" />
+      </div>
       <div class="goose-message">{{ currentMessage }}</div>
       <div class="honk-counter">{{ honkCount }} honks</div>
     </div>
@@ -61,6 +63,10 @@ const honk = () => {
   z-index: 1000;
   cursor: pointer;
   transition: all 0.3s ease;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
 }
 
 .digital-goose:hover {
@@ -94,9 +100,18 @@ const honk = () => {
 }
 
 .goose-emoji {
-  font-size: 48px;
+  width: 64px;
+  height: 64px;
   text-align: center;
-  margin-bottom: 10px;
+  margin: 0 auto 10px;
+  display: block;
+  object-fit: contain;
+  border-radius: 4px;
+}
+
+.goose-emoji img {
+  width: 100%;
+  height: 100%;
 }
 
 .goose-message {

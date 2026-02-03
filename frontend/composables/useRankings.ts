@@ -16,7 +16,7 @@ export function useRankings() {
       loading.value = true
       const response = await fetch('/api/rankings')
       const data = await response.json()
-      rankings.value = data
+      rankings.value = data.rankings
     } catch (err) {
       console.error('Failed to load rankings:', err)
     } finally {
