@@ -19,7 +19,7 @@ import pointsController from './controllers/points.controller';
 import versionController from './controllers/version.controller';
 
 const app: Express = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 // In production Docker: __dirname is /app/backend/dist, webdist is at /app/backend/webdist
 // In development: __dirname is /backend/src, webdist is at /backend/webdist
 const SERVE_ROOT = process.env.SERVE_ROOT || path.join(__dirname, '..', 'webdist');

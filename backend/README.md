@@ -5,27 +5,30 @@ TypeScript-powered Express server serving the Vue.js webapp with API endpoints.
 
 ## Setup
 ```bash
-cd server
+cd backend
 npm install
 ```
 
-## Development
+## Quick Start
+
+### Development Mode (with hot reload)
 ```bash
 npm run dev
 ```
 Server runs on http://localhost:3000 with hot reload via ts-node-dev.
 
-## Build
+### Production Mode
 ```bash
-npm run build
+npm run build    # Build TypeScript to JavaScript
+npm start        # Run the built server
 ```
-Compiles TypeScript to `dist/` directory.
 
-## Production
-```bash
-npm run build
-npm start
-```
+## Available Scripts
+
+- `npm run dev` - Start development server with hot reload
+- `npm run build` - Compile TypeScript to `dist/` directory
+- `npm start` - Run production server (requires build first)
+- `npm run watch` - Watch mode for TypeScript compilation
 
 ## API Endpoints
 
@@ -48,8 +51,23 @@ Returns the coolness rankings leaderboard.
 ]
 ```
 
+## Requirements
+- Node.js 20.x or later
+- npm or yarn
+
+## Troubleshooting
+
+### better-sqlite3 Build Issues
+If you encounter build errors with `better-sqlite3`, try:
+```bash
+npm install better-sqlite3@latest
+```
+
+This native module needs to be compatible with your Node.js version.
+
 ## Environment Variables
-- `PORT` - Server port (default: 3000)
+- `PORT` - Server port (default: 3001)
+- `SEETHBOT_API_KEYS` - Comma-separated API keys for authentication (generates default key if not set)
 
 ## Static Files
 Serves all files from parent directory (Vue.js app including components, styles, etc.)
