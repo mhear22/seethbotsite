@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { generalRepository } from '../repositories/general.repository'
 
 // Gender detection constants (from Gender\Gender PHP class)
 const GENDER_CONSTANTS = {
@@ -62,22 +63,7 @@ const detectGender = async () => {
   error.value = null
 
   try {
-    const response = await fetch('/api/gender', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        name: name.value,
-        country: selectedCountry.value
-      })
-    })
-
-    if (!response.ok) {
-      throw new Error('Failed to detect gender')
-    }
-
-    const data = await response.json()
+    const data = await generalRepository.detectGender(name.value, selectedCountry.value)
 
     // Map backend gender strings to constants
     const genderStringToCode: { [key: string]: number } = {

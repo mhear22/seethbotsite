@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { generalRepository } from '../repositories/general.repository'
 
 export const useQuote = () => {
   const currentQuote = ref('Loading quote...')
@@ -10,11 +11,10 @@ export const useQuote = () => {
     error.value = null
 
     try {
-      const response = await fetch('/api/quote')
-      const data = await response.json()
+      const quote = await generalRepository.getQuote()
 
-      if (data.quote) {
-        currentQuote.value = data.quote
+      if (quote.text) {
+        currentQuote.value = quote.text
       } else {
         currentQuote.value = 'Stay curious, keep asking questions.'
       }

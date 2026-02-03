@@ -3,18 +3,18 @@ import { ref, onMounted } from 'vue'
 import MovieSuggestions from './MovieSuggestions.vue'
 import MovieVoting from './MovieVoting.vue'
 import MovieResults from './MovieResults.vue'
+import { moviesRepository } from '../repositories/movies.repository'
+import { usePolling } from '../composables/usePolling'
 
 const activeTab = ref<'suggestions' | 'voting' | 'results'>('suggestions')
 const votingRound = ref<any>(null)
 
 const fetchVotingRound = async () => {
   try {
-    const response = await fetch('/api/movies/voting-round')
-    const data = await response.json()
-    votingRound.value = data.round
+    votingRound.value = await moviesRepository.getVotingRound()
 
     // Auto-switch to voting tab if there's an active round
-    if (data.round?.isActive && activeTab.value === 'results') {
+    if (votingRound.value?.isActive && activeTab.value === 'results') {
       activeTab.value = 'voting'
     }
   } catch (error) {
@@ -22,10 +22,26 @@ const fetchVotingRound = async () => {
   }
 }
 
+// Use polling composable for automatic updates
+const { data: polledRound } = usePolling(
+  () => moviesRepository.getVotingRound(),
+  { initialInterval: 10000 }
+)
+
 onMounted(() => {
   fetchVotingRound()
-  // Refresh every 10 seconds
-  setInterval(fetchVotingRound, 10000)
+})
+
+// Watch for polling updates
+import { watch } from 'vue'
+watch(polledRound, (newRound) => {
+  if (newRound) {
+    votingRound.value = newRound
+    // Auto-switch to voting tab if there's an active round
+    if (newRound.isActive && activeTab.value === 'results') {
+      activeTab.value = 'voting'
+    }
+  }
 })
 </script>
 

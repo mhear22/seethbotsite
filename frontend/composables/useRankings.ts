@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { generalRepository } from '../repositories/general.repository'
 
 export interface RankingItem {
   name: string
@@ -14,9 +15,7 @@ export function useRankings() {
   const loadRankings = async () => {
     try {
       loading.value = true
-      const response = await fetch('/api/rankings')
-      const data = await response.json()
-      rankings.value = data.rankings
+      rankings.value = await generalRepository.getRankings()
     } catch (err) {
       console.error('Failed to load rankings:', err)
     } finally {

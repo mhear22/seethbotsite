@@ -14,6 +14,8 @@ RUN npm ci
 COPY frontend/vite.config.ts frontend/tsconfig.json frontend/tsconfig.node.json frontend/index.html ./
 COPY frontend/main.ts frontend/App.vue ./
 COPY frontend/components ./components/
+COPY frontend/repositories ./repositories/
+COPY frontend/config ./config/
 COPY frontend/router ./router/
 COPY frontend/utils ./utils/
 COPY frontend/composables ./composables/

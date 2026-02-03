@@ -1,5 +1,8 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { stocksRepository } from '../repositories/stocks.repository'
+import { useUserId } from '../composables/useUserId'
+import { usePolling } from '../composables/usePolling'
 
 interface Stock {
   name: string
@@ -32,14 +35,9 @@ interface Portfolio {
   transactions: Transaction[]
 }
 
-// Store userId in localStorage to persist across page refreshes
-const savedUserId = localStorage.getItem('stock-market-user-id')
-const userId = ref<string>(savedUserId || 'user-' + Math.random().toString(36).substr(2, 9))
+// Use centralized userId management
+const { userId } = useUserId()
 
-// Save userId to localStorage if it's a new one
-if (!savedUserId) {
-  localStorage.setItem('stock-market-user-id', userId.value)
-}
 const stocks = ref<Stock[]>([])
 const portfolio = ref<Portfolio | null>(null)
 const portfolioValue = ref<number>(10000)
@@ -47,7 +45,6 @@ const selectedStock = ref<Stock | null>(null)
 const tradeShares = ref<number>(1)
 const tradeType = ref<'buy' | 'sell'>('buy')
 const loading = ref<boolean>(false)
-const pollInterval = ref<number | null>(null)
 
 // Computed
 const selectedStockOwned = computed(() => {
@@ -77,9 +74,7 @@ const canTrade = computed(() => {
 // Methods
 const loadStocks = async () => {
   try {
-    const response = await fetch('/api/stocks')
-    const data = await response.json()
-    stocks.value = data.stocks
+    stocks.value = await stocksRepository.getStocks()
   } catch (error) {
     console.error('Error loading stocks:', error)
   }
@@ -87,8 +82,7 @@ const loadStocks = async () => {
 
 const loadPortfolio = async () => {
   try {
-    const response = await fetch(`/api/portfolio/${userId.value}`)
-    const data = await response.json()
+    const data = await stocksRepository.getPortfolio(userId.value)
     portfolio.value = data.portfolio
     portfolioValue.value = data.portfolioValue
   } catch (error) {
@@ -107,22 +101,14 @@ const executeTrade = async () => {
 
   loading.value = true
   try {
-    const endpoint = tradeType.value === 'buy' ? '/api/stocks/buy' : '/api/stocks/sell'
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        userId: userId.value,
-        stockName: selectedStock.value.name,
-        shares: tradeShares.value
-      })
-    })
-    const data = await response.json()
-
-    if (data.success) {
-      await loadStocks()
-      await loadPortfolio()
+    if (tradeType.value === 'buy') {
+      await stocksRepository.buyStock(userId.value, selectedStock.value.name, tradeShares.value)
+    } else {
+      await stocksRepository.sellStock(userId.value, selectedStock.value.name, tradeShares.value)
     }
+
+    await loadStocks()
+    await loadPortfolio()
   } catch (error) {
     console.error('Error executing trade:', error)
   } finally {
@@ -192,22 +178,14 @@ const formatEmoji = (emoji: string): string => {
   return emoji
 }
 
+// Use polling composables for automatic updates
+usePolling(loadStocks, { initialInterval: 5000 })
+usePolling(loadPortfolio, { initialInterval: 5000 })
+
 // Lifecycle
 onMounted(() => {
   loadStocks()
   loadPortfolio()
-
-  // Poll for updates every 5 seconds
-  pollInterval.value = window.setInterval(() => {
-    loadStocks()
-    loadPortfolio()
-  }, 5000)
-})
-
-onUnmounted(() => {
-  if (pollInterval.value) {
-    clearInterval(pollInterval.value)
-  }
 })
 </script>
 

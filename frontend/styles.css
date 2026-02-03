@@ -18,47 +18,201 @@ body.dark {
   background: linear-gradient(135deg, #9333ea 0%, #7c3aed 50%, #5b21b6 100%);
 }
 
-/* Router Navigation */
+/* Router Navigation - Modern Full-Width Bar */
 .router-nav {
   position: fixed;
-  top: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  gap: 15px;
+  top: 0;
+  left: 0;
+  width: 100%;
   z-index: 200;
-  background: rgba(255, 255, 255, 0.95);
-  padding: 10px 20px;
-  border-radius: 25px;
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-  transition: transform 0.3s ease;
+  background: rgba(255, 255, 255, 0.98);
+  border-bottom: 1px solid rgba(255, 182, 193, 0.3);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  backdrop-filter: blur(10px);
 }
 
-.router-link {
-  background: linear-gradient(45deg, #ff6b9d, #ff8a80);
-  color: white;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 20px;
-  cursor: pointer;
+.dark .router-nav {
+  background: rgba(40, 44, 52, 0.98);
+  border-bottom: 1px solid rgba(255, 182, 193, 0.2);
+}
+
+.nav-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 60px;
+  gap: 1rem;
+}
+
+.nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   font-family: 'Quicksand', sans-serif;
   font-weight: bold;
-  box-shadow: 0 3px 10px rgba(255, 107, 157, 0.3);
-  transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  font-size: 20px;
+  color: #ff91a4;
+  flex-shrink: 0;
+}
+
+.brand-icon {
+  font-size: 24px;
+}
+
+.brand-text {
+  letter-spacing: 0.5px;
+}
+
+.nav-controls {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 16px;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.control-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: none;
+  background: rgba(255, 182, 193, 0.15);
+  cursor: pointer;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.dark .control-btn {
+  background: rgba(255, 182, 193, 0.1);
+}
+
+.control-btn:hover {
+  background: rgba(255, 182, 193, 0.25);
+  transform: scale(1.05);
+}
+
+.dark .control-btn:hover {
+  background: rgba(255, 182, 193, 0.2);
+}
+
+.control-btn.active {
+  background: #ff91a4;
+}
+
+.dark .control-btn.active {
+  background: #ff91a4;
+}
+
+.mobile-menu-toggle {
+  display: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  z-index: 201;
+}
+
+.hamburger-icon {
+  width: 24px;
+  height: 20px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.hamburger-icon span {
+  display: block;
+  width: 100%;
+  height: 3px;
+  background: #ff91a4;
+  border-radius: 2px;
+  transition: all 0.3s ease;
+}
+
+.hamburger-icon.open span:nth-child(1) {
+  transform: translateY(8.5px) rotate(45deg);
+}
+
+.hamburger-icon.open span:nth-child(2) {
+  opacity: 0;
+}
+
+.hamburger-icon.open span:nth-child(3) {
+  transform: translateY(-8.5px) rotate(-45deg);
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.router-link {
+  color: #666;
+  text-decoration: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: 'Quicksand', sans-serif;
+  font-weight: 600;
+  font-size: 15px;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+}
+
+.dark .router-link {
+  color: #aaa;
 }
 
 .router-link:hover {
-  transform: translateY(-2px) scale(1.02);
-  box-shadow: 0 6px 15px rgba(255, 107, 157, 0.5);
+  background: rgba(255, 182, 193, 0.15);
+  color: #ff91a4;
+}
+
+.dark .router-link:hover {
+  background: rgba(255, 182, 193, 0.1);
+  color: #ffb6c1;
 }
 
 .router-link.active {
-  background: linear-gradient(45deg, #90EE90, #32CD32);
-  box-shadow: 0 0 0 3px rgba(144, 238, 144, 0.3);
+  color: #ff91a4;
+  background: rgba(255, 182, 193, 0.2);
+}
+
+.dark .router-link.active {
+  color: #ffb6c1;
+  background: rgba(255, 182, 193, 0.15);
+}
+
+.router-link.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 16px;
+  right: 16px;
+  height: 2px;
+  background: #ff91a4;
+  border-radius: 2px 2px 0 0;
+}
+
+.link-icon {
+  font-size: 18px;
+}
+
+.link-text {
+  font-size: 15px;
 }
 
 /* Girl Mode Page */
@@ -343,6 +497,7 @@ body.dark .full-rank-score {
   display: flex;
   align-items: center;
   justify-content: center;
+  padding-top: 60px;
   padding: 80px 20px;
   position: relative;
 }
@@ -411,7 +566,7 @@ body.dark .bg-circle:nth-child(3) {
 /* Quote section */
 .quote-section {
   position: fixed;
-  top: 80px;
+  top: 60px;
   left: 0;
   width: 100%;
   padding: 20px;
@@ -1387,25 +1542,9 @@ body.dark .mika-modal-box {
 
 /* Mobile Header Controls */
 @media (max-width: 768px) {
+  /* Old header-controls - now integrated into navbar */
   .header-controls {
-    position: fixed;
-    top: 10px;
-    left: 50%;
-    transform: translateX(-50%);
-    display: flex;
-    gap: 8px;
-    z-index: 200;
-    background: rgba(255, 255, 255, 0.95);
-    padding: 8px 12px;
-    border-radius: 20px;
-    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15);
-    flex-wrap: wrap;
-    justify-content: center;
-    max-width: 95vw;
-  }
-
-  .dark .header-controls {
-    background: rgba(40, 44, 52, 0.95);
+    display: none;
   }
 
   .control-btn {
@@ -1440,25 +1579,92 @@ body.dark .mika-modal-box {
 
 /* Mobile Router Navigation */
 @media (max-width: 768px) {
-  .router-nav {
-    position: fixed;
-    top: 70px;
-    left: 50%;
-    transform: translateX(-50%);
-    display: flex;
-    gap: 8px;
-    z-index: 200;
-    background: rgba(255, 255, 255, 0.95);
-    padding: 8px 12px;
-    border-radius: 20px;
-    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15);
-    flex-wrap: wrap;
-    justify-content: center;
-    max-width: 95vw;
+  .nav-container {
+    padding: 0 1rem;
+    height: 56px;
   }
 
-  .dark .router-nav {
-    background: rgba(40, 44, 52, 0.95);
+  .nav-brand {
+    font-size: 18px;
+  }
+
+  .brand-icon {
+    font-size: 22px;
+  }
+
+  .nav-controls {
+    position: static;
+    transform: none;
+    gap: 6px;
+  }
+
+  .control-btn {
+    width: 36px;
+    height: 36px;
+    font-size: 18px;
+  }
+
+  .mobile-menu-toggle {
+    display: block;
+  }
+
+  .nav-links {
+    position: fixed;
+    top: 56px;
+    left: 0;
+    width: 100%;
+    background: rgba(255, 255, 255, 0.98);
+    flex-direction: column;
+    gap: 0;
+    padding: 0;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+
+  .dark .nav-links {
+    background: rgba(40, 44, 52, 0.98);
+  }
+
+  .nav-links.open {
+    max-height: calc(100vh - 56px);
+    overflow-y: auto;
+  }
+
+  .router-link {
+    width: 100%;
+    padding: 16px 1.5rem;
+    border-radius: 0;
+    border-bottom: 1px solid rgba(255, 182, 193, 0.1);
+    justify-content: flex-start;
+    font-size: 16px;
+  }
+
+  .dark .router-link {
+    border-bottom: 1px solid rgba(255, 182, 193, 0.08);
+  }
+
+  .router-link.active::after {
+    display: none;
+  }
+
+  .router-link.active::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: #ff91a4;
+  }
+
+  .link-icon {
+    font-size: 20px;
+  }
+
+  .link-text {
+    font-size: 16px;
   }
 
   .router-link {
@@ -1472,7 +1678,7 @@ body.dark .mika-modal-box {
 @media (max-width: 768px) {
   .quote-section {
     position: fixed;
-    top: 130px;
+    top: 120px;
     left: 0;
     width: 100%;
     padding: 15px;
@@ -1495,7 +1701,7 @@ body.dark .mika-modal-box {
 @media (max-width: 768px) {
   .tachometer {
     position: fixed;
-    top: 200px;
+    top: 190px;
     left: 50%;
     transform: translateX(-50%);
     z-index: 100;
@@ -1656,7 +1862,7 @@ body.dark .mika-modal-box {
 /* Mobile Page Content */
 @media (max-width: 768px) {
   .page-content {
-    padding: 220px 15px 20px;
+    padding: 76px 15px 20px;
     min-height: 100vh;
   }
 
@@ -1734,7 +1940,7 @@ body.dark .mika-modal-box {
 /* Mobile Girl Mode Page */
 @media (max-width: 768px) {
   .girl-mode-container {
-    padding: 220px 15px 20px;
+    padding: 76px 15px 20px;
   }
 
   .girl-mode-content {
@@ -1795,7 +2001,7 @@ body.dark .mika-modal-box {
   }
 
   .gender-picker {
-    padding: 220px 15px 20px;
+    padding: 76px 15px 20px;
   }
 
   .name-input,
@@ -1896,20 +2102,31 @@ body.dark .mika-modal-box {
 
 /* Small Mobile Devices (< 480px) */
 @media (max-width: 480px) {
-  .header-controls {
-    gap: 6px;
-    padding: 6px 10px;
+  .nav-controls {
+    gap: 4px;
   }
 
   .control-btn {
-    width: 36px;
-    height: 36px;
-    font-size: 18px;
+    width: 32px;
+    height: 32px;
+    font-size: 16px;
+  }
+
+  .nav-brand {
+    font-size: 16px;
+  }
+
+  .brand-icon {
+    font-size: 20px;
   }
 
   .router-link {
-    padding: 6px 10px;
-    font-size: 11px;
+    padding: 14px 1rem;
+    font-size: 15px;
+  }
+
+  .link-icon {
+    font-size: 18px;
   }
 
   .quote-text {
@@ -1939,7 +2156,7 @@ body.dark .mika-modal-box {
 /* Landscape Mobile */
 @media (max-width: 768px) and (orientation: landscape) {
   .quote-section {
-    top: 60px;
+    top: 110px;
     padding: 10px;
   }
 
@@ -1948,7 +2165,7 @@ body.dark .mika-modal-box {
   }
 
   .tachometer {
-    top: 110px;
+    top: 160px;
   }
 
   .rankings-panel,
@@ -1957,7 +2174,7 @@ body.dark .mika-modal-box {
   }
 
   .page-content {
-    padding: 140px 15px 20px;
+    padding: 76px 15px 20px;
   }
 }
 

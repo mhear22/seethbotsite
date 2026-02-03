@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
+import { moviesRepository } from '../repositories/movies.repository'
+import { useUserId } from '../composables/useUserId'
 
 const emit = defineEmits(['refresh'])
 
@@ -25,7 +27,9 @@ const movies = ref<Movie[]>([])
 const rankings = ref<string[]>([])
 const myVote = ref<any>(null)
 const hasVoted = ref(false)
-const userId = ref('')
+
+// Use centralized userId management
+const { userId } = useUserId()
 
 const votingMovies = computed(() => {
   if (!votingRound.value) return []
@@ -36,12 +40,10 @@ const votingMovies = computed(() => {
 
 const loadVotingRound = async () => {
   try {
-    const response = await fetch('/api/movies/voting-round')
-    const data = await response.json()
-    votingRound.value = data.round
+    votingRound.value = await moviesRepository.getVotingRound()
 
     // Load movies if there's an active round
-    if (data.round?.isActive) {
+    if (votingRound.value?.isActive) {
       await loadMovies()
     }
   } catch (error) {
@@ -51,9 +53,7 @@ const loadVotingRound = async () => {
 
 const loadMovies = async () => {
   try {
-    const response = await fetch('/api/movies')
-    const data = await response.json()
-    movies.value = data.movies
+    movies.value = await moviesRepository.getMovies()
   } catch (error) {
     console.error('Failed to load movies:', error)
   }
@@ -63,11 +63,10 @@ const loadMyVote = async () => {
   if (!userId.value) return
 
   try {
-    const response = await fetch(`/api/movies/vote/${userId.value}`)
-    if (response.ok) {
-      const data = await response.json()
-      myVote.value = data.vote
-      rankings.value = data.vote.rankings
+    const vote = await moviesRepository.getVote(userId.value)
+    if (vote) {
+      myVote.value = vote
+      rankings.value = vote.rankings
       hasVoted.value = true
     } else {
       hasVoted.value = false
@@ -84,23 +83,10 @@ const submitVote = async () => {
   }
 
   try {
-    const response = await fetch('/api/movies/vote', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        userId: userId.value,
-        rankings: rankings.value
-      })
-    })
-
-    if (response.ok) {
-      hasVoted.value = true
-      const data = await response.json()
-      myVote.value = data.vote
-      alert('Vote submitted! 🗳️')
-    } else {
-      alert('Failed to submit vote')
-    }
+    const response = await moviesRepository.submitVote(userId.value, rankings.value)
+    hasVoted.value = true
+    myVote.value = response.vote
+    alert('Vote submitted! 🗳️')
   } catch (error) {
     console.error('Error submitting vote:', error)
     alert('Failed to submit vote')
@@ -126,9 +112,6 @@ const getMovieById = (id: string) => {
 }
 
 onMounted(async () => {
-  userId.value = localStorage.getItem('userId') || 'user-' + Math.random().toString(36).substr(2, 9)
-  localStorage.setItem('userId', userId.value)
-
   await loadVotingRound()
   await loadMyVote()
 })

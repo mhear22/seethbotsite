@@ -85,7 +85,7 @@ const onFart = () => {
 <style scoped>
 .tachometer {
   position: fixed;
-  top: 20px;
+  top: 70px;
   left: 20px;
   display: flex;
   flex-direction: column;

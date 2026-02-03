@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
+import { moviesRepository } from '../repositories/movies.repository'
 
 const emit = defineEmits(['refresh'])
 
@@ -37,16 +38,14 @@ const getMovieTitle = (id: string) => {
 
 const loadVotingRound = async () => {
   try {
-    const response = await fetch('/api/movies/voting-round')
-    const data = await response.json()
-    votingRound.value = data.round
+    votingRound.value = await moviesRepository.getVotingRound()
 
-    if (data.round) {
+    if (votingRound.value) {
       await loadMovies()
       await loadVotes()
 
       // If round is ended, calculate results
-      if (!data.round.isActive) {
+      if (!votingRound.value.isActive) {
         results.value = calculateResults()
       }
     }
@@ -57,9 +56,7 @@ const loadVotingRound = async () => {
 
 const loadMovies = async () => {
   try {
-    const response = await fetch('/api/movies')
-    const data = await response.json()
-    movies.value = data.movies
+    movies.value = await moviesRepository.getMovies()
   } catch (error) {
     console.error('Failed to load movies:', error)
   }
@@ -67,9 +64,7 @@ const loadMovies = async () => {
 
 const loadVotes = async () => {
   try {
-    const response = await fetch('/api/movies/votes')
-    const data = await response.json()
-    votes.value = data.votes
+    votes.value = await moviesRepository.getVotes()
   } catch (error) {
     console.error('Failed to load votes:', error)
   }
@@ -169,23 +164,12 @@ const endVoting = async () => {
   }
 
   try {
-    const response = await fetch('/api/movies/voting-round/end', {
-      method: 'POST'
-    })
+    const data = await moviesRepository.endVotingRound()
+    alert('Voting ended! The winner is ' + (winner.value?.title || 'Unknown') + '! 🏆')
 
-    if (response.ok) {
-      const data = await response.json()
-      alert('Voting ended! The winner is ' + (winner.value?.title || 'Unknown') + '! 🏆')
-      results.value = {
-        rounds: data.results,
-        totalVotes: votes.length,
-        winner: data.winner
-      }
-      votingRound.value!.isActive = false
-      emit('refresh')
-    } else {
-      alert('Failed to end voting')
-    }
+    // Reload the voting round to get updated data
+    await loadVotingRound()
+    emit('refresh')
   } catch (error) {
     console.error('Error ending voting:', error)
     alert('Failed to end voting')
@@ -198,17 +182,10 @@ const resetVoting = async () => {
   }
 
   try {
-    const response = await fetch('/api/movies/voting-round/reset', {
-      method: 'POST'
-    })
-
-    if (response.ok) {
-      alert('Voting reset successfully!')
-      results.value = null
-      emit('refresh')
-    } else {
-      alert('Failed to reset voting')
-    }
+    await moviesRepository.resetVotingRound()
+    alert('Voting reset successfully!')
+    results.value = null
+    emit('refresh')
   } catch (error) {
     console.error('Error resetting voting:', error)
     alert('Failed to reset voting')

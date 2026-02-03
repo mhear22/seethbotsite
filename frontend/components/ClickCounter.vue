@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, onMounted, watch } from 'vue'
+import { clicksRepository } from '../repositories/clicks.repository'
+import { usePolling } from '../composables/usePolling'
 
 interface ClickData {
   count: number
@@ -7,12 +9,10 @@ interface ClickData {
 }
 
 const props = withDefaults(defineProps<{
-  apiUrl?: string
   initialInterval?: number
   maxInterval?: number
   backoffMultiplier?: number
 }>(), {
-  apiUrl: '/api/clicks',
   initialInterval: 1000,
   maxInterval: 30000,
   backoffMultiplier: 2
@@ -22,47 +22,26 @@ const count = ref(0)
 const loading = ref(false)
 const isClicking = ref(false)
 const lastUpdate = ref<Date | null>(null)
-const pollInterval = ref(props.initialInterval)
-let intervalId: number | null = null
 
-const scheduleNextFetch = () => {
-  if (intervalId !== null) {
-    clearInterval(intervalId)
+// Use adaptive polling
+const { data: clickData, currentInterval } = usePolling(
+  () => clicksRepository.getCount(),
+  {
+    mode: 'adaptive',
+    initialInterval: props.initialInterval,
+    maxInterval: props.maxInterval,
+    backoffMultiplier: props.backoffMultiplier,
+    isUnchanged: (prev, next) => prev?.count === next?.count
   }
-  intervalId = window.setTimeout(() => {
-    fetchCount()
-  }, pollInterval.value)
-}
+)
 
-const resetBackoff = () => {
-  pollInterval.value = props.initialInterval
-}
-
-const increaseBackoff = () => {
-  const nextInterval = pollInterval.value * props.backoffMultiplier
-  pollInterval.value = Math.min(nextInterval, props.maxInterval)
-}
-
-const fetchCount = async () => {
-  try {
-    const response = await fetch(props.apiUrl)
-    const data = await response.json() as ClickData
-
-    if (data.count !== count.value) {
-      resetBackoff()
-    } else {
-      increaseBackoff()
-    }
-
-    count.value = data.count
-    lastUpdate.value = new Date(data.timestamp)
-
-    scheduleNextFetch()
-  } catch (error) {
-    console.error('Error fetching click count:', error)
-    scheduleNextFetch()
+// Update local state when polling data changes
+watch(clickData, (newData) => {
+  if (newData) {
+    count.value = newData.count
+    lastUpdate.value = new Date(newData.timestamp)
   }
-}
+})
 
 const incrementClick = async () => {
   if (loading.value) return
@@ -71,13 +50,9 @@ const incrementClick = async () => {
   isClicking.value = true
 
   try {
-    const response = await fetch(`${props.apiUrl}/increment`, {
-      method: 'POST'
-    })
-    const data = await response.json() as ClickData
+    const data = await clicksRepository.increment()
     count.value = data.count
     lastUpdate.value = new Date(data.timestamp)
-    resetBackoff()
 
     setTimeout(() => {
       isClicking.value = false
@@ -100,13 +75,7 @@ const formatTime = (date: Date): string => {
 }
 
 onMounted(() => {
-  fetchCount()
-})
-
-onBeforeUnmount(() => {
-  if (intervalId !== null) {
-    clearTimeout(intervalId)
-  }
+  // Initial load happens automatically via usePolling
 })
 </script>
 

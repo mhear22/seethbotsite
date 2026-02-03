@@ -3,6 +3,28 @@
  * Simplified without authentication requirements
  */
 
+import { getApiBaseUrl } from '../config/api.config';
+
+/**
+ * Build a full URL by prepending the configured base URL
+ * @param path - The API path (e.g., '/api/movies')
+ * @returns Full URL with base URL prepended if configured
+ */
+export const buildUrl = (path: string): string => {
+  const baseUrl = getApiBaseUrl();
+
+  // If no base URL is configured, return the path as-is (relative path)
+  if (!baseUrl) {
+    return path;
+  }
+
+  // Remove trailing slash from baseUrl and leading slash from path if both exist
+  const normalizedBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+
+  return `${normalizedBase}${normalizedPath}`;
+};
+
 /**
  * Simple fetch wrapper with error handling
  */
@@ -12,7 +34,9 @@ export const apiFetch = async (url: string, options: RequestInit = {}): Promise<
     ...options.headers
   };
 
-  const response = await fetch(url, {
+  const fullUrl = buildUrl(url);
+
+  const response = await fetch(fullUrl, {
     ...options,
     headers
   });
@@ -138,6 +162,7 @@ export const API_ENDPOINTS = {
 } as const;
 
 export default {
+  buildUrl,
   apiFetch,
   handleApiError,
   apiGet,

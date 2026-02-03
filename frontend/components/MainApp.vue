@@ -46,24 +46,6 @@ const goToGirlMode = () => {
 
 <template>
   <div class="main-app" :class="{ dark: appStore.darkMode, 'centered': appStore.currentRoute === 'home' }">
-    <!-- Header Controls -->
-    <div class="header-controls">
-      <button @click="appStore.toggleDarkMode" class="control-btn" :class="{ active: appStore.darkMode }">
-        {{ appStore.darkMode ? '🌙' : '☀️' }}
-      </button>
-      <button @click="appStore.toggleMusic" class="control-btn" :class="{ active: appStore.musicPlaying }">
-        {{ appStore.musicPlaying ? '🔊' : '🔇' }}
-      </button>
-      <button @click="appStore.togglePanel('rankings')" class="control-btn" :class="{ active: appStore.panels.rankings }">
-        👻
-      </button>
-      <button @click="appStore.togglePanel('cat')" class="control-btn" :class="{ active: appStore.panels.cat }">
-        🐱
-      </button>
-      <button @click="appStore.togglePanel('feed')" class="control-btn" :class="{ active: appStore.panels.feed }">
-        📰
-      </button>
-    </div>
     <Router />
     <router-view />
 
