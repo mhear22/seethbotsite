@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import MainApp from './components/MainApp.vue'
+import MainApp from './components/shared/core/MainApp.vue'
 import { useAppStore } from './stores/useAppStore'
 
 // Store

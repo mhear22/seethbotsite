@@ -19,6 +19,8 @@ import pointsController from './controllers/points.controller';
 import versionController from './controllers/version.controller';
 import ticketsController from './controllers/tickets.controller';
 import authController from './controllers/auth.controller';
+import holidaysController from './controllers/holidays.controller';
+import birdsoundsController from './controllers/birdsounds.controller';
 
 const app: Express = express();
 const PORT = process.env.PORT || 3001;
@@ -54,6 +56,8 @@ app.use('/api', versionController);
 app.use('/api/points', pointsController);
 app.use('/api', ticketsController);
 app.use('/api', authController);
+app.use('/api', holidaysController);
+app.use('/api', birdsoundsController);
 
 // Serve raw OpenAPI JSON spec for type generation
 app.get('/api/openapi.json', (req: Request, res: Response) => {

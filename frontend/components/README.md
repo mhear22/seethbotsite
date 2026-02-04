@@ -2,290 +2,188 @@
 
 This directory contains all the reusable Vue.js components for mald.mikahear.es.
 
-## Components
-
-### 1. RankingsPanel.js
-**Purpose:** Displays coolness rankings leaderboard
-**Props:**
-- `isOpen` (Boolean) - Panel visibility
-- `rankings` (Array) - List of ranking objects
-
-**Emits:**
-- `toggle` - Fired when close button clicked
-
-**Example:**
-```javascript
-<RankingsPanel
-  :is-open="rankingsOpen"
-  :rankings="rankings"
-  @toggle="toggleRankings"
-/>
-```
-
----
-
-### 2. CatPanel.js
-**Purpose:** Displays random cat images with refresh button
-**Props:**
-- `isOpen` (Boolean) - Panel visibility
-- `catImage` (String) - Current cat image URL
-
-**Emits:**
-- `toggle` - Fired when close button clicked
-- `new-cat` - Fired when "New Cat" button clicked
-
-**Example:**
-```javascript
-<CatPanel
-  :is-open="catOpen"
-  :cat-image="currentCatImage"
-  @toggle="toggleCat"
-  @new-cat="nextCat"
-/>
-```
-
----
-
-### 3. Tachometer.js
-**Purpose:** Mold meter gauge with fart button
-**Props:**
-- `value` (Number) - Current percentage value
-- `needleAngle` (Number) - Needle rotation angle
-- `clicked` (Boolean) - Disable state
-- `exploded` (Boolean) - Particle explosion state
-
-**Emits:**
-- `fart` - Fired when fart button clicked
-
-**Example:**
-```javascript
-<Tachometer
-  :value="tachValue"
-  :needle-angle="needleAngle"
-  :clicked="fartClicked"
-  :exploded="fartExploded"
-  @fart="onFart"
-/>
-```
-
----
-
-### 4. FeedPanel.js
-**Purpose:** Displays live feeds (weather radar, YouTube, Twitter)
-**Props:**
-- `isOpen` (Boolean) - Panel visibility
-
-**Emits:**
-- `toggle` - Fired when close button clicked
-
-**Example:**
-```javascript
-<FeedPanel
-  :is-open="feedOpen"
-  @toggle="toggleFeed"
-/>
-```
-
----
-
-### 5. QuoteSection.js
-**Purpose:** Displays inspirational quote
-**Props:**
-- `currentQuote` (String) - Current quote text
-
-**Emits:**
-- `next-quote` - Fired when quote is clicked
-
-**Example:**
-```javascript
-<QuoteSection
-  :current-quote="currentQuote"
-  @next-quote="nextQuote"
-/>
-```
-
----
-
-### 6. MikaModal.js
-**Purpose:** Blank modal for Mika button
-**Props:**
-- `isOpen` (Boolean) - Modal visibility
-
-**Emits:**
-- `close` - Fired when close button clicked or backdrop clicked
-
-**Example:**
-```javascript
-<MikaModal
-  :is-open="mikaModalOpen"
-  @close="closeMikaModal"
-/>
-```
-
----
-
-### 7. ConfirmationModal.js
-**Purpose:** "Turn me into a girl" confirmation modal
-**Props:**
-- `isOpen` (Boolean) - Modal visibility
-
-**Emits:**
-- `close` - Fired when "Go back" button clicked or backdrop clicked
-
-**Example:**
-```javascript
-<ConfirmationModal
-  :is-open="confirmationOpen"
-  @close="closeConfirmation"
-/>
-```
-
----
-
-### 8. ControlButtons.js
-**Purpose:** All control buttons (rankings, dark mode, music, feeds, Mika)
-**Props:**
-- `darkMode` (Boolean) - Dark mode state
-- `musicPlaying` (Boolean) - Music playing state
-
-**Emits:**
-- `toggle-rankings` - Toggle rankings panel
-- `toggle-dark` - Toggle dark mode
-- `toggle-music` - Toggle music
-- `toggle-feed` - Toggle feeds panel
-- `toggle-mika` - Toggle Mika modal
-
-**Example:**
-```javascript
-<ControlButtons
-  :dark-mode="darkMode"
-  :music-playing="musicPlaying"
-  @toggle-rankings="toggleRankings"
-  @toggle-dark="toggleDarkMode"
-  @toggle-music="toggleMusic"
-  @toggle-feed="toggleFeed"
-  @toggle-mika="openMikaModal"
-/>
-```
-
----
-
-## Adding New Components
-
-### Step 1: Create Component File
-```javascript
-// components/MyComponent.js
-export const MyComponent = {
-  template: `
-    <div class="my-component">
-      <h2>{{ title }}</h2>
-      <p>{{ description }}</p>
-    </div>
-  `,
-  props: {
-    title: {
-      type: String,
-      required: true
-    },
-    description: {
-      type: String,
-      default: 'Default description'
-    }
-  }
-};
-```
-
-### Step 2: Import in Main App
-```javascript
-import { MyComponent } from './components/MyComponent.js';
-
-createApp({
-  components: {
-    MyComponent
-  }
-});
-```
-
-### Step 3: Use in Template
-```javascript
-template: \`
-  <MyComponent
-    title="My Component"
-    description="This is my new component"
-  />
-\`
-```
-
----
-
-## Component Guidelines
-
-### Props
-- Always define prop types
-- Mark required props with `required: true`
-- Provide sensible defaults where possible
-- Use descriptive names
-
-### Emits
-- Emit events with descriptive names
-- Use kebab-case for event names
-- Document all emitted events
-
-### Styling
-- Keep styles in main `index.html` for CDN setup
-- Use semantic class names
-- Follow BEM-like naming if needed
-
-### Accessibility
-- Use semantic HTML elements
-- Add proper ARIA labels where needed
-- Ensure keyboard navigation works
-
----
-
-## Benefits of Component Architecture
-
-✅ **Modular** - Each component is self-contained
-✅ **Reusable** - Components can be used multiple times
-✅ **Maintainable** - Easier to find and fix issues
-✅ **Testable** - Components can be tested independently
-✅ **Collaboration** - Multiple developers can work on different components
-✅ **Clear contracts** - Props and emits define clear interfaces
-
----
-
-## File Structure
+## Directory Structure
 
 ```
 components/
 ├── README.md              # This file
-├── RankingsPanel.js       # Coolness rankings panel
-├── CatPanel.js            # Random cats panel
-├── Tachometer.js          # Mold meter gauge
-├── FeedPanel.js           # Live feeds panel
-├── QuoteSection.js        # Quote display
-├── MikaModal.js           # Mika modal
-├── ConfirmationModal.js    # Girl transformation confirmation
-└── ControlButtons.js      # All control buttons
+├── pages/                 # Route-level page components
+│   ├── AboutPage.vue
+│   ├── CatsPage.vue
+│   ├── ClocksPage.vue
+│   ├── CountdownPage.vue
+│   ├── GenderPage.vue
+│   ├── GirlModePage.vue
+│   ├── HomePage.vue
+│   ├── MoviePage.vue
+│   ├── MusicPage.vue
+│   ├── RankingsPage.vue
+│   ├── StockMarket.vue
+│   └── TicketsPage.vue
+│
+├── panels/                # Floating/dockable panels
+│   ├── CatPanel.vue
+│   ├── DigitalGoose.vue
+│   ├── FeedPanel.vue
+│   ├── RankingsPanel.vue
+│   └── TachometerContent.vue
+│
+└── shared/                # Shared/reusable components
+    ├── core/             # Core app layout components
+    │   ├── MainApp.vue   # Main app container
+    │   ├── Router.vue    # Navigation router
+    │   └── AppFooter.vue # Site footer
+    │
+    ├── modals/           # Modal components
+    │   ├── ConfirmationModal.vue
+    │   ├── MikaModal.vue
+    │   └── ModalContainer.vue
+    │
+    ├── ui/               # UI widgets and controls
+    │   ├── ControlButtons.vue
+    │   ├── EmojiRenderer.vue
+    │   ├── FeedContent.vue
+    │   ├── GenderPicker.vue
+    │   └── QuoteSection.vue
+    │
+    └── movies/           # Movie-related components
+        ├── MovieResults.vue
+        ├── MovieSuggestions.vue
+        └── MovieVoting.vue
 ```
 
+## Component Categories
+
+### Pages (`pages/`)
+Route-level components that represent full pages. Each page is accessible via a route in the router.
+
+### Panels (`panels/`)
+Floating, dockable components that can be toggled on/off. Panels are positioned at screen edges and can be hidden.
+
+### Shared (`shared/`)
+Reusable components used across multiple pages and panels.
+
+#### Core (`shared/core/`)
+- **MainApp.vue**: Main application layout container
+- **Router.vue**: Navigation system with dropdown menus
+- **AppFooter.vue**: Site footer with links and info
+
+#### Modals (`shared/modals/`)
+- **ModalContainer.vue**: Generic modal container for docked panels
+- **MikaModal.vue**: Blank modal for Mika button
+- **ConfirmationModal.vue**: Confirmation dialog for actions
+
+#### UI (`shared/ui/`)
+- **ControlButtons.vue**: All control buttons (rankings, dark mode, music, feeds, Mika)
+- **EmojiRenderer.vue**: Renders emojis with custom styling
+- **FeedContent.vue**: Feed panel content wrapper
+- **GenderPicker.vue**: Gender detection picker form
+- **QuoteSection.vue**: Displays inspirational quotes
+
+#### Movies (`shared/movies/`)
+- **MovieSuggestions.vue**: Movie suggestion form
+- **MovieVoting.vue**: Movie voting interface
+- **MovieResults.vue**: Movie voting results display
+
+## Adding New Components
+
+### Step 1: Choose the Right Category
+
+- Is it a full page? → Put it in `pages/`
+- Is it a floating/dockable panel? → Put it in `panels/`
+- Is it reusable across multiple places? → Put it in the appropriate `shared/` subdirectory
+
+### Step 2: Create the Component File
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue'
+
+// Define props
+interface Props {
+  title: string
+  description?: string
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  description: 'Default description'
+})
+
+// Define emits
+const emit = defineEmits<{
+  click: []
+}>()
+
+// Component logic
+const handleClick = () => {
+  emit('click')
+}
+</script>
+
+<template>
+  <div class="my-component">
+    <h2>{{ title }}</h2>
+    <p>{{ description }}</p>
+    <button @click="handleClick">Click me</button>
+  </div>
+</template>
+
+<style scoped>
+.my-component {
+  padding: 1rem;
+  background: var(--panel-bg);
+  border-radius: 8px;
+}
+</style>
+```
+
+### Step 3: Import Where Needed
+
+```vue
+<script setup lang="ts">
+import MyComponent from './path/to/MyComponent.vue'
+</script>
+
+<template>
+  <MyComponent
+    title="My Component"
+    description="This is my new component"
+    @click="handleClick"
+  />
+</template>
+```
+
+## Component Guidelines
+
+### Props
+- Always define prop types with TypeScript interfaces
+- Use `withDefaults()` for optional props with defaults
+- Use descriptive names
+
+### Emits
+- Use TypeScript for type-safe emits
+- Emit events with descriptive names
+- Use kebab-case for event names
+
+### Styling
+- Use `<style scoped>` for component-specific styles
+- Reference CSS variables for theming (e.g., `var(--panel-bg)`)
+- Follow existing naming conventions
+
+### TypeScript
+- Use `<script setup lang="ts">` for all components
+- Export interfaces used by other components
+- Use `defineProps<Interface>()` for prop types
+- Use `defineEmits<{ eventName: [] }>()` for emit types
+
+## Benefits of This Structure
+
+✅ **Organized** - Components are grouped by purpose
+✅ **Scalable** - Easy to find and add components
+✅ **Maintainable** - Clear separation of concerns
+✅ **Type-Safe** - TypeScript prevents many errors
+✅ **Reusable** - Shared components can be used anywhere
+
 ---
 
-## Future Improvements
-
-### Possible Enhancements:
-1. **Scoped CSS** - Extract component styles to individual files
-2. **TypeScript** - Add type definitions for better IDE support
-3. **Composition API** - Convert to `setup()` function for better reactivity
-4. **Testing** - Add unit tests for each component
-5. **Storybook** - Visual component playground
-
-### Migration Path:
-- Move to Vite build setup for full component features
-- Use `.vue` single-file components
-- Add CSS modules or scoped styles
-- Implement prop validation
-
----
-
-*Last Updated: 2026-01-29*
+*Last Updated: 2026-02-05*

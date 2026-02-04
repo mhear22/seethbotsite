@@ -142,6 +142,74 @@ router.patch('/tickets/settings/ignore-mode', async (req: Request, res: Response
 
 /**
  * @openapi
+ * /api/tickets/next-task:
+ *   get:
+ *     tags: [Tickets]
+ *     summary: Get next task and update last collection time
+ *     description: Returns the next pending ticket to work on (excluding those collected in the last hour) and updates the last collection timestamp. Designed for heartbeat automation.
+ *     responses:
+ *       200:
+ *         description: Next task retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ticket:
+ *                   type: object
+ *                   nullable: true
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                     title:
+ *                       type: string
+ *                     description:
+ *                       type: string
+ *                     status:
+ *                       type: string
+ *                     type:
+ *                       type: string
+ *                     priority:
+ *                       type: string
+ *                     created_at:
+ *                       type: string
+ *                     updated_at:
+ *                       type: string
+ *                 lastCollection:
+ *                   type: string
+ *                   example: "2024-02-04T00:00:00.000Z"
+ */
+router.get('/tickets/next-task', async (req: Request, res: Response) => {
+  try {
+    const db = getDB();
+
+    // Update last collection timestamp
+    const now = new Date().toISOString();
+    db.prepare(`
+      INSERT INTO settings (key, value) VALUES ('last_collection', ?)
+      ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = CURRENT_TIMESTAMP
+    `).run(now, now);
+
+    // Get the next pending ticket, excluding those picked in the last hour
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const ticket = db.prepare(`
+      SELECT * FROM tickets
+      WHERE status = 'pending'
+        AND (updated_at < ? OR updated_at IS NULL)
+        AND (title NOT LIKE '%weiner%' AND title NOT LIKE '%fire%')
+      ORDER BY priority DESC, created_at ASC
+      LIMIT 1
+    `).get(oneHourAgo) || null;
+
+    res.json({ ticket, lastCollection: now });
+  } catch (error) {
+    console.error('Error fetching next task:', error);
+    res.status(500).json({ error: 'Failed to fetch next task' });
+  }
+});
+
+/**
+ * @openapi
  * /api/tickets/settings/last-collection:
  *   get:
  *     tags: [Tickets]

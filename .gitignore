@@ -26,3 +26,18 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+
+# Archived scripts
+scripts/archive/
+backend/scripts/archive/
+
+# Database files
+backend/data/*.db
+backend/data/*.db-shm
+backend/data/*.db-wal
+backend/data/health-state.json
+
+# Temporary scripts
+*-ticket-*.js
+check-*.js
+list-*.js

@@ -1,16 +1,17 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import Home from '../components/HomePage.vue'
-import GirlMode from '../components/GirlModePage.vue'
-import Gender from '../components/GenderPage.vue'
-import About from '../components/AboutPage.vue'
-import Rankings from '../components/RankingsPage.vue'
-import Cats from '../components/CatsPage.vue'
-import StockMarket from '../components/StockMarket.vue'
-import MoviePage from '../components/MoviePage.vue'
-import CountdownPage from '../components/CountdownPage.vue'
-import TicketsPage from '../components/TicketsPage.vue'
-import ClocksPage from '../components/ClocksPage.vue'
-import MusicPage from '../components/MusicPage.vue'
+import Home from '../components/pages/HomePage.vue'
+import GirlMode from '../components/pages/GirlModePage.vue'
+import Gender from '../components/pages/GenderPage.vue'
+import About from '../components/pages/AboutPage.vue'
+import Rankings from '../components/pages/RankingsPage.vue'
+import Cats from '../components/pages/CatsPage.vue'
+import StockMarket from '../components/pages/StockMarket.vue'
+import MoviePage from '../components/pages/MoviePage.vue'
+import CountdownPage from '../components/pages/CountdownPage.vue'
+import TicketsPage from '../components/pages/TicketsPage.vue'
+import ClocksPage from '../components/pages/ClocksPage.vue'
+import MusicPage from '../components/pages/MusicPage.vue'
+import OpinionPage from '../components/pages/OpinionPage.vue'
 
 const routes = [
   {
@@ -72,6 +73,11 @@ const routes = [
     path: '/music',
     name: 'music',
     component: MusicPage
+  },
+  {
+    path: '/opinion',
+    name: 'opinion',
+    component: OpinionPage
   }
 ]
 

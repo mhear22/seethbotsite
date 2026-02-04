@@ -560,6 +560,137 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/birdsounds/random": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a random bird sound
+         * @description Returns a random bird recording from the Macaulay Library (Cornell Lab of Ornithology)
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description A random bird sound */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @description Common name of the bird species */
+                            commonName?: string;
+                            /** @description Scientific name of the bird species */
+                            sciName?: string;
+                            /** @description Location where the recording was made */
+                            location?: string;
+                            /** @description URL to the audio file */
+                            mediaUrl?: string;
+                            /** @description URL to a thumbnail image */
+                            thumbnailUrl?: string;
+                            /** @description Type of bird sound (e.g., Call, Song) */
+                            behaviors?: string;
+                            /** @description Quality rating of the recording */
+                            rating?: string;
+                        };
+                    };
+                };
+                /** @description Error fetching bird sound */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/birdsounds/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search for bird sounds
+         * @description Search for bird recordings by species name
+         */
+        get: {
+            parameters: {
+                query: {
+                    /** @description Bird species name to search for */
+                    query: string;
+                    /** @description Maximum number of results to return */
+                    maxResults?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description List of matching bird sounds */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @description Total number of results */
+                            count?: number;
+                            results?: {
+                                commonName?: string;
+                                sciName?: string;
+                                location?: string;
+                                mediaUrl?: string;
+                                thumbnailUrl?: string;
+                                behaviors?: string;
+                                rating?: string;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Missing query parameter */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Error searching bird sounds */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/clicks": {
         parameters: {
             query?: never;
@@ -886,6 +1017,65 @@ export interface paths {
                 };
             };
         };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/holidays/today": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get holidays for today in all countries
+         * @description Returns a list of holidays occurring today across all countries
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description List of holidays */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            holidays?: {
+                                name?: string;
+                                name_local?: string;
+                                language?: string;
+                                iso?: string;
+                                country?: string;
+                                date?: string;
+                                weekday?: {
+                                    date?: string;
+                                    type?: string;
+                                };
+                            }[];
+                        };
+                    };
+                };
+                /** @description API key not configured or error fetching holidays */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2212,6 +2402,58 @@ export interface paths {
                 };
             };
         };
+        trace?: never;
+    };
+    "/api/tickets/next-task": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get next task and update last collection time
+         * @description Returns the next pending ticket to work on (excluding those collected in the last hour) and updates the last collection timestamp. Designed for heartbeat automation.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Next task retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            ticket?: {
+                                id?: number;
+                                title?: string;
+                                description?: string;
+                                status?: string;
+                                type?: string;
+                                priority?: string;
+                                created_at?: string;
+                                updated_at?: string;
+                            } | null;
+                            /** @example 2024-02-04T00:00:00.000Z */
+                            lastCollection?: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/tickets/settings/last-collection": {
