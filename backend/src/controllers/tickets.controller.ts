@@ -447,8 +447,8 @@ router.post('/tickets', async (req: Request, res: Response) => {
   try {
     const { title, description, creator_id } = req.body;
 
-    if (!title || !description) {
-      return res.status(400).json({ error: 'Title and description are required' });
+    if (!title) {
+      return res.status(400).json({ error: 'Title is required' });
     }
 
     const db = getDB();
@@ -456,7 +456,7 @@ router.post('/tickets', async (req: Request, res: Response) => {
       INSERT INTO tickets (title, description, status, creator_id, created_at, updated_at)
       VALUES (?, ?, 'pending', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
     `);
-    const result = stmt.run(title, description, creator_id || null);
+    const result = stmt.run(title, description || null, creator_id || null);
 
     const newTicket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(result.lastInsertRowid);
 

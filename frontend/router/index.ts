@@ -12,6 +12,10 @@ import TicketsPage from '../components/pages/TicketsPage.vue'
 import ClocksPage from '../components/pages/ClocksPage.vue'
 import MusicPage from '../components/pages/MusicPage.vue'
 import OpinionPage from '../components/pages/OpinionPage.vue'
+import MoldPage from '../components/pages/MoldPage.vue'
+import ClickerPage from '../components/pages/ClickerPage.vue'
+import ApiDocsPage from '../components/pages/ApiDocsPage.vue'
+import AuthPage from '../components/pages/AuthPage.vue'
 
 const routes = [
   {
@@ -78,6 +82,26 @@ const routes = [
     path: '/opinion',
     name: 'opinion',
     component: OpinionPage
+  },
+  {
+    path: '/mold',
+    name: 'mold',
+    component: MoldPage
+  },
+  {
+    path: '/clicker',
+    name: 'clicker',
+    component: ClickerPage
+  },
+  {
+    path: '/api-docs',
+    name: 'api-docs',
+    component: ApiDocsPage
+  },
+  {
+    path: '/auth',
+    name: 'auth',
+    component: AuthPage
   }
 ]
 

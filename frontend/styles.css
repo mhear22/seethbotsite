@@ -1068,8 +1068,10 @@ body.dark .emulator-screen {
   position: relative;
   bottom: auto;
   left: auto;
-  margin: 40px auto;
+  right: auto;
+  width: 100%;
   max-width: 500px;
+  margin: 0 auto;
 }
 
 .cat-header {
