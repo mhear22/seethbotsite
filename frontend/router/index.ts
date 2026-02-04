@@ -9,6 +9,7 @@ import StockMarket from '../components/StockMarket.vue'
 import MoviePage from '../components/MoviePage.vue'
 import CountdownPage from '../components/CountdownPage.vue'
 import TicketsPage from '../components/TicketsPage.vue'
+import ClocksPage from '../components/ClocksPage.vue'
 
 const routes = [
   {
@@ -60,6 +61,11 @@ const routes = [
     path: '/tickets',
     name: 'tickets',
     component: TicketsPage
+  },
+  {
+    path: '/clocks',
+    name: 'clocks',
+    component: ClocksPage
   }
 ]
 

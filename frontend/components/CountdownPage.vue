@@ -25,6 +25,14 @@ const releases: GameRelease[] = [
     image: '/orlando-roommate-cat.png'
   },
   {
+    title: 'ZAI Key Expiration',
+    game: 'zai-key-expiration',
+    date: new Date('2026-05-04T00:00:00Z'),
+    description: 'The ZAI API key runs out. Time to renew or find an alternative!',
+    emoji: '🔑',
+    image: '/zai-key-expiration.png'
+  },
+  {
     title: 'New Mewgenics',
     game: 'new-mewgenics',
     date: new Date('2026-02-10T00:00:00Z'),
@@ -151,6 +159,7 @@ const sortedReleases = computed(() => {
       <p>New Mewgenics - February 10, 2026</p>
       <p>Slay The Spire 2 - March 15, 2026</p>
       <p>Tomodachi Life - April 16, 2026</p>
+      <p>ZAI Key Expiration - May 4, 2026</p>
       <p>The Heat Death of Universe - 10^100 (a googol) years from now!</p>
       <p class="credit">🖼 Images by Orlando</p>
     </div>
