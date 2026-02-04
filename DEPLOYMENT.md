@@ -46,6 +46,16 @@ The `deploy.sh` script:
 3. Starts a new container with the updated code
 4. Runs on port 8081: http://localhost:8081
 
+## Environment Variables (Optional)
+
+If you need to customize the authentication system, you can set environment variables in the Docker container:
+
+- `SEETHBOT_JWT_SECRET`: Secret key for JWT tokens (CHANGE THIS IN PRODUCTION!)
+- `SEETHBOT_JWT_EXPIRY`: Token expiry time (default: 30d)
+- `SEETHBOT_API_KEYS`: Comma-separated API keys for admin access
+
+To set environment variables, edit the `deploy.sh` script or use Docker's `-e` flag.
+
 ## Troubleshooting
 
 **Site not updating?**

@@ -61,7 +61,7 @@ const sections = ref([
       <div class="footer-brand">
         <div class="brand-logo">
           <span class="brand-icon">🌸</span>
-          <span class="brand-text">SeethBot</span>
+          <span class="brand-text">Mold</span>
         </div>
         <p class="brand-tagline">Your favorite interactive website ✨</p>
         <div class="social-links">
@@ -71,7 +71,7 @@ const sections = ref([
     </div>
 
     <div class="footer-bottom">
-      <p class="copyright">© {{ new Date().getFullYear() }} SeethBot. All rights reserved.</p>
+      <p class="copyright">© {{ new Date().getFullYear() }} Mold. All rights reserved.</p>
     </div>
   </footer>
 </template>

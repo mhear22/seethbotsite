@@ -1,32 +1,7 @@
 # Multi-stage build for full-stack application
 # Force rebuild: goose-honk support
 
-# Stage 1: Build frontend (Vite)
-FROM node:20-alpine AS frontend-builder
-
-WORKDIR /app/frontend
-
-# Copy frontend package files
-COPY frontend/package*.json ./
-RUN npm ci
-
-# Copy frontend source
-COPY frontend/vite.config.ts frontend/tsconfig.json frontend/tsconfig.node.json frontend/index.html ./
-COPY frontend/main.ts frontend/App.vue ./
-COPY frontend/components ./components/
-COPY frontend/repositories ./repositories/
-COPY frontend/config ./config/
-COPY frontend/router ./router/
-COPY frontend/utils ./utils/
-COPY frontend/composables ./composables/
-COPY frontend/stores ./stores/
-COPY frontend/*.css frontend/*.mp3 frontend/*.html ./
-COPY frontend/public ./public/
-
-# Build frontend
-RUN npm run build
-
-# Stage 2: Build backend (TypeScript)
+# Stage 1: Build backend (TypeScript) - MUST BE FIRST to generate OpenAPI spec
 FROM node:20-alpine AS backend-builder
 
 WORKDIR /app/backend
@@ -41,8 +16,37 @@ RUN npm ci
 # Copy backend source
 COPY backend/tsconfig.json ./
 COPY backend/src ./src/
+COPY backend/scripts ./scripts/
 
-# Build backend
+# Build backend (generates dist/openapi.json)
+RUN npm run build
+
+# Stage 2: Build frontend (Vite) - depends on backend's OpenAPI spec
+FROM node:20-alpine AS frontend-builder
+
+WORKDIR /app/frontend
+
+# Copy frontend package files
+COPY frontend/package*.json ./
+RUN npm ci
+
+# Copy backend OpenAPI spec for type generation
+COPY --from=backend-builder /app/backend/dist/openapi.json ../backend/dist/openapi.json
+
+# Copy frontend source
+COPY frontend/vite.config.ts frontend/tsconfig.json frontend/tsconfig.node.json frontend/index.html ./
+COPY frontend/main.ts frontend/App.vue ./
+COPY frontend/components ./components/
+COPY frontend/repositories ./repositories/
+COPY frontend/config ./config/
+COPY frontend/router ./router/
+COPY frontend/utils ./utils/
+COPY frontend/composables ./composables/
+COPY frontend/stores ./stores/
+COPY frontend/*.css frontend/*.mp3 frontend/*.html ./
+COPY frontend/public ./public/
+
+# Build frontend (generates types from backend OpenAPI spec)
 RUN npm run build
 
 # Stage 3: Production image

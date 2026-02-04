@@ -2,34 +2,41 @@
  * Stocks Repository
  *
  * Handles all stock market-related API calls including stocks, portfolio, and trading.
- * Provides 4 endpoints for stock market operations.
+ * Uses type-safe openapi-fetch client for API communication.
  */
 
-import { apiGet, apiPost } from '../utils/api';
-import type {
-  Stock,
-  Portfolio,
-  StocksResponse,
-  PortfolioResponse,
-  TradeRequest,
-  TradeResponse
-} from './types/stocks.types';
+import { apiClient } from '../utils/apiClient';
 
 class StocksRepository {
   /**
    * Get all available stocks
    */
-  async getStocks(): Promise<Stock[]> {
-    const response = await apiGet<StocksResponse>('/api/stocks');
-    return response.stocks;
+  async getStocks() {
+    const { data, error } = await apiClient.GET('/stocks', {});
+
+    if (error) {
+      throw new Error(error.error || 'Failed to get stocks');
+    }
+
+    return data?.stocks || [];
   }
 
   /**
    * Get a user's portfolio
    * @param userId - The user ID
    */
-  async getPortfolio(userId: string): Promise<PortfolioResponse> {
-    return apiGet<PortfolioResponse>(`/api/portfolio/${userId}`);
+  async getPortfolio(userId: string) {
+    const { data, error } = await apiClient.GET('/portfolio/{userId}', {
+      params: {
+        path: { userId },
+      },
+    });
+
+    if (error) {
+      throw new Error(error.error || 'Failed to get portfolio');
+    }
+
+    return data;
   }
 
   /**
@@ -38,9 +45,16 @@ class StocksRepository {
    * @param stockName - The name of the stock
    * @param shares - Number of shares to buy
    */
-  async buyStock(userId: string, stockName: string, shares: number): Promise<TradeResponse> {
-    const request: TradeRequest = { userId, stockName, shares };
-    return apiPost<TradeResponse>('/api/stocks/buy', request);
+  async buyStock(userId: string, stockName: string, shares: number) {
+    const { data, error } = await apiClient.POST('/stocks/buy', {
+      body: { userId, stockName, shares },
+    });
+
+    if (error) {
+      throw new Error(error.error || 'Failed to buy shares');
+    }
+
+    return data;
   }
 
   /**
@@ -49,9 +63,16 @@ class StocksRepository {
    * @param stockName - The name of the stock
    * @param shares - Number of shares to sell
    */
-  async sellStock(userId: string, stockName: string, shares: number): Promise<TradeResponse> {
-    const request: TradeRequest = { userId, stockName, shares };
-    return apiPost<TradeResponse>('/api/stocks/sell', request);
+  async sellStock(userId: string, stockName: string, shares: number) {
+    const { data, error } = await apiClient.POST('/stocks/sell', {
+      body: { userId, stockName, shares },
+    });
+
+    if (error) {
+      throw new Error(error.error || 'Failed to sell shares');
+    }
+
+    return data;
   }
 }
 

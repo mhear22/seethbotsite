@@ -2,7 +2,190 @@
 
 ## Overview
 
-The seethbotsite API implements a simple API key-based authentication system to protect destructive endpoints (POST/DELETE operations that modify data). Read-only operations (GET endpoints) remain publicly accessible.
+The seethbotsite API implements **two authentication systems**:
+
+1. **User Authentication** (NEW) - Optional username/password-based authentication with cross-device support
+2. **API Key Authentication** - Simple API key-based authentication for admins and integrations
+
+**Both systems are optional** - users can access the site without logging in, and read-only operations (GET endpoints) remain publicly accessible.
+
+## User Authentication (Optional)
+
+### Overview
+
+User authentication allows individuals to create accounts, login across multiple devices, and manage their sessions. This is **completely optional** - users can still use all site features without logging in.
+
+### Features
+
+- ✅ **Password Hashing**: All passwords are securely hashed using bcrypt (10 salt rounds)
+- ✅ **Cross-Device Login**: Login from multiple devices and manage sessions
+- ✅ **JWT Tokens**: Secure token-based authentication with 30-day expiry
+- ✅ **Session Management**: View, manage, and logout from specific devices
+- ✅ **Account Management**: Change passwords, update display name, delete account
+
+### Endpoints
+
+#### Register a New User
+```bash
+POST /api/auth/register
+Content-Type: application/json
+
+{
+  "email": "user@example.com",
+  "password": "securepassword123",
+  "displayName": "My Name",
+  "deviceName": "My iPhone",
+  "deviceType": "mobile"
+}
+```
+
+**Response:**
+```json
+{
+  "user": {
+    "id": 1,
+    "email": "user@example.com",
+    "display_name": "My Name",
+    "created_at": "2026-02-04 11:06:09",
+    "updated_at": "2026-02-04 11:06:09"
+  },
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+#### Login
+```bash
+POST /api/auth/login
+Content-Type: application/json
+
+{
+  "email": "user@example.com",
+  "password": "securepassword123",
+  "deviceName": "My Desktop",
+  "deviceType": "desktop"
+}
+```
+
+**Response:** Same as register (user + token)
+
+#### Get Current User
+```bash
+GET /api/auth/me
+Authorization: Bearer <your-jwt-token>
+```
+
+**Response:**
+```json
+{
+  "user": {
+    "id": 1,
+    "email": "user@example.com",
+    "display_name": "My Name",
+    "created_at": "2026-02-04 11:06:09",
+    "updated_at": "2026-02-04 11:06:09"
+  },
+  "session": {
+    "id": 1,
+    "device_name": "My Desktop",
+    "device_type": "desktop",
+    "created_at": "2026-02-04 11:06:09",
+    "last_used_at": "2026-02-04 11:07:00"
+  }
+}
+```
+
+#### Get All Sessions (Cross-Device View)
+```bash
+GET /api/auth/sessions
+Authorization: Bearer <your-jwt-token>
+```
+
+**Response:**
+```json
+{
+  "sessions": [
+    {
+      "id": 3,
+      "user_id": 1,
+      "device_name": "My iPhone",
+      "device_type": "mobile",
+      "created_at": "2026-02-04 11:06:19",
+      "last_used_at": "2026-02-04 11:07:00"
+    },
+    {
+      "id": 2,
+      "user_id": 1,
+      "device_name": "My Desktop",
+      "device_type": "desktop",
+      "created_at": "2026-02-04 11:06:11",
+      "last_used_at": "2026-02-04 11:06:50"
+    }
+  ]
+}
+```
+
+#### Logout Current Session
+```bash
+POST /api/auth/logout
+Authorization: Bearer <your-jwt-token>
+```
+
+#### Logout from Specific Device
+```bash
+DELETE /api/auth/sessions/:sessionId
+Authorization: Bearer <your-jwt-token>
+```
+
+#### Logout from All Devices
+```bash
+DELETE /api/auth/sessions/all
+Authorization: Bearer <your-jwt-token>
+```
+
+#### Update Profile
+```bash
+PATCH /api/auth/profile
+Authorization: Bearer <your-jwt-token>
+Content-Type: application/json
+
+{
+  "displayName": "New Display Name"
+}
+```
+
+#### Change Password
+```bash
+PATCH /api/auth/password
+Authorization: Bearer <your-jwt-token>
+Content-Type: application/json
+
+{
+  "oldPassword": "oldpassword123",
+  "newPassword": "newpassword456"
+}
+```
+
+**Note:** Changing your password will invalidate all sessions - you'll need to login again on all devices.
+
+#### Delete Account
+```bash
+DELETE /api/auth/account
+Authorization: Bearer <your-jwt-token>
+Content-Type: application/json
+
+{
+  "password": "yourpassword123"
+}
+```
+
+### Security Details
+
+- **Password Hashing**: bcrypt with 10 salt rounds
+- **JWT Secret**: Configurable via `SEETHBOT_JWT_SECRET` environment variable
+- **Token Expiry**: 30 days (configurable via `SEETHBOT_JWT_EXPIRY`)
+- **Session Storage**: SQLite database with automatic cleanup of expired sessions
+
+---
 
 ## API Key Authentication
 
@@ -164,13 +347,15 @@ All endpoints include input validation and sanitization:
 ## Production Deployment Checklist
 
 - [ ] Set `SEETHBOT_API_KEYS` environment variable with production keys
-- [ ] Change `SEETHBOT_JWT_SECRET` from default
+- [ ] **Set `SEETHBOT_JWT_SECRET` to a strong, random value** (required for user auth)
+- [ ] **Set `SEETHBOT_JWT_EXPIRY` if you want custom token expiry** (default: 30d)
 - [ ] Use HTTPS for all API communications
 - [ ] Configure proper CORS origins
 - [ ] Set up monitoring for failed authentication attempts
 - [ ] Review rate limit settings based on expected traffic
 - [ ] Implement API key rotation strategy
 - [ ] Add logging for security events
+- [ ] Backup the `users.db` database regularly (stored in `backend/data/`)
 
 ## Development Notes
 
@@ -181,7 +366,121 @@ All endpoints include input validation and sanitization:
 
 ## Frontend Integration
 
-When making authenticated requests from the frontend:
+### Using User Authentication (Recommended for End Users)
+
+```javascript
+// Store JWT token securely (e.g., in localStorage or httpOnly cookie)
+const USER_TOKEN = localStorage.getItem('authToken');
+
+// Get current user info
+async function getUser() {
+  const response = await fetch('/api/auth/me', {
+    headers: {
+      'Authorization': `Bearer ${USER_TOKEN}`
+    }
+  });
+
+  if (!response.ok) {
+    // Token invalid or expired, redirect to login
+    window.location.href = '/login';
+    return null;
+  }
+
+  return await response.json();
+}
+
+// Make authenticated request with user token
+async function submitVote(movieId) {
+  const response = await fetch('/api/movies/vote', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${USER_TOKEN}`
+    },
+    body: JSON.stringify({ movieId })
+  });
+
+  if (response.status === 401) {
+    // Token expired, redirect to login
+    window.location.href = '/login';
+    return;
+  }
+
+  return await response.json();
+}
+
+// Register new user
+async function register(email, password, displayName) {
+  const response = await fetch('/api/auth/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email,
+      password,
+      displayName,
+      deviceName: navigator.userAgent,
+      deviceType: 'desktop'
+    })
+  });
+
+  const data = await response.json();
+  if (response.ok) {
+    localStorage.setItem('authToken', data.token);
+    return data.user;
+  }
+  throw new Error(data.error);
+}
+
+// Login
+async function login(email, password) {
+  const response = await fetch('/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email,
+      password,
+      deviceName: navigator.userAgent,
+      deviceType: 'desktop'
+    })
+  });
+
+  const data = await response.json();
+  if (response.ok) {
+    localStorage.setItem('authToken', data.token);
+    return data.user;
+  }
+  throw new Error(data.error);
+}
+
+// Get all sessions (cross-device view)
+async function getSessions() {
+  const response = await fetch('/api/auth/sessions', {
+    headers: { 'Authorization': `Bearer ${USER_TOKEN}` }
+  });
+  return await response.json();
+}
+
+// Logout from specific device
+async function logoutDevice(sessionId) {
+  const response = await fetch(`/api/auth/sessions/${sessionId}`, {
+    method: 'DELETE',
+    headers: { 'Authorization': `Bearer ${USER_TOKEN}` }
+  });
+  return await response.json();
+}
+
+// Logout from all devices
+async function logoutAllDevices() {
+  const response = await fetch('/api/auth/sessions/all', {
+    method: 'DELETE',
+    headers: { 'Authorization': `Bearer ${USER_TOKEN}` }
+  });
+  localStorage.removeItem('authToken');
+  return await response.json();
+}
+```
+
+### Using API Key Authentication (Admin/Integrations)
 
 ```javascript
 // Store API key securely (e.g., in localStorage or a secure cookie)
@@ -211,8 +510,16 @@ fetch('/api/movies', {
 .catch(error => console.error('Error:', error));
 ```
 
-Handle authentication errors gracefully:
-- Redirect users to a login page
+### Handling Authentication Errors
+
+Both authentication systems use the same error codes:
+
+- **401 Unauthorized**: No credentials provided or token expired
+- **403 Forbidden**: Invalid credentials or insufficient permissions
+
+Handle errors gracefully:
+- Redirect users to login page (for user auth)
 - Show friendly error messages
 - Allow users to retry after rate limit expires
-- Store API key securely (never expose in client-side code)
+- Store tokens securely (never expose in client-side code)
+- For user auth, implement automatic token refresh logic if needed

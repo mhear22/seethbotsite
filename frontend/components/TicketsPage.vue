@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 
 interface Ticket {
   id: number
   title: string
   description: string
   status: 'pending' | 'needs-info' | 'completed' | 'declined'
+  type: 'feature' | 'bug' | 'feedback'
+  priority: 'high' | 'medium' | 'low'
   response?: string
   creator_id?: string
   created_at: string
@@ -18,6 +20,11 @@ const error = ref<string | null>(null)
 const showForm = ref(false)
 const ignoreMode = ref(false)
 const lastCollection = ref<string | null>(null)
+
+// Filter state
+const filterStatus = ref('all')
+const filterType = ref('all')
+const filterPriority = ref('all')
 
 // Admin state
 const apiKey = ref<string>('')
@@ -34,7 +41,9 @@ const creatorId = ref<string>('')
 // Form state
 const newTicket = ref({
   title: '',
-  description: ''
+  description: '',
+  type: 'feature' as 'feature' | 'bug' | 'feedback',
+  priority: 'medium' as 'high' | 'medium' | 'low'
 })
 
 // Edit ticket state
@@ -54,10 +63,52 @@ const statusColors = {
 
 const statusLabels = {
   pending: '⏳ Pending',
-  'needs-info': '❓ Needs Info',
-  completed: '✅ Completed',
+  'needs-info': '🔄 In Progress',
+  completed: '✅ Complete',
   declined: '❌ Declined'
 }
+
+// Filter options
+const statusOptions = [
+  { value: 'all', label: 'All' },
+  { value: 'pending', label: '⏳ Pending' },
+  { value: 'in-progress', label: '🔄 In Progress' },
+  { value: 'completed', label: '✅ Complete' }
+]
+
+const typeOptions = [
+  { value: 'all', label: 'All' },
+  { value: 'feature', label: '✨ Feature' },
+  { value: 'bug', label: '🐛 Bug' },
+  { value: 'feedback', label: '💬 Feedback' }
+]
+
+const priorityOptions = [
+  { value: 'all', label: 'All' },
+  { value: 'high', label: '🔴 High' },
+  { value: 'medium', label: '🟡 Medium' },
+  { value: 'low', label: '🟢 Low' }
+]
+
+// Computed property for filtered tickets
+const filteredTickets = computed(() => {
+  let result = tickets.value
+
+  if (filterStatus.value !== 'all') {
+    const statusFilter = filterStatus.value === 'in-progress' ? 'needs-info' : filterStatus.value
+    result = result.filter(t => t.status === statusFilter)
+  }
+
+  if (filterType.value !== 'all') {
+    result = result.filter(t => t.type === filterType.value)
+  }
+
+  if (filterPriority.value !== 'all') {
+    result = result.filter(t => t.priority === filterPriority.value)
+  }
+
+  return result
+})
 
 // Generate or get creator ID
 const getOrCreateCreatorId = (): string => {
@@ -80,7 +131,12 @@ const loadTickets = async () => {
   loading.value = true
   error.value = null
   try {
-    const response = await fetch('/api/tickets')
+    const params = new URLSearchParams()
+    if (filterStatus.value !== 'all') params.append('status', filterStatus.value)
+    if (filterType.value !== 'all') params.append('type', filterType.value)
+    if (filterPriority.value !== 'all') params.append('priority', filterPriority.value)
+
+    const response = await fetch(`/api/tickets?${params.toString()}`)
     if (!response.ok) throw new Error('Failed to load tickets')
     const data = await response.json()
     tickets.value = data.tickets || []
@@ -90,6 +146,11 @@ const loadTickets = async () => {
     loading.value = false
   }
 }
+
+// Watch for filter changes and reload tickets
+watch([filterStatus, filterType, filterPriority], () => {
+  loadTickets()
+})
 
 // Submit new ticket
 const submitTicket = async () => {
@@ -107,6 +168,8 @@ const submitTicket = async () => {
       body: JSON.stringify({
         title: newTicket.value.title.trim(),
         description: newTicket.value.description.trim(),
+        type: newTicket.value.type,
+        priority: newTicket.value.priority,
         creator_id: creatorId.value
       })
     })
@@ -117,7 +180,12 @@ const submitTicket = async () => {
     }
 
     // Reset form
-    newTicket.value = { title: '', description: '' }
+    newTicket.value = {
+      title: '',
+      description: '',
+      type: 'feature',
+      priority: 'medium'
+    }
     showForm.value = false
 
     // Reload tickets
@@ -463,6 +531,32 @@ onMounted(() => {
             :disabled="loading"
           ></textarea>
         </div>
+        <div class="form-row">
+          <div class="form-group half">
+            <label for="type">Type</label>
+            <select
+              id="type"
+              v-model="newTicket.type"
+              :disabled="loading"
+            >
+              <option value="feature">✨ Feature</option>
+              <option value="bug">🐛 Bug</option>
+              <option value="feedback">💬 Feedback</option>
+            </select>
+          </div>
+          <div class="form-group half">
+            <label for="priority">Priority</label>
+            <select
+              id="priority"
+              v-model="newTicket.priority"
+              :disabled="loading"
+            >
+              <option value="high">🔴 High</option>
+              <option value="medium">🟡 Medium</option>
+              <option value="low">🟢 Low</option>
+            </select>
+          </div>
+        </div>
         <button
           @click="submitTicket"
           class="submit-btn"
@@ -513,13 +607,66 @@ onMounted(() => {
         </div>
       </div>
 
+      <!-- Filter Chips -->
+      <div class="filter-section">
+        <div class="filter-group">
+          <span class="filter-label">Status:</span>
+          <div class="filter-chips">
+            <button
+              v-for="option in statusOptions"
+              :key="option.value"
+              @click="filterStatus = option.value"
+              class="filter-chip"
+              :class="{ active: filterStatus === option.value }"
+            >
+              {{ option.label }}
+            </button>
+          </div>
+        </div>
+
+        <div class="filter-group">
+          <span class="filter-label">Type:</span>
+          <div class="filter-chips">
+            <button
+              v-for="option in typeOptions"
+              :key="option.value"
+              @click="filterType = option.value"
+              class="filter-chip"
+              :class="{ active: filterType === option.value }"
+            >
+              {{ option.label }}
+            </button>
+          </div>
+        </div>
+
+        <div class="filter-group">
+          <span class="filter-label">Priority:</span>
+          <div class="filter-chips">
+            <button
+              v-for="option in priorityOptions"
+              :key="option.value"
+              @click="filterPriority = option.value"
+              class="filter-chip"
+              :class="{ active: filterPriority === option.value }"
+            >
+              {{ option.label }}
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- Tickets List -->
       <div class="tickets-list">
         <div v-if="loading" class="loading-state">
           Loading tickets...
         </div>
         <div v-else-if="tickets.length === 0" class="empty-state">
-          No tickets yet. Be the first to share an idea! 💡
+          <template v-if="filterStatus === 'all' && filterType === 'all' && filterPriority === 'all'">
+            No tickets yet. Be the first to share an idea! 💡
+          </template>
+          <template v-else>
+            No tickets match your filters. Try adjusting them to see more results.
+          </template>
         </div>
         <div
           v-for="ticket in tickets"
@@ -528,9 +675,19 @@ onMounted(() => {
         >
           <div class="ticket-header">
             <h3 class="ticket-title">{{ ticket.title }}</h3>
-            <span class="ticket-status" :class="statusColors[ticket.status]">
-              {{ statusLabels[ticket.status] }}
-            </span>
+            <div class="ticket-badges">
+              <span class="ticket-status" :class="statusColors[ticket.status]">
+                {{ statusLabels[ticket.status] }}
+              </span>
+              <span class="ticket-type" :class="`type-${ticket.type}`">
+                {{ ticket.type === 'feature' ? '✨' : ticket.type === 'bug' ? '🐛' : '💬' }}
+                {{ ticket.type }}
+              </span>
+              <span class="ticket-priority" :class="`priority-${ticket.priority}`">
+                {{ ticket.priority === 'high' ? '🔴' : ticket.priority === 'medium' ? '🟡' : '🟢' }}
+                {{ ticket.priority }}
+              </span>
+            </div>
           </div>
           <div class="ticket-description">{{ ticket.description }}</div>
           <div class="ticket-meta">
@@ -691,6 +848,61 @@ onMounted(() => {
   border: 1px solid #fc8181;
 }
 
+.filter-section {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
+  border: 1px solid #e2e8f0;
+}
+
+.filter-group {
+  margin-bottom: 16px;
+}
+
+.filter-group:last-child {
+  margin-bottom: 0;
+}
+
+.filter-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: #4a5568;
+  margin-bottom: 8px;
+}
+
+.filter-chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filter-chip {
+  padding: 8px 16px;
+  border: 2px solid #e2e8f0;
+  background: white;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #4a5568;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.filter-chip:hover {
+  border-color: #4299e1;
+  color: #2b6cb0;
+  transform: translateY(-1px);
+}
+
+.filter-chip.active {
+  background: #4299e1;
+  border-color: #4299e1;
+  color: white;
+}
+
 .new-ticket-btn {
   width: 100%;
   padding: 14px 20px;
@@ -793,6 +1005,34 @@ onMounted(() => {
   min-height: 100px;
 }
 
+.form-group select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 2px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+  transition: border-color 0.2s;
+  background: white;
+  cursor: pointer;
+}
+
+.form-group select:focus {
+  outline: none;
+  border-color: #4299e1;
+}
+
+.form-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.form-group.half {
+  flex: 1;
+  margin-bottom: 0;
+}
+
 .submit-btn {
   width: 100%;
   padding: 12px 20px;
@@ -859,6 +1099,67 @@ onMounted(() => {
   font-weight: 600;
   white-space: nowrap;
   border: 1px solid;
+}
+
+.ticket-badges {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.ticket-type {
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  border: 1px solid;
+}
+
+.ticket-type.type-feature {
+  background: #ebf8ff;
+  color: #2b6cb0;
+  border-color: #bee3f8;
+}
+
+.ticket-type.type-bug {
+  background: #fff5f5;
+  color: #c53030;
+  border-color: #fc8181;
+}
+
+.ticket-type.type-feedback {
+  background: #f7fafc;
+  color: #4a5568;
+  border-color: #cbd5e0;
+}
+
+.ticket-priority {
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  border: 1px solid;
+}
+
+.ticket-priority.priority-high {
+  background: #fff5f5;
+  color: #c53030;
+  border-color: #fc8181;
+}
+
+.ticket-priority.priority-medium {
+  background: #fffaf0;
+  color: #c05621;
+  border-color: #fbd38d;
+}
+
+.ticket-priority.priority-low {
+  background: #f0fff4;
+  color: #276749;
+  border-color: #9ae6b4;
 }
 
 .ticket-description {

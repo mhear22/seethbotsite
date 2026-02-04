@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
-    "build": "tsc",
+    "build": "tsc && node scripts/generate-openapi.js",
     "start": "node dist/index.js",
     "watch": "tsc -w"
   },
@@ -17,6 +17,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "bcrypt": "^6.0.0",
     "better-sqlite3": "^12.6.2",
     "compression": "^1.7.4",
     "cors": "^2.8.5",
@@ -27,6 +28,7 @@
     "validator": "^13.15.26"
   },
   "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
     "@types/better-sqlite3": "^7.6.9",
     "@types/compression": "^1.7.5",
     "@types/cors": "^2.8.17",

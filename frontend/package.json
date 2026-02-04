@@ -5,10 +5,13 @@
   "description": "Vue.js + TypeScript + Vite interactive website",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "build": "npm run generate:types || true && vite build",
+    "preview": "vite preview",
+    "generate:types": "openapi-typescript ../backend/dist/openapi.json -o ./src/types/openapi.ts"
   },
   "dependencies": {
+    "openapi-fetch": "^0.15.0",
+    "openapi-typescript": "^7.10.1",
     "pinia": "^3.0.4",
     "vue": "^3.4.0",
     "vue-router": "^4.6.4"

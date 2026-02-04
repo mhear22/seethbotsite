@@ -225,10 +225,9 @@ router.patch('/tickets/settings/last-collection', async (req: Request, res: Resp
  *   get:
  *     tags: [Tickets]
  *     summary: Get all tickets
- *     description: Returns all tickets with their status and responses
+ *
  *     responses:
  *       200:
- *         description: Tickets retrieved successfully
  *         content:
  *           application/json:
  *             schema:
@@ -255,10 +254,92 @@ router.patch('/tickets/settings/last-collection', async (req: Request, res: Resp
  *                       updated_at:
  *                         type: string
  */
+/**
+ * @openapi
+ * /api/tickets:
+ *   get:
+ *     tags: [Tickets]
+ *     summary: Get all tickets
+ *     description: Returns all tickets with optional filtering by status, type, and priority
+ *     parameters:
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [all, pending, needs-info, completed, declined, in-progress]
+ *       - in: query
+ *         name: type
+ *         schema:
+ *           type: string
+ *           enum: [all, feature, bug, feedback]
+ *       - in: query
+ *         name: priority
+ *         schema:
+ *           type: string
+ *           enum: [all, high, medium, low]
+ *     responses:
+ *       200:
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 tickets:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: integer
+ *                       title:
+ *                         type: string
+ *                       description:
+ *                         type: string
+ *                       status:
+ *                         type: string
+ *                         enum: [pending, needs-info, completed, declined]
+ *                       type:
+ *                         type: string
+ *                         enum: [feature, bug, feedback]
+ *                       priority:
+ *                         type: string
+ *                         enum: [high, medium, low]
+ *                       response:
+ *                         type: string
+ *                       created_at:
+ *                         type: string
+ *                       updated_at:
+ *                         type: string
+ */
 router.get('/tickets', async (req: Request, res: Response) => {
   try {
     const db = getDB();
-    const tickets = db.prepare('SELECT * FROM tickets ORDER BY created_at DESC').all();
+    const { status = 'all', type = 'all', priority = 'all' } = req.query;
+
+    let query = 'SELECT * FROM tickets WHERE 1=1';
+    const params: any[] = [];
+
+    // Map "in-progress" to "needs-info" for frontend compatibility
+    const statusFilter = status === 'in-progress' ? 'needs-info' : status;
+
+    if (statusFilter !== 'all') {
+      query += ' AND status = ?';
+      params.push(statusFilter);
+    }
+
+    if (type !== 'all') {
+      query += ' AND type = ?';
+      params.push(type);
+    }
+
+    if (priority !== 'all') {
+      query += ' AND priority = ?';
+      params.push(priority);
+    }
+
+    query += ' ORDER BY created_at DESC';
+
+    const tickets = db.prepare(query).all(...params);
     res.json({ tickets });
   } catch (error) {
     console.error('Error fetching tickets:', error);
@@ -324,7 +405,6 @@ router.post('/tickets', async (req: Request, res: Response) => {
  *   patch:
  *     tags: [Tickets]
  *     summary: Update a ticket
- *     description: Updates ticket title, description, status, and/or response. Status and response updates require API key authentication, except users can close their own tickets (status: completed/declined) by providing their creator_id.
  *     parameters:
  *       - in: path
  *         name: id
@@ -340,20 +420,15 @@ router.post('/tickets', async (req: Request, res: Response) => {
  *             properties:
  *               title:
  *                 type: string
- *                 description: New title for the ticket
  *               description:
  *                 type: string
- *                 description: New description for the ticket
  *               status:
  *                 type: string
  *                 enum: [pending, needs-info, completed, declined]
- *                 description: New status (requires API key unless closing own ticket)
  *               response:
  *                 type: string
- *                 description: Admin response to the ticket (requires API key)
  *               creator_id:
  *                 type: string
- *                 description: Creator ID for authorization when closing own ticket
  *     responses:
  *       200:
  *         description: Ticket updated successfully

@@ -2,32 +2,49 @@
  * Clicks Repository
  *
  * Handles all click counter-related API calls.
- * Provides 3 endpoints for click counter operations.
+ * Uses type-safe openapi-fetch client for API communication.
  */
 
-import { apiGet, apiPost } from '../utils/api';
-import type { ClickData, ClickResponse } from './types/clicks.types';
+import { apiClient } from '../utils/apiClient';
 
 class ClicksRepository {
   /**
    * Get the current click count
    */
-  async getCount(): Promise<ClickData> {
-    return apiGet<ClickResponse>('/api/clicks');
+  async getCount() {
+    const { data, error } = await apiClient.GET('/clicks', {});
+
+    if (error) {
+      throw new Error(error.error || 'Failed to get click count');
+    }
+
+    return data;
   }
 
   /**
    * Increment the click count
    */
-  async increment(): Promise<ClickData> {
-    return apiPost<ClickResponse>('/api/clicks/increment');
+  async increment() {
+    const { data, error } = await apiClient.POST('/clicks/increment', {});
+
+    if (error) {
+      throw new Error(error.error || 'Failed to increment clicks');
+    }
+
+    return data;
   }
 
   /**
    * Reset the click count to zero
    */
-  async reset(): Promise<ClickData> {
-    return apiPost<ClickResponse>('/api/clicks/reset');
+  async reset() {
+    const { data, error } = await apiClient.POST('/clicks/reset', {});
+
+    if (error) {
+      throw new Error(error.error || 'Failed to reset clicks');
+    }
+
+    return data;
   }
 }
 

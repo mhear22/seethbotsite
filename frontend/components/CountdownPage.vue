@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useAppStore } from '../stores/useAppStore'
 
 interface GameRelease {
   title: string
@@ -8,10 +9,21 @@ interface GameRelease {
   description: string
   emoji: string
   image: string
+  infinite?: boolean
 }
+
+const appStore = useAppStore()
 
 // Real release dates with actual game images
 const releases: GameRelease[] = [
+  {
+    title: "Orlando's Roommate's Cat comes to Orlando's apartment",
+    game: 'orlando-roommate-cat',
+    date: new Date('2026-02-20T00:00:00Z'),
+    description: 'The big day approaches...',
+    emoji: '🐈',
+    image: '/orlando-roommate-cat.png'
+  },
   {
     title: 'New Mewgenics',
     game: 'new-mewgenics',
@@ -21,7 +33,7 @@ const releases: GameRelease[] = [
     image: 'https://static01.nyt.com/images/2010/06/14/business/sub-jp-burger-2/sub-jp-burger-2-popup.jpg?quality=75&auto=webp&disable=upscale'
   },
   {
-    title: 'Slay the Spire 2',
+    title: 'Slay The Spire 2',
     game: 'slay-the-spire-2',
     date: new Date('2026-03-15T00:00:00Z'),
     description: 'The highly anticipated sequel returns',
@@ -34,15 +46,16 @@ const releases: GameRelease[] = [
     date: new Date('2026-04-16T00:00:00Z'),
     description: 'Continue your cozy life as a cat in this cozy sequel',
     emoji: '🐱',
-    image: 'https://static.wikia.nocookie.net/vinesauce/images/c/c2/Two_faced.png/revision/latest?cb=20250621040938'
+    image: '/tomodachi-life.png'
   },
   {
     title: 'The Heat Death of Universe',
     game: 'heat-death-of-universe',
     date: new Date('12006-01-01T00:00:00Z'),
-    description: 'The universe faces its ultimate fate in ~10,000 years',
+    description: 'The universe faces its ultimate fate in 10^100 years (a googol)',
     emoji: '🌌',
-    image: 'https://www.italia.it/content/dam/tdh/en/destinations/lazio/frosinone/media/google/image3.jpeg'
+    image: 'https://www.italia.it/content/dam/tdh/en/destinations/lazio/frosinone/media/google/image3.jpeg',
+    infinite: true
   }
 ]
 
@@ -87,7 +100,7 @@ const sortedReleases = computed(() => {
 </script>
 
 <template>
-  <div class="countdown-page">
+  <div class="countdown-page" :class="{ dark: appStore.darkMode }">
     <div class="countdown-header">
       <h1>🎮 Game Release Countdowns</h1>
       <p class="subtitle">Time until your most anticipated games!</p>
@@ -107,6 +120,9 @@ const sortedReleases = computed(() => {
         <div class="countdown-display">
           <div v-if="getTimeUntil(release.date).released" class="released-badge">
             ✨ Released! ✨
+          </div>
+          <div v-else-if="release.infinite" class="infinity-badge">
+            ∞ 10¹⁰⁰ years
           </div>
           <div v-else class="timer">
             <div class="time-unit">
@@ -133,9 +149,9 @@ const sortedReleases = computed(() => {
     <div class="footer-note">
       <p>📌 <strong>Real Release Dates:</strong></p>
       <p>New Mewgenics - February 10, 2026</p>
-      <p>Slay the Spire 2 - March 15, 2026</p>
+      <p>Slay The Spire 2 - March 15, 2026</p>
       <p>Tomodachi Life - April 16, 2026</p>
-      <p>The Heat Death of Universe - ~10,000 years from now!</p>
+      <p>The Heat Death of Universe - 10^100 (a googol) years from now!</p>
       <p class="credit">🖼 Images by Orlando</p>
     </div>
   </div>
@@ -146,6 +162,11 @@ const sortedReleases = computed(() => {
   min-height: 100vh;
   padding: 20px;
   background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+  transition: background 0.5s ease;
+}
+
+.countdown-page.dark {
+  background: linear-gradient(135deg, #9333ea 0%, #7c3aed 50%, #5b21b6 100%);
 }
 
 .countdown-header {
@@ -190,6 +211,10 @@ const sortedReleases = computed(() => {
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
   transition: transform 0.3s ease, box-shadow 0.3s ease;
   overflow: hidden;
+}
+
+.dark .countdown-card {
+  background: rgba(40, 44, 52, 0.95);
 }
 
 .countdown-card:hover {
@@ -240,6 +265,10 @@ const sortedReleases = computed(() => {
   font-weight: bold;
 }
 
+.dark .game-title {
+  color: #e2e8f0;
+}
+
 .game-description {
   color: #666;
   font-size: 0.95rem;
@@ -247,11 +276,19 @@ const sortedReleases = computed(() => {
   line-height: 1.5;
 }
 
+.dark .game-description {
+  color: #a0a0a0;
+}
+
 .release-date {
   color: #999;
   font-size: 0.85rem;
   margin: 0 0 15px 0;
   font-style: italic;
+}
+
+.dark .release-date {
+  color: #888;
 }
 
 .countdown-display {
@@ -262,6 +299,11 @@ const sortedReleases = computed(() => {
   border: 2px solid rgba(255, 107, 157, 0.2);
 }
 
+.dark .countdown-display {
+  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+  border-color: rgba(232, 94, 144, 0.3);
+}
+
 .released-badge {
   font-size: 1.2rem;
   font-weight: bold;
@@ -270,6 +312,17 @@ const sortedReleases = computed(() => {
   padding: 10px 20px;
   border-radius: 25px;
   box-shadow: 0 4px 15px rgba(144, 238, 144, 0.3);
+}
+
+.infinity-badge {
+  font-size: 2rem;
+  font-weight: bold;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 15px 20px;
+  border-radius: 25px;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
 }
 
 .timer {
@@ -288,6 +341,10 @@ const sortedReleases = computed(() => {
   transition: transform 0.2s ease;
 }
 
+.dark .time-unit {
+  background: rgba(60, 64, 72, 0.8);
+}
+
 .time-unit:hover {
   transform: scale(1.05);
 }
@@ -300,12 +357,20 @@ const sortedReleases = computed(() => {
   font-family: 'Courier New', monospace;
 }
 
+.dark .time-value {
+  color: #ffb6c1;
+}
+
 .time-label {
   font-size: 0.75rem;
   color: #666;
   text-transform: uppercase;
   letter-spacing: 1px;
   margin-top: 5px;
+}
+
+.dark .time-label {
+  color: #a0a0a0;
 }
 
 .footer-note {
@@ -316,10 +381,18 @@ const sortedReleases = computed(() => {
   border-radius: 15px;
 }
 
+.dark .footer-note {
+  background: rgba(40, 44, 52, 0.8);
+}
+
 .footer-note p {
   color: #666;
   font-size: 0.9rem;
   margin: 0;
+}
+
+.dark .footer-note p {
+  color: #a0a0a0;
 }
 
 .credit {
@@ -327,6 +400,10 @@ const sortedReleases = computed(() => {
   font-size: 0.8rem;
   margin-top: 10px;
   font-style: italic;
+}
+
+.dark .credit {
+  color: #888;
 }
 
 @media (max-width: 768px) {

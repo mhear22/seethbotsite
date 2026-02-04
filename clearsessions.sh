@@ -2,7 +2,7 @@
 
 # Configuration
 SESSIONS_DIR="${1:-/root/.clawdbot/agents/main/sessions}"  # Set this to your session files directory
-TOKEN_THRESHOLD=50000
+TOKEN_THRESHOLD=80000
 DRY_RUN=false  # Set to false to actually delete files
 
 # Check if jq is installed

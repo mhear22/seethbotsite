@@ -87,7 +87,12 @@ export const useAppStore = defineStore('app', () => {
   const createHeart = () => {
     const heart = document.createElement('div')
     heart.className = 'heart'
-    heart.innerHTML = ['💖', '💕', '💗', '💓', '❤️'][Math.floor(Math.random() * 5)]
+    // 15% chance for egg emoji, 85% for hearts
+    if (Math.random() < 0.15) {
+      heart.innerHTML = '🥚'
+    } else {
+      heart.innerHTML = ['💖', '💕', '💗', '💓', '❤️'][Math.floor(Math.random() * 5)]
+    }
     heart.style.left = Math.random() * 100 + 'vw'
     heart.style.animationDuration = (Math.random() * 3 + 3) + 's'
     document.body.appendChild(heart)
