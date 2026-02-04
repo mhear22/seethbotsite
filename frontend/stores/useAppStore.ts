@@ -12,8 +12,9 @@ export const useAppStore = defineStore('app', () => {
   const rankingsStore = useRankings()
   const panels = usePanels()
 
-  // State
-  const darkMode = ref(false)
+  // Load dark mode preference from localStorage
+  const savedDarkMode = localStorage.getItem('darkMode')
+  const darkMode = ref(savedDarkMode === 'true')
   const musicPlaying = ref(false)
   const currentQuoteIndex = ref(0)
   const tachValue = ref(50)
@@ -38,6 +39,7 @@ export const useAppStore = defineStore('app', () => {
   // Actions
   const toggleDarkMode = () => {
     darkMode.value = !darkMode.value
+    localStorage.setItem('darkMode', darkMode.value.toString())
     document.body.classList.toggle('dark', darkMode.value)
   }
 
