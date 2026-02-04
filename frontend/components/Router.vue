@@ -83,22 +83,52 @@ const isDropdownOpen = (dropdownTitle: string) => {
 const closeDropdowns = () => {
   openDropdown.value = null
 }
+
+// Handle clicking outside to close mobile menu
+const handleClickOutside = (event: MouseEvent) => {
+  const target = event.target as HTMLElement
+  const navLinks = document.querySelector('.nav-links')
+  const menuToggle = document.querySelector('.mobile-menu-toggle')
+
+  if (mobileMenuOpen.value &&
+      navLinks &&
+      menuToggle &&
+      !navLinks.contains(target) &&
+      !menuToggle.contains(target)) {
+    closeMobileMenu()
+  }
+}
+
+// Add click listener for outside clicks on mobile
+if (typeof window !== 'undefined') {
+  document.addEventListener('click', handleClickOutside)
+}
 </script>
 
 <template>
   <nav class="router-nav" @mouseleave="closeDropdowns">
+    <!-- Mobile menu backdrop -->
+    <div
+      v-if="mobileMenuOpen"
+      class="mobile-menu-backdrop"
+      @click="closeMobileMenu"
+    ></div>
+
     <div class="nav-container">
       <div class="nav-brand">
         <span class="brand-icon">🌸</span>
-        <span class="brand-text">SeethBot</span>
+        <span class="brand-text">Mold</span>
       </div>
 
-      <div class="nav-controls" style="margin-top: 70px;">
+      <div class="nav-controls">
         <button @click="appStore.toggleDarkMode" class="control-btn" :class="{ active: appStore.darkMode }" title="Toggle dark mode">
           {{ appStore.darkMode ? '🌙' : '☀️' }}
         </button>
         <button @click="appStore.toggleMusic" class="control-btn" :class="{ active: appStore.musicPlaying }" title="Toggle music">
           {{ appStore.musicPlaying ? '🔊' : '🔇' }}
+        </button>
+        <button @click="appStore.togglePanel('tachometer')" class="control-btn" :class="{ active: appStore.panels.tachometer }" title="Toggle mold meter">
+          🍄
         </button>
         <button @click="appStore.togglePanel('rankings')" class="control-btn" :class="{ active: appStore.panels.rankings }" title="Toggle rankings">
           👻
@@ -308,6 +338,27 @@ const closeDropdowns = () => {
 
 .dropdown-item .link-icon {
   font-size: 16px;
+}
+
+/* Mobile Menu Backdrop */
+.mobile-menu-backdrop {
+  position: fixed;
+  top: 56px;
+  left: 0;
+  width: 100%;
+  height: calc(100vh - 56px);
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 198;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 /* Mobile Responsive Styles */
