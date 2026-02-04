@@ -120,28 +120,33 @@ if (typeof window !== 'undefined') {
         <span class="brand-text">Mold</span>
       </div>
 
-      <div class="nav-controls">
-        <button @click="appStore.toggleDarkMode" class="control-btn" :class="{ active: appStore.darkMode }" title="Toggle dark mode">
-          {{ appStore.darkMode ? '🌙' : '☀️' }}
-        </button>
-        <button @click="appStore.toggleMusic" class="control-btn" :class="{ active: appStore.musicPlaying }" title="Toggle music">
-          {{ appStore.musicPlaying ? '🔊' : '🔇' }}
-        </button>
-        <button @click="appStore.togglePanel('tachometer')" class="control-btn" :class="{ active: appStore.panels.tachometer }" title="Toggle mold meter">
-          🍄
-        </button>
-        <button @click="appStore.togglePanel('rankings')" class="control-btn" :class="{ active: appStore.panels.rankings }" title="Toggle rankings">
-          👻
-        </button>
-        <button @click="appStore.togglePanel('cat')" class="control-btn" :class="{ active: appStore.panels.cat }" title="Toggle cats">
-          🐱
-        </button>
-        <button @click="appStore.togglePanel('feed')" class="control-btn" :class="{ active: appStore.panels.feed }" title="Toggle feed">
-          📰
-        </button>
-        <button @click="appStore.togglePanel('digitalGoose')" class="control-btn" :class="{ active: appStore.panels.digitalGoose }" title="Toggle goose">
-          🦆
-        </button>
+      <div class="nav-controls-wrapper">
+        <div class="nav-controls-chevron">
+          <span class="chevron-icon">▲</span>
+        </div>
+        <div class="nav-controls">
+          <button @click="appStore.toggleDarkMode" class="control-btn" :class="{ active: appStore.darkMode }" title="Toggle dark mode">
+            {{ appStore.darkMode ? '🌙' : '☀️' }}
+          </button>
+          <button @click="appStore.toggleMusic" class="control-btn" :class="{ active: appStore.musicPlaying }" title="Toggle music">
+            {{ appStore.musicPlaying ? '🔊' : '🔇' }}
+          </button>
+          <button @click="appStore.togglePanel('tachometer')" class="control-btn" :class="{ active: appStore.panels.tachometer }" title="Toggle mold meter">
+            🍄
+          </button>
+          <button @click="appStore.togglePanel('rankings')" class="control-btn" :class="{ active: appStore.panels.rankings }" title="Toggle rankings">
+            👻
+          </button>
+          <button @click="appStore.togglePanel('cat')" class="control-btn" :class="{ active: appStore.panels.cat }" title="Toggle cats">
+            🐱
+          </button>
+          <button @click="appStore.togglePanel('feed')" class="control-btn" :class="{ active: appStore.panels.feed }" title="Toggle feed">
+            📰
+          </button>
+          <button @click="appStore.togglePanel('digitalGoose')" class="control-btn" :class="{ active: appStore.panels.digitalGoose }" title="Toggle goose">
+            🦆
+          </button>
+        </div>
       </div>
 
       <button class="mobile-menu-toggle" @click="toggleMobileMenu" :aria-label="mobileMenuOpen ? 'Close menu' : 'Open menu'">

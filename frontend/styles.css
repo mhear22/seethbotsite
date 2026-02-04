@@ -66,34 +66,95 @@ body.dark {
   letter-spacing: 0.5px;
 }
 
+/* MacOS Dock - Bottom Center Navigation Controls Wrapper */
+.nav-controls-wrapper {
+  position: fixed;
+  bottom: -95vh;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1002;
+}
+
+/* Chevron indicator - shown when controls are hidden */
+.nav-controls-chevron {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(30px) saturate(180%);
+  padding: 8px 16px;
+  border-radius: 20px 20px 0 0;
+  box-shadow:
+    0 5px 20px rgba(0, 0, 0, 0.1),
+    0 0 0 1px rgba(255, 255, 255, 0.5) inset;
+  transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  opacity: 1;
+  pointer-events: none;
+}
+
+.dark .nav-controls-chevron {
+  background: rgba(40, 44, 52, 0.85);
+  box-shadow:
+    0 5px 20px rgba(0, 0, 0, 0.2),
+    0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+}
+
+.chevron-icon {
+  font-size: 14px;
+  color: #ff91a4;
+  display: block;
+  animation: chevronBounce 2s ease-in-out infinite;
+}
+
+@keyframes chevronBounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+.dark .chevron-icon {
+  color: #ffb6c1;
+}
+
+/* Hide chevron on hover */
+.nav-controls-wrapper:hover .nav-controls-chevron {
+  opacity: 0;
+  transform: translateX(-50%) translateY(10px);
+}
+
 /* MacOS Dock - Bottom Center Navigation Controls */
 .nav-controls {
   display: flex;
   align-items: center;
   gap: 8px;
-  position: fixed;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
   background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(30px) saturate(180%);
   padding: 12px 24px;
   border-radius: 24px;
-  box-shadow: 
+  box-shadow:
     0 10px 40px rgba(0, 0, 0, 0.15),
     0 0 0 1px rgba(255, 255, 255, 0.5) inset,
     0 0 0 0.5px rgba(0, 0, 0, 0.05);
   border: none;
-  z-index: 1002;
   transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  opacity: 0;
+  transform: translateY(20px);
+  pointer-events: none;
 }
 
 .dark .nav-controls {
   background: rgba(40, 44, 52, 0.85);
-  box-shadow: 
+  box-shadow:
     0 10px 40px rgba(0, 0, 0, 0.3),
     0 0 0 1px rgba(255, 255, 255, 0.1) inset,
     0 0 0 0.5px rgba(255, 255, 255, 0.05);
+}
+
+/* Show controls on hover */
+.nav-controls-wrapper:hover .nav-controls {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: all;
 }
 
 /* MacOS-style dock items with magnification effect */
@@ -1698,15 +1759,23 @@ body.dark .mika-modal-box {
     font-size: 22px;
   }
 
-  .nav-controls {
-    position: fixed;
+  .nav-controls-wrapper {
     bottom: 10px;
-    left: 50%;
-    transform: translateX(-50%);
+  }
+
+  .nav-controls-chevron {
+    padding: 6px 12px;
+    border-radius: 16px 16px 0 0;
+  }
+
+  .chevron-icon {
+    font-size: 12px;
+  }
+
+  .nav-controls {
     gap: 6px;
     padding: 8px 16px;
     border-radius: 18px;
-    z-index: 1002;
   }
 
   .control-btn {
@@ -2247,10 +2316,21 @@ body.dark .mika-modal-box {
 
 /* Small Mobile Devices (< 480px) */
 @media (max-width: 480px) {
+  .nav-controls-wrapper {
+    bottom: 8px;
+  }
+
+  .nav-controls-chevron {
+    padding: 5px 10px;
+  }
+
+  .chevron-icon {
+    font-size: 11px;
+  }
+
   .nav-controls {
     gap: 4px;
     padding: 6px 12px;
-    bottom: 8px;
   }
 
   .control-btn {
