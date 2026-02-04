@@ -10,6 +10,7 @@ import MoviePage from '../components/MoviePage.vue'
 import CountdownPage from '../components/CountdownPage.vue'
 import TicketsPage from '../components/TicketsPage.vue'
 import ClocksPage from '../components/ClocksPage.vue'
+import MusicPage from '../components/MusicPage.vue'
 
 const routes = [
   {
@@ -66,6 +67,11 @@ const routes = [
     path: '/clocks',
     name: 'clocks',
     component: ClocksPage
+  },
+  {
+    path: '/music',
+    name: 'music',
+    component: MusicPage
   }
 ]
 

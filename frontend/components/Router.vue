@@ -28,7 +28,8 @@ const dropdowns = ref<DropdownData[]>([
       { title: 'Girl Mode', icon: '💕', path: '/girl' },
       { title: 'Gender', icon: '🔮', path: '/gender' },
       { title: 'Cats', icon: '🐱', path: '/cats' },
-      { title: 'Stock Market', icon: '📈', path: '/stocks' }
+      { title: 'Stock Market', icon: '📈', path: '/stocks' },
+      { title: 'Music', icon: '🎵', path: '/music' }
     ]
   },
   {
