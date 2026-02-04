@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, nextTick } from 'vue'
+import { clicksRepository } from '../repositories/clicks.repository'
 
 const honkCount = ref(0)
+const isLoading = ref(false)
 const isMigrating = ref(false)
 const currentMessage = ref('Honk!')
 const goosePosition = ref({ x: 20, y: 20 }) // Initial position in pixels from top/left
@@ -99,9 +101,20 @@ const moveGoose = () => {
   }
 }
 
-const honk = () => {
-  honkCount.value++
-  
+const honk = async () => {
+  if (isLoading.value) return
+
+  isLoading.value = true
+  try {
+    const data = await clicksRepository.increment()
+    honkCount.value = data.count
+  } catch (error) {
+    console.error('Error incrementing click:', error)
+    honkCount.value++ // Fallback to local increment
+  } finally {
+    isLoading.value = false
+  }
+
   // Move goose to new position
   moveGoose()
   
@@ -137,12 +150,19 @@ const handleResize = () => {
   ensureGooseVisible()
 }
 
-onMounted(() => {
+onMounted(async () => {
   window.addEventListener('resize', handleResize)
   // Ensure goose is visible on initial mount
   nextTick(() => {
     ensureGooseVisible()
   })
+  // Load initial click count
+  try {
+    const data = await clicksRepository.getCount()
+    honkCount.value = data.count
+  } catch (error) {
+    console.error('Error loading click count:', error)
+  }
 })
 
 onUnmounted(() => {
