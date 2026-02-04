@@ -8,6 +8,7 @@ import Cats from '../components/CatsPage.vue'
 import StockMarket from '../components/StockMarket.vue'
 import MoviePage from '../components/MoviePage.vue'
 import CountdownPage from '../components/CountdownPage.vue'
+import TicketsPage from '../components/TicketsPage.vue'
 
 const routes = [
   {
@@ -54,6 +55,11 @@ const routes = [
     path: '/countdowns',
     name: 'countdowns',
     component: CountdownPage
+  },
+  {
+    path: '/tickets',
+    name: 'tickets',
+    component: TicketsPage
   }
 ]
 

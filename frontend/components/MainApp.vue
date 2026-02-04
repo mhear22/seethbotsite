@@ -7,6 +7,7 @@ import FeedPanel from './FeedPanel.vue'
 import MikaModal from './MikaModal.vue'
 import DigitalGoose from './DigitalGoose.vue'
 import Router from './Router.vue'
+import AppFooter from './AppFooter.vue'
 import { useAppStore } from '../stores/useAppStore'
 
 export interface RankingItem {
@@ -83,6 +84,9 @@ const goToGirlMode = () => {
       :is-open="appStore.mikaModalOpen"
       @close="appStore.closeMikaModal"
     />
+
+    <!-- Footer -->
+    <AppFooter />
   </div>
 
   <!-- Audio elements -->

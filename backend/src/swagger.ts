@@ -351,6 +351,10 @@ const options: swaggerJsdoc.Options = {
       {
         name: 'Quotes',
         description: 'Northernlion quote service'
+      },
+      {
+        name: 'Tickets',
+        description: 'Ticketing and feedback system'
       }
     ]
   },
