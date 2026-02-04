@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 
 export interface ModalItem {
   id: string
@@ -22,6 +22,27 @@ const emit = defineEmits<{
 
 const collapsed = ref(false)
 
+const containerClass = computed(() => {
+  const positions = [...new Set(props.modals.map(m => m.position || 'left'))]
+  return positions.includes('right') ? 'right-dock' : 'left-dock'
+})
+
+// localStorage key based on dock position
+const storageKey = computed(() => `dock-collapsed-${containerClass.value.replace('-dock', '')}`)
+
+// Load collapsed state from localStorage
+onMounted(() => {
+  const saved = localStorage.getItem(storageKey.value)
+  if (saved !== null) {
+    collapsed.value = saved === 'true'
+  }
+})
+
+// Save collapsed state to localStorage when it changes
+watch(collapsed, (newValue) => {
+  localStorage.setItem(storageKey.value, String(newValue))
+})
+
 const toggleModal = (modalId: string) => {
   emit('toggle', modalId)
 }
@@ -35,11 +56,6 @@ const openModals = computed(() => {
 })
 
 const anyOpen = computed(() => openModals.value.length > 0)
-
-const containerClass = computed(() => {
-  const positions = [...new Set(props.modals.map(m => m.position || 'left'))]
-  return positions.includes('right') ? 'right-dock' : 'left-dock'
-})
 </script>
 
 <template>
@@ -94,7 +110,7 @@ const containerClass = computed(() => {
   flex-direction: row;
   align-items: flex-start;
   gap: 0;
-  z-index: 999;
+  z-index: 150;
   transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   max-height: calc(100vh - 90px);
 }
@@ -116,13 +132,18 @@ const containerClass = computed(() => {
   width: 32px;
   height: 32px;
   cursor: pointer;
-  z-index: 1000;
+  z-index: 151;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 14px;
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  opacity: 0;
+}
+
+.modal-dock:hover .dock-toggle {
+  opacity: 1;
 }
 
 .left-dock .dock-toggle {
@@ -137,10 +158,12 @@ const containerClass = computed(() => {
 .dock-toggle:hover {
   background: rgba(255, 107, 157, 1);
   transform: scale(1.1);
+  opacity: 1;
 }
 
 .right-dock .dock-toggle:hover {
   transform: rotate(180deg) scale(1.1);
+  opacity: 1;
 }
 
 .modal-list {

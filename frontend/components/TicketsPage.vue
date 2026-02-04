@@ -531,7 +531,8 @@ onMounted(() => {
             :disabled="loading"
           ></textarea>
         </div>
-        <div class="form-row">
+        <!-- Type and priority hidden but still submitted with defaults -->
+        <div class="form-row" style="display: none;">
           <div class="form-group half">
             <label for="type">Type</label>
             <select
@@ -624,35 +625,6 @@ onMounted(() => {
           </div>
         </div>
 
-        <div class="filter-group">
-          <span class="filter-label">Type:</span>
-          <div class="filter-chips">
-            <button
-              v-for="option in typeOptions"
-              :key="option.value"
-              @click="filterType = option.value"
-              class="filter-chip"
-              :class="{ active: filterType === option.value }"
-            >
-              {{ option.label }}
-            </button>
-          </div>
-        </div>
-
-        <div class="filter-group">
-          <span class="filter-label">Priority:</span>
-          <div class="filter-chips">
-            <button
-              v-for="option in priorityOptions"
-              :key="option.value"
-              @click="filterPriority = option.value"
-              class="filter-chip"
-              :class="{ active: filterPriority === option.value }"
-            >
-              {{ option.label }}
-            </button>
-          </div>
-        </div>
       </div>
 
       <!-- Tickets List -->
@@ -678,14 +650,6 @@ onMounted(() => {
             <div class="ticket-badges">
               <span class="ticket-status" :class="statusColors[ticket.status]">
                 {{ statusLabels[ticket.status] }}
-              </span>
-              <span class="ticket-type" :class="`type-${ticket.type}`">
-                {{ ticket.type === 'feature' ? '✨' : ticket.type === 'bug' ? '🐛' : '💬' }}
-                {{ ticket.type }}
-              </span>
-              <span class="ticket-priority" :class="`priority-${ticket.priority}`">
-                {{ ticket.priority === 'high' ? '🔴' : ticket.priority === 'medium' ? '🟡' : '🟢' }}
-                {{ ticket.priority }}
               </span>
             </div>
           </div>
