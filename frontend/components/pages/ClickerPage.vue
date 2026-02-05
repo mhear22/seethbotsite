@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { clicksRepository } from '../../repositories/clicks.repository'
+import { generalRepository } from '../../repositories/general.repository'
+import { statsRepository } from '../../repositories/stats.repository'
 
 const router = useRouter()
 
@@ -12,16 +14,202 @@ const isLoading = ref(true)
 const isClicking = ref(false)
 const clickParticles = ref<Array<{ id: number, x: number, y: number, value: number }>>([])
 const showParticles = ref(true)
+const unsyncedClicks = ref(0)
+
+// User ID for tracking points
+const userId = ref('')
+const selectedTargetUser = ref('')
+
+// Rankings for dropdown
+const rankings = ref<Array<{ avatar: string; name: string; score: number; isCurrentUser?: boolean }>>([])
+
+// Get or create user ID
+
+// Get or create user ID
+const getOrCreateUserId = (): string => {
+  let id = localStorage.getItem('clicker-user-id')
+  if (!id) {
+    id = 'user_' + Math.random().toString(36).substring(2, 15)
+    localStorage.setItem('clicker-user-id', id)
+  }
+  return id
+}
 
 // Upgrades
-const upgrades = ref([
+const originalUpgrades = [
   { id: 1, name: 'Better Click', icon: '👆', cost: 10, power: 1, type: 'click', purchased: 0 },
   { id: 2, name: 'Auto Clicker', icon: '🤖', cost: 50, power: 1, type: 'auto', purchased: 0 },
   { id: 3, name: 'Double Click', icon: '✌️', cost: 200, power: 5, type: 'click', purchased: 0 },
   { id: 4, name: 'Mold Farm', icon: '🍄', cost: 500, power: 5, type: 'auto', purchased: 0 },
   { id: 5, name: 'Super Click', icon: '⚡', cost: 1000, power: 20, type: 'click', purchased: 0 },
   { id: 6, name: 'Mold Factory', icon: '🏭', cost: 2500, power: 20, type: 'auto', purchased: 0 }
-])
+]
+
+const upgrades = ref([...originalUpgrades])
+
+// Save upgrades to localStorage
+const saveUpgrades = () => {
+  const savedData = upgrades.value.map(u => ({
+    id: u.id,
+    purchased: u.purchased,
+    cost: u.cost
+  }))
+  localStorage.setItem('clicker-upgrades', JSON.stringify(savedData))
+}
+
+// Save stats to localStorage
+const saveStats = () => {
+  const stats = {
+    count: count.value,
+    clickPower: clickPower.value,
+    autoClickPower: autoClickPower.value
+  }
+  localStorage.setItem('clicker-stats', JSON.stringify(stats))
+
+  // Save selected target user
+  if (selectedTargetUser.value) {
+    localStorage.setItem('clicker-target-user', selectedTargetUser.value)
+  }
+}
+
+// Recalculate click power and auto click power from purchased upgrades
+const recalculatePower = () => {
+  let newClickPower = 1 // Base click power
+  let newAutoClickPower = 0 // Base auto click power
+
+  upgrades.value.forEach(u => {
+    if (u.type === 'click') {
+      newClickPower += u.purchased * u.power
+    } else if (u.type === 'auto') {
+      newAutoClickPower += u.purchased * u.power
+    }
+  })
+
+  clickPower.value = newClickPower
+  autoClickPower.value = newAutoClickPower
+}
+
+// Load stats from localStorage
+const loadStats = () => {
+  try {
+    const saved = localStorage.getItem('clicker-stats')
+    if (saved) {
+      const stats = JSON.parse(saved)
+      // Only load count, let upgrades determine power
+      count.value = stats.count || 0
+    }
+
+    // Load selected target user
+    const savedTarget = localStorage.getItem('clicker-target-user')
+    if (savedTarget) {
+      selectedTargetUser.value = savedTarget
+    }
+  } catch (error) {
+    console.error('Error loading stats:', error)
+  }
+}
+
+// Load upgrades from localStorage
+const loadUpgrades = () => {
+  try {
+    const saved = localStorage.getItem('clicker-upgrades')
+    if (saved) {
+      const savedData = JSON.parse(saved)
+      // Create a new array with saved data merged in to properly trigger Vue reactivity
+      upgrades.value = upgrades.value.map(u => {
+        const savedUpgrade = savedData.find((s: any) => s.id === u.id)
+        const purchased = savedUpgrade?.purchased || 0
+        return {
+          ...u,
+          purchased: purchased,
+          cost: Math.floor(getOriginalCost(u.id) * Math.pow(1.5, purchased))
+        }
+      })
+      // Recalculate power after loading upgrades
+      recalculatePower()
+    }
+  } catch (error) {
+    console.error('Error loading upgrades:', error)
+  }
+}
+
+// Load rankings
+const loadRankings = async () => {
+  try {
+    const data = await generalRepository.getRankings()
+    rankings.value = data
+
+    // Set default target to current user if they exist in rankings
+    const currentUser = rankings.value.find(r => r.isCurrentUser)
+    if (currentUser) {
+      selectedTargetUser.value = currentUser.name
+    }
+  } catch (error) {
+    console.error('Error loading rankings:', error)
+  }
+}
+
+// Watch for target user changes
+watch(selectedTargetUser, (newValue) => {
+  if (newValue) {
+    localStorage.setItem('clicker-target-user', newValue)
+  }
+})
+
+// Sync clicks to rankings
+const syncClicksToPoints = async () => {
+  if (unsyncedClicks.value <= 0 || !selectedTargetUser.value) return
+
+  try {
+    await clicksRepository.addPoints(selectedTargetUser.value, unsyncedClicks.value)
+    unsyncedClicks.value = 0
+  } catch (error) {
+    console.error('Error syncing clicks to points:', error)
+    // Don't reset unsyncedClicks on error - will retry next time
+  }
+}
+
+// Record click stat
+const recordClickStat = async () => {
+  try {
+    await statsRepository.recordStat({
+      userId: userId.value,
+      userName: localStorage.getItem('user-name') || undefined,
+      gameType: 'clicker',
+      statType: 'click',
+      value: clickPower.value,
+      metadata: {
+        timestamp: new Date().toISOString(),
+        autoClicker: autoClickPower.value > 0
+      }
+    })
+  } catch (error) {
+    console.error('Error recording click stat:', error)
+  }
+}
+
+// Track and update high score
+let lastRecordedScore = 0
+const updateHighScore = async () => {
+  if (count.value > lastRecordedScore) {
+    try {
+      await statsRepository.updateHighScore({
+        userId: userId.value,
+        userName: localStorage.getItem('user-name') || undefined,
+        gameType: 'clicker',
+        score: count.value,
+        details: {
+          clickPower: clickPower.value,
+          autoClickPower: autoClickPower.value,
+          timestamp: new Date().toISOString()
+        }
+      })
+      lastRecordedScore = count.value
+    } catch (error) {
+      console.error('Error updating high score:', error)
+    }
+  }
+}
 
 let autoClickInterval: ReturnType<typeof setInterval> | null = null
 let particleIdCounter = 0
@@ -43,13 +231,35 @@ const loadCount = async () => {
   }
 }
 
+// Save stats periodically
+let saveInterval: ReturnType<typeof setInterval> | null = null
+
 const handleClick = async (event: MouseEvent) => {
   if (isClicking.value) return
   isClicking.value = true
 
   try {
-    const result = await clicksRepository.increment()
-    count.value = result.count
+    // Increment local count directly (idle clicker is independent)
+    count.value += clickPower.value
+
+    // Track unsynced clicks for points
+    unsyncedClicks.value += clickPower.value
+
+    // Sync clicks to points (with debounce)
+    if (unsyncedClicks.value >= 10) {
+      syncClicksToPoints()
+    }
+
+    // Record click stat
+    recordClickStat()
+
+    // Update high score periodically
+    if (count.value > lastRecordedScore && count.value % 10 === 0) {
+      updateHighScore()
+    }
+
+    // Save stats after click
+    saveStats()
 
     // Add click particle
     if (showParticles.value && event.target instanceof HTMLElement) {
@@ -83,21 +293,26 @@ const purchaseUpgrade = async (upgrade: any) => {
 
   count.value -= upgrade.cost
   upgrade.purchased++
-  upgrade.cost = Math.floor(upgrade.cost * 1.5)
+  // Recalculate cost from original base cost
+  upgrade.cost = Math.floor(getOriginalCost(upgrade.id) * Math.pow(1.5, upgrade.purchased))
 
   if (upgrade.type === 'click') {
     clickPower.value += upgrade.power
   } else {
     autoClickPower.value += upgrade.power
   }
+
+  // Save upgrades and stats to localStorage
+  saveUpgrades()
+  saveStats()
 }
 
 const resetClicks = async () => {
   if (!confirm('Are you sure you want to reset all progress?')) return
 
   try {
-    const result = await clicksRepository.reset()
-    count.value = result.count
+    // Reset locally (don't call legacy API - idle clicker is independent)
+    count.value = 0
     clickPower.value = 1
     autoClickPower.value = 0
 
@@ -105,6 +320,15 @@ const resetClicks = async () => {
       u.purchased = 0
       u.cost = getOriginalCost(u.id)
     })
+
+    // Save the reset upgrades state to localStorage (not just remove)
+    saveUpgrades()
+
+    // Also clear stats from localStorage
+    localStorage.removeItem('clicker-stats')
+
+    // Save the reset state
+    saveStats()
   } catch (error) {
     console.error('Error resetting:', error)
   }
@@ -129,25 +353,75 @@ const goBack = () => {
 }
 
 onMounted(async () => {
-  await loadCount()
+  // Initialize user ID
+  userId.value = getOrCreateUserId()
+
+  // Load stats and upgrades from localStorage (idle clicker is independent)
+  loadStats()
+  loadUpgrades()
+
+  // Load rankings for user selection dropdown
+  await loadRankings()
+
+  // Initialize count to loaded value or 0 (don't load from server)
+  if (count.value === 0) {
+    count.value = 0
+  }
+  isLoading.value = false
 
   // Auto clicker interval
   autoClickInterval = setInterval(async () => {
     if (autoClickPower.value > 0) {
       try {
-        const result = await clicksRepository.increment()
-        count.value = result.count + (autoClickPower.value - 1)
+        // Increment local count directly (don't use legacy API)
+        count.value += autoClickPower.value
+
+        // Track unsynced auto-clicks
+        unsyncedClicks.value += autoClickPower.value
+
+        // Sync clicks periodically (every 10 auto-clicks worth)
+        if (unsyncedClicks.value >= 10) {
+          syncClicksToPoints()
+        }
+
+        // Record auto-click stat
+        recordClickStat()
+
+        // Update high score
+        updateHighScore()
+
+        // Save stats to localStorage
+        saveStats()
       } catch (error) {
         console.error('Auto-click error:', error)
       }
     }
   }, 1000)
+
+  // Save stats to localStorage every 5 seconds
+  saveInterval = setInterval(() => {
+    saveStats()
+  }, 5000)
+
+  // Sync any remaining clicks every 30 seconds
+  setInterval(() => {
+    syncClicksToPoints()
+  }, 30000)
 })
 
 onUnmounted(() => {
   if (autoClickInterval) {
     clearInterval(autoClickInterval)
   }
+  if (saveInterval) {
+    clearInterval(saveInterval)
+  }
+  // Sync any remaining clicks before unmount
+  syncClicksToPoints()
+  // Update final high score
+  updateHighScore()
+  // Save stats before unmount
+  saveStats()
 })
 </script>
 
@@ -179,6 +453,24 @@ onUnmounted(() => {
             <span class="stat-label">Auto/Sec</span>
             <span class="stat-value">{{ formatNumber(autoClickPower) }}</span>
           </div>
+        </div>
+
+        <!-- Target User Selector (for giving points to rankings) -->
+        <div class="target-user-section">
+          <label for="target-user" class="target-label">Give idle points to:</label>
+          <select
+            id="target-user"
+            v-model="selectedTargetUser"
+            class="target-select"
+          >
+            <option value="">Select a user...</option>
+            <option v-for="user in rankings" :key="user.name" :value="user.name">
+              {{ user.avatar }} {{ user.name }} ({{ formatNumber(user.score) }} pts)
+            </option>
+          </select>
+          <p v-if="!selectedTargetUser" class="target-warning">
+            ⚠️ Select a user to give idle points to rankings
+          </p>
         </div>
 
         <!-- Click Button -->
@@ -246,7 +538,7 @@ onUnmounted(() => {
 }
 
 .clicker-container {
-  max-width: 900px;
+  max-width: 800px;
   margin: 0 auto;
 }
 
@@ -326,6 +618,55 @@ onUnmounted(() => {
   font-size: 1.8rem;
   font-weight: bold;
   color: #a8e063;
+}
+
+.target-user-section {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 15px;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.target-label {
+  display: block;
+  font-size: 0.9rem;
+  color: #a8e063;
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+
+.target-select {
+  width: 100%;
+  max-width: 400px;
+  padding: 10px 12px;
+  background: rgba(26, 26, 46, 0.8);
+  border: 2px solid #a8e063;
+  border-radius: 8px;
+  color: #eee;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+}
+
+.target-select:focus {
+  outline: none;
+  border-color: #56ab2f;
+  box-shadow: 0 0 10px rgba(168, 224, 99, 0.3);
+}
+
+.target-select option {
+  background: #1a1a2e;
+  color: #eee;
+  padding: 8px;
+}
+
+.target-warning {
+  color: #ff6b9d;
+  font-size: 0.85rem;
+  margin: 10px 0 0 0;
+  font-style: italic;
 }
 
 .click-section {
