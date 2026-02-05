@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import RankingsPanel from '../../panels/RankingsPanel.vue'
 import CatPanel from '../../panels/CatPanel.vue'
@@ -11,7 +11,10 @@ import DigitalGoose from '../../panels/DigitalGoose.vue'
 import MiningPanel from '../../panels/MiningPanel.vue'
 import TorchEffect from '../ui/TorchEffect.vue'
 import Router from './Router.vue'
+import SwipeFeedback from '../ui/SwipeFeedback.vue'
+import SearchModal from '../ui/SearchModal.vue'
 import { useAppStore } from '../../../stores/useAppStore'
+import { useSwipeGestures } from '../../../composables/useSwipeGestures'
 
 export interface RankingItem {
   name: string
@@ -42,6 +45,18 @@ const appStore = useAppStore()
 // Router
 const router = useRouter()
 const route = useRoute()
+
+// Swipe Gestures (Ticket #129)
+const {
+  swipeFeedback,
+  isEnabled: swipeEnabled,
+  isMobile,
+  manualSwipe
+} = useSwipeGestures({
+  enabledOnMobile: true,
+  enabledOnDesktop: false, // Swipe gestures enabled on mobile only for better UX
+  showVisualFeedback: true
+})
 
 // Modal items for left dock (Tachometer)
 const leftModals = computed<ModalItem[]>(() => [
@@ -77,6 +92,23 @@ const goToGirlMode = () => {
     router.push('/girl')
   }, 100)
 }
+
+// Keyboard shortcuts
+const handleGlobalKeydown = (e: KeyboardEvent) => {
+  // Open search with Ctrl/Cmd + K
+  if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+    e.preventDefault()
+    appStore.toggleSearchModal()
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('keydown', handleGlobalKeydown)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('keydown', handleGlobalKeydown)
+})
 </script>
 
 <template>
@@ -154,14 +186,34 @@ const goToGirlMode = () => {
 
     <!-- Torch Effect for Darker Mode (Ticket #109) -->
     <TorchEffect />
+
+    <!-- Swipe Gesture Feedback (Ticket #129) -->
+    <SwipeFeedback
+      :visible="swipeFeedback.visible"
+      :direction="swipeFeedback.direction"
+      :icon="swipeFeedback.icon"
+      :message="swipeFeedback.message"
+    />
+
+    <!-- Search Modal (Ticket #139) -->
+    <SearchModal
+      :is-open="appStore.searchModalOpen"
+      @close="appStore.toggleSearchModal"
+    />
   </div>
 
   <!-- Audio elements -->
-  <audio id="newMusic" loop>
+  <audio id="newMusic">
     <source src="/newMusic.mp3" type="audio/mpeg">
   </audio>
   <audio id="fartSound">
     <source src="/fart-with-reverb.mp3" type="audio/mpeg">
+  </audio>
+  <audio id="buttonSound">
+    <source src="/button-sound.mp3" type="audio/mpeg">
+  </audio>
+  <audio id="gooseHonk">
+    <source src="/goose-honk.mp3" type="audio/mpeg">
   </audio>
 </template>
 

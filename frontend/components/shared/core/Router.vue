@@ -38,9 +38,9 @@ const quickNavItems = ref<RouteData[]>([
   { title: 'Home', icon: '🌸', path: '/' },
   { title: 'Movies', icon: '🎬', path: '/movies' },
   { title: 'Rankings', icon: '👻', path: '/rankings' },
+  { title: 'Messages', icon: '💬', path: '/messages' },
   { title: 'Tickets', icon: '🎫', path: '/tickets' },
-  { title: 'Stocks', icon: '📈', path: '/stocks' },
-  { title: 'Mold', icon: '🍄', path: '/mold' }
+  { title: 'Stocks', icon: '📈', path: '/stocks' }
 ])
 
 const dropdowns = ref<DropdownData[]>([
@@ -65,11 +65,26 @@ const dropdowns = ref<DropdownData[]>([
     title: 'Community',
     icon: '👥',
     routes: [
+      { title: 'Messages', icon: '💬', path: '/messages' },
       { title: 'Mold', icon: '🍄', path: '/mold' },
       { title: 'Rankings', icon: '👻', path: '/rankings' },
       { title: 'Movie Night', icon: '🎬', path: '/movies' },
       { title: 'Tickets', icon: '🎫', path: '/tickets' },
-      { title: 'Moldbot Opinions', icon: '🤖', path: '/opinion' }
+      { title: 'Moldbot Opinions', icon: '🤖', path: '/opinion' },
+      { title: 'Analytics', icon: '📊', path: '/analytics' }
+    ]
+  },
+  {
+    title: 'Community',
+    icon: '👥',
+    routes: [
+      { title: 'Messages', icon: '💬', path: '/messages' },
+      { title: 'Mold', icon: '🍄', path: '/mold' },
+      { title: 'Rankings', icon: '👻', path: '/rankings' },
+      { title: 'Movie Night', icon: '🎬', path: '/movies' },
+      { title: 'Tickets', icon: '🎫', path: '/tickets' },
+      { title: 'Moldbot Opinions', icon: '🤖', path: '/opinion' },
+      { title: 'Analytics', icon: '📊', path: '/analytics' }
     ]
   },
   {
@@ -200,6 +215,17 @@ onMounted(() => {
     }
   })
 
+  // Search shortcut (Ticket #139)
+  registerShortcut({
+    key: 'k',
+    ctrl: true,
+    description: 'Open search',
+    action: () => {
+      appStore.toggleSearchModal()
+    }
+  })
+
+  // Navigation shortcuts
   registerShortcut({
     key: 'h',
     description: 'Go to Home',
@@ -241,13 +267,162 @@ onMounted(() => {
   })
 
   registerShortcut({
-    key: 'c',
+    key: 'k',
+    description: 'Go to Clicker',
+    action: () => {
+      router.push('/clicker')
+    }
+  })
+
+  registerShortcut({
+    key: 'f',
+    description: 'Go to Fishing',
+    action: () => {
+      router.push('/fishing')
+    }
+  })
+
+  registerShortcut({
+    key: 'g',
+    description: 'Go to Stats',
+    action: () => {
+      router.push('/stats')
+    }
+  })
+
+  registerShortcut({
+    key: 'o',
+    description: 'Go to Shop',
+    action: () => {
+      router.push('/shop')
+    }
+  })
+
+  registerShortcut({
+    key: ',',
+    description: 'Go to Settings',
+    action: () => {
+      router.push('/settings')
+    }
+  })
+
+  // Toggle shortcuts
+  registerShortcut({
+    key: 'd',
     description: 'Toggle dark mode',
     action: () => {
       appStore.toggleDarkMode()
     }
   })
 
+  registerShortcut({
+    key: 'u',
+    description: 'Toggle music',
+    action: () => {
+      appStore.toggleMusic()
+    }
+  })
+
+  registerShortcut({
+    key: 'z',
+    description: 'Toggle chaos mode',
+    action: () => {
+      appStore.toggleChaosMode()
+    }
+  })
+
+  registerShortcut({
+    key: 'q',
+    description: 'Toggle mold mode',
+    action: () => {
+      appStore.toggleMoldMode()
+    }
+  })
+
+  // Panel shortcuts (number keys - standard for panel toggles)
+  registerShortcut({
+    key: '1',
+    description: 'Toggle mold meter',
+    action: () => {
+      appStore.togglePanel('tachometer')
+    }
+  })
+
+  registerShortcut({
+    key: '2',
+    description: 'Toggle rankings panel',
+    action: () => {
+      appStore.togglePanel('rankings')
+    }
+  })
+
+  registerShortcut({
+    key: '3',
+    description: 'Toggle cat panel',
+    action: () => {
+      appStore.togglePanel('cat')
+    }
+  })
+
+  registerShortcut({
+    key: '4',
+    description: 'Toggle feed panel',
+    action: () => {
+      appStore.togglePanel('feed')
+    }
+  })
+
+  registerShortcut({
+    key: '5',
+    description: 'Toggle goose',
+    action: () => {
+      appStore.togglePanel('digitalGoose')
+    }
+  })
+
+  registerShortcut({
+    key: '6',
+    description: 'Toggle GPU mining',
+    action: () => {
+      appStore.togglePanel('mining')
+    }
+  })
+
+  registerShortcut({
+    key: '7',
+    description: 'Toggle coolness panel',
+    action: () => {
+      appStore.togglePanel('coolnessPanel')
+    }
+  })
+
+  // Panel shortcuts (letter keys - quick access)
+  registerShortcut({
+    key: 'c',
+    description: 'Toggle cat panel',
+    action: () => {
+      appStore.togglePanel('cat')
+    }
+  })
+
+  registerShortcut({
+    key: 'p',
+    description: 'Toggle GPU mining',
+    action: () => {
+      appStore.togglePanel('mining')
+    }
+  })
+
+  registerShortcut({
+    key: 'g',
+    shift: true,
+    description: 'Toggle goose',
+    action: () => {
+      appStore.togglePanel('digitalGoose')
+    }
+  })
+
+  // Escape to close
   registerShortcut({
     key: 'Escape',
     description: 'Close modal/menu',
@@ -360,14 +535,17 @@ if (typeof window !== 'undefined') {
           <span class="chevron-icon">▲</span>
         </div>
         <div class="nav-controls">
+          <button @click="appStore.toggleSearchModal" class="control-btn search-btn" :class="{ active: appStore.searchModalOpen }" title="Search (Ctrl+K)">
+             🔍
+          </button>
           <button @click="appStore.toggleDarkMode" class="control-btn" :class="{ active: appStore.darkMode }" :title="appStore.darkerMode ? 'Midnight mode (click for light)' : (appStore.darkMode ? 'Dark mode (click for midnight)' : 'Light mode (click for dark)')">
             {{ appStore.darkerMode ? '🌑' : (appStore.darkMode ? '🌙' : '☀️') }}
           </button>
           <button @click="appStore.toggleLanguage" class="control-btn" :class="{ active: appStore.isAustralian }" :title="appStore.isAustralian ? 'Australian English (click for US)' : 'US English (click for Australian)'">
             {{ appStore.isAustralian ? '🇦🇺' : '🇺🇸' }}
           </button>
-          <button @click="appStore.toggleMusic" class="control-btn" :class="{ active: appStore.musicPlaying }" title="Toggle music">
-            {{ appStore.musicPlaying ? '🔊' : '🔇' }}
+          <button @click="appStore.toggleMute" class="control-btn" :class="{ active: !appStore.isMuted }" title="Toggle mute">
+            {{ appStore.isMuted ? '🔇' : '🔊' }}
           </button>
           <button @click="appStore.togglePanel('tachometer')" class="control-btn" :class="{ active: appStore.panels.tachometer }" title="Toggle mold meter">
              🍄
@@ -495,6 +673,29 @@ if (typeof window !== 'undefined') {
   display: inline-block;
   transition: transform 0.1s linear;
   font-size: 1.5rem;
+}
+
+/* Keyboard Help Button */
+.keyboard-help-btn {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  margin-left: 8px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  opacity: 0.7;
+}
+
+.keyboard-help-btn:hover {
+  opacity: 1;
+  background: rgba(255, 182, 193, 0.15);
+  transform: scale(1.1);
+}
+
+.dark .keyboard-help-btn:hover {
+  background: rgba(255, 182, 193, 0.1);
 }
 
 /* Dropdown Container */
