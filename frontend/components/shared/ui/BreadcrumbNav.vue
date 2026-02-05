@@ -37,7 +37,8 @@ const pathNames: Record<string, string> = {
   '/keanu': 'Keanu',
   '/patch-notes': 'Patch Notes',
   '/settings': 'Settings',
-  '/car': 'Car Display'
+  '/car': 'Car Display',
+  '/archive': 'Archive & History'
 }
 
 const categoryMap: Record<string, string> = {
@@ -65,7 +66,8 @@ const categoryMap: Record<string, string> = {
   '/keanu': 'Fun & Games',
   '/patch-notes': 'Tools',
   '/settings': 'Tools',
-  '/car': 'Tools'
+  '/car': 'Tools',
+  '/archive': 'Tools'
 }
 
 const breadcrumbs = computed<BreadcrumbItem[]>(() => {
