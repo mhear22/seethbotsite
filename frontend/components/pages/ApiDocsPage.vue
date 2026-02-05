@@ -59,7 +59,7 @@ onMounted(() => {
 }
 
 .api-docs-container {
-  max-width: 1400px;
+  max-width: 900px;
   margin: 0 auto;
 }
 

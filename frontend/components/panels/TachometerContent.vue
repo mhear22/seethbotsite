@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { computed, watch, ref } from 'vue'
 
 const props = withDefaults(defineProps<{
   value?: number
@@ -14,6 +14,32 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
   fart: []
 }>()
+
+// Fart click counter (persisted to localStorage)
+const FART_COUNT_KEY = 'fart-click-count'
+const fartCount = ref<number>(parseInt(localStorage.getItem(FART_COUNT_KEY) || '0'))
+
+// Update fart count in localStorage and global click count (ticket #53)
+const updateFartCount = async () => {
+  fartCount.value++
+  localStorage.setItem(FART_COUNT_KEY, fartCount.value.toString())
+
+  // Increment global click count on backend
+  try {
+    await fetch('/api/clicks/increment', {
+      method: 'POST'
+    })
+  } catch (error) {
+    console.error('Failed to increment global click count:', error)
+    // Don't show error to user, just log it
+  }
+}
+
+// Call this when fart is clicked
+const onFart = () => {
+  updateFartCount()
+  emit('fart')
+}
 
 // Calculate needle angle based on percentage (0-100%)
 // Formula: (percentage x 270) - 45
@@ -42,10 +68,6 @@ watch(() => props.value, (newValue) => {
     console.log(`  ✅ ${clampedValue}% = ${angle}°`)
   }
 })
-
-const onFart = () => {
-  emit('fart')
-}
 </script>
 
 <template>
@@ -77,6 +99,8 @@ const onFart = () => {
     </div>
 
     <div class="tachometer-title">🍄 MOLD METER</div>
+
+    <div class="fart-count">💨 Farts: {{ fartCount }}</div>
 
     <button class="fart-btn" @click="onFart" :class="{ exploded: exploded }" :disabled="clicked">💨 Fart!</button>
   </div>
@@ -228,6 +252,18 @@ const onFart = () => {
 
 .dark .tachometer-title {
   color: #e2e8f0;
+}
+
+.fart-count {
+  font-size: 14px;
+  font-weight: 600;
+  color: #00b894;
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+.dark .fart-count {
+  color: #00cec9;
 }
 
 .fart-btn {

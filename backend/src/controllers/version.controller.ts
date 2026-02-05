@@ -1,4 +1,6 @@
 import { Router, Request, Response } from 'express';
+import * as fs from 'fs';
+import * as path from 'path';
 
 const router = Router();
 
@@ -8,7 +10,61 @@ interface VersionInfo {
   buildTime: string;
   version: string;
   environment: string;
+  buildCount: number;
 }
+
+// Read build info from file generated during build
+let buildInfoCache: VersionInfo | null = null;
+
+const loadBuildInfo = (): VersionInfo => {
+  if (buildInfoCache) {
+    return buildInfoCache;
+  }
+
+  try {
+    // Try both possible paths: in production (app/backend) and development (dist/backend)
+    const possiblePaths = [
+      path.join(__dirname, '..', 'build-info.json'),  // /app/backend/dist/../build-info.json -> /app/backend/build-info.json
+      path.join(__dirname, '..', '..', 'build-info.json'),  // /app/backend/dist/controllers/../../build-info.json -> /app/backend/build-info.json
+    ];
+    
+    let buildData = null;
+    for (const buildInfoPath of possiblePaths) {
+      try {
+        buildData = fs.readFileSync(buildInfoPath, 'utf-8');
+        break;
+      } catch (err) {
+        // Try next path
+        continue;
+      }
+    }
+    
+    if (!buildData) {
+      throw new Error('Could not find build-info.json in any expected location');
+    }
+    
+    const info = JSON.parse(buildData);
+    buildInfoCache = {
+      gitHash: info.gitHash || 'unknown',
+      gitBranch: info.gitBranch || 'unknown',
+      buildTime: info.buildTime || new Date().toISOString(),
+      version: info.version || '1.0.0',
+      environment: process.env.NODE_ENV || 'production',
+      buildCount: info.buildCount || 1
+    };
+    return buildInfoCache;
+  } catch (error) {
+    console.warn('Could not load build-info.json, using defaults');
+    return {
+      gitHash: process.env.GIT_HASH || 'unknown',
+      gitBranch: process.env.GIT_BRANCH || 'unknown',
+      buildTime: new Date().toISOString(),
+      version: process.env.npm_package_version || '1.0.0',
+      environment: process.env.NODE_ENV || 'production',
+      buildCount: 1
+    };
+  }
+};
 
 /**
  * @openapi
@@ -16,7 +72,7 @@ interface VersionInfo {
  *   get:
  *     tags: [Version]
  *     summary: Get version and build information
- *     description: Returns git hash, branch, build time, and version information
+ *     description: Returns git hash, branch, build time, version, and build count information
  *     responses:
  *       200:
  *         description: Version information retrieved successfully
@@ -46,19 +102,22 @@ interface VersionInfo {
  *                   type: string
  *                   example: "production"
  *                   description: Deployment environment
+ *                 buildCount:
+ *                   type: number
+ *                   example: 42
+ *                   description: Total number of builds
+ *                 currentTimestamp:
+ *                   type: string
+ *                   format: date-time
+ *                   example: "2026-02-03T10:30:00.000Z"
+ *                   description: Current server time
  */
 router.get('/version', (req: Request, res: Response) => {
-  const versionInfo: VersionInfo = {
-    gitHash: process.env.GIT_HASH || 'unknown',
-    gitBranch: process.env.GIT_BRANCH || 'unknown',
-    buildTime: new Date().toISOString(),
-    version: process.env.npm_package_version || '1.0.0',
-    environment: process.env.NODE_ENV || 'production'
-  };
+  const versionInfo = loadBuildInfo();
 
   res.json({
     ...versionInfo,
-    timestamp: new Date().toISOString()
+    currentTimestamp: new Date().toISOString()
   });
 });
 

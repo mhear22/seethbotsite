@@ -300,3 +300,54 @@ export function calculatePortfolioValue(userId: string): number {
 
   return value
 }
+
+// Add a new stock to the market (for GPU mining feature)
+export function addStock(config: {
+  name: string
+  avatar: string
+  baseScore: number
+  basePrice?: number
+}): Stock {
+  const db = getStocksDB();
+
+  // Check if stock already exists
+  const existing = db.prepare('SELECT * FROM stocks WHERE name = ?').get(config.name) as any;
+  if (existing) {
+    // Return existing stock
+    return stocks[config.name]!;
+  }
+
+  const price = config.basePrice || Math.round(config.baseScore / 10);
+  const stock: Stock = {
+    name: config.name,
+    avatar: config.avatar,
+    price,
+    coolnessScore: config.baseScore,
+    shares: 1000, // Total shares available
+    minPrice: Math.max(10, Math.round(price * 0.5)), // Min 50% of base, minimum €10
+    maxPrice: Math.round(price * 5), // Max 5x base price
+    priceHistory: [
+      { timestamp: Date.now(), price }
+    ]
+  };
+
+  // Insert into database
+  db.prepare(`
+    INSERT INTO stocks (name, avatar, price, coolness_score, shares, min_price, max_price, price_history)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    stock.name,
+    stock.avatar,
+    stock.price,
+    stock.coolnessScore,
+    stock.shares,
+    stock.minPrice,
+    stock.maxPrice,
+    JSON.stringify(stock.priceHistory)
+  );
+
+  // Add to in-memory store
+  stocks[config.name] = stock;
+
+  return stock;
+}

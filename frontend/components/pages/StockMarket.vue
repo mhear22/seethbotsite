@@ -338,7 +338,7 @@ body.dark .stock-market {
 }
 
 .market-container {
-  max-width: 1400px;
+  max-width: 900px;
   margin: 0 auto;
   display: grid;
   grid-template-columns: 1fr 400px;

@@ -45,6 +45,14 @@ const clocks: ClockData[] = [
     emoji: '🔔',
     sunrise: 6.5,  // ~6:30 AM
     sunset: 19.0   // ~7:00 PM
+  },
+  {
+    title: 'Chatham Islands',
+    timezone: 'Pacific/Chatham',
+    label: 'Chatham Islands, NZ',
+    emoji: '🏝️',
+    sunrise: 7.0,  // ~7:00 AM
+    sunset: 19.5   // ~7:30 PM
   }
 ]
 
@@ -141,24 +149,47 @@ const getBarOffset = (timezone: string): number => {
   return NOW_POSITION - currentPosition
 }
 
-// Get sunrise position with offset applied
+// Get sunrise position with offset applied (normalized to 0-100)
 const getSunrisePosition = (sunrise: number, timezone: string): number => {
   const basePosition = (sunrise / 24) * 100
   const offset = getBarOffset(timezone)
-  return basePosition + offset
+  let position = basePosition + offset
+  // Normalize to 0-100 range (for wrapping)
+  while (position < 0) position += 100
+  while (position > 100) position -= 100
+  return position
 }
 
-// Get sunset position with offset applied
+// Get sunset position with offset applied (normalized to 0-100)
 const getSunsetPosition = (sunset: number, timezone: string): number => {
   const basePosition = (sunset / 24) * 100
   const offset = getBarOffset(timezone)
-  return basePosition + offset
+  let position = basePosition + offset
+  // Normalize to 0-100 range (for wrapping)
+  while (position < 0) position += 100
+  while (position > 100) position -= 100
+  return position
 }
 
-// Check if current time is during daylight
+// Check if daylight period wraps around the bar
+const daylightWraps = (sunrise: number, sunset: number, timezone: string): boolean => {
+  const sunrisePos = getSunrisePosition(sunrise, timezone)
+  const sunsetPos = getSunsetPosition(sunset, timezone)
+  return sunsetPos < sunrisePos
+}
+
+// Check if current time is during daylight (handles wrapping)
 const isDaylight = (timezone: string, sunrise: number, sunset: number): boolean => {
   const hour = getCurrentHour(timezone)
-  return hour >= sunrise && hour < sunset
+
+  // If sunset is after sunrise (normal case)
+  if (sunset >= sunrise) {
+    return hour >= sunrise && hour < sunset
+  }
+
+  // If sunset is before sunrise (wraps around midnight)
+  // Daylight period is: [sunrise, 24:00] U [00:00, sunset]
+  return hour >= sunrise || hour < sunset
 }
 
 // Format hour to readable time
@@ -353,6 +384,10 @@ const fetchHolidays = async () => {
           <p class="clock-label">{{ clock.label }}</p>
           <p class="clock-digital">{{ formatTime(clock.timezone) }}</p>
           <p class="clock-date">{{ formatDate(clock.timezone) }}</p>
+          <div class="daylight-indicator" :class="{ day: isDaylight(clock.timezone, clock.sunrise, clock.sunset) }">
+            <span class="daylight-icon">{{ isDaylight(clock.timezone, clock.sunrise, clock.sunset) ? '☀️' : '🌙' }}</span>
+            <span class="daylight-text">{{ isDaylight(clock.timezone, clock.sunrise, clock.sunset) ? 'Day' : 'Night' }}</span>
+          </div>
         </div>
       </div>
     </div>
@@ -369,13 +404,35 @@ const fetchHolidays = async () => {
           <div class="time-bar-wrapper">
             <div class="time-bar">
               <!-- Night/Day gradient background -->
+              <!-- Normal daylight bar (no wrap) -->
               <div
+                v-if="!daylightWraps(clock.sunrise, clock.sunset, clock.timezone)"
                 class="time-bar-day"
                 :style="{
                   left: getSunrisePosition(clock.sunrise, clock.timezone) + '%',
                   width: (getSunsetPosition(clock.sunset, clock.timezone) - getSunrisePosition(clock.sunrise, clock.timezone)) + '%'
                 }"
               ></div>
+
+              <!-- Wrapped daylight bar (wraps to left side) -->
+              <template v-else>
+                <!-- First part: from sunrise to 100% -->
+                <div
+                  class="time-bar-day"
+                  :style="{
+                    left: getSunrisePosition(clock.sunrise, clock.timezone) + '%',
+                    width: (100 - getSunrisePosition(clock.sunrise, clock.timezone)) + '%'
+                  }"
+                ></div>
+                <!-- Second part: from 0% to sunset -->
+                <div
+                  class="time-bar-day"
+                  :style="{
+                    left: '0%',
+                    width: getSunsetPosition(clock.sunset, clock.timezone) + '%'
+                  }"
+                ></div>
+              </template>
 
               <!-- Sunrise marker -->
               <div
@@ -576,7 +633,7 @@ const fetchHolidays = async () => {
 }
 
 .clocks-grid {
-  max-width: 1200px;
+  max-width: 800px;
   margin: 0 auto;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -758,6 +815,42 @@ const fetchHolidays = async () => {
   color: #888;
 }
 
+.daylight-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #2d3139 0%, #1a1a2e 100%);
+  border-radius: 20px;
+  border: 2px solid #4a4a5a;
+}
+
+.daylight-indicator.day {
+  background: linear-gradient(135deg, #ffd89b 0%, #87ceeb 100%);
+  border-color: #ffd89b;
+}
+
+.daylight-icon {
+  font-size: 1.3rem;
+}
+
+.daylight-text {
+  font-size: 0.9rem;
+  font-weight: bold;
+  color: #333;
+}
+
+.dark .daylight-text {
+  color: #1a1a2e;
+}
+
+.dark .daylight-indicator:not(.day) .daylight-text {
+  color: #e2e8f0;
+}
+
+
 .footer-note {
   text-align: center;
   margin-top: 60px;
@@ -782,7 +875,7 @@ const fetchHolidays = async () => {
 
 /* Stacked Time Bars Section */
 .time-bars-section {
-  max-width: 900px;
+  max-width: 800px;
   margin: 40px auto 0;
   padding: 25px;
   background: rgba(255, 255, 255, 0.95);
@@ -1007,7 +1100,7 @@ const fetchHolidays = async () => {
 
 /* Holidays Section */
 .holidays-section {
-  max-width: 900px;
+  max-width: 800px;
   margin: 40px auto 0;
   padding: 25px;
   background: rgba(255, 255, 255, 0.95);

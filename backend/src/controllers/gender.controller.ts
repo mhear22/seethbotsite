@@ -3,71 +3,214 @@ import { sanitizeBody, validations, handleValidationErrors } from '../middleware
 
 const router = Router();
 
-// Gender detection database (mock implementation)
-// In production, this would use a proper gender detection library/service
-const genderPatterns: { [key: string]: { gender: string; probability: number } } = {
-  // Female names
-  'mary': { gender: 'female', probability: 0.99 },
-  'patricia': { gender: 'female', probability: 0.99 },
-  'jennifer': { gender: 'female', probability: 0.99 },
-  'linda': { gender: 'female', probability: 0.99 },
-  'elizabeth': { gender: 'female', probability: 0.99 },
-  'barbara': { gender: 'female', probability: 0.99 },
-  'susan': { gender: 'female', probability: 0.99 },
-  'jessica': { gender: 'female', probability: 0.99 },
-  'sarah': { gender: 'female', probability: 0.99 },
-  'karen': { gender: 'female', probability: 0.99 },
-  'lisa': { gender: 'female', probability: 0.99 },
-  'nancy': { gender: 'female', probability: 0.99 },
-  'betty': { gender: 'female', probability: 0.99 },
-  'margaret': { gender: 'female', probability: 0.99 },
-  'sandra': { gender: 'female', probability: 0.99 },
-  'ashley': { gender: 'female', probability: 0.85 },
-  'mika': { gender: 'female', probability: 0.95 },
-  'emily': { gender: 'female', probability: 0.99 },
-  'sophie': { gender: 'female', probability: 0.99 },
-  'emma': { gender: 'female', probability: 0.99 },
+// Mock phrenology properties (baseless/fun attributes)
+const phrenologyProperties = [
+  { name: 'Cranial Bumpiness', value: () => (Math.random() * 10).toFixed(1) + '/10' },
+  { name: 'Astral Compatibility', value: () => ['High', 'Medium', 'Low', 'Cosmic'][Math.floor(Math.random() * 4)] },
+  { name: 'Vibe Alignment', value: () => ['Chaotic Good', 'Lawful Neutral', 'True Neutral', 'Balanced'][Math.floor(Math.random() * 4)] },
+  { name: 'Aura Color', value: () => ['Royal Blue', 'Fuchsia', 'Chartreuse', 'Mint', 'Lavender'][Math.floor(Math.random() * 5)] },
+  { name: 'Destiny Score', value: () => (Math.random() * 100).toFixed(0) + '%' },
+  { name: 'Soul Type', value: () => ['Old', 'Young', 'Ancient', 'Newborn'][Math.floor(Math.random() * 4)] },
+  { name: 'Luck Coefficient', value: () => (Math.random() * 2 - 1).toFixed(2) },
+  { name: 'Zodiac Override', value: () => ['♈', '♉', '♊', '♋', '♌', '♍', '♎', '♏', '♐', '♑', '♒', '♓'][Math.floor(Math.random() * 12)] },
+  { name: 'Fortune Level', value: () => ['Blessed', 'Average', 'Challenged', 'Transcendent'][Math.floor(Math.random() * 4)] },
+  { name: 'Spirit Animal', value: () => ['Phoenix', 'Wolf', 'Otter', 'Owl', 'Dolphin', 'Eagle', 'Bear'][Math.floor(Math.random() * 7)] }
+];
 
-  // Male names
-  'james': { gender: 'male', probability: 0.99 },
-  'john': { gender: 'male', probability: 0.99 },
-  'robert': { gender: 'male', probability: 0.99 },
-  'michael': { gender: 'male', probability: 0.99 },
-  'william': { gender: 'male', probability: 0.99 },
-  'david': { gender: 'male', probability: 0.99 },
-  'richard': { gender: 'male', probability: 0.99 },
-  'joseph': { gender: 'male', probability: 0.99 },
-  'thomas': { gender: 'male', probability: 0.99 },
-  'charles': { gender: 'male', probability: 0.99 },
-  'christopher': { gender: 'male', probability: 0.99 },
-  'daniel': { gender: 'male', probability: 0.99 },
-  'matthew': { gender: 'male', probability: 0.99 },
-  'anthony': { gender: 'male', probability: 0.99 },
-  'mark': { gender: 'male', probability: 0.99 },
-  'donald': { gender: 'male', probability: 0.99 },
-  'steven': { gender: 'male', probability: 0.99 },
-  'paul': { gender: 'male', probability: 0.99 },
-  'andrew': { gender: 'male', probability: 0.99 },
-  'orlando': { gender: 'male', probability: 0.99 },
+/**
+ * Fetch data from genderize.io API
+ */
+async function fetchGender(name: string) {
+  try {
+    const response = await fetch(`https://api.genderize.io?name=${encodeURIComponent(name)}`);
+    const data = await response.json() as any;
+    return {
+      gender: data.gender || 'unknown',
+      probability: data.probability || 0,
+      count: data.count || 0
+    };
+  } catch (error) {
+    console.error('Error fetching gender:', error);
+    return { gender: 'unknown', probability: 0, count: 0 };
+  }
+}
 
-  // Unisex names
-  'pat': { gender: 'unisex', probability: 0.5 },
-  'alex': { gender: 'unisex', probability: 0.5 },
-  'taylor': { gender: 'unisex', probability: 0.5 },
-  'jordan': { gender: 'unisex', probability: 0.5 },
-  'jamie': { gender: 'unisex', probability: 0.5 },
-  'casey': { gender: 'unisex', probability: 0.5 },
-  'riley': { gender: 'unisex', probability: 0.5 },
-  'morgan': { gender: 'unisex', probability: 0.5 }
-};
+/**
+ * Fetch data from agify.io API
+ */
+async function fetchAge(name: string) {
+  try {
+    const response = await fetch(`https://api.agify.io?name=${encodeURIComponent(name)}`);
+    const data = await response.json() as any;
+    return {
+      age: data.age || null,
+      count: data.count || 0
+    };
+  } catch (error) {
+    console.error('Error fetching age:', error);
+    return { age: null, count: 0 };
+  }
+}
+
+/**
+ * Fetch data from nationalize.io API
+ */
+async function fetchNationality(name: string) {
+  try {
+    const response = await fetch(`https://api.nationalize.io?name=${encodeURIComponent(name)}`);
+    const data = await response.json() as any;
+    return {
+      countries: data.country || [],
+      count: data.count || 0
+    };
+  } catch (error) {
+    console.error('Error fetching nationality:', error);
+    return { countries: [], count: 0 };
+  }
+}
+
+/**
+ * Get 2 random phrenology properties
+ */
+function getRandomPhrenologyProperties(count: number = 2) {
+  const shuffled = [...phrenologyProperties].sort(() => 0.5 - Math.random());
+  return shuffled.slice(0, count).map(prop => ({
+    name: prop.name,
+    value: prop.value()
+  }));
+}
+
+/**
+ * @openapi
+ * /api/phrenology:
+ *   post:
+ *     tags: [Phrenology]
+ *     summary: Predict properties from name (phrenology)
+ *     description: Uses genderize.io, agify.io, and nationalize.io APIs to predict gender, age, and nationality from a given name. Also includes 2 baselessly attributed random properties.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - name
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 maxLength: 100
+ *                 example: Emily
+ *     responses:
+ *       200:
+ *         description: Phrenology prediction result
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 name:
+ *                   type: string
+ *                   example: Emily
+ *                 gender:
+ *                   type: string
+ *                   enum: [male, female, unknown]
+ *                   example: female
+ *                 genderProbability:
+ *                   type: number
+ *                   minimum: 0
+ *                   maximum: 1
+ *                   example: 0.99
+ *                 genderCount:
+ *                   type: integer
+ *                   example: 12345
+ *                 age:
+ *                   type: integer
+ *                   nullable: true
+ *                   example: 28
+ *                 ageCount:
+ *                   type: integer
+ *                   example: 5432
+ *                 nationalities:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       country_id:
+ *                         type: string
+ *                         example: US
+ *                       probability:
+ *                         type: number
+ *                         example: 0.5
+ *                 nationalityCount:
+ *                   type: integer
+ *                   example: 321
+ *                 phrenology:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       name:
+ *                         type: string
+ *                         example: Cranial Bumpiness
+ *                       value:
+ *                         type: string
+ *                         example: 7.5/10
+ *       400:
+ *         $ref: '#/components/responses/ValidationError'
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+router.post('/phrenology',
+  validations.detectGender,
+  handleValidationErrors,
+  sanitizeBody(['name']),
+  async (req: Request, res: Response) => {
+    try {
+      const { name } = req.body;
+
+      if (!name || typeof name !== 'string') {
+        return res.status(400).json({ error: 'Name is required' });
+      }
+
+      // Fetch data from all APIs in parallel
+      const [genderData, ageData, nationalityData] = await Promise.all([
+        fetchGender(name),
+        fetchAge(name),
+        fetchNationality(name)
+      ]);
+
+      // Get 2 random phrenology properties
+      const phrenologyProps = getRandomPhrenologyProperties(2);
+
+      res.json({
+        name: name,
+        gender: genderData.gender,
+        genderProbability: genderData.probability,
+        genderCount: genderData.count,
+        age: ageData.age,
+        ageCount: ageData.count,
+        nationalities: nationalityData.countries.slice(0, 3), // Top 3 countries
+        nationalityCount: nationalityData.count,
+        phrenology: phrenologyProps
+      });
+    } catch (error) {
+      console.error('Error in phrenology prediction:', error);
+      res.status(500).json({ error: 'Failed to predict phrenology properties' });
+    }
+  }
+);
 
 /**
  * @openapi
  * /api/gender:
  *   post:
  *     tags: [Gender]
- *     summary: Detect gender from name
- *     description: Attempts to detect gender from a given name. Text is sanitized.
+ *     summary: Detect gender from name (deprecated)
+ *     description: Attempts to detect gender from a given name. This endpoint is deprecated in favor of /api/phrenology.
  *     requestBody:
  *       required: true
  *       content:
@@ -122,7 +265,7 @@ router.post('/gender',
   validations.detectGender,
   handleValidationErrors,
   sanitizeBody(['name']),
-  (req: Request, res: Response) => {
+  async (req: Request, res: Response) => {
     try {
       const { name, country } = req.body;
 
@@ -130,27 +273,15 @@ router.post('/gender',
         return res.status(400).json({ error: 'Name is required' });
       }
 
-      const normalizedName = name.toLowerCase().trim();
+      // Use the new genderize.io API
+      const genderData = await fetchGender(name);
 
-      // Check if name exists in our database
-      if (genderPatterns[normalizedName]) {
-        const result = genderPatterns[normalizedName];
-        res.json({
-          gender: result.gender,
-          probability: result.probability,
-          name: name,
-          country: country || 0
-        });
-      } else {
-        // Name not found - could use heuristics here
-        // For now, return not_found
-        res.json({
-          gender: 'not_found',
-          probability: 0,
-          name: name,
-          country: country || 0
-        });
-      }
+      res.json({
+        gender: genderData.gender === 'unknown' ? 'not_found' : genderData.gender,
+        probability: genderData.probability,
+        name: name,
+        country: country || 0
+      });
     } catch (error) {
       console.error('Error detecting gender:', error);
       res.status(500).json({ error: 'Failed to detect gender' });

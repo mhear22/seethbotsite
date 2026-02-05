@@ -166,7 +166,7 @@ describe('Middleware', () => {
 
   describe('securityHeaders middleware', () => {
     let mockRequest: Partial<Request>;
-    let mockResponse: Partial<Response>;
+    let mockResponse: Partial<Response> & { headers: Record<string, string> };
     let mockNext: NextFunction;
     let nextCalled: boolean;
 
@@ -217,7 +217,7 @@ describe('Middleware', () => {
 
   describe('rateLimiter middleware', () => {
     let mockRequest: Partial<Request>;
-    let mockResponse: Partial<Response>;
+    let mockResponse: Partial<Response> & { headers: Record<string, string> };
     let mockNext: NextFunction;
     let nextCalled: boolean;
     let responseStatus: number;
@@ -230,7 +230,7 @@ describe('Middleware', () => {
         ip: '127.0.0.1',
         socket: {
           remoteAddress: '127.0.0.1',
-        },
+        } as any,
       };
 
       const headers: Record<string, string> = {};

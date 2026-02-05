@@ -19,10 +19,27 @@ watch(() => route.path, (newPath) => {
 // Lifecycle
 onMounted(() => {
   document.body.classList.toggle('dark', appStore.darkMode)
-  setInterval(appStore.createHeart, 500)
+  setInterval(appStore.createHeart, 125)
+
+  // Initialize mold visual effects (Ticket #32) - only if mold mode is enabled (Ticket #112)
+  if (appStore.moldMode) {
+    appStore.initMoldCircles()
+    appStore.startMoldSpawner()
+  }
+
+  // Update mold effects based on current level (Ticket #74)
+  appStore.updateMoldEffects()
+
+  // Watch mold level changes and update effects
+  watch(() => appStore.tachValue, () => {
+    appStore.updateMoldEffects()
+  })
 
   // Load initial rankings from API
   appStore.loadRankings()
+
+  // Preload advice slips for quotes (Ticket #52)
+  appStore.preloadAdvice()
 
   // Riddle answer for Orlando 🍆
   console.log('🩺 Riddle Answer: The surgeon is his mother.')
@@ -40,16 +57,26 @@ onMounted(() => {
 /* Heart animation for background */
 .heart {
   position: fixed;
-  top: -10vh;
+  top: -50px;
   animation: fall linear forwards;
   pointer-events: none;
   z-index: 9999;
-  font-size: 20px;
 }
 
 @keyframes fall {
   to {
-    transform: translateY(110vh) rotate(360deg);
+    transform: translateY(calc(100vh + 100px)) rotate(360deg);
   }
+}
+
+/* Mold visual effects (Ticket #32) */
+.mold-circle {
+  position: fixed;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 9998;
+  opacity: 0.95;
+  filter: blur(2px);
+  transition: width 0.1s linear, height 0.1s linear;
 }
 </style>

@@ -8,11 +8,15 @@ interface TicketFormProps {
   priority?: 'high' | 'medium' | 'low'
   isEditing?: boolean
   loading?: boolean
+  estimatedWaitTimeMinutes?: number | null
+  sampleSize?: number
 }
 
 const props = withDefaults(defineProps<TicketFormProps>(), {
   isEditing: false,
-  loading: false
+  loading: false,
+  estimatedWaitTimeMinutes: null,
+  sampleSize: 0
 })
 
 const emit = defineEmits<{
@@ -65,6 +69,27 @@ const handleKeyDown = (e: KeyboardEvent) => {
     handleSubmit()
   }
 }
+
+// Format wait time for display
+const formatWaitTime = (minutes: number): string => {
+  if (minutes < 60) {
+    return `${Math.round(minutes)} minutes`
+  } else if (minutes < 1440) {
+    const hours = Math.floor(minutes / 60)
+    const mins = Math.round(minutes % 60)
+    if (mins === 0) {
+      return `${hours} hour${hours > 1 ? 's' : ''}`
+    }
+    return `${hours} hour${hours > 1 ? 's' : ''} ${mins} min`
+  } else {
+    const days = Math.floor(minutes / 1440)
+    const hours = Math.round((minutes % 1440) / 60)
+    if (hours === 0) {
+      return `${days} day${days > 1 ? 's' : ''}`
+    }
+    return `${days} day${days > 1 ? 's' : ''} ${hours}h`
+  }
+}
 </script>
 
 <template>
@@ -93,6 +118,32 @@ const handleKeyDown = (e: KeyboardEvent) => {
       ></textarea>
     </div>
 
+    <div class="form-group">
+      <label for="ticket-type">Type</label>
+      <select
+        id="ticket-type"
+        v-model="localType"
+        :disabled="loading"
+      >
+        <option value="feature">✨ Feature Request</option>
+        <option value="bug">🐛 Bug Report</option>
+        <option value="feedback">💬 Feedback</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label for="ticket-priority">Priority</label>
+      <select
+        id="ticket-priority"
+        v-model="localPriority"
+        :disabled="loading"
+      >
+        <option value="low">🟢 Low</option>
+        <option value="medium">🟡 Medium</option>
+        <option value="high">🔴 High</option>
+      </select>
+    </div>
+
     <div class="form-actions">
       <button
         v-if="isEditing"
@@ -114,6 +165,14 @@ const handleKeyDown = (e: KeyboardEvent) => {
 
     <div class="form-hint">
       💡 Tip: Press <kbd>Ctrl</kbd> + <kbd>Enter</kbd> to submit quickly
+    </div>
+
+    <div v-if="!isEditing && estimatedWaitTimeMinutes !== null" class="estimated-wait-time">
+      <span class="wait-icon">⏱️</span>
+      <span class="wait-text">
+        Estimated wait time: <strong>{{ formatWaitTime(estimatedWaitTimeMinutes) }}</strong>
+        <span class="wait-subtext">(based on {{ sampleSize }} completed tickets)</span>
+      </span>
     </div>
   </div>
 </template>
@@ -242,6 +301,38 @@ const handleKeyDown = (e: KeyboardEvent) => {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
+.estimated-wait-time {
+  margin-top: 8px;
+  padding: 12px 14px;
+  background: #f0fff4;
+  border-radius: 8px;
+  border: 1px solid #c6f6d5;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wait-icon {
+  font-size: 18px;
+}
+
+.wait-text {
+  font-size: 14px;
+  color: #22543d;
+  flex: 1;
+}
+
+.wait-text strong {
+  color: #2f855a;
+  font-weight: 600;
+}
+
+.wait-subtext {
+  font-size: 12px;
+  color: #276749;
+  opacity: 0.8;
+}
+
 /* Dark mode */
 .dark .form-group label {
   color: #cbd5e0;
@@ -279,5 +370,22 @@ const handleKeyDown = (e: KeyboardEvent) => {
   background: #1a202c;
   border-color: #4a5568;
   color: #e2e8f0;
+}
+
+.dark .estimated-wait-time {
+  background: #22543d;
+  border-color: #276749;
+}
+
+.dark .wait-text {
+  color: #c6f6d5;
+}
+
+.dark .wait-text strong {
+  color: #68d391;
+}
+
+.dark .wait-subtext {
+  color: #9ae6b4;
 }
 </style>

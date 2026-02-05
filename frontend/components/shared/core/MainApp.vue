@@ -8,8 +8,9 @@ import TachometerContent from '../../panels/TachometerContent.vue'
 import ModalContainer from '../modals/ModalContainer.vue'
 import MikaModal from '../modals/MikaModal.vue'
 import DigitalGoose from '../../panels/DigitalGoose.vue'
+import MiningPanel from '../../panels/MiningPanel.vue'
+import TorchEffect from '../ui/TorchEffect.vue'
 import Router from './Router.vue'
-import AppFooter from './AppFooter.vue'
 import { useAppStore } from '../../../stores/useAppStore'
 
 export interface RankingItem {
@@ -81,7 +82,10 @@ const goToGirlMode = () => {
 <template>
   <div class="main-app" :class="{ dark: appStore.darkMode, 'centered': appStore.currentRoute === 'home' }">
     <Router />
-    <router-view />
+
+    <div class="content-wrapper">
+      <router-view />
+    </div>
 
     <!-- Digital Goose (Independent - not in modal container per ticket requirements) -->
     <DigitalGoose v-if="appStore.panels.digitalGoose" />
@@ -135,6 +139,12 @@ const goToGirlMode = () => {
       class="floating-panel cat-panel"
     />
 
+    <!-- Mining Panel - Shows on stock market route -->
+    <MiningPanel
+      v-if="appStore.panels.mining && appStore.currentRoute === 'stocks'"
+      class="floating-panel mining-panel"
+    />
+
     <!-- Modals -->
     <MikaModal
       v-if="appStore.mikaModalOpen"
@@ -142,8 +152,8 @@ const goToGirlMode = () => {
       @close="appStore.closeMikaModal"
     />
 
-    <!-- Footer -->
-    <AppFooter />
+    <!-- Torch Effect for Darker Mode (Ticket #109) -->
+    <TorchEffect />
   </div>
 
   <!-- Audio elements -->
@@ -173,5 +183,19 @@ const goToGirlMode = () => {
 /* All other pages allow natural scrolling */
 .main-app:not(.centered) {
   display: block;
+}
+
+/* Content wrapper for pages */
+.content-wrapper {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+/* Don't constrain on home page */
+.main-app.centered .content-wrapper {
+  max-width: 100%;
+  padding: 0;
 }
 </style>

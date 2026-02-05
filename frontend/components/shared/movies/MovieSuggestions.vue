@@ -27,6 +27,7 @@ const newMovie = ref({
 })
 const selectedMovies = ref<string[]>([])
 const userId = ref('')
+const validationErrors = ref<Record<string, string>>({})
 
 const loadMovies = async () => {
   try {
@@ -38,8 +39,17 @@ const loadMovies = async () => {
 }
 
 const addMovie = async () => {
-  if (!newMovie.value.title || !newMovie.value.suggestedBy) {
-    showError('Please fill in title and your name')
+  // Clear previous validation errors
+  validationErrors.value = {}
+
+  // Basic client-side validation
+  if (!newMovie.value.title.trim()) {
+    validationErrors.value.title = 'Title is required'
+    return
+  }
+
+  if (!newMovie.value.suggestedBy.trim()) {
+    validationErrors.value.suggestedBy = 'Your name is required'
     return
   }
 
@@ -65,7 +75,23 @@ const addMovie = async () => {
     showSuccess('Movie added successfully!')
     await loadMovies()
   } catch (error) {
-    showError(handleApiError(error, 'Failed to add movie'))
+    const errorMsg = handleApiError(error, 'Failed to add movie')
+
+    // Check if error contains validation details with line breaks (multiple fields)
+    if (errorMsg.includes('\n')) {
+      // Parse multi-field validation errors
+      const errors = errorMsg.split('\n')
+      errors.forEach(err => {
+        const match = err.match(/^([^:]+): (.+)$/)
+        if (match) {
+          const field = match[1].toLowerCase().replace(/\s+/g, '')
+          validationErrors.value[field] = match[2]
+        }
+      })
+    } else {
+      // Single error - show as general alert
+      showError(errorMsg)
+    }
   }
 }
 
@@ -138,7 +164,11 @@ onMounted(() => {
           type="text"
           placeholder="Enter movie title..."
           required
+          :class="{ 'has-error': validationErrors.title }"
         />
+        <div v-if="validationErrors.title" class="field-error">
+          {{ validationErrors.title }}
+        </div>
       </div>
       <div class="form-group">
         <label>Your Name *</label>
@@ -147,7 +177,11 @@ onMounted(() => {
           type="text"
           placeholder="Your name..."
           required
+          :class="{ 'has-error': validationErrors.suggestedBy }"
         />
+        <div v-if="validationErrors.suggestedBy" class="field-error">
+          {{ validationErrors.suggestedBy }}
+        </div>
       </div>
       <div class="form-row">
         <div class="form-group">
@@ -156,7 +190,11 @@ onMounted(() => {
             v-model="newMovie.year"
             type="text"
             placeholder="2024"
+            :class="{ 'has-error': validationErrors.year }"
           />
+          <div v-if="validationErrors.year" class="field-error">
+            {{ validationErrors.year }}
+          </div>
         </div>
         <div class="form-group">
           <label>Genre</label>
@@ -164,7 +202,11 @@ onMounted(() => {
             v-model="newMovie.genre"
             type="text"
             placeholder="Action, Comedy..."
+            :class="{ 'has-error': validationErrors.genre }"
           />
+          <div v-if="validationErrors.genre" class="field-error">
+            {{ validationErrors.genre }}
+          </div>
         </div>
       </div>
       <div class="form-group">
@@ -173,7 +215,23 @@ onMounted(() => {
           v-model="newMovie.notes"
           placeholder="Why this movie? Any details..."
           rows="3"
+          :class="{ 'has-error': validationErrors.notes }"
         ></textarea>
+        <div v-if="validationErrors.notes" class="field-error">
+          {{ validationErrors.notes }}
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Thumbnail URL</label>
+        <input
+          v-model="newMovie.thumbnail"
+          type="text"
+          placeholder="https://example.com/poster.jpg"
+          :class="{ 'has-error': validationErrors.thumbnail }"
+        />
+        <div v-if="validationErrors.thumbnail" class="field-error">
+          {{ validationErrors.thumbnail }}
+        </div>
       </div>
       <div class="form-actions">
         <button class="btn-secondary" @click="showAddForm = false">Cancel</button>
@@ -281,6 +339,33 @@ onMounted(() => {
   border-radius: 6px;
   font-size: 1rem;
   box-sizing: border-box;
+  transition: border-color 0.2s;
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.form-group input.has-error,
+.form-group textarea.has-error {
+  border-color: #e53e3e;
+  background-color: #fff5f5;
+}
+
+.form-group input.has-error:focus,
+.form-group textarea.has-error:focus {
+  border-color: #e53e3e;
+  box-shadow: 0 0 0 3px rgba(229, 62, 62, 0.1);
+}
+
+.field-error {
+  color: #e53e3e;
+  font-size: 0.85rem;
+  margin-top: 4px;
+  font-weight: 500;
 }
 
 .form-group textarea {

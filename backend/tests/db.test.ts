@@ -57,7 +57,7 @@ describe('Database Operations', () => {
     it('should create the clicks table if it does not exist', () => {
       const tables = testDB
         .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='clicks'")
-        .all();
+        .all() as { name: string }[];
 
       expect(tables.length).toBeGreaterThan(0);
       expect(tables[0].name).toBe('clicks');

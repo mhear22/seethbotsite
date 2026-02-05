@@ -1,9 +1,71 @@
 <script setup lang="ts">
+import { ref, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import QuoteSection from '../shared/ui/QuoteSection.vue'
 import { useAppStore } from '../../stores/useAppStore'
 
 const appStore = useAppStore()
+
+// Latest patch note
+interface PatchNote {
+  id: string
+  version: string
+  buildNumber: number
+  buildTime: string
+  title: string
+  changes: {
+    type: 'added' | 'improved' | 'fixed' | 'removed'
+    description: string
+  }[]
+  createdAt: string
+}
+
+const latestPatchNote = ref<PatchNote | null>(null)
+const patchNoteLoading = ref(true)
+
+const loadLatestPatchNote = async () => {
+  try {
+    const response = await fetch('/api/patch-notes/latest')
+    if (response.ok) {
+      latestPatchNote.value = await response.json()
+    }
+  } catch (error) {
+    console.error('Failed to load latest patch note:', error)
+  } finally {
+    patchNoteLoading.value = false
+  }
+}
+
+const formatBuildTime = (timeString: string) => {
+  const date = new Date(timeString)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffMins = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMs / 3600000)
+  const diffDays = Math.floor(diffMs / 86400000)
+
+  if (diffMins < 60) {
+    return `${diffMins} minute${diffMins !== 1 ? 's' : ''} ago`
+  } else if (diffHours < 24) {
+    return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`
+  } else {
+    return `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`
+  }
+}
+
+const getChangeIcon = (type: string) => {
+  const icons: Record<string, string> = {
+    added: '✨',
+    improved: '🚀',
+    fixed: '🔧',
+    removed: '🗑️'
+  }
+  return icons[type] || '•'
+}
+
+onMounted(() => {
+  loadLatestPatchNote()
+})
 
 // Feature categories for the home page
 const featureCategories = [
@@ -25,6 +87,7 @@ const featureCategories = [
     description: 'Connect with rankings and events',
     features: [
       { name: 'Rankings', icon: '👻', path: '/rankings' },
+      { name: 'Stats', icon: '📊', path: '/stats' },
       { name: 'Movie Night', icon: '🎬', path: '/movies' },
       { name: 'Tickets', icon: '🎫', path: '/tickets' }
     ]
@@ -56,6 +119,30 @@ const featureCategories = [
 
     <!-- Quote Section -->
     <QuoteSection :current-quote="appStore.currentQuote" @next-quote="appStore.nextQuote" />
+
+    <!-- Latest Patch Note Section -->
+    <section v-if="latestPatchNote" class="patch-note-section">
+      <div class="patch-note-header">
+        <h2 class="patch-note-title">📝 Latest Update</h2>
+        <RouterLink to="/patch-notes" class="view-all-link">View All →</RouterLink>
+      </div>
+      <div class="patch-note-card">
+        <div class="patch-note-meta">
+          <span class="version-badge">v{{ latestPatchNote.version }}</span>
+          <span class="build-info">Build #{{ latestPatchNote.buildNumber }} • {{ formatBuildTime(latestPatchNote.buildTime) }}</span>
+        </div>
+        <h3 class="patch-note-heading">{{ latestPatchNote.title }}</h3>
+        <ul class="patch-note-changes">
+          <li v-for="(change, index) in latestPatchNote.changes.slice(0, 5)" :key="index" class="change-item">
+            <span class="change-icon">{{ getChangeIcon(change.type) }}</span>
+            <span class="change-text">{{ change.description }}</span>
+          </li>
+        </ul>
+        <p v-if="latestPatchNote.changes.length > 5" class="more-changes">
+          +{{ latestPatchNote.changes.length - 5 }} more change{{ latestPatchNote.changes.length - 5 !== 1 ? 's' : '' }}
+        </p>
+      </div>
+    </section>
 
     <!-- Feature Categories -->
     <section class="features-section">
@@ -102,15 +189,61 @@ const featureCategories = [
 /* Page Container */
 .page.home-page {
   width: 100%;
-  max-width: 1200px;
+  max-width: 900px;
   margin: 0 auto;
   padding: 2rem;
+  /* Animated gradient background - light mode */
+  background: linear-gradient(
+    -45deg,
+    #ffecd2,
+    #fcb69f,
+    #a8edea,
+    #fed6e3,
+    #ffecd2
+  );
+  background-size: 400% 400%;
+  animation: gradientAnimation 15s ease infinite;
+  border-radius: 24px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+/* Animated gradient background - dark mode */
+.dark .page.home-page {
+  background: linear-gradient(
+    -45deg,
+    #1a1a2e,
+    #16213e,
+    #0f3460,
+    #1a1a2e
+  );
+  background-size: 400% 400%;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+@keyframes gradientAnimation {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
 }
 
 /* Welcome Section */
 .welcome-section {
   text-align: center;
   margin-bottom: 3rem;
+  background: rgba(255, 255, 255, 0.6);
+  padding: 2rem;
+  border-radius: 16px;
+  backdrop-filter: blur(8px);
+}
+
+.dark .welcome-section {
+  background: rgba(26, 32, 44, 0.6);
 }
 
 .welcome-title {
@@ -144,17 +277,18 @@ const featureCategories = [
 }
 
 .feature-category {
-  background: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.7);
   border-radius: 16px;
   padding: 2rem;
   margin-bottom: 2rem;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   transition: transform 0.3s ease, box-shadow 0.3s ease;
   animation: fadeInUp 0.6s ease both;
+  backdrop-filter: blur(8px);
 }
 
 .dark .feature-category {
-  background: rgba(40, 44, 52, 0.8);
+  background: rgba(40, 44, 52, 0.7);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
@@ -281,15 +415,16 @@ const featureCategories = [
 
 /* Tips Section */
 .tips-section {
-  background: rgba(255, 182, 193, 0.1);
+  background: rgba(255, 255, 255, 0.6);
   border-radius: 16px;
   padding: 2rem;
   margin-bottom: 3rem;
   animation: fadeInUp 0.6s ease 0.5s both;
+  backdrop-filter: blur(8px);
 }
 
 .dark .tips-section {
-  background: rgba(255, 182, 193, 0.05);
+  background: rgba(26, 32, 44, 0.6);
 }
 
 .tips-title {
@@ -348,6 +483,146 @@ const featureCategories = [
 /* Quote Section Wrapper */
 :deep(.quote-section) {
   margin: 3rem 0;
+}
+
+/* Patch Note Section */
+.patch-note-section {
+  margin: 3rem 0;
+}
+
+.patch-note-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.patch-note-title {
+  font-size: 1.8rem;
+  font-weight: 600;
+  color: #ff91a4;
+  margin: 0;
+}
+
+.dark .patch-note-title {
+  color: #ffb6c1;
+}
+
+.view-all-link {
+  color: #ff91a4;
+  text-decoration: none;
+  font-weight: 500;
+  transition: opacity 0.2s ease;
+}
+
+.dark .view-all-link {
+  color: #ffb6c1;
+}
+
+.view-all-link:hover {
+  opacity: 0.8;
+}
+
+.patch-note-card {
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 16px;
+  padding: 1.5rem;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.dark .patch-note-card {
+  background: rgba(40, 44, 52, 0.7);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.patch-note-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+}
+
+.dark .patch-note-card:hover {
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+}
+
+.patch-note-meta {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.version-badge {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.build-info {
+  color: #666;
+  font-size: 0.8rem;
+}
+
+.dark .build-info {
+  color: #aaa;
+}
+
+.patch-note-heading {
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: #333;
+  margin: 0 0 1rem 0;
+}
+
+.dark .patch-note-heading {
+  color: #eee;
+}
+
+.patch-note-changes {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.change-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  color: #555;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.dark .change-item {
+  color: #ccc;
+}
+
+.change-icon {
+  font-size: 1rem;
+  min-width: 20px;
+}
+
+.change-text {
+  flex: 1;
+}
+
+.more-changes {
+  color: #ff91a4;
+  font-size: 0.85rem;
+  margin: 0.5rem 0 0 0;
+  font-weight: 500;
+}
+
+.dark .more-changes {
+  color: #ffb6c1;
 }
 
 /* Animations */

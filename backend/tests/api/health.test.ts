@@ -126,10 +126,11 @@ describe('Health API', () => {
 
   describe('Health state persistence', () => {
     it('should read initial health state from file', async () => {
-      // Create a fresh test state
+      // Create a fresh test state with consistent timestamps
+      const now = Date.now();
       const testState = {
-        lastChecked: new Date().toISOString(),
-        lastCheckTime: Date.now(),
+        lastChecked: new Date(now).toISOString(),
+        lastCheckTime: now,
       };
       fs.writeFileSync(testHealthStatePath, JSON.stringify(testState, null, 2));
 

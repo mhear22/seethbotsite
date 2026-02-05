@@ -109,12 +109,13 @@ const sortedReleases = computed(() => {
 
 <template>
   <div class="countdown-page" :class="{ dark: appStore.darkMode }">
-    <div class="countdown-header">
-      <h1>🎮 Game Release Countdowns</h1>
-      <p class="subtitle">Time until your most anticipated games!</p>
-    </div>
+    <div class="countdown-container">
+      <div class="countdown-header">
+        <h1>🎮 Game Release Countdowns</h1>
+        <p class="subtitle">Time until your most anticipated games!</p>
+      </div>
 
-    <div class="countdown-grid">
+      <div class="countdown-grid">
       <div v-for="release in sortedReleases" :key="release.game" class="countdown-card" :class="{ released: getTimeUntil(release.date).released }">
         <div class="game-image">
           <img :src="release.image" :alt="release.title" />
@@ -123,7 +124,7 @@ const sortedReleases = computed(() => {
         <div class="game-info">
           <h3 class="game-title">{{ release.title }}</h3>
           <p class="game-description">{{ release.description }}</p>
-          <p class="release-date">Release: {{ release.date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) }}</p>
+          <p class="release-date">Release: {{ release.date.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' }) }}</p>
         </div>
         <div class="countdown-display">
           <div v-if="getTimeUntil(release.date).released" class="released-badge">
@@ -154,14 +155,15 @@ const sortedReleases = computed(() => {
       </div>
     </div>
 
-    <div class="footer-note">
-      <p>📌 <strong>Real Release Dates:</strong></p>
-      <p>New Mewgenics - February 10, 2026</p>
-      <p>Slay The Spire 2 - March 15, 2026</p>
-      <p>Tomodachi Life - April 16, 2026</p>
-      <p>ZAI Key Expiration - May 4, 2026</p>
-      <p>The Heat Death of Universe - 10^100 (a googol) years from now!</p>
-      <p class="credit">🖼 Images by Orlando</p>
+      <div class="footer-note">
+        <p>📌 <strong>Real Release Dates:</strong></p>
+        <p>New Mewgenics - February 10, 2026</p>
+        <p>Slay The Spire 2 - March 15, 2026</p>
+        <p>Tomodachi Life - April 16, 2026</p>
+        <p>ZAI Key Expiration - May 4, 2026</p>
+        <p>The Heat Death of Universe - 10^100 (a googol) years from now!</p>
+        <p class="credit">🖼 Images by Orlando</p>
+      </div>
     </div>
   </div>
 </template>
@@ -169,9 +171,14 @@ const sortedReleases = computed(() => {
 <style scoped>
 .countdown-page {
   min-height: 100vh;
-  padding: 20px;
+  padding: 40px 20px;
   background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
   transition: background 0.5s ease;
+}
+
+.countdown-container {
+  max-width: 1000px;
+  margin: 0 auto;
 }
 
 .countdown-page.dark {
@@ -206,7 +213,7 @@ const sortedReleases = computed(() => {
 }
 
 .countdown-grid {
-  max-width: 1200px;
+  max-width: 900px;
   margin: 0 auto;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
@@ -337,8 +344,9 @@ const sortedReleases = computed(() => {
 .timer {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 15px;
+  gap: 10px;
   overflow: hidden;
+  width: 100%;
 }
 
 .time-unit {
@@ -362,14 +370,14 @@ const sortedReleases = computed(() => {
 }
 
 .time-value {
-  font-size: 2rem;
+  font-size: 1.8rem;
   font-weight: bold;
-  color: #ff6b9d;
-  line-height: 1;
-  font-family: 'Courier New', monospace;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: #ff6b9d;
+  line-height: 1;
+  font-family: 'Courier New', monospace;
   max-width: 100%;
 }
 

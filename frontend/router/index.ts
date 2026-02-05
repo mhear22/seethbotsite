@@ -14,8 +14,18 @@ import MusicPage from '../components/pages/MusicPage.vue'
 import OpinionPage from '../components/pages/OpinionPage.vue'
 import MoldPage from '../components/pages/MoldPage.vue'
 import ClickerPage from '../components/pages/ClickerPage.vue'
+import ShopPage from '../components/pages/ShopPage.vue'
 import ApiDocsPage from '../components/pages/ApiDocsPage.vue'
 import AuthPage from '../components/pages/AuthPage.vue'
+import FishingPage from '../components/pages/FishingPage.vue'
+import StatsPage from '../components/pages/StatsPage.vue'
+import CharacterTinderPage from '../components/pages/CharacterTinderPage.vue'
+import WordCloudPage from '../components/pages/WordCloudPage.vue'
+import KeanuPage from '../components/pages/KeanuPage.vue'
+import PatchNotesPage from '../components/pages/PatchNotesPage.vue'
+import SettingsPage from '../components/pages/SettingsPage.vue'
+import CarPage from '../components/pages/CarPage.vue'
+import FavoritesPage from '../components/pages/FavoritesPage.vue'
 
 const routes = [
   {
@@ -24,13 +34,28 @@ const routes = [
     component: Home
   },
   {
+    path: '/fishing',
+    name: 'fishing',
+    component: FishingPage
+  },
+  {
+    path: '/stats',
+    name: 'stats',
+    component: StatsPage
+  },
+  {
+    path: '/character-tinder',
+    name: 'character-tinder',
+    component: CharacterTinderPage
+  },
+  {
     path: '/girl',
     name: 'girl',
     component: GirlMode
   },
   {
     path: '/gender',
-    name: 'gender',
+    name: 'phrenology',
     component: Gender
   },
   {
@@ -94,6 +119,11 @@ const routes = [
     component: ClickerPage
   },
   {
+    path: '/shop',
+    name: 'shop',
+    component: ShopPage
+  },
+  {
     path: '/api-docs',
     name: 'api-docs',
     component: ApiDocsPage
@@ -102,6 +132,36 @@ const routes = [
     path: '/auth',
     name: 'auth',
     component: AuthPage
+  },
+  {
+    path: '/wordcloud',
+    name: 'wordcloud',
+    component: WordCloudPage
+  },
+  {
+    path: '/keanu',
+    name: 'keanu',
+    component: KeanuPage
+  },
+  {
+    path: '/patch-notes',
+    name: 'patch-notes',
+    component: PatchNotesPage
+  },
+  {
+    path: '/settings',
+    name: 'settings',
+    component: SettingsPage
+  },
+  {
+    path: '/car',
+    name: 'car',
+    component: CarPage
+  },
+  {
+    path: '/favorites',
+    name: 'favorites',
+    component: FavoritesPage
   }
 ]
 

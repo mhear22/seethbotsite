@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import Modal from '../shared/ui/Modal.vue'
 import TicketForm from '../shared/ui/TicketForm.vue'
 
@@ -7,7 +7,7 @@ interface Ticket {
   id: number
   title: string
   description: string
-  status: 'pending' | 'needs-info' | 'completed' | 'declined'
+  status: 'pending' | 'needs-info' | 'completed' | 'declined' | 'unresolved'
   type: 'feature' | 'bug' | 'feedback'
   priority: 'high' | 'medium' | 'low'
   response?: string
@@ -16,22 +16,41 @@ interface Ticket {
   updated_at: string
 }
 
+interface TicketStats {
+  totalTickets: number
+  byStatus: { [key: string]: number }
+  oldestTicket: { id: number; title: string; created_at: string }
+  newestTicket: { id: number; title: string; created_at: string }
+  dates: {
+    oldestCreated: string
+    newestCreated: string
+    oldestCompleted: string | null
+    newestCompleted: string | null
+  } | null
+}
+
 const tickets = ref<Ticket[]>([])
 const loading = ref(false)
 const error = ref<string | null>(null)
+const ticketStats = ref<TicketStats | null>(null)
 const showNewTicketModal = ref(false)
 const ignoreMode = ref(false)
 const lastCollection = ref<string | null>(null)
+const estimatedWaitTime = ref<{ minutes: number | null; sampleSize: number } | null>(null)
 const notification = ref<{ show: boolean; message: string; type: 'success' | 'error' }>({
   show: false,
   message: '',
   type: 'success'
 })
 
-// Filter state
-const filterStatus = ref('all')
-const filterType = ref('all')
-const filterPriority = ref('all')
+// Filter state (default to pending per ticket #151)
+const filterStatus = ref('pending')
+const filterType = ref('')
+const filterPriority = ref('')
+
+// Search state
+const searchQuery = ref('')
+const searchInputRef = ref<HTMLInputElement | null>(null)
 
 // Admin state
 const apiKey = ref<string>('')
@@ -41,6 +60,13 @@ const showForm = ref(false)
 const closeForm = ref({
   status: 'completed' as 'completed' | 'declined',
   response: ''
+})
+
+// Ticket completion confirmation state
+const confirmingTicket = ref<Ticket | null>(null)
+const showConfirmModal = ref(false)
+const unresolvedForm = ref({
+  reason: ''
 })
 
 // User/Creator state
@@ -69,33 +95,32 @@ const statusColors = {
   pending: 'bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900 dark:text-yellow-200 dark:border-yellow-700',
   'needs-info': 'bg-orange-100 text-orange-800 border-orange-300 dark:bg-orange-900 dark:text-orange-200 dark:border-orange-700',
   completed: 'bg-green-100 text-green-800 border-green-300 dark:bg-green-900 dark:text-green-200 dark:border-green-700',
-  declined: 'bg-red-100 text-red-800 border-red-300 dark:bg-red-900 dark:text-red-200 dark:border-red-700'
+  declined: 'bg-red-100 text-red-800 border-red-300 dark:bg-red-900 dark:text-red-200 dark:border-red-700',
+  unresolved: 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-900 dark:text-purple-200 dark:border-purple-700'
 }
 
 const statusLabels = {
   pending: '⏳ Pending',
   'needs-info': '🔄 In Progress',
   completed: '✅ Complete',
-  declined: '❌ Declined'
+  declined: '❌ Declined',
+  unresolved: '⚠️ Unresolved'
 }
 
-// Filter options
+// Filter options (no "all" option per ticket #151)
 const statusOptions = [
-  { value: 'all', label: 'All' },
   { value: 'pending', label: '⏳ Pending' },
   { value: 'in-progress', label: '🔄 In Progress' },
   { value: 'completed', label: '✅ Complete' }
 ]
 
 const typeOptions = [
-  { value: 'all', label: 'All' },
   { value: 'feature', label: '✨ Feature' },
   { value: 'bug', label: '🐛 Bug' },
   { value: 'feedback', label: '💬 Feedback' }
 ]
 
 const priorityOptions = [
-  { value: 'all', label: 'All' },
   { value: 'high', label: '🔴 High' },
   { value: 'medium', label: '🟡 Medium' },
   { value: 'low', label: '🟢 Low' }
@@ -105,20 +130,38 @@ const priorityOptions = [
 const filteredTickets = computed(() => {
   let result = tickets.value
 
-  if (filterStatus.value !== 'all') {
+  if (filterStatus.value) {
     const statusFilter = filterStatus.value === 'in-progress' ? 'needs-info' : filterStatus.value
     result = result.filter(t => t.status === statusFilter)
   }
 
-  if (filterType.value !== 'all') {
+  if (filterType.value) {
     result = result.filter(t => t.type === filterType.value)
   }
 
-  if (filterPriority.value !== 'all') {
+  if (filterPriority.value) {
     result = result.filter(t => t.priority === filterPriority.value)
   }
 
+  // Search filter
+  if (searchQuery.value.trim()) {
+    const query = searchQuery.value.toLowerCase().trim()
+    result = result.filter(t => 
+      t.title.toLowerCase().includes(query) || 
+      t.description.toLowerCase().includes(query)
+    )
+  }
+
   return result
+})
+
+// Kanban columns
+const kanbanColumns = computed(() => {
+  return {
+    pending: tickets.value.filter(t => t.status === 'pending'),
+    inProgress: tickets.value.filter(t => t.status === 'needs-info'),
+    completed: tickets.value.filter(t => t.status === 'completed')
+  }
 })
 
 // Generate or get creator ID
@@ -142,13 +185,9 @@ const loadTickets = async () => {
   loading.value = true
   error.value = null
   try {
-    const params = new URLSearchParams()
-    if (filterStatus.value !== 'all') {
-      const statusParam = filterStatus.value === 'in-progress' ? 'needs-info' : filterStatus.value
-      params.append('status', statusParam)
-    }
-
-    const response = await fetch(`/api/tickets?${params.toString()}`)
+    // Always load all tickets and filter client-side for consistency
+    // Sort by updated_at descending to show most recent tickets first
+    const response = await fetch('/api/tickets?sortBy=updated_at')
     if (!response.ok) throw new Error('Failed to load tickets')
     const data = await response.json()
     tickets.value = data.tickets || []
@@ -159,10 +198,21 @@ const loadTickets = async () => {
   }
 }
 
+// Load ticket statistics
+const loadTicketStats = async () => {
+  try {
+    const response = await fetch('/api/tickets/stats')
+    if (!response.ok) throw new Error('Failed to load ticket stats')
+    const stats = await response.json()
+    ticketStats.value = stats
+  } catch (err) {
+    console.warn('Failed to load ticket stats:', err)
+  }
+}
+
 // Watch for filter changes and reload tickets
-watch([filterStatus], () => {
-  loadTickets()
-})
+// Note: We don't need to reload on filter changes anymore since we filter client-side
+// This is handled by the filteredTickets computed property
 
 // Show notification
 const showNotification = (message: string, type: 'success' | 'error' = 'success') => {
@@ -197,6 +247,8 @@ const submitTicket = async () => {
       body: JSON.stringify({
         title: newTicket.value.title.trim(),
         description: newTicket.value.description.trim() || null,
+        type: newTicket.value.type,
+        priority: newTicket.value.priority,
         creator_id: creatorId.value
       })
     })
@@ -267,7 +319,9 @@ const saveEdit = async () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         title: editForm.value.title.trim(),
-        description: editForm.value.description.trim() || null
+        description: editForm.value.description.trim() || null,
+        type: editForm.value.type,
+        priority: editForm.value.priority
       })
     })
 
@@ -300,7 +354,7 @@ const saveEdit = async () => {
 
 const formatDate = (dateString: string) => {
   const date = new Date(dateString)
-  return date.toLocaleDateString('en-AU', {
+  return date.toLocaleDateString(undefined, {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
@@ -359,6 +413,24 @@ const loadLastCollection = async () => {
     }
   } catch (err) {
     console.warn('Failed to load last collection from backend:', err)
+  }
+}
+
+// Load estimated wait time
+const loadEstimatedWaitTime = async () => {
+  try {
+    const response = await fetch('/api/tickets/estimated-wait-time')
+    if (response.ok) {
+      const data = await response.json()
+      if (data.estimatedWaitTimeMinutes !== null) {
+        estimatedWaitTime.value = {
+          minutes: data.estimatedWaitTimeMinutes,
+          sampleSize: data.sampleSize
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to load estimated wait time from backend:', err)
   }
 }
 
@@ -446,6 +518,119 @@ const closeTicket = async () => {
   }
 }
 
+// Start confirming a ticket
+const startConfirmTicket = (ticket: Ticket) => {
+  confirmingTicket.value = ticket
+  showConfirmModal.value = true
+}
+
+// Cancel confirming ticket
+const cancelConfirmTicket = () => {
+  confirmingTicket.value = null
+  showConfirmModal.value = false
+  unresolvedForm.value = {
+    reason: ''
+  }
+}
+
+// Confirm ticket completion
+const confirmTicket = async () => {
+  if (!confirmingTicket.value) return
+  if (!apiKey.value.trim()) {
+    error.value = 'API key is required to confirm tickets'
+    return
+  }
+
+  loading.value = true
+  error.value = null
+  try {
+    const response = await fetch(`/api/tickets/${confirmingTicket.value.id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-Key': apiKey.value.trim()
+      },
+      body: JSON.stringify({
+        status: 'completed',
+        response: confirmingTicket.value.response || (unresolvedForm.value.reason ? `Confirmed: ${unresolvedForm.value.reason}` : 'Confirmed by human reviewer')
+      })
+    })
+
+    if (!response.ok) {
+      const data = await response.json()
+      throw new Error(data.error || 'Failed to confirm ticket')
+    }
+
+    // Reset form
+    confirmingTicket.value = null
+    showConfirmModal.value = false
+    unresolvedForm.value = {
+      reason: ''
+    }
+
+    // Show success notification
+    showNotification('Ticket confirmed successfully!')
+
+    // Reload tickets
+    await loadTickets()
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : 'Failed to confirm ticket'
+  } finally {
+    loading.value = false
+  }
+}
+
+// Mark ticket as unresolved
+const markUnresolved = async () => {
+  if (!confirmingTicket.value) return
+  if (!unresolvedForm.value.reason.trim()) {
+    error.value = 'Reason is required to mark ticket as unresolved'
+    return
+  }
+  if (!apiKey.value.trim()) {
+    error.value = 'API key is required'
+    return
+  }
+
+  loading.value = true
+  error.value = null
+  try {
+    const response = await fetch(`/api/tickets/${confirmingTicket.value.id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-Key': apiKey.value.trim()
+      },
+      body: JSON.stringify({
+        status: 'unresolved',
+        response: `Unresolved: ${unresolvedForm.value.reason}`
+      })
+    })
+
+    if (!response.ok) {
+      const data = await response.json()
+      throw new Error(data.error || 'Failed to mark ticket as unresolved')
+    }
+
+    // Reset form
+    confirmingTicket.value = null
+    showConfirmModal.value = false
+    unresolvedForm.value = {
+      reason: ''
+    }
+
+    // Show success notification
+    showNotification('Ticket marked as unresolved!')
+
+    // Reload tickets
+    await loadTickets()
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : 'Failed to mark ticket as unresolved'
+  } finally {
+    loading.value = false
+  }
+}
+
 // Close own ticket (user)
 const closeOwnTicket = async (ticket: Ticket) => {
   loading.value = true
@@ -517,8 +702,50 @@ onMounted(() => {
   creatorId.value = getOrCreateCreatorId()
   loadIgnoreMode()
   loadLastCollection()
+  loadEstimatedWaitTime()
   loadApiKey()
   loadTickets()
+  loadTicketStats()
+
+  // Keyboard shortcuts
+  const handleKeyDown = (e: KeyboardEvent) => {
+    // Don't trigger if user is typing in an input/textarea
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+      return
+    }
+
+    // 'n' or 'c' to create new ticket
+    if ((e.key === 'n' || e.key === 'c' || e.key === 'N' || e.key === 'C') && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault()
+      showNewTicketModal.value = true
+    }
+
+    // '/' to focus search
+    if (e.key === '/' && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault()
+      searchInputRef.value?.focus()
+    }
+  }
+
+  window.addEventListener('keydown', handleKeyDown)
+})
+
+// Cleanup keyboard shortcuts
+onUnmounted(() => {
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+      return
+    }
+    if ((e.key === 'n' || e.key === 'c' || e.key === 'N' || e.key === 'C') && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault()
+      showNewTicketModal.value = true
+    }
+    if (e.key === '/' && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault()
+      searchInputRef.value?.focus()
+    }
+  }
+  window.removeEventListener('keydown', handleKeyDown)
 })
 </script>
 
@@ -529,6 +756,10 @@ onMounted(() => {
       <div class="tickets-header">
         <h1>🎫 Tickets & Feedback</h1>
         <p>Submit requests, report bugs, or share your ideas</p>
+        <div class="keyboard-hints">
+          <span class="hint"><kbd>N</kbd> New ticket</span>
+          <span class="hint"><kbd>/</kbd> Search</span>
+        </div>
 
         <!-- Last Collection Display -->
         <div v-if="lastCollection" class="last-collection">
@@ -552,6 +783,97 @@ onMounted(() => {
         </div>
       </div>
 
+      <!-- Ticket Statistics -->
+      <div v-if="ticketStats" class="ticket-stats-section">
+        <div class="stats-header">
+          <span class="stats-icon">📊</span>
+          <h3 class="stats-title">Ticket Statistics</h3>
+        </div>
+        <div class="stats-grid">
+          <!-- Total Tickets Card -->
+          <div class="stat-card stat-primary">
+            <div class="stat-icon stat-icon-primary">🎫</div>
+            <div class="stat-content">
+              <span class="stat-label">Total Tickets</span>
+              <span class="stat-value">{{ ticketStats.totalTickets }}</span>
+            </div>
+          </div>
+
+          <!-- Status Breakdown Card -->
+          <div class="stat-card stat-status">
+            <div class="stat-icon stat-icon-status">📋</div>
+            <div class="stat-content">
+              <span class="stat-label">By Status</span>
+              <div class="status-breakdown">
+                <span :class="['status-badge', statusColors.pending]">
+                  ⏳ {{ ticketStats.byStatus.pending || 0 }}
+                </span>
+                <span :class="['status-badge', statusColors['needs-info']]">
+                  🔄 {{ ticketStats.byStatus['needs-info'] || 0 }}
+                </span>
+                <span :class="['status-badge', statusColors.completed]">
+                  ✅ {{ ticketStats.byStatus.completed || 0 }}
+                </span>
+                <span :class="['status-badge', statusColors.declined]">
+                  ❌ {{ ticketStats.byStatus.declined || 0 }}
+                </span>
+                <span v-if="ticketStats.byStatus.unresolved" :class="['status-badge', statusColors.unresolved]">
+                  ⚠️ {{ ticketStats.byStatus.unresolved }}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Oldest Ticket Card -->
+          <div class="stat-card">
+            <div class="stat-icon">📅</div>
+            <div class="stat-content">
+              <span class="stat-label">Oldest Ticket</span>
+              <div class="ticket-info">
+                <span class="ticket-id">#{{ ticketStats.oldestTicket.id }}</span>
+                <span class="ticket-title">{{ ticketStats.oldestTicket.title }}</span>
+              </div>
+              <span class="ticket-date">{{ formatDate(ticketStats.oldestTicket.created_at) }}</span>
+            </div>
+          </div>
+
+          <!-- Newest Ticket Card -->
+          <div class="stat-card">
+            <div class="stat-icon">✨</div>
+            <div class="stat-content">
+              <span class="stat-label">Newest Ticket</span>
+              <div class="ticket-info">
+                <span class="ticket-id">#{{ ticketStats.newestTicket.id }}</span>
+                <span class="ticket-title">{{ ticketStats.newestTicket.title }}</span>
+              </div>
+              <span class="ticket-date">{{ formatDate(ticketStats.newestTicket.created_at) }}</span>
+            </div>
+          </div>
+
+          <!-- Date Range Card -->
+          <div class="stat-card">
+            <div class="stat-icon">📈</div>
+            <div class="stat-content">
+              <span class="stat-label">Date Range</span>
+              <div class="date-range">
+                <div class="date-row">
+                  <span class="date-label">Created:</span>
+                  <span class="date-value">{{ formatDate(ticketStats.dates.oldestCreated) }}</span>
+                  <span class="date-separator">→</span>
+                  <span class="date-value">{{ formatDate(ticketStats.dates.newestCreated) }}</span>
+                </div>
+                <div v-if="ticketStats.dates.oldestCompleted" class="date-row completed-date">
+                  <span class="date-label">Completed:</span>
+                  <span class="date-value">{{ formatDate(ticketStats.dates.oldestCompleted) }}</span>
+                  <span class="date-separator">→</span>
+                  <span class="date-value">{{ formatDate(ticketStats.dates.newestCompleted) }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Notification Toast -->
       <div v-if="notification.show" class="notification" :class="`notification-${notification.type}`">
         <span class="notification-icon">{{ notification.type === 'success' ? '✅' : '❌' }}</span>
@@ -566,37 +888,68 @@ onMounted(() => {
         + New Ticket
       </button>
 
-      <!-- Filter Chips -->
+      <!-- Filter Chips (buttons instead of dropdown per ticket #151) -->
       <div class="filter-section">
-        <div class="filter-group">
-          <span class="filter-label">Status:</span>
-          <div class="filter-chips">
-            <button
-              v-for="option in statusOptions"
-              :key="option.value"
-              @click="filterStatus = option.value"
-              class="filter-chip"
-              :class="{ active: filterStatus === option.value }"
-            >
-              {{ option.label }}
-            </button>
-          </div>
+        <div class="search-box">
+          <input
+            ref="searchInputRef"
+            v-model="searchQuery"
+            type="text"
+            placeholder="🔍 Search tickets... (press / to focus)"
+            class="search-input"
+          />
+          <button
+            v-if="searchQuery"
+            @click="searchQuery = ''"
+            class="search-clear"
+            title="Clear search"
+          >
+            ✕
+          </button>
         </div>
-        <!-- Type and Priority filters removed per ticket #65 -->
+        <div class="filter-group-title">Status</div>
+        <div class="filter-chips">
+          <button
+            v-for="option in statusOptions"
+            :key="option.value"
+            @click="filterStatus = option.value"
+            :class="['filter-chip', { active: filterStatus === option.value }]"
+          >
+            {{ option.label }}
+          </button>
+        </div>
+        <div class="filter-group-title">Type</div>
+        <div class="filter-chips">
+          <button
+            v-for="option in typeOptions"
+            :key="option.value"
+            @click="filterType = filterType === option.value ? '' : option.value"
+            :class="['filter-chip', { active: filterType === option.value }]"
+          >
+            {{ option.label }}
+          </button>
+        </div>
+        <div class="filter-group-title">Priority</div>
+        <div class="filter-chips">
+          <button
+            v-for="option in priorityOptions"
+            :key="option.value"
+            @click="filterPriority = filterPriority === option.value ? '' : option.value"
+            :class="['filter-chip', { active: filterPriority === option.value }]"
+          >
+            {{ option.label }}
+          </button>
+        </div>
       </div>
 
-      <!-- Tickets List -->
-      <div class="tickets-list">
+      <!-- Filtered Tickets List -->
+      <div  class="tickets-list">
         <div v-if="loading" class="loading-state">
-          Loading tickets...
+          <div class="loading-spinner"></div>
+          <span>Loading tickets...</span>
         </div>
-        <div v-else-if="tickets.length === 0" class="empty-state">
-          <template v-if="filterStatus === 'all'">
-            No tickets yet. Be the first to share an idea! 💡
-          </template>
-          <template v-else>
-            No tickets match your filters. Try adjusting them to see more results.
-          </template>
+        <div v-else-if="filteredTickets.length === 0" class="empty-state">
+          No tickets match your filters.
         </div>
         <div
           v-for="ticket in filteredTickets"
@@ -616,10 +969,11 @@ onMounted(() => {
             <span class="ticket-date">Created: {{ formatDate(ticket.created_at) }}</span>
             <div class="ticket-actions">
               <button
-                v-if="ticket.status === 'needs-info'"
+                v-if="ticket.status === 'pending'"
                 @click="startEdit(ticket)"
                 class="edit-ticket-btn"
                 :disabled="loading"
+                title="Edit ticket"
               >
                 ✏️ Edit
               </button>
@@ -628,14 +982,16 @@ onMounted(() => {
                 @click="closeOwnTicket(ticket)"
                 class="close-ticket-btn"
                 :disabled="loading"
+                title="Mark as completed"
               >
                 ✅ Close
               </button>
               <button
-                v-if="isOwnTicket(ticket) && (ticket.status === 'pending' || ticket.status === 'needs-info')"
+                v-if="isOwnTicket(ticket) && ticket.status === 'pending'"
                 @click="deleteOwnTicket(ticket)"
                 class="delete-ticket-btn"
                 :disabled="loading"
+                title="Delete ticket"
               >
                 🗑️ Delete
               </button>
@@ -660,6 +1016,8 @@ onMounted(() => {
         v-model:description="newTicket.description"
         :is-editing="false"
         :loading="loading"
+        :estimated-wait-time-minutes="estimatedWaitTime?.minutes ?? null"
+        :sample-size="estimatedWaitTime?.sampleSize ?? 0"
         @submit="submitTicket"
         @cancel="showNewTicketModal = false"
       />
@@ -680,13 +1038,72 @@ onMounted(() => {
         @cancel="cancelEdit"
       />
     </Modal>
+
+    <!-- Confirm Ticket Modal -->
+    <Modal
+      :is-open="showConfirmModal"
+      :title="confirmingTicket ? `Review Ticket #${confirmingTicket.id}` : 'Review Ticket'"
+      @close="cancelConfirmTicket"
+    >
+      <div v-if="confirmingTicket" class="confirm-modal-content">
+        <div class="ticket-preview">
+          <h3>{{ confirmingTicket.title }}</h3>
+          <p>{{ confirmingTicket.description }}</p>
+          <div v-if="confirmingTicket.response" class="existing-response">
+            <strong>Current Response:</strong>
+            <p>{{ confirmingTicket.response }}</p>
+          </div>
+        </div>
+
+        <div class="confirm-actions">
+          <div class="api-key-input">
+            <label for="confirm-api-key">API Key (required):</label>
+            <input
+              id="confirm-api-key"
+              v-model="apiKey"
+              type="password"
+              placeholder="Enter admin API key"
+              class="input-field"
+            />
+          </div>
+
+          <div class="action-buttons">
+            <button
+              @click="confirmTicket"
+              class="btn-confirm"
+              :disabled="loading || !apiKey.trim()"
+            >
+              ✅ Confirm Completion
+            </button>
+
+            <div class="unresolved-section">
+              <label for="unresolved-reason">Or mark as unresolved:</label>
+              <textarea
+                id="unresolved-reason"
+                v-model="unresolvedForm.reason"
+                placeholder="Explain why this ticket is not properly completed..."
+                class="input-field textarea-field"
+                rows="3"
+              ></textarea>
+              <button
+                @click="markUnresolved"
+                class="btn-unresolved"
+                :disabled="loading || !unresolvedForm.reason.trim() || !apiKey.trim()"
+              >
+                ⚠️ Mark as Unresolved
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Modal>
   </div>
 </template>
 
 <style scoped>
 .tickets-page {
   min-height: 100vh;
-  padding: 100px 20px 40px;
+  padding: 100px 20px 85px; /* Add bottom padding for mobile-bottom-nav (70px + 15px) */
 }
 
 .tickets-container {
@@ -702,12 +1119,264 @@ onMounted(() => {
 .tickets-header h1 {
   font-size: 2.5rem;
   margin: 0 0 10px 0;
-  color: #2d3748;
 }
 
 .tickets-header p {
   color: #718096;
   margin: 0;
+}
+
+/* Ticket Statistics Section */
+.ticket-stats-section {
+  background: rgba(255, 255, 255, 0.95);
+  padding: 24px;
+  border-radius: 16px;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  border: 1px solid #e2e8f0;
+}
+
+.stats-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.stats-icon {
+  font-size: 1.75rem;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+}
+
+.stats-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #2d3748;
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.stat-card {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  border: 1px solid #e2e8f0;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  transition: all 0.2s ease;
+}
+
+.stat-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.stat-card.stat-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+}
+
+.stat-card.stat-status {
+  background: #f7fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.stat-icon {
+  font-size: 2rem;
+  flex-shrink: 0;
+  line-height: 1;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+}
+
+.stat-icon-primary,
+.stat-icon-status {
+  filter: brightness(1.3);
+}
+
+.stat-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.stat-label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #718096;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.stat-primary .stat-label {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.stat-value {
+  display: block;
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: #2d3748;
+  line-height: 1;
+}
+
+.stat-primary .stat-value {
+  color: white;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.status-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.status-breakdown .status-badge {
+  padding: 4px 10px;
+  border-radius: 16px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ticket-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.ticket-id {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #718096;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ticket-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #2d3748;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.ticket-date {
+  font-size: 0.8rem;
+  color: #718096;
+  font-weight: 500;
+}
+
+.date-range {
+  font-size: 0.85rem;
+  line-height: 1.7;
+}
+
+.date-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.date-label {
+  font-weight: 600;
+  color: #718096;
+}
+
+.date-value {
+  font-weight: 600;
+  color: #2d3748;
+}
+
+.date-separator {
+  color: #cbd5e0;
+  font-weight: 500;
+}
+
+.completed-date {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed #e2e8f0;
+}
+
+/* Dark mode ticket stats */
+.dark .ticket-stats-section {
+  background: rgba(40, 44, 52, 0.95);
+  border-color: #4a5568;
+}
+
+.dark .stats-header .stats-title {
+  color: #e2e8f0;
+}
+
+.dark .stat-card {
+  background: #2d3748;
+  border-color: #4a5568;
+}
+
+.dark .stat-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+
+.dark .stat-card.stat-primary {
+  background: linear-gradient(135deg, #805ad5 0%, #6b46c1 100%);
+  border: none;
+}
+
+.dark .stat-card.stat-status {
+  background: #1a202c;
+  border-color: #4a5568;
+}
+
+.dark .stat-label {
+  color: #a0aec0;
+}
+
+.dark .stat-primary .stat-label {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.dark .stat-value {
+  color: #e2e8f0;
+}
+
+.dark .stat-primary .stat-value {
+  color: white;
+}
+
+.dark .ticket-id {
+  color: #a0aec0;
+}
+
+.dark .ticket-title,
+.dark .date-value {
+  color: #cbd5e0;
+}
+
+.dark .ticket-date,
+.dark .date-label {
+  color: #718096;
+}
+
+.dark .date-separator {
+  color: #4a5568;
+}
+
+.dark .completed-date {
+  border-top-color: #4a5568;
 }
 
 .ignore-mode-toggle {
@@ -880,12 +1549,17 @@ onMounted(() => {
 }
 
 .filter-section {
-  background: white;
+  background: rgba(255, 255, 255, 0.95);
   padding: 20px;
   border-radius: 12px;
   margin-bottom: 20px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
   border: 1px solid #e2e8f0;
+}
+
+.dark .filter-section {
+  background: rgba(40, 44, 52, 0.95);
+  border-color: #4a5568;
 }
 
 .filter-group {
@@ -897,41 +1571,53 @@ onMounted(() => {
 }
 
 .filter-label {
-  display: block;
+  display: inline-block;
   font-size: 14px;
   font-weight: 600;
   color: #4a5568;
-  margin-bottom: 8px;
+  margin-right: 12px;
 }
 
-.filter-chips {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.filter-chip {
-  padding: 8px 16px;
+.filter-dropdown {
+  padding: 8px 12px;
   border: 2px solid #e2e8f0;
   background: white;
-  border-radius: 20px;
-  font-size: 13px;
+  border-radius: 8px;
+  font-size: 14px;
   font-weight: 500;
   color: #4a5568;
   cursor: pointer;
   transition: all 0.2s;
+  min-width: 150px;
 }
 
-.filter-chip:hover {
+.filter-dropdown:hover {
   border-color: #4299e1;
-  color: #2b6cb0;
-  transform: translateY(-1px);
 }
 
-.filter-chip.active {
-  background: #4299e1;
+.filter-dropdown:focus {
+  outline: none;
   border-color: #4299e1;
-  color: white;
+  box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
+}
+
+.dark .filter-dropdown {
+  background: #2d3748;
+  border-color: #4a5568;
+  color: #e2e8f0;
+}
+
+.dark .filter-dropdown:hover {
+  border-color: #4299e1;
+}
+
+.dark .filter-dropdown:focus {
+  border-color: #4299e1;
+  box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.2);
+}
+
+.dark .filter-label {
+  color: #cbd5e0;
 }
 
 .new-ticket-btn {
@@ -959,12 +1645,121 @@ onMounted(() => {
   gap: 20px;
 }
 
+.kanban-board {
+  width: 100%;
+}
+
+.kanban-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+  width: 100%;
+}
+
+.kanban-column {
+  display: flex;
+  flex-direction: column;
+  background: #f7fafc;
+  border-radius: 12px;
+  padding: 16px;
+  min-height: 400px;
+  max-height: 800px;
+  overflow-y: auto;
+}
+
+.column-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.column-header h3 {
+  margin: 0;
+  font-size: 1.2rem;
+  color: #2d3748;
+}
+
+.column-count {
+  background: #e2e8f0;
+  color: #4a5568;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.column-tickets {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.empty-column {
+  text-align: center;
+  padding: 40px 20px;
+  color: #a0aec0;
+  font-style: italic;
+}
+
 .loading-state,
 .empty-state {
   text-align: center;
   padding: 60px 20px;
   color: #718096;
   font-size: 18px;
+}
+
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.loading-spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid #e2e8f0;
+  border-top-color: #4299e1;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.keyboard-hints {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #718096;
+}
+
+.hint kbd {
+  background: white;
+  border: 1px solid #cbd5e0;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  color: #2d3748;
 }
 
 .ticket-card {
@@ -1161,16 +1956,14 @@ onMounted(() => {
   background: #1a202c;
 }
 
-.dark .tickets-header h1 {
-  color: #e2e8f0;
-}
+/* Dark mode h1 uses global gradient style */
 
 .dark .tickets-header p {
   color: #a0aec0;
 }
 
 .dark .filter-section {
-  background: rgba(40, 44, 52, 0.95);
+  background: #2d3748;
   border-color: #4a5568;
 }
 
@@ -1220,24 +2013,354 @@ onMounted(() => {
   color: #90cdf4;
 }
 
-.dark .filter-label {
-  color: #cbd5e0;
+/* Search box styles */
+.search-box {
+  position: relative;
+  margin-bottom: 16px;
 }
 
-.dark .filter-chip {
-  background: rgba(45, 55, 72, 0.95);
+.search-input {
+  width: 100%;
+  padding: 10px 40px 10px 16px;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s;
+  background: white;
+  color: #4a5568;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #4299e1;
+  box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
+}
+
+.search-input::placeholder {
+  color: #a0aec0;
+}
+
+.search-clear {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: #48bb78;
+  border: none;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  color: white;
+}
+
+.search-clear:hover {
+  background: #38a169;
+  transform: translateY(-50%) scale(1.1);
+}
+
+.dark .search-input {
+  background: #2d3748;
   border-color: #4a5568;
+  color: #e2e8f0;
+  font-weight: 500;
+}
+
+.dark .search-input:focus {
+  border-color: #4299e1;
+  box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.2);
+}
+
+.dark .search-input::placeholder {
+  color: #718096;
+}
+
+.dark .search-clear {
+  background: #38a169;
+  color: white;
+}
+
+.dark .search-clear:hover {
+  background: #48bb78;
+}
+
+/* Filter group title styles */
+.filter-group-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #718096;
+  margin: 16px 0 8px 0;
+}
+
+.filter-group-title:first-of-type {
+  margin-top: 0;
+}
+
+.dark .filter-group-title {
+  color: #a0aec0;
+}
+
+/* Dark mode kanban styles */
+.dark .kanban-column {
+  background: #2d3748;
+}
+
+.dark .column-header {
+  border-bottom-color: #4a5568;
+}
+
+.dark .column-header h3 {
+  color: #e2e8f0;
+}
+
+.dark .column-count {
+  background: #4a5568;
   color: #cbd5e0;
 }
 
-.dark .filter-chip:hover {
-  border-color: #ff6b9d;
-  color: #ffb6c1;
+.dark .empty-column {
+  color: #718096;
 }
 
-.dark .filter-chip.active {
-  background: rgba(255, 107, 157, 0.3);
-  border-color: rgba(255, 107, 157, 0.7);
-  color: #ffb6c1;
+.dark .loading-spinner {
+  border-color: #4a5568;
+  border-top-color: #4299e1;
+}
+
+.dark .keyboard-hints {
+  margin-top: 12px;
+}
+
+.dark .hint {
+  color: #a0aec0;
+}
+
+.dark .hint kbd {
+  background: #2d3748;
+  border-color: #4a5568;
+  color: #e2e8f0;
+}
+
+/* Confirm/Unresolved Modal Styles */
+.confirm-modal-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.ticket-preview {
+  padding: 16px;
+  background: #f7fafc;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  margin-bottom: 16px;
+}
+
+.ticket-preview h3 {
+  margin: 0 0 12px 0;
+  color: #2d3748;
+  font-size: 1.1rem;
+}
+
+.ticket-preview p {
+  margin: 0 0 12px 0;
+  color: #4a5568;
+  line-height: 1.6;
+}
+
+.existing-response {
+  padding-top: 12px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.existing-response strong {
+  display: block;
+  margin-bottom: 8px;
+  color: #2d3748;
+  font-size: 14px;
+}
+
+.existing-response p {
+  margin: 0;
+  color: #718096;
+  font-size: 13px;
+  font-style: italic;
+}
+
+.confirm-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.api-key-input {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.api-key-input label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #4a5568;
+}
+
+.input-field {
+  padding: 10px 12px;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.input-field:focus {
+  outline: none;
+  border-color: #4299e1;
+  box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
+}
+
+.textarea-field {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.action-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.btn-confirm {
+  width: 100%;
+  padding: 14px 20px;
+  background: #48bb78;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-confirm:hover:not(:disabled) {
+  background: #38a169;
+  transform: translateY(-1px);
+}
+
+.btn-confirm:disabled {
+  background: #cbd5e0;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.unresolved-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  background: #fff5f5;
+  border-radius: 8px;
+  border: 1px solid #fed7d7;
+}
+
+.unresolved-section label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #c53030;
+}
+
+.btn-unresolved {
+  width: 100%;
+  padding: 12px 16px;
+  background: #e53e3e;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-unresolved:hover:not(:disabled) {
+  background: #c53030;
+  transform: translateY(-1px);
+}
+
+.btn-unresolved:disabled {
+  background: #feb2b2;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.review-ticket-btn {
+  padding: 6px 14px;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: #805ad5;
+}
+
+.review-ticket-btn:hover:not(:disabled) {
+  background: #6b46c1;
+  transform: translateY(-1px);
+}
+
+.review-ticket-btn:disabled {
+  background: #cbd5e0;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Dark mode confirm modal */
+.dark .ticket-preview {
+  background: #1a202c;
+  border-color: #4a5568;
+}
+
+.dark .ticket-preview h3,
+.dark .existing-response strong {
+  color: #e2e8f0;
+}
+
+.dark .ticket-preview p,
+.dark .existing-response p {
+  color: #cbd5e0;
+}
+
+.dark .api-key-input label {
+  color: #cbd5e0;
+}
+
+.dark .input-field {
+  background: #2d3748;
+  border-color: #4a5568;
+  color: #e2e8f0;
+}
+
+.dark .input-field:focus {
+  border-color: #4299e1;
+  box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.2);
+}
+
+.dark .unresolved-section {
+  background: #742a2a;
+  border-color: #9b2c2c;
+}
+
+.dark .unresolved-section label {
+  color: #fc8181;
 }
 </style>

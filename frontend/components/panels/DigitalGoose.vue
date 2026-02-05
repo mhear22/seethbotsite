@@ -154,16 +154,20 @@ const handleResize = () => {
 onMounted(async () => {
   window.addEventListener('resize', handleResize)
 
-  // Set initial position to center-right of screen
+  // Set initial position to random location
   const setInitialPosition = () => {
     const dimensions = getGooseDimensions()
     const safeMargin = 20
     const viewportWidth = window.innerWidth
     const viewportHeight = window.innerHeight
 
-    // Position in center-right area
-    const startX = Math.max(safeMargin, Math.floor(viewportWidth / 2) - Math.floor(dimensions.width / 2))
-    const startY = Math.max(safeMargin, Math.floor(viewportHeight / 3))
+    // Calculate maximum x and y positions
+    const maxX = viewportWidth - dimensions.width - safeMargin
+    const maxY = viewportHeight - dimensions.height - safeMargin
+
+    // Generate random position within bounds
+    const startX = Math.floor(Math.random() * (maxX - safeMargin) + safeMargin)
+    const startY = Math.floor(Math.random() * (maxY - safeMargin) + safeMargin)
 
     goosePosition.value = { x: startX, y: startY }
   }
@@ -200,7 +204,7 @@ onUnmounted(() => {
   >
     <div class="goose-container">
       <div class="goose-emoji">
-        <img src="/goose.png" alt="goose" />
+        🪿
       </div>
       <div class="goose-message">{{ currentMessage }}</div>
       <div class="honk-counter">{{ honkCount }} honks</div>
@@ -215,7 +219,8 @@ onUnmounted(() => {
   cursor: pointer;
   transition: left 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275),
               top 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275),
-              transform 0.3s ease;
+              transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.3s ease;
   user-select: none;
   -webkit-user-select: none;
   -moz-user-select: none;
@@ -223,7 +228,12 @@ onUnmounted(() => {
 }
 
 .digital-goose:hover {
-  transform: scale(1.1);
+  transform: scale(1.15) translateY(-5px);
+}
+
+.digital-goose:hover .goose-container {
+  box-shadow: 0 8px 30px rgba(255, 159, 64, 0.4);
+  border-color: rgba(255, 159, 64, 0.4);
 }
 
 .digital-goose.migrating {
@@ -237,51 +247,84 @@ onUnmounted(() => {
 }
 
 .goose-container {
-  background: rgba(40, 44, 52, 0.95);
-  border-radius: 12px;
-  padding: 15px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  background: linear-gradient(135deg, rgba(66, 153, 225, 0.95), rgba(49, 130, 206, 0.95));
+  border-radius: 50px;
+  padding: 10px 15px;
+  box-shadow: 0 4px 20px rgba(66, 153, 225, 0.3);
   backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  min-width: 200px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  min-width: 140px;
+  transition: all 0.3s ease;
 }
 
 .dark .goose-container {
-  background: rgba(20, 24, 32, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: linear-gradient(135deg, rgba(49, 130, 206, 0.95), rgba(30, 64, 175, 0.95));
+  border: 2px solid rgba(129, 140, 248, 0.3);
 }
 
 .goose-emoji {
-  width: 64px;
-  height: 64px;
+  font-size: 48px;
   text-align: center;
-  margin: 0 auto 10px;
-  display: block;
-  object-fit: contain;
-  border-radius: 4px;
+  margin: 0 auto 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  line-height: 1;
+  background: rgba(255, 255, 255, 0.15);
+  width: 60px;
+  height: 60px;
+  margin-left: auto;
+  margin-right: auto;
+  transition: transform 0.2s ease;
+  animation: float 3s ease-in-out infinite;
 }
 
-.goose-emoji img {
-  width: 100%;
-  height: 100%;
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.digital-goose:hover .goose-emoji {
+  animation: bounce 0.5s ease;
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-15px);
+  }
 }
 
 .goose-message {
-  color: #e2e8f0;
-  font-size: 14px;
+  color: #ffffff;
+  font-size: 11px;
   text-align: center;
-  margin-bottom: 8px;
-  font-weight: 500;
+  margin-bottom: 6px;
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  line-height: 1.2;
 }
 
 .honk-counter {
-  color: #48bb78;
-  font-size: 12px;
+  color: #fffbeb;
+  font-size: 10px;
   text-align: center;
   font-weight: bold;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 3px 8px;
+  border-radius: 12px;
+  display: inline-block;
 }
 
 .dark .honk-counter {
-  color: #68d391;
+  color: #fef3c7;
+  background: rgba(0, 0, 0, 0.3);
 }
 </style>

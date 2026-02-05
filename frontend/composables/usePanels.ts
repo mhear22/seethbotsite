@@ -7,6 +7,7 @@ export interface PanelState {
   digitalGoose: boolean
   tachometer: boolean
   coolnessPanel: boolean
+  mining: boolean
 }
 
 const DEFAULT_PANELS: PanelState = {
@@ -15,7 +16,8 @@ const DEFAULT_PANELS: PanelState = {
   feed: false,
   digitalGoose: true,
   tachometer: true,
-  coolnessPanel: true
+  coolnessPanel: true,
+  mining: false
 }
 
 // Mobile-exclusive panels that should not overlap

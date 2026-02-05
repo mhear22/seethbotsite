@@ -38,7 +38,10 @@ const router = Router();
  */
 router.get('/rankings', (req: Request, res: Response) => {
   const leaderboard = pointsManager.getLeaderboard();
-  res.json(leaderboard);
+  res.json({
+    ...leaderboard,
+    timestamp: new Date().toISOString()
+  });
 });
 
 export default router;

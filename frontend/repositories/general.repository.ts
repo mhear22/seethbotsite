@@ -63,6 +63,22 @@ class GeneralRepository {
 
     return data;
   }
+
+  /**
+   * Analyze phrenology from a name (gender, age, nationality, plus random properties)
+   * @param name - The name to analyze
+   */
+  async analyzePhrenology(name: string) {
+    const { data, error } = await apiClient.POST('/phrenology', {
+      body: { name },
+    });
+
+    if (error) {
+      throw new Error(error.error || 'Failed to analyze phrenology');
+    }
+
+    return data;
+  }
 }
 
 // Export singleton instance

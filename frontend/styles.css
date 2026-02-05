@@ -18,6 +18,50 @@ body.dark {
   background: linear-gradient(135deg, #9333ea 0%, #7c3aed 50%, #5b21b6 100%);
 }
 
+/* Ultra-dark / Midnight mode (Ticket #109) */
+body.darker {
+  background: linear-gradient(135deg, #1a0b2e 0%, #0f0620 50%, #0a0515 100%);
+}
+
+/* Chaos mode (Ticket #88) */
+body.chaos {
+  animation: chaosPulse 4s ease-in-out infinite;
+}
+
+@keyframes chaosPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.002); }
+}
+
+body.chaos .router-nav {
+  animation: navShake 2s ease-in-out infinite;
+}
+
+@keyframes navShake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-2px); }
+  75% { transform: translateX(2px); }
+}
+
+.chaos-particle {
+  animation: chaosFloat 4s ease-in-out forwards;
+}
+
+@keyframes chaosFloat {
+  0% {
+    opacity: 0;
+    transform: translateY(0) scale(0) rotate(0deg);
+  }
+  50% {
+    opacity: 0.8;
+    transform: translateY(-50px) scale(1.2) rotate(180deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-100px) scale(0) rotate(360deg);
+  }
+}
+
 /* Router Navigation - Modern Full-Width Bar */
 .router-nav {
   position: fixed;
@@ -34,6 +78,11 @@ body.dark {
 .dark .router-nav {
   background: rgba(40, 44, 52, 0.98);
   border-bottom: 1px solid rgba(255, 182, 193, 0.2);
+}
+
+.darker .router-nav {
+  background: rgba(15, 15, 20, 0.98);
+  border-bottom: 1px solid rgba(255, 182, 193, 0.15);
 }
 
 .nav-container {
@@ -60,6 +109,30 @@ body.dark {
 
 .brand-icon {
   font-size: 24px;
+  cursor: pointer;
+  transition: transform 0.3s ease, filter 0.3s ease;
+  display: inline-block;
+}
+
+.brand-icon:hover {
+  transform: scale(1.3) rotate(15deg);
+  filter: drop-shadow(0 0 8px rgba(255, 145, 164, 0.6));
+}
+
+.brand-icon.clicking {
+  animation: brandClick 0.4s ease-out;
+}
+
+@keyframes brandClick {
+  0% {
+    transform: scale(1.3) rotate(15deg);
+  }
+  50% {
+    transform: scale(1.5) rotate(180deg);
+  }
+  100% {
+    transform: scale(1) rotate(360deg);
+  }
 }
 
 .brand-text {
@@ -98,6 +171,13 @@ body.dark {
   box-shadow:
     0 5px 20px rgba(0, 0, 0, 0.2),
     0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+}
+
+.darker .nav-controls-chevron {
+  background: rgba(10, 10, 15, 0.9);
+  box-shadow:
+    0 5px 20px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset;
 }
 
 .chevron-icon {
@@ -151,6 +231,14 @@ body.dark {
     0 0 0 0.5px rgba(255, 255, 255, 0.05);
 }
 
+.darker .nav-controls {
+  background: rgba(8, 8, 12, 0.9);
+  box-shadow:
+    0 10px 40px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+    0 0 0 0.5px rgba(255, 255, 255, 0.02);
+}
+
 /* Show controls on hover */
 .nav-controls-wrapper:hover .nav-controls {
   opacity: 1;
@@ -180,9 +268,16 @@ body.dark {
 
 .dark .control-btn {
   background: linear-gradient(145deg, rgba(60, 64, 72, 0.9), rgba(40, 44, 52, 0.8));
-  box-shadow: 
+  box-shadow:
     0 4px 12px rgba(0, 0, 0, 0.3),
     0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.darker .control-btn {
+  background: linear-gradient(145deg, rgba(30, 32, 36, 0.95), rgba(15, 15, 20, 0.9));
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.5),
+    0 1px 3px rgba(0, 0, 0, 0.4);
 }
 
 /* Hover magnification effect (MacOS dock style) */
@@ -197,9 +292,16 @@ body.dark {
 
 .dark .control-btn:hover {
   background: linear-gradient(145deg, rgba(80, 84, 92, 0.95), rgba(60, 64, 72, 0.9));
-  box-shadow: 
+  box-shadow:
     0 12px 28px rgba(0, 0, 0, 0.4),
     0 4px 10px rgba(0, 0, 0, 0.3);
+}
+
+.darker .control-btn:hover {
+  background: linear-gradient(145deg, rgba(50, 52, 56, 0.95), rgba(30, 32, 36, 0.9));
+  box-shadow:
+    0 12px 28px rgba(0, 0, 0, 0.6),
+    0 4px 10px rgba(0, 0, 0, 0.5);
 }
 
 /* Active state with macOS-like indicator */
@@ -302,6 +404,10 @@ body.dark {
   color: #aaa;
 }
 
+.darker .router-link {
+  color: #777;
+}
+
 .router-link:hover {
   background: rgba(255, 182, 193, 0.15);
   color: #ff91a4;
@@ -310,6 +416,11 @@ body.dark {
 .dark .router-link:hover {
   background: rgba(255, 182, 193, 0.1);
   color: #ffb6c1;
+}
+
+.darker .router-link:hover {
+  background: rgba(255, 182, 193, 0.08);
+  color: #ff91a4;
 }
 
 .router-link.active {
@@ -367,6 +478,10 @@ body.dark {
 
 body.dark .girl-mode-content {
   background: rgba(40, 44, 52, 0.95);
+}
+
+body.darker .girl-mode-content {
+  background: rgba(12, 12, 16, 0.98);
 }
 
 .girl-emoji {
@@ -488,6 +603,11 @@ body.dark .cats-container {
   background: rgba(40, 44, 52, 0.95);
 }
 
+body.darker .rankings-container,
+body.darker .cats-container {
+  background: rgba(12, 12, 16, 0.98);
+}
+
 .full-rankings-list {
   display: flex;
   flex-direction: column;
@@ -518,6 +638,10 @@ body.dark .cats-container {
 
 body.dark .full-rank-item {
   background: rgba(60, 64, 72, 0.9);
+}
+
+body.darker .full-rank-item {
+  background: rgba(25, 25, 30, 0.95);
 }
 
 body.dark .full-rank-item.current-user {
@@ -552,6 +676,10 @@ body.dark .full-rank-name {
   color: #f0f0f0;
 }
 
+body.darker .full-rank-name {
+  color: #d0d0d0;
+}
+
 .full-rank-score {
   font-size: 16px;
   color: #666;
@@ -559,6 +687,10 @@ body.dark .full-rank-name {
 
 body.dark .full-rank-score {
   color: #aaa;
+}
+
+body.darker .full-rank-score {
+  color: #888;
 }
 
 .full-rank-trend {
@@ -691,9 +823,7 @@ body.dark .bg-circle:nth-child(3) {
 
 /* Quote section */
 .quote-section {
-  position: fixed;
-  top: 60px;
-  left: 0;
+  position: relative;
   width: 100%;
   padding: 20px;
   background: rgba(255, 255, 255, 0.95);
@@ -1070,7 +1200,7 @@ body.dark .emulator-screen {
   left: auto;
   right: auto;
   width: 100%;
-  max-width: 500px;
+  max-width: 800px;
   margin: 0 auto;
 }
 
@@ -1112,6 +1242,7 @@ body.dark .emulator-screen {
 
 .cat-image {
   width: 100%;
+  max-width: 100%;
   border-radius: 15px;
   transition: transform 0.2s ease;
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
@@ -1196,10 +1327,42 @@ body.dark .emulator-screen {
   50% { transform: scale(1.1); }
 }
 
+/* Gradient Headings */
+h1, h2, h3, h4, h5, h6 {
+  background: linear-gradient(135deg, #ff6b9d 0%, #ff8a80 50%, #ffb6c1 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-weight: bold;
+}
+
+body.dark h1,
+body.dark h2,
+body.dark h3,
+body.dark h4,
+body.dark h5,
+body.dark h6 {
+  background: linear-gradient(135deg, #ffb6c1 0%, #ff91a4 50%, #e85e90 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
 h1 {
-  color: #ff6b9d;
   font-size: 36px;
   margin-bottom: 15px;
+  transition: all 0.2s ease;
+}
+
+h2 {
+  font-size: 28px;
+  margin-bottom: 12px;
+  transition: all 0.2s ease;
+}
+
+h3 {
+  font-size: 22px;
+  margin-bottom: 10px;
   transition: all 0.2s ease;
 }
 
@@ -1209,6 +1372,10 @@ p {
   line-height: 1.6;
   margin-bottom: 20px;
   transition: all 0.2s ease;
+}
+
+body.dark p {
+  color: #e2e8f0;
 }
 
 .sparkles {
@@ -1388,8 +1555,16 @@ body.dark .cat-panel {
   background: rgba(40, 44, 52, 0.95);
 }
 
+body.darker .cat-panel {
+  background: rgba(12, 12, 16, 0.98);
+}
+
 body.dark .rankings-toggle {
   background: rgba(232, 94, 144, 0.9);
+}
+
+body.darker .rankings-toggle {
+  background: rgba(200, 70, 120, 0.95);
 }
 
 body.dark .mika-btn {
@@ -1400,12 +1575,36 @@ body.dark .container {
   background: rgba(40, 44, 52, 0.95);
 }
 
+body.darker .container {
+  background: rgba(12, 12, 16, 0.98);
+}
+
 body.dark h1 {
   color: #e2e8f0;
 }
 
+body.darker h1,
+body.darker h2,
+body.darker h3,
+body.darker h4,
+body.darker h5,
+body.darker h6 {
+  background: linear-gradient(135deg, #ff91a4 0%, #ff6b9d 50%, #e85e90 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+body.darker h1 {
+  color: #c0c0c0;
+}
+
 body.dark p {
   color: #a0a0a0;
+}
+
+body.darker p {
+  color: #808080;
 }
 
 /* Control buttons container */
@@ -1572,6 +1771,14 @@ body.dark .mika-modal-box {
   background: rgba(40, 44, 52, 0.95);
 }
 
+body.darker .mika-modal {
+  background: linear-gradient(135deg, #1a0b2e 0%, #0a0515 100%);
+}
+
+body.darker .mika-modal-box {
+  background: rgba(12, 12, 16, 0.98);
+}
+
 /* Turn Me Button */
 .turn-me-btn {
   background: linear-gradient(45deg, #ff6b9d, #ff8a80);
@@ -1625,6 +1832,10 @@ body.dark .mika-modal-box {
 
 .dark .click-counter {
   background: rgba(30, 30, 30, 0.95);
+}
+
+.darker .click-counter {
+  background: rgba(8, 8, 12, 0.98);
 }
 
 .counter-header h3 {
@@ -1760,18 +1971,46 @@ body.dark .mika-modal-box {
   .nav-container {
     padding: 0 1rem;
     height: 56px;
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: hidden;
+    box-sizing: border-box;
+    flex-shrink: 0; /* Prevent container from growing */
+    min-width: 0; /* Allow flex items to shrink */
   }
 
   .nav-brand {
     font-size: 18px;
+    flex-shrink: 0;
+    min-width: 0;
+    max-width: 40%; /* Limit brand width on mobile */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .brand-icon {
     font-size: 22px;
+    flex-shrink: 0;
   }
 
+  .brand-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .build-indicator {
+    display: none; /* Hide build indicator on mobile to prevent overflow */
+  }
+
+  /* Move nav controls to avoid covering page navigation */
   .nav-controls-wrapper {
-    bottom: 10px;
+    bottom: 85px; /* Move above mobile bottom nav (70px + 15px spacing) */
+    right: 10px;
+    left: auto;
+    transform: none;
+    z-index: 1001;
   }
 
   .nav-controls-chevron {
@@ -1822,6 +2061,7 @@ body.dark .mika-modal-box {
     transition: max-height 0.3s ease;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     z-index: 199;
+    padding-bottom: 80px; /* Space for bottom nav */
   }
 
   .dark .nav-links {
@@ -1840,6 +2080,7 @@ body.dark .mika-modal-box {
     border-bottom: 1px solid rgba(255, 182, 193, 0.1);
     justify-content: flex-start;
     font-size: 16px;
+    position: relative;
   }
 
   .dark .router-link {
@@ -1869,12 +2110,93 @@ body.dark .mika-modal-box {
   }
 }
 
+/* ===== MOBILE BOTTOM NAVIGATION (Ticket #110) ===== */
+@media (max-width: 768px) {
+  .mobile-bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100vw;
+    height: 70px;
+    background: rgba(255, 255, 255, 0.98);
+    backdrop-filter: blur(10px);
+    border-top: 1px solid rgba(255, 182, 193, 0.2);
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    padding: 0;
+    z-index: 999; /* Below nav-controls (1001) but above content */
+    overflow: hidden;
+    box-sizing: border-box;
+  }
+
+  .dark .mobile-bottom-nav {
+    background: rgba(40, 44, 52, 0.98);
+    border-top-color: rgba(255, 182, 193, 0.1);
+  }
+
+  .mobile-bottom-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .mobile-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 4px 6px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    color: #666;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .dark .mobile-nav-item {
+    color: #aaa;
+  }
+
+  .mobile-nav-item:hover {
+    background: rgba(255, 182, 193, 0.1);
+  }
+
+  .dark .mobile-nav-item:hover {
+    background: rgba(255, 182, 193, 0.05);
+  }
+
+  .mobile-nav-item.active {
+    color: #ff91a4;
+  }
+
+  .dark .mobile-nav-item.active {
+    color: #ffb6c1;
+  }
+
+  .mobile-nav-icon {
+    font-size: 20px;
+    line-height: 1;
+  }
+
+  .mobile-nav-label {
+    font-size: 9px;
+    font-weight: 500;
+    line-height: 1.1;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
 /* Mobile Quote Section */
 @media (max-width: 768px) {
   .quote-section {
-    position: fixed;
-    top: 56px;
-    left: 0;
+    position: relative;
     width: 100%;
     padding: 12px 15px;
     background: rgba(255, 255, 255, 0.95);
@@ -1926,7 +2248,7 @@ body.dark .mika-modal-box {
 @media (max-width: 768px) {
   .rankings-panel {
     position: fixed;
-    bottom: 0;
+    bottom: 70px; /* Position above mobile-bottom-nav */
     left: 0;
     width: 100%;
     max-height: 35vh;
@@ -1982,7 +2304,7 @@ body.dark .mika-modal-box {
 @media (max-width: 768px) {
   .cat-panel {
     position: fixed;
-    bottom: 0;
+    bottom: 70px; /* Position above mobile-bottom-nav */
     left: 0;
     width: 100%;
     max-height: 50vh;
@@ -2073,7 +2395,7 @@ body.dark .mika-modal-box {
 /* Mobile Page Content */
 @media (max-width: 768px) {
   .page-content {
-    padding: 100px 15px 20px;
+    padding: 100px 15px 85px; /* Add bottom padding for mobile-bottom-nav (70px + 15px) */
     min-height: 100vh;
   }
 
@@ -2328,7 +2650,7 @@ body.dark .mika-modal-box {
 /* Small Mobile Devices (< 480px) */
 @media (max-width: 480px) {
   .nav-controls-wrapper {
-    bottom: 8px;
+    bottom: 85px; /* Keep above mobile-bottom-nav on small screens too */
   }
 
   .nav-controls-chevron {
@@ -2417,10 +2739,16 @@ body.dark .mika-modal-box {
   .rankings-panel,
   .cat-panel {
     max-height: 30vh;
+    bottom: 70px; /* Position above mobile-bottom-nav in landscape too */
   }
 
   .page-content {
-    padding: 90px 15px 20px;
+    padding: 90px 15px 85px; /* Maintain bottom padding in landscape */
+  }
+
+  /* Adjust nav controls for landscape */
+  .nav-controls-wrapper {
+    bottom: 85px; /* Keep above mobile-bottom-nav */
   }
 }
 

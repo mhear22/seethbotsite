@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { getClickCount, incrementClick, resetClick } from '../db';
 import { requireApiKey } from '../auth';
+import { pointsManager } from '../services/points-manager';
 
 const router = Router();
 
@@ -137,5 +138,74 @@ router.post('/clicks/reset',
     }
   }
 );
+
+/**
+ * @openapi
+ * /api/clicks/add-points:
+ *   post:
+ *     tags: [Clicks]
+ *     summary: Add points to rankings based on clicks
+ *     description: Adds points to user's rankings based on their clicker activity
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               userId:
+ *                 type: string
+ *                 description: User ID
+ *               clicks:
+ *                 type: integer
+ *                 description: Number of clicks to convert to points
+ *     responses:
+ *       200:
+ *         description: Points added successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 points:
+ *                   type: integer
+ *                 message:
+ *                   type: string
+ *       500:
+ *         description: Server error
+ */
+router.post('/clicks/add-points', (req: Request, res: Response) => {
+  try {
+    const { userId, clicks } = req.body;
+
+    if (!userId || typeof userId !== 'string') {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+
+    if (!clicks || typeof clicks !== 'number' || clicks < 0) {
+      return res.status(400).json({ error: 'valid clicks value is required' });
+    }
+
+    // Convert clicks to points (1 click = 1 point)
+    let totalPoints = 0;
+    for (let i = 0; i < clicks; i++) {
+      const result = pointsManager.addPoints(userId, 'clicker');
+      if (result.success) {
+        totalPoints += result.points;
+      }
+    }
+
+    res.json({
+      success: true,
+      points: totalPoints,
+      message: `Added ${totalPoints} points to rankings`
+    });
+  } catch (error) {
+    console.error('Error adding points:', error);
+    res.status(500).json({ error: 'Failed to add points' });
+  }
+});
 
 export default router;

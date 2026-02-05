@@ -1,11 +1,49 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useAppStore } from '../../stores/useAppStore'
 
-const moldLevel = ref(50)
+const appStore = useAppStore()
 const maxLevel = 100
+const chaosMode = ref(false)
 
 const updateMoldLevel = (delta: number) => {
-  moldLevel.value = Math.max(0, Math.min(maxLevel, moldLevel.value + delta))
+  appStore.tachValue = Math.max(0, Math.min(maxLevel, appStore.tachValue + delta))
+}
+
+const toggleChaosMode = () => {
+  chaosMode.value = !chaosMode.value
+
+  if (chaosMode.value) {
+    // Apply gravity to all elements
+    document.body.classList.add('chaos-active')
+
+    // Make all interactive elements fall
+    const elements = document.querySelectorAll('.feature-card, .meter-controls button, .mold-header, .mold-fact, .mold-footer')
+    elements.forEach((el, index) => {
+      setTimeout(() => {
+        (el as HTMLElement).style.transition = 'transform 2s cubic-bezier(0.25, 0.46, 0.45, 0.94)'
+        (el as HTMLElement).style.transform = `translateY(${window.innerHeight}px) rotate(${Math.random() * 360 - 180}deg)`
+        (el as HTMLElement).style.opacity = '0'
+      }, index * 100)
+    })
+
+    // Reset after 3 seconds
+    setTimeout(() => {
+      chaosMode.value = false
+      document.body.classList.remove('chaos-active')
+      elements.forEach((el) => {
+        (el as HTMLElement).style.transition = 'transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+        (el as HTMLElement).style.transform = 'translateY(0) rotate(0deg)'
+        (el as HTMLElement).style.opacity = '1'
+      })
+    }, 3000)
+  }
+}
+
+const handleFeatureClick = (feature: any) => {
+  if (feature.action === 'chaos') {
+    toggleChaosMode()
+  }
 }
 
 const moldFacts = [
@@ -49,9 +87,9 @@ const features = [
         <h2>📊 Mold Level</h2>
         <div class="meter-container">
           <div class="meter-bar">
-            <div class="meter-fill" :style="{ width: moldLevel + '%' }"></div>
+            <div class="meter-fill" :style="{ width: appStore.tachValue + '%' }"></div>
           </div>
-          <div class="meter-value">{{ moldLevel }}%</div>
+          <div class="meter-value">{{ appStore.tachValue }}%</div>
         </div>
         <div class="meter-controls">
           <button @click="updateMoldLevel(-10)" class="meter-btn">-10</button>
@@ -64,7 +102,7 @@ const features = [
       <div class="mold-features">
         <h2>✨ Mold Features</h2>
         <div class="features-grid">
-          <div v-for="feature in features" :key="feature.title" class="feature-card">
+          <div v-for="feature in features" :key="feature.title" class="feature-card" @click="handleFeatureClick(feature)">
             <div class="feature-icon">{{ feature.icon }}</div>
             <h3>{{ feature.title }}</h3>
             <p>{{ feature.desc }}</p>
@@ -325,5 +363,20 @@ const features = [
 
 .dark .feature-card:hover {
   background: rgba(255, 255, 255, 0.08);
+}
+
+/* Chaos mode */
+.chaos-active .mold-page {
+  animation: shake 0.5s ease-in-out;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px) rotate(-1deg); }
+  75% { transform: translateX(5px) rotate(1deg); }
+}
+
+.feature-card.chaos-target {
+  transition: transform 2s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 2s ease;
 }
 </style>

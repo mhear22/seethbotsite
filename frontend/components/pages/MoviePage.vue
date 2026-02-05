@@ -83,9 +83,15 @@ watch(polledRound, (newRound) => {
 
 <style scoped>
 .movie-page {
-  max-width: 1200px;
+  max-width: 800px;
   margin: 0 auto;
-  padding: 20px;
+  padding: 40px 20px;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ed 100%);
+}
+
+.dark .movie-page {
+  background: linear-gradient(135deg, #0d1219 0%, #1a202c 100%);
 }
 
 .movie-header {
@@ -158,15 +164,18 @@ watch(polledRound, (newRound) => {
 
 /* Dark mode support */
 .dark .tab-content {
-  background: rgba(40, 44, 52, 0.95);
-  color: #e2e8f0;
+  background: rgba(30, 35, 45, 0.95);
+  color: #f7fafc;
 }
 
 .dark .movie-header h1 {
+  background: linear-gradient(135deg, #ffb6c1 0%, #ff91a4 100%);
+  -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .dark .subtitle {
-  color: #a0aec0;
+  color: #e2e8f0;
 }
 </style>

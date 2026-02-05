@@ -17,7 +17,7 @@ const store = useAppStore()
           <li><strong>🏆 Coolness Rankings</strong> - Real-time leaderboard that refreshes every 30 seconds</li>
           <li><strong>🐱 Random Cats</strong> - Fetch random cat images with a built-in toy synth game</li>
           <li><strong>📈 Stock Market Game</strong> - Buy and sell virtual stocks with database persistence</li>
-          <li><strong>🎬 Movie Night</strong> - Suggest movies, vote for favorites, and see results</li>
+          <li><strong>🎬 Movie Night</strong> - Suggest movies, vote for favourites, and see results</li>
           <li><strong>🌙 Dark Mode</strong> - Toggle between light and dark themes with smooth transitions</li>
           <li><strong>🎵 Audio System</strong> - Interactive sound effects and background music</li>
         </ul>
@@ -117,8 +117,25 @@ const store = useAppStore()
 </template>
 
 <style scoped>
+/* CSS Variables for theme colors */
+:root {
+  --card-bg: rgba(255, 255, 255, 0.95);
+  --text-primary: #2d3748;
+  --text-secondary: #718096;
+  --hover-bg: #f7fafc;
+  --primary-color: #667eea;
+  --secondary-color: #764ba2;
+}
+
+.about-page.dark {
+  --card-bg: #2d3748;
+  --text-primary: #ffffff;
+  --text-secondary: #f1f5f9;
+  --hover-bg: #4a5568;
+}
+
 .about-page {
-  max-width: 1000px;
+  max-width: 800px;
   margin: 0 auto;
   padding: 40px 20px;
   min-height: 100vh;
@@ -126,7 +143,7 @@ const store = useAppStore()
 }
 
 .about-page.dark {
-  background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
+  background: linear-gradient(135deg, #0d1219 0%, #1a202c 100%);
 }
 
 h1 {
@@ -178,6 +195,7 @@ h1 {
   background: var(--hover-bg);
   border-radius: 8px;
   border-left: 4px solid var(--primary-color);
+  color: var(--text-primary);
   transition: transform 0.2s ease;
 }
 
@@ -198,6 +216,7 @@ h1 {
   padding: 1rem;
   background: var(--hover-bg);
   border-radius: 8px;
+  color: var(--text-primary);
   transition: transform 0.2s ease;
 }
 
@@ -222,10 +241,11 @@ h1 {
 
 .highlight {
   padding: 1rem;
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%);
   border-radius: 8px;
   text-align: center;
   font-weight: 500;
+  color: var(--text-primary);
 }
 
 .stats-grid {

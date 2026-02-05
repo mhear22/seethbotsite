@@ -10,9 +10,11 @@
     "generate:types": "openapi-typescript ../backend/dist/openapi.json -o ./src/types/openapi.ts"
   },
   "dependencies": {
+    "@types/three": "^0.182.0",
     "openapi-fetch": "^0.15.0",
     "openapi-typescript": "^7.10.1",
     "pinia": "^3.0.4",
+    "three": "^0.182.0",
     "vue": "^3.4.0",
     "vue-router": "^4.6.4"
   },

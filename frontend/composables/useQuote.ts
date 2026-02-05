@@ -11,12 +11,20 @@ export const useQuote = () => {
     error.value = null
 
     try {
-      const quote = await generalRepository.getQuote()
+      // Fetch both quote and advice
+      const [quote, adviceResponse] = await Promise.all([
+        generalRepository.getQuote(),
+        fetch('https://api.adviceslip.com/advice').then(res => res.json())
+      ])
 
-      if (quote.text) {
-        currentQuote.value = quote.text
+      const quoteText = quote.text || 'Stay curious, keep asking questions.'
+      const adviceText = adviceResponse.slip?.advice || ''
+
+      // Combine quote and advice
+      if (adviceText) {
+        currentQuote.value = `${quoteText}\n\n💡 ${adviceText}`
       } else {
-        currentQuote.value = 'Stay curious, keep asking questions.'
+        currentQuote.value = quoteText
       }
     } catch (err) {
       console.error('Error fetching quote:', err)

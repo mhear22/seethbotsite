@@ -17,6 +17,7 @@ RUN npm ci
 COPY backend/tsconfig.json ./
 COPY backend/src ./src/
 COPY backend/scripts ./scripts/
+COPY backend/build-info.json ./build-info.json
 
 # Build backend (generates dist/openapi.json)
 RUN npm run build
@@ -61,6 +62,7 @@ RUN apk add --no-cache python3 make g++
 COPY --from=backend-builder /app/backend/dist ./dist
 COPY --from=backend-builder /app/backend/node_modules ./node_modules
 COPY --from=backend-builder /app/backend/package.json ./package.json
+COPY --from=backend-builder /app/backend/build-info.json ./build-info.json
 
 # Copy frontend build
 COPY --from=frontend-builder /app/frontend/dist ./webdist

@@ -54,6 +54,7 @@ export const apiFetch = async (url: string, options: RequestInit = {}): Promise<
 
 /**
  * Handle API errors and show user-friendly messages
+ * Parses validation details if available
  */
 export const handleApiError = (error: unknown, defaultMessage: string = 'An error occurred'): string => {
   if (error instanceof Error) {
@@ -64,6 +65,32 @@ export const handleApiError = (error: unknown, defaultMessage: string = 'An erro
         return error.message || defaultMessage;
     }
   }
+
+  // Handle API error objects with validation details
+  if (error && typeof error === 'object') {
+    const errorObj = error as { error?: string; details?: Array<{ field: string; message: string }> };
+
+    // If we have validation details, extract and format them
+    if (errorObj.details && Array.isArray(errorObj.details) && errorObj.details.length > 0) {
+      const fieldErrors = errorObj.details.map(detail => {
+        // Format field name (e.g., "suggestedBy" -> "Suggested By")
+        const formattedField = detail.field
+          .replace(/([A-Z])/g, ' $1')
+          .replace(/^./, str => str.toUpperCase())
+          .trim();
+
+        return `${formattedField}: ${detail.message}`;
+      });
+
+      return fieldErrors.join('\n');
+    }
+
+    // Otherwise return the generic error message
+    if (errorObj.error) {
+      return errorObj.error;
+    }
+  }
+
   return defaultMessage;
 };
 

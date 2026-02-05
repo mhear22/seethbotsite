@@ -1,0 +1,43 @@
+{
+  "name": "Mold - Fun & Games",
+  "short_name": "Mold",
+  "description": "Play games, track stats, and have fun with Mold! Clicker, fishing, and more.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1a1a2e",
+  "theme_color": "#a8e063",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["games", "entertainment"],
+  "shortcuts": [
+    {
+      "name": "Clicker",
+      "short_name": "Click",
+      "description": "Play the idle clicker game",
+      "url": "/clicker",
+      "icons": [{ "src": "/favicon.svg", "sizes": "96x96" }]
+    },
+    {
+      "name": "Fishing",
+      "short_name": "Fish",
+      "description": "Play the 3D fishing game",
+      "url": "/fishing",
+      "icons": [{ "src": "/favicon.svg", "sizes": "96x96" }]
+    },
+    {
+      "name": "Stats",
+      "short_name": "Stats",
+      "description": "View your game statistics",
+      "url": "/stats",
+      "icons": [{ "src": "/favicon.svg", "sizes": "96x96" }]
+    }
+  ]
+}

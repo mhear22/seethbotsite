@@ -25,6 +25,16 @@ const imageSize = computed(() => {
     loading="lazy"
   />
 
+  <!-- Goose emoji - render as image -->
+  <img
+    v-else-if="emoji === '🪿'"
+    src="/goose.png"
+    alt="goose"
+    class="goose-emoji"
+    :style="{ width: `${imageSize}px`, height: `${imageSize}px` }"
+    loading="lazy"
+  />
+
   <!-- Regular unicode emoji -->
   <span v-else class="unicode-emoji" :style="{ fontSize: `${imageSize}px` }">
     {{ emoji }}
@@ -38,6 +48,13 @@ const imageSize = computed(() => {
   image-rendering: -webkit-optimize-contrast;
   image-rendering: crisp-edges;
   object-fit: contain;
+}
+
+.goose-emoji {
+  display: inline-block;
+  vertical-align: middle;
+  object-fit: contain;
+  border-radius: 8px;
 }
 
 .unicode-emoji {

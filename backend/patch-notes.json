@@ -1,0 +1,118 @@
+[
+  {
+    "id": "1738745600000-abc123",
+    "version": "1.0.4",
+    "buildNumber": 4,
+    "buildTime": "2025-02-04T20:30:00.000Z",
+    "title": "Patch Notes & Advice Feature",
+    "changes": [
+      {
+        "type": "added",
+        "description": "Patch notes section with build history"
+      },
+      {
+        "type": "added",
+        "description": "Advice added to quotes using api.adviceslip.com"
+      },
+      {
+        "type": "improved",
+        "description": "Quote formatting with advice sections"
+      },
+      {
+        "type": "fixed",
+        "description": "Timestamps now display in browser's local time"
+      }
+    ],
+    "createdAt": "2025-02-04T20:30:00.000Z"
+  },
+  {
+    "id": "1738659200000-def456",
+    "version": "1.0.3",
+    "buildNumber": 3,
+    "buildTime": "2025-02-04T19:00:00.000Z",
+    "title": "Ticket System Improvements",
+    "changes": [
+      {
+        "type": "added",
+        "description": "Ticket statistics section"
+      },
+      {
+        "type": "improved",
+        "description": "Mobile experience for tickets page"
+      },
+      {
+        "type": "added",
+        "description": "Keyboard shortcuts (N for new ticket, / for search)"
+      },
+      {
+        "type": "fixed",
+        "description": "Filter panel dark mode styling"
+      }
+    ],
+    "createdAt": "2025-02-04T19:00:00.000Z"
+  },
+  {
+    "id": "1738572800000-ghi789",
+    "version": "1.0.2",
+    "buildNumber": 2,
+    "buildTime": "2025-02-04T17:30:00.000Z",
+    "title": "Core Features",
+    "changes": [
+      {
+        "type": "added",
+        "description": "Ticket filtering system"
+      },
+      {
+        "type": "added",
+        "description": "Ticket completion confirmation"
+      },
+      {
+        "type": "fixed",
+        "description": "Timestamp display issues"
+      },
+      {
+        "type": "added",
+        "description": "Ignore mode for ticket processing"
+      }
+    ],
+    "createdAt": "2025-02-04T17:30:00.000Z"
+  },
+  {
+    "id": "1738486400000-jkl012",
+    "version": "1.0.1",
+    "buildNumber": 1,
+    "buildTime": "2025-02-04T16:00:00.000Z",
+    "title": "Initial Release",
+    "changes": [
+      {
+        "type": "added",
+        "description": "Basic ticket system"
+      },
+      {
+        "type": "added",
+        "description": "User authentication"
+      },
+      {
+        "type": "added",
+        "description": "Coolness rankings"
+      },
+      {
+        "type": "added",
+        "description": "Various page features (clocks, countdowns, cats, etc.)"
+      },
+      {
+        "type": "added",
+        "description": "Stock market game"
+      },
+      {
+        "type": "added",
+        "description": "Movie suggestions"
+      },
+      {
+        "type": "added",
+        "description": "Shop with coolness points"
+      }
+    ],
+    "createdAt": "2025-02-04T16:00:00.000Z"
+  }
+]

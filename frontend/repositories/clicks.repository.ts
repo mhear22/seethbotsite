@@ -46,6 +46,23 @@ class ClicksRepository {
 
     return data;
   }
+
+  /**
+   * Add points to rankings based on clicks
+   * @param userId - User ID
+   * @param clicks - Number of clicks to convert to points
+   */
+  async addPoints(userId: string, clicks: number) {
+    const { data, error } = await apiClient.POST('/clicks/add-points', {
+      body: { userId, clicks },
+    });
+
+    if (error) {
+      throw new Error(error.error || 'Failed to add points');
+    }
+
+    return data;
+  }
 }
 
 // Export singleton instance

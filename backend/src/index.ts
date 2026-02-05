@@ -21,6 +21,13 @@ import ticketsController from './controllers/tickets.controller';
 import authController from './controllers/auth.controller';
 import holidaysController from './controllers/holidays.controller';
 import birdsoundsController from './controllers/birdsounds.controller';
+import shopController from './controllers/shop.controller';
+import charactersController from './controllers/characters.controller';
+import patchNotesController from './controllers/patch-notes.controller';
+import miningController from './controllers/mining.controller';
+import statsController from './controllers/stats.controller';
+import challengesController from './controllers/challenges.controller';
+import achievementsController from './controllers/achievements.controller';
 
 const app: Express = express();
 const PORT = process.env.PORT || 3001;
@@ -58,6 +65,13 @@ app.use('/api', ticketsController);
 app.use('/api', authController);
 app.use('/api', holidaysController);
 app.use('/api', birdsoundsController);
+app.use('/api/shop', shopController);
+app.use('/api', charactersController);
+app.use('/api', patchNotesController);
+app.use('/api', miningController);
+app.use('/api/stats', statsController);
+app.use('/api/challenges', challengesController);
+app.use('/api/achievements', achievementsController);
 
 // Serve raw OpenAPI JSON spec for type generation
 app.get('/api/openapi.json', (req: Request, res: Response) => {

@@ -56,6 +56,30 @@ const northernlionQuotes = [
   "That's the spirit!"
 ];
 
+// Advice/wisdom collection
+const adviceQuotes = [
+  "Embrace the chaos, you can't control everything anyway.",
+  "Progress is progress, even if it's in the wrong direction.",
+  "Trust the process, but also trust your gut.",
+  "Sometimes the best strategy is no strategy at all.",
+  "Pivot early, pivot often.",
+  "Every mistake is just data for the next attempt.",
+  "If you're not having fun, you're doing it wrong.",
+  "The RNG giveth, and the RNG taketh away.",
+  "Regret nothing, it all made you who you are.",
+  "That's the game, baby - play it or leave it.",
+  "Keep moving forward, even if it's sideways.",
+  "Sometimes 'terrible idea' is just 'brave idea' in disguise.",
+  "Stay curious, keep asking questions.",
+  "You're not the problem, but you can be the solution.",
+  "Famous last words are just regular words until they're not.",
+  "Embrace the vibe, it's yours.",
+  "Professional streamer, serious business, but don't forget to play.",
+  "That's the spirit - keep it alive.",
+  "The content people want is the content you make with heart.",
+  "Never gonna happen until you make it happen."
+];
+
 /**
  * @openapi
  * /api/quote:
@@ -94,15 +118,91 @@ router.get('/quote', async (req: Request, res: Response) => {
       quote,
       source: 'northernlion-db',
       index: randomIndex,
-      totalQuotes: northernlionQuotes.length
+      totalQuotes: northernlionQuotes.length,
+      timestamp: new Date().toISOString()
     });
   } catch (error) {
     console.error('Error generating quote:', error);
     // Fallback quote
     res.json({
       quote: 'Stay curious, keep asking questions.',
-      source: 'fallback'
+      source: 'fallback',
+      timestamp: new Date().toISOString()
     });
+  }
+});
+
+/**
+ * @openapi
+ * /api/advice:
+ *   get:
+ *     tags: [Quotes]
+ *     summary: Get random advice
+ *     description: Returns a random piece of advice from the adviceslip.com API (ticket #52)
+ *     responses:
+ *       200:
+ *         description: Advice retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 advice:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                     advice:
+ *                       type: string
+ *                 source:
+ *                   type: string
+ *                   example: adviceslip-api
+ *                 timestamp:
+ *                   type: string
+ *                   format: date-time
+ */
+router.get('/advice', async (req: Request, res: Response) => {
+  try {
+    // Fetch advice from adviceslip.com API
+    const response = await fetch('https://api.adviceslip.com/advice');
+    if (!response.ok) {
+      throw new Error(`Advice slip API returned ${response.status}`);
+    }
+    const data = await response.json() as { slip: { id: string; advice: string } };
+
+    res.json({
+      advice: data.slip,
+      source: 'adviceslip-api',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Error fetching advice from adviceslip.com:', error);
+    // Fallback to local advice quotes
+    try {
+      const randomIndex = Math.floor(Math.random() * adviceQuotes.length);
+      const advice = adviceQuotes[randomIndex];
+
+      res.json({
+        advice: {
+          id: `fallback-${randomIndex}`,
+          advice: advice
+        },
+        source: 'advice-db-fallback',
+        index: randomIndex,
+        totalAdvice: adviceQuotes.length,
+        timestamp: new Date().toISOString()
+      });
+    } catch (fallbackError) {
+      console.error('Error using fallback advice:', fallbackError);
+      res.json({
+        advice: {
+          id: 'fallback-0',
+          advice: 'Keep going, you\'re doing better than you think.'
+        },
+        source: 'final-fallback',
+        timestamp: new Date().toISOString()
+      });
+    }
   }
 });
 
