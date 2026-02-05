@@ -338,41 +338,6 @@ router.patch('/tickets/settings/last-collection', async (req: Request, res: Resp
  *   get:
  *     tags: [Tickets]
  *     summary: Get all tickets
- *
- *     responses:
- *       200:
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 tickets:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       id:
- *                         type: integer
- *                       title:
- *                         type: string
- *                       description:
- *                         type: string
- *                       status:
- *                         type: string
- *                         enum: [pending, needs-info, completed, declined]
- *                       response:
- *                         type: string
- *                       created_at:
- *                         type: string
- *                       updated_at:
- *                         type: string
- */
-/**
- * @openapi
- * /api/tickets:
- *   get:
- *     tags: [Tickets]
- *     summary: Get all tickets
  *     description: Returns all tickets with optional filtering by status, type, and priority. Sorted by relevance by default (older pending tickets first).
  *     parameters:
  *       - in: query
