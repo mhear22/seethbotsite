@@ -5,6 +5,7 @@ import { useCat } from '../composables/useCat'
 import { useRankings } from '../composables/useRankings'
 import { usePanels } from '../composables/usePanels'
 import { useLanguage } from '../composables/useLanguage'
+import { useAuth } from '../composables/useAuth'
 
 export const useAppStore = defineStore('app', () => {
   // Composables
@@ -13,6 +14,7 @@ export const useAppStore = defineStore('app', () => {
   const rankingsStore = useRankings()
   const panels = usePanels()
   const language = useLanguage()
+  const auth = useAuth()
 
   // Load dark mode preference from localStorage
   const savedDarkMode = localStorage.getItem('darkMode')
@@ -24,10 +26,12 @@ export const useAppStore = defineStore('app', () => {
   const chaosMode = ref(savedChaosMode === 'true')
   const moldMode = ref(savedMoldMode !== 'false') // Default to true
   const musicPlaying = ref(false)
+  const isMuted = ref(false) // Mute state (Ticket #172)
   const currentQuoteIndex = ref(0)
   const tachValue = ref(50)
   const mikaModalOpen = ref(false)
   const confirmationOpen = ref(false)
+  const searchModalOpen = ref(false)
   const currentRoute = ref('home')
 
   const quotes = ref([
@@ -41,11 +45,38 @@ export const useAppStore = defineStore('app', () => {
     'Be energy you want to see in world.'
   ])
 
+  // Temer3-specific light-hearted insults (Ticket #176)
+  const temer3Quotes = ref([
+    "Temer3 couldn't code his way out of a wet paper bag 🌧️",
+    "Temer3's debugging skills are legendary... for all the wrong reasons 🐛",
+    "Temer3 thinks CSS stands for 'Can't Style Stuff' 💅",
+    "Temer3 commits faster than he thinks about the consequences 🚀",
+    "Temer3's code is like a box of chocolates - you never know what's gonna break 🍫",
+    "Temer3 once forgot to push his changes... three times in a row 📤",
+    "Temer3's pull requests are basically puzzles for everyone else 🧩",
+    "Temer3 writes code that makes AI question its existence 🤖",
+    "Temer3 tested the 'delete node_modules' theory once... and lived to tell the tale 🗑️",
+    "Temer3's Git history is a fascinating archaeological dig 🏺"
+  ])
+
   // Advice slips cache
   const adviceSlips = ref<string[]>([])
 
+  // Helper function to check if current user is Temer3
+  const isTemer3 = computed(() => {
+    if (!auth.user.value) return false
+    const displayName = auth.user.value.display_name || ''
+    const email = auth.user.value.email || ''
+    return displayName.toLowerCase().includes('temer3') || email.toLowerCase().includes('temer3')
+  })
+
   // Getters
-  const currentQuote = computed(() => quotes.value[currentQuoteIndex.value])
+  const currentQuote = computed(() => {
+    if (isTemer3.value) {
+      return temer3Quotes.value[currentQuoteIndex.value % temer3Quotes.value.length]
+    }
+    return quotes.value[currentQuoteIndex.value]
+  })
 
   // Preload advice slips on startup
   const preloadAdvice = async () => {
@@ -77,6 +108,7 @@ export const useAppStore = defineStore('app', () => {
     localStorage.setItem('darkerMode', darkerMode.value.toString())
     document.body.classList.toggle('dark', darkMode.value)
     document.body.classList.toggle('darker', darkerMode.value)
+    audio.playButtonClick()
   }
 
   const toggleDarkerMode = () => {
@@ -221,6 +253,19 @@ export const useAppStore = defineStore('app', () => {
   const toggleMusic = () => {
     musicPlaying.value = !musicPlaying.value
     audio.toggleMusic(musicPlaying.value)
+    audio.playButtonClick()
+  }
+
+  // Toggle mute state (Ticket #172)
+  const toggleMute = () => {
+    isMuted.value = !isMuted.value
+    if (isMuted.value) {
+      audio.muteAll()
+    } else {
+      audio.unmuteAll()
+      // Play button sound to indicate unmuted
+      audio.playButtonClick()
+    }
   }
 
   const fetchAdvice = async () => {
@@ -244,15 +289,21 @@ export const useAppStore = defineStore('app', () => {
   }
 
   const nextQuote = async () => {
-    // 30% chance to fetch new advice from API
-    if (Math.random() < 0.3) {
-      const advice = await fetchAdvice()
-      if (advice) {
-        currentQuoteIndex.value = quotes.value.length - 1
-        return
+    // Don't fetch advice for Temer3 - they get their special collection
+    if (!isTemer3.value) {
+      // 30% chance to fetch new advice from API
+      if (Math.random() < 0.3) {
+        const advice = await fetchAdvice()
+        if (advice) {
+          currentQuoteIndex.value = quotes.value.length - 1
+          return
+        }
       }
+      currentQuoteIndex.value = (currentQuoteIndex.value + 1) % quotes.value.length
+    } else {
+      // For Temer3, just cycle through his special collection
+      currentQuoteIndex.value = (currentQuoteIndex.value + 1) % temer3Quotes.value.length
     }
-    currentQuoteIndex.value = (currentQuoteIndex.value + 1) % quotes.value.length
   }
 
   const onFart = () => {
@@ -266,6 +317,7 @@ export const useAppStore = defineStore('app', () => {
     }, 300)
 
     tachValue.value = randomValue
+    audio.playGooseHonk()
   }
 
   const onTurnMe = () => {
@@ -281,6 +333,10 @@ export const useAppStore = defineStore('app', () => {
 
   const closeMikaModal = () => {
     mikaModalOpen.value = false
+  }
+
+  const toggleSearchModal = () => {
+    searchModalOpen.value = !searchModalOpen.value
   }
 
   const onRouteChange = (route: string) => {
@@ -519,16 +575,20 @@ export const useAppStore = defineStore('app', () => {
     chaosMode,
     moldMode,
     musicPlaying,
+    isMuted,
     currentQuoteIndex,
     tachValue,
     mikaModalOpen,
     confirmationOpen,
+    searchModalOpen,
     currentRoute,
     quotes,
+    temer3Quotes,
     adviceSlips,
 
     // Getters
     currentQuote,
+    isTemer3,
 
     // Composables (expose directly)
     panels: panels.panels,
@@ -549,6 +609,7 @@ export const useAppStore = defineStore('app', () => {
     toggleChaosMode,
     toggleMoldMode,
     toggleMusic,
+    toggleMute,
     togglePanel: panels.togglePanel,
     nextQuote,
     preloadAdvice,
@@ -557,6 +618,7 @@ export const useAppStore = defineStore('app', () => {
     onTurnMe,
     closeConfirmation,
     closeMikaModal,
+    toggleSearchModal,
     onRouteChange,
     loadRankings: rankingsStore.loadRankings,
     createHeart,
