@@ -1,0 +1,14 @@
+{
+  "id": 140,
+  "title": "Tags/categories",
+  "description": "Group related content better",
+  "status": "pending",
+  "response": null,
+  "created_at": "2026-02-05 03:45:54",
+  "updated_at": "2026-02-05 03:45:54",
+  "creator_id": null,
+  "type": "feature",
+  "priority": "medium",
+  "relevanceScore": 100,
+  "daysSinceCreation": 0
+}

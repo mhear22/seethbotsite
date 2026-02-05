@@ -11,6 +11,8 @@ interface Ticket {
   status: 'pending' | 'needs-info' | 'completed' | 'declined' | 'unresolved'
   type: 'feature' | 'bug' | 'feedback'
   priority: 'high' | 'medium' | 'low'
+  tags?: string
+  category?: string
   response?: string
   creator_id?: string
   created_at: string
@@ -48,6 +50,8 @@ const notification = ref<{ show: boolean; message: string; type: 'success' | 'er
 const filterStatus = ref('pending')
 const filterType = ref('')
 const filterPriority = ref('')
+const filterTag = ref('')
+const filterCategory = ref('')
 
 // Search state
 const searchQuery = ref('')
@@ -80,7 +84,9 @@ const newTicket = ref({
   title: '',
   description: '',
   type: 'feature' as 'feature' | 'bug' | 'feedback', // Kept for backend compatibility
-  priority: 'medium' as 'high' | 'medium' | 'low' // Kept for backend compatibility
+  priority: 'medium' as 'high' | 'medium' | 'low', // Kept for backend compatibility
+  tags: '',
+  category: ''
 })
 
 // Edit ticket modal state
@@ -90,7 +96,9 @@ const editForm = ref({
   title: '',
   description: '',
   type: 'feature' as 'feature' | 'bug' | 'feedback',
-  priority: 'medium' as 'high' | 'medium' | 'low'
+  priority: 'medium' as 'high' | 'medium' | 'low',
+  tags: '',
+  category: ''
 })
 
 // Status colors
@@ -144,6 +152,22 @@ const filteredTickets = computed(() => {
 
   if (filterPriority.value) {
     result = result.filter(t => t.priority === filterPriority.value)
+  }
+
+  // Filter by tag
+  if (filterTag.value) {
+    const tag = filterTag.value.toLowerCase().trim()
+    result = result.filter(t => 
+      t.tags && t.tags.toLowerCase().includes(tag)
+    )
+  }
+
+  // Filter by category
+  if (filterCategory.value) {
+    const category = filterCategory.value.toLowerCase().trim()
+    result = result.filter(t => 
+      t.category && t.category.toLowerCase() === category
+    )
   }
 
   // Search filter
@@ -262,6 +286,8 @@ const submitTicket = async () => {
         description: newTicket.value.description.trim() || null,
         type: newTicket.value.type,
         priority: newTicket.value.priority,
+        tags: newTicket.value.tags.trim() || null,
+        category: newTicket.value.category.trim() || null,
         creator_id: creatorId.value
       })
     })
@@ -276,7 +302,9 @@ const submitTicket = async () => {
       title: '',
       description: '',
       type: 'feature',
-      priority: 'medium'
+      priority: 'medium',
+      tags: '',
+      category: ''
     }
     showNewTicketModal.value = false
 
@@ -300,7 +328,9 @@ const startEdit = (ticket: Ticket) => {
     title: ticket.title,
     description: ticket.description,
     type: ticket.type,
-    priority: ticket.priority
+    priority: ticket.priority,
+    tags: ticket.tags || '',
+    category: ticket.category || ''
   }
   showEditModal.value = true
 }
@@ -313,7 +343,9 @@ const cancelEdit = () => {
     title: '',
     description: '',
     type: 'feature',
-    priority: 'medium'
+    priority: 'medium',
+    tags: '',
+    category: ''
   }
 }
 
@@ -335,7 +367,9 @@ const saveEdit = async () => {
         title: editForm.value.title.trim(),
         description: editForm.value.description.trim() || null,
         type: editForm.value.type,
-        priority: editForm.value.priority
+        priority: editForm.value.priority,
+        tags: editForm.value.tags.trim() || null,
+        category: editForm.value.category.trim() || null
       })
     })
 
@@ -351,7 +385,9 @@ const saveEdit = async () => {
       title: '',
       description: '',
       type: 'feature',
-      priority: 'medium'
+      priority: 'medium',
+      tags: '',
+      category: ''
     }
 
     // Show success notification
@@ -929,6 +965,40 @@ onUnmounted(() => {
             {{ option.label }}
           </button>
         </div>
+        <div class="filter-group-title">Tags</div>
+        <div class="filter-chips">
+          <input
+            v-model="filterTag"
+            type="text"
+            placeholder="🏷️ Filter by tag..."
+            class="filter-input"
+          />
+          <button
+            v-if="filterTag"
+            @click="filterTag = ''"
+            class="filter-clear"
+            title="Clear tag filter"
+          >
+            ✕
+          </button>
+        </div>
+        <div class="filter-group-title">Category</div>
+        <div class="filter-chips">
+          <input
+            v-model="filterCategory"
+            type="text"
+            placeholder="📁 Filter by category..."
+            class="filter-input"
+          />
+          <button
+            v-if="filterCategory"
+            @click="filterCategory = ''"
+            class="filter-clear"
+            title="Clear category filter"
+          >
+            ✕
+          </button>
+        </div>
       </div>
 
       <!-- Filtered Tickets List -->
@@ -961,6 +1031,23 @@ onUnmounted(() => {
             </div>
           </div>
           <div class="ticket-description">{{ ticket.description }}</div>
+
+          <!-- Tags and Category -->
+          <div v-if="ticket.tags || ticket.category" class="ticket-tags-category">
+            <div v-if="ticket.tags" class="ticket-tags">
+              <span
+                v-for="tag in ticket.tags.split(',').map(t => t.trim()).filter(t => t)"
+                :key="tag"
+                class="tag-chip"
+              >
+                🏷️ {{ tag }}
+              </span>
+            </div>
+            <div v-if="ticket.category" class="ticket-category">
+              <span class="category-chip">📁 {{ ticket.category }}</span>
+            </div>
+          </div>
+
           <div class="ticket-meta">
             <span class="ticket-date">Created: {{ formatDate(ticket.created_at) }}</span>
             <div class="ticket-actions">
@@ -1010,6 +1097,8 @@ onUnmounted(() => {
       <TicketForm
         v-model:title="newTicket.title"
         v-model:description="newTicket.description"
+        v-model:tags="newTicket.tags"
+        v-model:category="newTicket.category"
         :is-editing="false"
         :loading="loading"
         :estimated-wait-time-minutes="estimatedWaitTime?.minutes ?? null"
@@ -1028,6 +1117,8 @@ onUnmounted(() => {
       <TicketForm
         v-model:title="editForm.title"
         v-model:description="editForm.description"
+        v-model:tags="editForm.tags"
+        v-model:category="editForm.category"
         :is-editing="true"
         :loading="loading"
         @submit="saveEdit"
@@ -2432,5 +2523,112 @@ onUnmounted(() => {
 
 .dark .error-close:hover {
   color: #fff5f5;
+}
+
+/* Tags and Category Styles */
+.ticket-tags-category {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.ticket-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tag-chip {
+  display: inline-block;
+  padding: 4px 10px;
+  background: #ebf8ff;
+  color: #2b6cb0;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid #bee3f8;
+}
+
+.ticket-category {
+  display: flex;
+  align-items: center;
+}
+
+.category-chip {
+  display: inline-block;
+  padding: 4px 10px;
+  background: #faf5ff;
+  color: #6b46c1;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid #d6bcfa;
+}
+
+/* Filter Input Styles */
+.filter-input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #4a5568;
+  background: white;
+  min-width: 150px;
+}
+
+.filter-input:focus {
+  outline: none;
+  border-color: #4299e1;
+  box-shadow: 0 0 0 2px rgba(66, 153, 225, 0.1);
+}
+
+.filter-clear {
+  padding: 4px 8px;
+  background: #cbd5e0;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.filter-clear:hover {
+  background: #a0aec0;
+}
+
+.dark .filter-input {
+  background: #2d3748;
+  border-color: #4a5568;
+  color: #e2e8f0;
+}
+
+.dark .filter-input:focus {
+  border-color: #4299e1;
+  box-shadow: 0 0 0 2px rgba(66, 153, 225, 0.2);
+}
+
+.dark .filter-clear {
+  background: #4a5568;
+}
+
+.dark .filter-clear:hover {
+  background: #718096;
+}
+
+.dark .tag-chip {
+  background: #2c5282;
+  color: #bee3f8;
+  border-color: #2b6cb0;
+}
+
+.dark .category-chip {
+  background: #44337a;
+  color: #d6bcfa;
+  border-color: #6b46c1;
 }
 </style>
