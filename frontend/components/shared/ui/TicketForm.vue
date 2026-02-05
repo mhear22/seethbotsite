@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { computed, watch, ref, onMounted } from 'vue'
 
 interface TicketFormProps {
   title: string
   description: string
   type?: 'feature' | 'bug' | 'feedback'
   priority?: 'high' | 'medium' | 'low'
+  tags?: string
+  category?: string
   isEditing?: boolean
   loading?: boolean
   estimatedWaitTimeMinutes?: number | null
@@ -24,6 +26,8 @@ const emit = defineEmits<{
   'update:description': [value: string]
   'update:type': [value: 'feature' | 'bug' | 'feedback']
   'update:priority': [value: 'high' | 'medium' | 'low']
+  'update:tags': [value: string]
+  'update:category': [value: string]
   submit: []
   cancel: []
 }>()
@@ -47,6 +51,36 @@ const localType = computed({
 const localPriority = computed({
   get: () => props.priority || 'medium',
   set: (value: 'high' | 'medium' | 'low') => emit('update:priority', value)
+})
+
+const localTags = computed({
+  get: () => props.tags || '',
+  set: (value: string) => emit('update:tags', value)
+})
+
+const localCategory = computed({
+  get: () => props.category || '',
+  set: (value: string) => emit('update:category', value)
+})
+
+// Available categories for autocomplete
+const availableCategories = ref<string[]>([])
+
+// Load available categories
+const loadCategories = async () => {
+  try {
+    const response = await fetch('/api/tickets/categories')
+    if (response.ok) {
+      const data = await response.json()
+      availableCategories.value = data.categories.map((c: any) => c.name)
+    }
+  } catch (err) {
+    console.warn('Failed to load categories:', err)
+  }
+}
+
+onMounted(() => {
+  loadCategories()
 })
 
 const isFormValid = computed(() => {
@@ -142,6 +176,32 @@ const formatWaitTime = (minutes: number): string => {
         <option value="medium">🟡 Medium</option>
         <option value="high">🔴 High</option>
       </select>
+    </div>
+
+    <div class="form-group">
+      <label for="ticket-tags">Tags (comma-separated)</label>
+      <input
+        id="ticket-tags"
+        v-model="localTags"
+        type="text"
+        placeholder="e.g., ui, bug, performance"
+        :disabled="loading"
+      />
+    </div>
+
+    <div class="form-group">
+      <label for="ticket-category">Category</label>
+      <input
+        id="ticket-category"
+        v-model="localCategory"
+        type="text"
+        list="category-list"
+        placeholder="e.g., User Interface, Backend, Performance"
+        :disabled="loading"
+      />
+      <datalist id="category-list">
+        <option v-for="cat in availableCategories" :key="cat" :value="cat" />
+      </datalist>
     </div>
 
     <div class="form-actions">

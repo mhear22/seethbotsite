@@ -92,6 +92,20 @@ function getDB(): Database.Database {
     // Column already exists, ignore the error
   }
 
+  // Add tags column if it doesn't exist (for ticket categorization - Ticket #140)
+  try {
+    db.exec(`ALTER TABLE tickets ADD COLUMN tags TEXT`);
+  } catch (err) {
+    // Column already exists, ignore the error
+  }
+
+  // Add category column if it doesn't exist (for ticket categorization - Ticket #140)
+  try {
+    db.exec(`ALTER TABLE tickets ADD COLUMN category TEXT`);
+  } catch (err) {
+    // Column already exists, ignore the error
+  }
+
   // Create settings table if it doesn't exist
   db.exec(`
     CREATE TABLE IF NOT EXISTS settings (
@@ -338,30 +352,7 @@ router.patch('/tickets/settings/last-collection', async (req: Request, res: Resp
  *   get:
  *     tags: [Tickets]
  *     summary: Get all tickets
- *     description: Returns all tickets with optional filtering by status, type, and priority. Sorted by relevance by default (older pending tickets first).
- *     parameters:
- *       - in: query
- *         name: status
- *         schema:
- *           type: string
- *           enum: [all, pending, needs-info, completed, declined, in-progress]
- *       - in: query
- *         name: type
- *         schema:
- *           type: string
- *           enum: [all, feature, bug, feedback]
- *       - in: query
- *         name: priority
- *         schema:
- *           type: string
- *           enum: [all, high, medium, low]
- *       - in: query
- *         name: sortBy
- *         schema:
- *           type: string
- *           enum: [relevance, created_at, updated_at]
- *           default: relevance
- *           description: Sort method - relevance prioritizes older pending tickets
+ *     description: Returns all tickets with optional filtering by status, type, priority, tags, and category. Sorted by relevance by default (older pending tickets first).
  *     responses:
  *       200:
  *         content:
@@ -405,7 +396,7 @@ router.patch('/tickets/settings/last-collection', async (req: Request, res: Resp
 router.get('/tickets', async (req: Request, res: Response) => {
   try {
     const db = getDB();
-    const { status = 'all', type = 'all', priority = 'all', sortBy = 'relevance' } = req.query;
+    const { status = 'all', type = 'all', priority = 'all', tag, category, sortBy = 'relevance' } = req.query;
 
     let query = 'SELECT * FROM tickets WHERE 1=1';
     const params: any[] = [];
@@ -426,6 +417,18 @@ router.get('/tickets', async (req: Request, res: Response) => {
     if (priority !== 'all') {
       query += ' AND priority = ?';
       params.push(priority);
+    }
+
+    // Filter by tag (tags are comma-separated, so we use LIKE)
+    if (tag && typeof tag === 'string') {
+      query += ' AND tags LIKE ?';
+      params.push(`%${tag}%`);
+    }
+
+    // Filter by category
+    if (category && typeof category === 'string') {
+      query += ' AND category = ?';
+      params.push(category);
     }
 
     // Sort options: relevance (default), created_at, updated_at
@@ -503,41 +506,10 @@ router.get('/tickets', async (req: Request, res: Response) => {
  *   post:
  *     tags: [Tickets]
  *     summary: Create a new ticket
- *     description: Creates a new ticket with title and description. Optionally includes type, priority, and creator_id for ticket ownership tracking.
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [title]
- *             properties:
- *               title:
- *                 type: string
- *               description:
- *                 type: string
- *               ticketType:
- *                 type: string
- *                 enum: [feature, bug, feedback]
- *                 default: feature
- *                 description: Type of ticket
- *               priority:
- *                 type: string
- *                 enum: [high, medium, low]
- *                 default: medium
- *                 description: Priority level of the ticket
- *               creator_id:
- *                 type: string
- *                 description: Optional unique identifier for the ticket creator
- *     responses:
- *       201:
- *         description: Ticket created successfully
- *       400:
- *         description: Bad request - missing required fields
- */
+ *     description: Creates a new ticket with title and description. Optionally includes type, priority, tags, category, and creator_id for ticket ownership tracking.
 router.post('/tickets', async (req: Request, res: Response) => {
   try {
-    const { title, description, creator_id, type, priority } = req.body;
+    const { title, description, creator_id, type, priority, tags, category } = req.body;
 
     if (!title) {
       return res.status(400).json({ error: 'Title is required' });
@@ -545,15 +517,17 @@ router.post('/tickets', async (req: Request, res: Response) => {
 
     const db = getDB();
     const stmt = db.prepare(`
-      INSERT INTO tickets (title, description, status, creator_id, type, priority, created_at, updated_at)
-      VALUES (?, ?, 'pending', ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      INSERT INTO tickets (title, description, status, creator_id, type, priority, tags, category, created_at, updated_at)
+      VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
     `);
     const result = stmt.run(
       title,
       description || null,
       creator_id || null,
       type || 'feature',
-      priority || 'medium'
+      priority || 'medium',
+      tags || null,
+      category || null
     );
 
     const newTicket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(result.lastInsertRowid);
@@ -571,56 +545,14 @@ router.post('/tickets', async (req: Request, res: Response) => {
  *   patch:
  *     tags: [Tickets]
  *     summary: Update a ticket
- *     description: Update ticket fields including status, response, title, and description. No authentication required.
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *     requestBody:
- *       required: false
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               title:
- *                 type: string
- *               description:
- *                 type: string
- *               status:
- *                 type: string
- *                 enum: [pending, needs-info, completed, declined, unresolved]
- *               response:
- *                 type: string
- *               type:
- *                 type: string
- *                 enum: [feature, bug, feedback]
- *                 description: Type of ticket
- *               priority:
- *                 type: string
- *                 enum: [high, medium, low]
- *                 description: Priority level of the ticket
- *               creator_id:
- *                 type: string
- *     responses:
- *       200:
- *         description: Ticket updated successfully
- *       400:
- *         description: Bad request - invalid field values
- *       403:
- *         description: Forbidden - cannot edit non-pending tickets
- *       404:
- *         description: Ticket not found
- */
+ *     description: Update ticket fields including status, response, title, description, tags, and category. No authentication required.
 router.patch('/tickets/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { status, response, title, description, creator_id, type, priority } = req.body;
+    const { status, response, title, description, creator_id, type, priority, tags, category } = req.body;
 
     // Check if any field is provided
-    if (!status && !response && !title && !description) {
+    if (!status && !response && !title && !description && !tags && !category) {
       return res.status(400).json({ error: 'At least one field must be provided' });
     }
 
@@ -687,6 +619,14 @@ router.patch('/tickets/:id', async (req: Request, res: Response) => {
     if (priority !== undefined) {
       updates.push('priority = ?');
       values.push(priority);
+    }
+    if (tags !== undefined) {
+      updates.push('tags = ?');
+      values.push(tags.trim());
+    }
+    if (category !== undefined) {
+      updates.push('category = ?');
+      values.push(category.trim());
     }
     updates.push('updated_at = CURRENT_TIMESTAMP');
 
@@ -1226,5 +1166,115 @@ router.patch('/tickets/appeals/:id/review', async (req: Request, res: Response) 
   } catch (error) {
     console.error('Error reviewing appeal:', error);
     res.status(500).json({ error: 'Failed to review appeal' });
+  }
+});
+
+/**
+ * @openapi
+ * /api/tickets/tags:
+ *   get:
+ *     tags: [Tickets]
+ *     summary: Get all tags used across tickets
+ *     description: Returns a list of all unique tags used in tickets, sorted by usage count
+ *     responses:
+ *       200:
+ *         description: Tags retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 tags:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       name:
+ *                         type: string
+ *                         example: "ui"
+ *                       count:
+ *                         type: integer
+ *                         example: 5
+ */
+router.get('/tickets/tags', async (req: Request, res: Response) => {
+  try {
+    const db = getDB();
+
+    // Get all tickets with tags
+    const tickets = db.prepare('SELECT tags FROM tickets WHERE tags IS NOT NULL AND tags != ""').all() as { tags: string }[];
+
+    // Parse and count tags (tags are comma-separated)
+    const tagCounts: Record<string, number> = {};
+    for (const ticket of tickets) {
+      const tags = ticket.tags.split(',').map(t => t.trim()).filter(t => t.length > 0);
+      for (const tag of tags) {
+        tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+      }
+    }
+
+    // Sort by count (most used first)
+    const sortedTags = Object.entries(tagCounts)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count);
+
+    res.json({ tags: sortedTags });
+  } catch (error) {
+    console.error('Error fetching tags:', error);
+    res.status(500).json({ error: 'Failed to fetch tags' });
+  }
+});
+
+/**
+ * @openapi
+ * /api/tickets/categories:
+ *   get:
+ *     tags: [Tickets]
+ *     summary: Get all categories used across tickets
+ *     description: Returns a list of all unique categories used in tickets, sorted by usage count
+ *     responses:
+ *       200:
+ *         description: Categories retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 categories:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       name:
+ *                         type: string
+ *                         example: "ui"
+ *                       count:
+ *                         type: integer
+ *                         example: 3
+ */
+router.get('/tickets/categories', async (req: Request, res: Response) => {
+  try {
+    const db = getDB();
+
+    // Get all tickets with categories
+    const tickets = db.prepare('SELECT category FROM tickets WHERE category IS NOT NULL AND category != ""').all() as { category: string }[];
+
+    // Count categories
+    const categoryCounts: Record<string, number> = {};
+    for (const ticket of tickets) {
+      const category = ticket.category.trim();
+      if (category.length > 0) {
+        categoryCounts[category] = (categoryCounts[category] || 0) + 1;
+      }
+    }
+
+    // Sort by count (most used first)
+    const sortedCategories = Object.entries(categoryCounts)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count);
+
+    res.json({ categories: sortedCategories });
+  } catch (error) {
+    console.error('Error fetching categories:', error);
+    res.status(500).json({ error: 'Failed to fetch categories' });
   }
 });
