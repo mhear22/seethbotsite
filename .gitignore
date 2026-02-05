@@ -1,43 +1,61 @@
 # Dependencies
 node_modules/
-frontend/node_modules/
-backend/node_modules/
 
 # Build outputs
 dist/
-build/
-frontend/dist/
-backend/dist/
+webdist/
 
-# Environment files
+# Environment variables
 .env
 .env.local
-frontend/.env*
-backend/.env*
+.env.*.local
 
 # Logs
 *.log
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
 
-# OS files
-.DS_Store
-Thumbs.db
+# Testing
+coverage/
+
+# SQLite databases
+*.db
+*.db-shm
+*.db-wal
+backend/data/*.db
 
 # IDE
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
 
-# Archived scripts
-scripts/archive/
-backend/scripts/archive/
+# OS
+.DS_Store
+Thumbs.db
 
-# Database files
-backend/data/*.db
-backend/data/*.db-shm
-backend/data/*.db-wal
-backend/data/health-state.json
-
-# Temporary scripts
-*-ticket-*.js
+# Temporary test scripts
+complete-*.js
 check-*.js
+create-*.js
+delete-*.js
+find-*.js
 list-*.js
+mark-*.js
+query-*.js
+read-*.js
+show-*.js
+sync-*.js
+test-*.js
+update-*.js
+verify-*.js
+
+# Ticket documentation (keep in repo but organized)
+# TICKET_*.md - keep these, they're useful
+
+# Build info (generated)
+backend/build-info.json
