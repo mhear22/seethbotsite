@@ -78,6 +78,7 @@ const dropdowns = ref<DropdownData[]>([
     routes: [
       { title: 'Clocks', icon: '🌍', path: '/clocks' },
       { title: 'Countdowns', icon: '⏰', path: '/countdowns' },
+      { title: 'Favorites', icon: '⭐', path: '/favorites' },
       { title: 'Patch Notes', icon: '📝', path: '/patch-notes' },
       { title: 'About', icon: 'ℹ️', path: '/about' },
       { title: 'Settings', icon: '⚙️', path: '/settings' },

@@ -1,5 +1,8 @@
 <script setup lang="ts">
-defineProps<{
+import { computed } from 'vue'
+import { useFavorites } from '../../composables/useFavorites'
+
+const props = defineProps<{
   isOpen?: boolean
   catImage: string
   loading?: boolean
@@ -10,6 +13,19 @@ const emit = defineEmits<{
   toggle: []
   'new-cat': []
 }>()
+
+const { toggleFavorite, isFavorite } = useFavorites()
+
+const catData = computed(() => ({
+  url: props.catImage
+}))
+
+const isFavorited = computed(() => isFavorite('cat', catData.value))
+
+const handleFavorite = (e: Event) => {
+  e.stopPropagation()
+  toggleFavorite('cat', catData.value)
+}
 
 const toggle = () => {
   emit('toggle')
@@ -23,7 +39,16 @@ const toggle = () => {
       <button class="cat-close" @click="toggle" v-if="!centered">✕</button>
     </div>
     <div class="cat-content">
-      <img v-if="!loading" :src="catImage" class="cat-image" alt="Random cat" />
+      <div v-if="!loading" class="cat-image-wrapper">
+        <img :src="catImage" class="cat-image" alt="Random cat" />
+        <button
+          @click="handleFavorite"
+          :class="['favorite-btn', { favorited: isFavorited }]"
+          :title="isFavorited ? 'Remove from favorites' : 'Add to favorites'"
+        >
+          ⭐
+        </button>
+      </div>
       <div v-if="loading" class="cat-loading">Loading... 🐱</div>
       <button class="cute-btn" @click="$emit('new-cat')" :disabled="loading">🔄 New Cat</button>
 
@@ -101,12 +126,54 @@ const toggle = () => {
   gap: 20px;
 }
 
-.cat-image {
+.cat-image-wrapper {
+  position: relative;
   width: 100%;
   max-width: 400px;
+}
+
+.cat-image {
+  width: 100%;
   border-radius: 12px;
   object-fit: cover;
   min-height: 300px;
+}
+
+.favorite-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid #cbd5e0;
+  background: rgba(255, 255, 255, 0.95);
+  color: #cbd5e0;
+  font-size: 1.4rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.favorite-btn:hover {
+  transform: scale(1.1);
+  border-color: #f6d365;
+  color: #f6d365;
+}
+
+.favorite-btn.favorited {
+  background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+  border-color: #f6d365;
+  color: white;
+  box-shadow: 0 4px 12px rgba(246, 211, 101, 0.4);
+}
+
+.favorite-btn.favorited:hover {
+  transform: scale(1.15);
+  box-shadow: 0 6px 16px rgba(246, 211, 101, 0.5);
 }
 
 .cat-loading {

@@ -2,6 +2,7 @@
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import Modal from '../shared/ui/Modal.vue'
 import TicketForm from '../shared/ui/TicketForm.vue'
+import { useFavorites } from '../../composables/useFavorites'
 
 interface Ticket {
   id: number
@@ -52,8 +53,10 @@ const filterPriority = ref('')
 const searchQuery = ref('')
 const searchInputRef = ref<HTMLInputElement | null>(null)
 
+// Favorites composable
+const { toggleFavorite, isFavorite } = useFavorites()
+
 // Admin state
-const apiKey = ref<string>('')
 const showAdminPanel = ref(false)
 const closingTicket = ref<Ticket | null>(null)
 const showForm = ref(false)
@@ -180,6 +183,16 @@ const isOwnTicket = (ticket: Ticket): boolean => {
   return !!(ticket.creator_id && ticket.creator_id === creatorId.value)
 }
 
+// Favorite helpers
+const handleTicketFavorite = (ticket: Ticket, e: Event) => {
+  e.stopPropagation()
+  toggleFavorite('ticket', ticket)
+}
+
+const isTicketFavorite = (ticket: Ticket): boolean => {
+  return isFavorite('ticket', ticket)
+}
+
 // Load tickets
 const loadTickets = async () => {
   loading.value = true
@@ -281,6 +294,7 @@ const submitTicket = async () => {
 
 // Start editing a ticket
 const startEdit = (ticket: Ticket) => {
+  error.value = null
   editingTicket.value = ticket
   editForm.value = {
     title: ticket.title,
@@ -434,25 +448,9 @@ const loadEstimatedWaitTime = async () => {
   }
 }
 
-// Load API key from localStorage
-const loadApiKey = () => {
-  const saved = localStorage.getItem('tickets-admin-api-key')
-  if (saved) {
-    apiKey.value = saved
-  }
-}
-
-// Save API key to localStorage
-const saveApiKey = () => {
-  if (apiKey.value) {
-    localStorage.setItem('tickets-admin-api-key', apiKey.value)
-  } else {
-    localStorage.removeItem('tickets-admin-api-key')
-  }
-}
-
 // Start closing a ticket
 const startCloseTicket = (ticket: Ticket) => {
+  error.value = null
   closingTicket.value = ticket
   closeForm.value = {
     status: 'completed',
@@ -470,14 +468,9 @@ const cancelCloseTicket = () => {
   }
 }
 
-// Close ticket (admin)
+// Close ticket
 const closeTicket = async () => {
   if (!closingTicket.value) return
-
-  if (!apiKey.value.trim()) {
-    error.value = 'API key is required to close tickets'
-    return
-  }
 
   loading.value = true
   error.value = null
@@ -485,8 +478,7 @@ const closeTicket = async () => {
     const response = await fetch(`/api/tickets/${closingTicket.value.id}`, {
       method: 'PATCH',
       headers: {
-        'Content-Type': 'application/json',
-        'X-API-Key': apiKey.value.trim()
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         status: closeForm.value.status,
@@ -520,6 +512,7 @@ const closeTicket = async () => {
 
 // Start confirming a ticket
 const startConfirmTicket = (ticket: Ticket) => {
+  error.value = null
   confirmingTicket.value = ticket
   showConfirmModal.value = true
 }
@@ -536,10 +529,6 @@ const cancelConfirmTicket = () => {
 // Confirm ticket completion
 const confirmTicket = async () => {
   if (!confirmingTicket.value) return
-  if (!apiKey.value.trim()) {
-    error.value = 'API key is required to confirm tickets'
-    return
-  }
 
   loading.value = true
   error.value = null
@@ -547,8 +536,7 @@ const confirmTicket = async () => {
     const response = await fetch(`/api/tickets/${confirmingTicket.value.id}`, {
       method: 'PATCH',
       headers: {
-        'Content-Type': 'application/json',
-        'X-API-Key': apiKey.value.trim()
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         status: 'completed',
@@ -587,10 +575,6 @@ const markUnresolved = async () => {
     error.value = 'Reason is required to mark ticket as unresolved'
     return
   }
-  if (!apiKey.value.trim()) {
-    error.value = 'API key is required'
-    return
-  }
 
   loading.value = true
   error.value = null
@@ -598,8 +582,7 @@ const markUnresolved = async () => {
     const response = await fetch(`/api/tickets/${confirmingTicket.value.id}`, {
       method: 'PATCH',
       headers: {
-        'Content-Type': 'application/json',
-        'X-API-Key': apiKey.value.trim()
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         status: 'unresolved',
@@ -703,7 +686,6 @@ onMounted(() => {
   loadIgnoreMode()
   loadLastCollection()
   loadEstimatedWaitTime()
-  loadApiKey()
   loadTickets()
   loadTicketStats()
 
@@ -881,6 +863,13 @@ onUnmounted(() => {
         <button @click="hideNotification" class="notification-close">&times;</button>
       </div>
 
+      <!-- Error Message Display -->
+      <div v-if="error" class="error-message">
+        <span class="error-icon">❌</span>
+        <span class="error-text">{{ error }}</span>
+        <button @click="error = null" class="error-close">&times;</button>
+      </div>
+
       <button
         @click="showNewTicketModal = true"
         class="new-ticket-btn"
@@ -962,6 +951,13 @@ onUnmounted(() => {
               <span class="ticket-status" :class="statusColors[ticket.status]">
                 {{ statusLabels[ticket.status] }}
               </span>
+              <button
+                @click="handleTicketFavorite(ticket, $event)"
+                :class="['ticket-favorite-btn', { favorited: isTicketFavorite(ticket) }]"
+                :title="isTicketFavorite(ticket) ? 'Remove from favorites' : 'Add to favorites'"
+              >
+                ⭐
+              </button>
             </div>
           </div>
           <div class="ticket-description">{{ ticket.description }}</div>
@@ -1056,22 +1052,11 @@ onUnmounted(() => {
         </div>
 
         <div class="confirm-actions">
-          <div class="api-key-input">
-            <label for="confirm-api-key">API Key (required):</label>
-            <input
-              id="confirm-api-key"
-              v-model="apiKey"
-              type="password"
-              placeholder="Enter admin API key"
-              class="input-field"
-            />
-          </div>
-
           <div class="action-buttons">
             <button
               @click="confirmTicket"
               class="btn-confirm"
-              :disabled="loading || !apiKey.trim()"
+              :disabled="loading"
             >
               ✅ Confirm Completion
             </button>
@@ -1088,7 +1073,7 @@ onUnmounted(() => {
               <button
                 @click="markUnresolved"
                 class="btn-unresolved"
-                :disabled="loading || !unresolvedForm.reason.trim() || !apiKey.trim()"
+                :disabled="loading || !unresolvedForm.reason.trim()"
               >
                 ⚠️ Mark as Unresolved
               </button>
@@ -1469,6 +1454,35 @@ onUnmounted(() => {
   border-radius: 8px;
   margin-bottom: 20px;
   border: 1px solid #fc8181;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.error-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.error-text {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.error-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #c53030;
+  line-height: 1;
+  padding: 0;
+  min-width: 24px;
+}
+
+.error-close:hover {
+  color: #9b2c2c;
 }
 
 .notification {
@@ -1799,6 +1813,57 @@ onUnmounted(() => {
   gap: 8px;
   flex-wrap: wrap;
   align-items: center;
+}
+
+.ticket-favorite-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid #cbd5e0;
+  background: white;
+  color: #cbd5e0;
+  font-size: 0.9rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.ticket-favorite-btn:hover {
+  transform: scale(1.1);
+  border-color: #f6d365;
+  color: #f6d365;
+}
+
+.ticket-favorite-btn.favorited {
+  background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+  border-color: #f6d365;
+  color: white;
+  box-shadow: 0 2px 6px rgba(246, 211, 101, 0.3);
+}
+
+.ticket-favorite-btn.favorited:hover {
+  transform: scale(1.15);
+  box-shadow: 0 3px 8px rgba(246, 211, 101, 0.4);
+}
+
+.dark .ticket-favorite-btn {
+  background: #2d3748;
+  border-color: #4a5568;
+  color: #718096;
+}
+
+.dark .ticket-favorite-btn:hover {
+  border-color: #f6d365;
+  color: #f6d365;
+}
+
+.dark .ticket-favorite-btn.favorited {
+  background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+  border-color: #f6d365;
 }
 
 .ticket-type {
@@ -2205,12 +2270,6 @@ onUnmounted(() => {
   gap: 8px;
 }
 
-.api-key-input label {
-  font-size: 14px;
-  font-weight: 600;
-  color: #4a5568;
-}
-
 .input-field {
   padding: 10px 12px;
   border: 2px solid #e2e8f0;
@@ -2340,10 +2399,6 @@ onUnmounted(() => {
   color: #cbd5e0;
 }
 
-.dark .api-key-input label {
-  color: #cbd5e0;
-}
-
 .dark .input-field {
   background: #2d3748;
   border-color: #4a5568;
@@ -2362,5 +2417,20 @@ onUnmounted(() => {
 
 .dark .unresolved-section label {
   color: #fc8181;
+}
+
+/* Dark mode error message */
+.dark .error-message {
+  background: #742a2a;
+  color: #fc8181;
+  border-color: #9b2c2c;
+}
+
+.dark .error-close {
+  color: #fc8181;
+}
+
+.dark .error-close:hover {
+  color: #fff5f5;
 }
 </style>

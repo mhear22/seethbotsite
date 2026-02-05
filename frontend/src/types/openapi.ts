@@ -3863,7 +3863,7 @@ export interface paths {
                                 title?: string;
                                 description?: string;
                                 status?: string;
-                                type?: string;
+                                ticketType?: string;
                                 priority?: string;
                                 created_at?: string;
                                 updated_at?: string;
@@ -4001,7 +4001,7 @@ export interface paths {
                                 created_at?: string;
                                 updated_at?: string;
                                 /** @enum {string} */
-                                type?: "feature" | "bug" | "feedback";
+                                ticketType?: "feature" | "bug" | "feedback";
                                 /** @enum {string} */
                                 priority?: "high" | "medium" | "low";
                                 /** @description Relevance score (0-100), higher = more relevant */
@@ -4036,7 +4036,7 @@ export interface paths {
                          * @default feature
                          * @enum {string}
                          */
-                        type?: "feature" | "bug" | "feedback";
+                        ticketType?: "feature" | "bug" | "feedback";
                         /**
                          * @description Priority level of the ticket
                          * @default medium

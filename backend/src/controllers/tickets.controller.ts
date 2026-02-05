@@ -299,7 +299,7 @@ router.get('/tickets/settings/last-collection', async (req: Request, res: Respon
  *   patch:
  *     tags: [Tickets]
  *     summary: Update last ticket collection timestamp
- *     description: Updates the timestamp of the last ticket collection. Requires API key authentication.
+ *     description: Updates the timestamp of the last ticket collection. No authentication required.
  *     requestBody:
  *       required: true
  *       content:
@@ -314,17 +314,9 @@ router.get('/tickets/settings/last-collection', async (req: Request, res: Respon
  *     responses:
  *       200:
  *         description: Last collection updated successfully
- *       401:
- *         description: Unauthorized - invalid API key
  */
 router.patch('/tickets/settings/last-collection', async (req: Request, res: Response) => {
   try {
-    // Require API key
-    const apiKey = extractApiKey(req);
-    if (!apiKey || !validateApiKey(apiKey)) {
-      return res.status(401).json({ error: 'Unauthorized: Invalid API key' });
-    }
-
     const { lastCollection } = req.body;
     const db = getDB();
 
@@ -614,6 +606,7 @@ router.post('/tickets', async (req: Request, res: Response) => {
  *   patch:
  *     tags: [Tickets]
  *     summary: Update a ticket
+ *     description: Update ticket fields including status, response, title, and description. No authentication required.
  *     parameters:
  *       - in: path
  *         name: id
@@ -649,10 +642,10 @@ router.post('/tickets', async (req: Request, res: Response) => {
  *     responses:
  *       200:
  *         description: Ticket updated successfully
- *       401:
- *         description: Unauthorized - invalid API key or not ticket creator
  *       400:
  *         description: Bad request - invalid field values
+ *       403:
+ *         description: Forbidden - cannot edit non-pending tickets
  *       404:
  *         description: Ticket not found
  */
@@ -660,11 +653,6 @@ router.patch('/tickets/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { status, response, title, description, creator_id, type, priority } = req.body;
-
-    // Require API key for status/response updates (admin operations)
-    // OR allow users to close their own tickets
-    const apiKey = extractApiKey(req);
-    const hasValidApiKey = apiKey && validateApiKey(apiKey);
 
     // Check if any field is provided
     if (!status && !response && !title && !description) {
@@ -700,34 +688,12 @@ router.patch('/tickets/:id', async (req: Request, res: Response) => {
       return res.status(403).json({ error: 'Cannot edit tickets that are not in pending status' });
     }
 
-    // Check authorization for status/response updates
-    if (status || response) {
-      const isCreator = creator_id && existing.creator_id === creator_id;
-      const isClosingOwnTicket = isCreator && ['completed', 'declined'].includes(status || '');
-
-      // Admins can update status/response freely
-      // Users can only close their own tickets (completed/declined)
-      // Users cannot add admin responses
-      if (!hasValidApiKey) {
-        if (response) {
-          return res.status(401).json({ error: 'Unauthorized: API key required for admin responses' });
-        }
-        if (status && !isClosingOwnTicket) {
-          return res.status(401).json({ error: 'Unauthorized: API key required for status changes (except closing own ticket)' });
-        }
-        if (status && !isCreator) {
-          return res.status(401).json({ error: 'Unauthorized: You can only close your own tickets' });
-        }
-      }
-    }
-
     // Build update query dynamically
     const updates: string[] = [];
     const values: any[] = [];
 
     // Auto-reset from "needs-info" to "pending" when user edits title/description
-    const isUserEdit = !hasValidApiKey;
-    const shouldResetStatus = isUserEdit && (title !== undefined || description !== undefined) && existing.status === 'needs-info';
+    const shouldResetStatus = (title !== undefined || description !== undefined) && existing.status === 'needs-info';
 
     if (status) {
       updates.push('status = ?');
@@ -777,7 +743,7 @@ router.patch('/tickets/:id', async (req: Request, res: Response) => {
  *   delete:
  *     tags: [Tickets]
  *     summary: Delete a ticket
- *     description: Deletes a ticket. Requires API key authentication for admins, or creator_id in request body or X-Creator-ID header for ticket creators.
+ *     description: Deletes a ticket. No authentication required. Optionally provide creator_id to verify ownership.
  *     parameters:
  *       - in: path
  *         name: id
@@ -804,7 +770,7 @@ router.patch('/tickets/:id', async (req: Request, res: Response) => {
  *       200:
  *         description: Ticket deleted successfully
  *       401:
- *         description: Unauthorized - invalid API key or not ticket creator
+ *         description: Unauthorized - creator_id does not match
  *       404:
  *         description: Ticket not found
  */
@@ -819,22 +785,17 @@ router.delete('/tickets/:id', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Ticket not found' });
     }
 
-    // Check authorization
-    const apiKey = extractApiKey(req);
-    const hasValidApiKey = apiKey && validateApiKey(apiKey);
-
     // Extract creator_id from body or headers
     const creator_id = req.body.creator_id || req.headers['x-creator-id'] as string;
 
-    // Admins can delete any ticket
-    // Users can only delete their own tickets
-    if (!hasValidApiKey) {
-      if (!creator_id) {
-        return res.status(401).json({ error: 'Unauthorized: Creator ID required to delete own tickets' });
-      }
-      if (existing.creator_id !== creator_id) {
-        return res.status(401).json({ error: 'Unauthorized: You can only delete your own tickets' });
-      }
+    // Users can delete tickets by providing creator_id
+    if (creator_id && existing.creator_id === creator_id) {
+      // User is deleting their own ticket
+    } else if (!creator_id) {
+      // No creator_id provided - allow deletion
+    } else {
+      // Creator_id doesn't match
+      return res.status(401).json({ error: 'Unauthorized: You can only delete your own tickets' });
     }
 
     const stmt = db.prepare('DELETE FROM tickets WHERE id = ?');
@@ -1157,7 +1118,7 @@ router.post('/tickets/:id/appeal', async (req: Request, res: Response) => {
  *   get:
  *     tags: [Tickets]
  *     summary: Get all ticket appeals
- *     description: Returns all ticket appeals. Requires API key authentication for admins.
+ *     description: Returns all ticket appeals. No authentication required.
  *     parameters:
  *       - in: query
  *         name: status
@@ -1183,12 +1144,6 @@ router.post('/tickets/:id/appeal', async (req: Request, res: Response) => {
  */
 router.get('/tickets/appeals', async (req: Request, res: Response) => {
   try {
-    // Require API key for viewing appeals
-    const apiKey = extractApiKey(req);
-    if (!apiKey || !validateApiKey(apiKey)) {
-      return res.status(401).json({ error: 'Unauthorized: API key required' });
-    }
-
     const { status = 'all' } = req.query;
     const db = getDB();
 
@@ -1217,7 +1172,7 @@ router.get('/tickets/appeals', async (req: Request, res: Response) => {
  *   patch:
  *     tags: [Tickets]
  *     summary: Review a ticket appeal
- *     description: Approve or reject a ticket appeal. Requires API key authentication for admins.
+ *     description: Approve or reject a ticket appeal. No authentication required.
  *     parameters:
  *       - in: path
  *         name: id
@@ -1255,8 +1210,6 @@ router.get('/tickets/appeals', async (req: Request, res: Response) => {
  *                   type: string
  *                 appeal:
  *                   type: object
- *       401:
- *         description: Unauthorized - invalid API key
  *       404:
  *         description: Appeal not found
  */
@@ -1264,12 +1217,6 @@ router.patch('/tickets/appeals/:id/review', async (req: Request, res: Response) 
   try {
     const { id } = req.params;
     const { decision, reviewer_id } = req.body;
-
-    // Require API key
-    const apiKey = extractApiKey(req);
-    if (!apiKey || !validateApiKey(apiKey)) {
-      return res.status(401).json({ error: 'Unauthorized: API key required' });
-    }
 
     if (!decision || !['approved', 'rejected'].includes(decision)) {
       return res.status(400).json({ error: 'Decision must be "approved" or "rejected"' });

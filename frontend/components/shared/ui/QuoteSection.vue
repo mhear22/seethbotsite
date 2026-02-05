@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useFavorites } from '../../../composables/useFavorites'
+
 defineProps<{
   currentQuote: string
 }>()
@@ -7,8 +10,19 @@ const emit = defineEmits<{
   'next-quote': []
 }>()
 
+const { toggleFavorite, isFavorite } = useFavorites()
+
+const isQuoteFavorite = computed(() => {
+  return isFavorite('quote', { text: 'quote' })
+})
+
 const nextQuote = () => {
   emit('next-quote')
+}
+
+const handleFavorite = (e: Event) => {
+  e.stopPropagation()
+  toggleFavorite('quote', { text: 'quote' })
 }
 
 // Format quote to handle advice section
@@ -26,6 +40,13 @@ const formatQuote = (quote: string) => {
     <div class="quote-text" @click="nextQuote">
       <span v-html="formatQuote(currentQuote)"></span>
     </div>
+    <button
+      @click="handleFavorite"
+      :class="['favorite-btn', { favorited: isQuoteFavorite }]"
+      :title="isQuoteFavorite ? 'Remove from favorites' : 'Add to favorites'"
+    >
+      ⭐
+    </button>
   </div>
 </template>
 
@@ -33,6 +54,7 @@ const formatQuote = (quote: string) => {
 .quote-section {
   padding: 20px;
   text-align: center;
+  position: relative;
 }
 
 .quote-text {
@@ -46,6 +68,60 @@ const formatQuote = (quote: string) => {
 
 .quote-text:hover {
   transform: scale(1.02);
+}
+
+.favorite-btn {
+  position: absolute;
+  top: 50%;
+  right: 20px;
+  transform: translateY(-50%);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 2px solid #cbd5e0;
+  background: rgba(255, 255, 255, 0.95);
+  color: #cbd5e0;
+  font-size: 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.favorite-btn:hover {
+  transform: translateY(-50%) scale(1.1);
+  border-color: #f6d365;
+  color: #f6d365;
+}
+
+.favorite-btn.favorited {
+  background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+  border-color: #f6d365;
+  color: white;
+  box-shadow: 0 4px 12px rgba(246, 211, 101, 0.4);
+}
+
+.favorite-btn.favorited:hover {
+  transform: translateY(-50%) scale(1.15);
+  box-shadow: 0 6px 16px rgba(246, 211, 101, 0.5);
+}
+
+.dark .favorite-btn {
+  background: rgba(45, 55, 72, 0.95);
+  border-color: #4a5568;
+  color: #718096;
+}
+
+.dark .favorite-btn:hover {
+  border-color: #f6d365;
+  color: #f6d365;
+}
+
+.dark .favorite-btn.favorited {
+  background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+  border-color: #f6d365;
 }
 
 .advice-section {
