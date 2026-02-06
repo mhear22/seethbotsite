@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Offline - Mold</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      color: #fff;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .offline-container {
+      text-align: center;
+      max-width: 500px;
+      animation: fadeIn 0.5s ease-in;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .offline-icon {
+      font-size: 64px;
+      margin-bottom: 20px;
+    }
+    h1 {
+      font-size: 28px;
+      margin-bottom: 12px;
+      color: #a8e063;
+    }
+    p {
+      font-size: 16px;
+      color: #ccc;
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+    .retry-btn {
+      background: #a8e063;
+      color: #1a1a2e;
+      border: none;
+      padding: 12px 32px;
+      font-size: 16px;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    .retry-btn:hover {
+      background: #96cc4a;
+      transform: scale(1.05);
+    }
+    .cached-games {
+      margin-top: 32px;
+      padding-top: 24px;
+      border-top: 1px solid rgba(255,255,255,0.1);
+    }
+    .cached-games h2 {
+      font-size: 18px;
+      margin-bottom: 16px;
+      color: #a8e063;
+    }
+    .game-links {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .game-link {
+      display: block;
+      padding: 12px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 8px;
+      color: #fff;
+      text-decoration: none;
+      transition: all 0.3s ease;
+    }
+    .game-link:hover {
+      background: rgba(168, 224, 99, 0.2);
+      transform: translateX(5px);
+    }
+  </style>
+</head>
+<body>
+  <div class="offline-container">
+    <div class="offline-icon">📡</div>
+    <h1>You're Offline</h1>
+    <p>It looks like you've lost your internet connection. Some features may not work properly until you're back online.</p>
+    <button class="retry-btn" onclick="window.location.reload()">Try Again</button>
+
+    <div class="cached-games">
+      <h2>Cached Games</h2>
+      <div class="game-links">
+        <a href="/" class="game-link">🏠 Home</a>
+        <a href="/clicker" class="game-link">🖱️ Clicker</a>
+        <a href="/fishing" class="game-link">🎣 Fishing</a>
+        <a href="/stats" class="game-link">📊 Stats</a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
