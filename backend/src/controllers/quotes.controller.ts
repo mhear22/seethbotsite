@@ -80,6 +80,49 @@ const adviceQuotes = [
   "Never gonna happen until you make it happen."
 ];
 
+// Light-hearted insults for Temer3 (Morgan) - user ID: 1408633913995301028
+const temer3Insults = [
+  "Morgan couldn't code his way out of a wet paper bag.",
+  "Temer3's brain runs on a hamster wheel.",
+  "Morgan's gaming skills are legendary...ly bad.",
+  "Temer3 thinks a firewall is a physical barrier.",
+  "Morgan's jokes are like his code - full of bugs.",
+  "Temer3 once lost at tic-tac-toe... to himself.",
+  "Morgan's idea of 'optimization' is deleting everything.",
+  "Temer3's WiFi signal is stronger than his arguments.",
+  "Morgan tried to debug his life, found 404 errors.",
+  "Temer3's cooking is experimental... and not in a good way.",
+  "Morgan's playlist is 90% elevator music and 10% confusion.",
+  "Temer3 got lost in a straight line.",
+  "Morgan's fashion sense went out of style in the 1800s.",
+  "Temer3's dance moves look like a bug report.",
+  "Morgan tried to be cool once. It didn't take.",
+  "Temer3's puns are so bad they're almost good... almost.",
+  "Morgan's attempts at sarcasm are painfully literal.",
+  "Temer3 thinks 'loading...' is a lifestyle choice.",
+  "Morgan's debugging strategy is 'hope it goes away'.",
+  "Temer3's gaming setup is held together by prayers.",
+  "Morgan's jokes require a patch to understand.",
+  "Temer3's idea of multitasking is failing at two things at once.",
+  "Morgan once got stuck in an infinite loop of overthinking.",
+  "Temer3's taste in music is... adventurous.",
+  "Morgan's code comments are just him crying for help.",
+  "Temer3 tried to git gud, but git rejected him.",
+  "Morgan's typing speed is measured in words per millennium.",
+  "Temer3's strategy guides are written in ancient Sumerian.",
+  "Morgan once rage-quit a single-player game.",
+  "Temer3's reflexes are measured in geological time.",
+  "Morgan tried to fix a bug and created a feature.",
+  "Temer3's gaming chair has more intelligence than his plays.",
+  "Morgan's troubleshooting guide is just 'turn it off and on again'.",
+  "Temer3's builds are creative... in a 'why would you do that' way.",
+  "Morgan once walked into a glass door while it was open.",
+  "Temer3's aim is so bad he misses by accident.",
+  "Morgan's debugging involves shouting at the screen.",
+  "Temer3's inventory management is throwing everything away.",
+  "Morgan tried to speedrun life, got lost in the tutorial."
+];
+
 /**
  * @openapi
  * /api/quote:
@@ -112,13 +155,22 @@ router.get('/quote', async (req: Request, res: Response) => {
   try {
     // Select a random quote from our Northernlion collection
     const randomIndex = Math.floor(Math.random() * northernlionQuotes.length);
-    const quote = northernlionQuotes[randomIndex];
+    let quote = northernlionQuotes[randomIndex];
+
+    // 30% chance to append a Temer3 insult to random quotes
+    const shouldAddInsult = Math.random() < 0.3;
+    if (shouldAddInsult) {
+      const randomInsultIndex = Math.floor(Math.random() * temer3Insults.length);
+      const insult = temer3Insults[randomInsultIndex];
+      quote = `${quote} (By the way, ${insult})`;
+    }
 
     res.json({
       quote,
       source: 'northernlion-db',
       index: randomIndex,
       totalQuotes: northernlionQuotes.length,
+      hasInsult: shouldAddInsult,
       timestamp: new Date().toISOString()
     });
   } catch (error) {
