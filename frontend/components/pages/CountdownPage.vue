@@ -19,7 +19,7 @@ const releases: GameRelease[] = [
   {
     title: "Orlando's Roommate's Cat comes to Orlando's apartment",
     game: 'orlando-roommate-cat',
-    date: new Date('2026-02-20T00:00:00Z'),
+    date: new Date('2026-02-16T00:00:00Z'),
     description: 'The big day approaches...',
     emoji: '🐈',
     image: '/orlando-roommate-cat.png'
