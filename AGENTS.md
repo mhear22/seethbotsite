@@ -12,6 +12,50 @@
 
 ---
 
+## 📚 READ THIS FIRST: Documentation
+
+**IMPORTANT:** Before working on any feature or modification, you MUST read the documentation to understand the context and decisions that led to the current implementation.
+
+### Required Reading Before Starting Work:
+
+1. **`docs/DECISIONS.md`** - ⭐ MOST IMPORTANT
+   - This document records ALL major architectural and design decisions
+   - Understand WHY things are built the way they are
+   - Prevents making decisions that conflict with existing architecture
+   - Covers: tech stack, authentication, database, frontend, backend, features, deployment, security
+
+2. **`AUTH.md`** - Authentication & Authorization Guide
+   - Two authentication systems: User Auth (optional) + API Key Auth
+   - User accounts, sessions, JWT tokens
+   - Protected vs. public endpoints
+   - Security best practices
+
+3. **`DEPLOYMENT.md`** - Deployment Guide
+   - How to deploy changes (Docker, deploy script)
+   - Environment variables
+   - Troubleshooting deployment issues
+
+### Why This Matters:
+
+- **Avoid conflicts** - Don't make changes that contradict existing decisions
+- **Stay consistent** - Follow established patterns and conventions
+- **Save time** - Learn from past decisions rather than re-deriving them
+- **Maintain quality** - Understand the reasoning behind architecture choices
+
+### When Working on a Feature:
+
+1. Read `docs/DECISIONS.md` sections relevant to your feature
+2. Check related documentation (AUTH.md, DEPLOYMENT.md, etc.)
+3. Look at existing code that implements similar features
+4. Follow established patterns (composables, repositories, controllers)
+5. Update this documentation if you make new architectural decisions
+
+**TL;DR:** Read `docs/DECISIONS.md` before touching any code. It will save you time and prevent mistakes.
+
+---
+
+---
+
 ## Current Architecture (2026-02-01)
 
 ### Tech Stack
