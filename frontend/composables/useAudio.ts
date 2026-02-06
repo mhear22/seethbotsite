@@ -25,8 +25,16 @@ export function useAudio() {
     })
   }
 
-  const playFart = (volume?: number) => {
-    playSound('fartSound', { volume: volume })
+  const playFart = async (volume?: number, forceSimple: boolean = false) => {
+    // Try to use enhanced fart audio processing if available
+    try {
+      const { useFartAudio } = await import('./useFartAudio')
+      const { playFart: playFartEnhanced } = useFartAudio()
+      await playFartEnhanced(volume, forceSimple)
+    } catch (error) {
+      console.log('Enhanced fart audio not available, using simple playback')
+      playSound('fartSound', { volume: volume })
+    }
   }
 
   const toggleMusic = (playing: boolean) => {
