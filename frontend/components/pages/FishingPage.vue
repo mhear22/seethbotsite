@@ -72,11 +72,16 @@ let fishes: THREE.Mesh[] = []
 let fishVelocities: { x: number; z: number }[] = []
 
 const fishTypes = [
-  { color: 0xff6b6b, name: 'Red Snapper', points: 10 },
-  { color: 0x4ecdc4, name: 'Coral Fish', points: 15 },
-  { color: 0xffe66d, name: 'Golden Fish', points: 20 },
-  { color: 0x95e1d3, name: 'Jellyfish', points: 25 },
-  { color: 0xdda0dd, name: 'Tropical Fish', points: 30 }
+  { color: 0xff6b6b, name: 'Red Snapper', points: 10, size: 1 },
+  { color: 0x4ecdc4, name: 'Coral Fish', points: 15, size: 0.9 },
+  { color: 0xffe66d, name: 'Golden Fish', points: 20, size: 1.1 },
+  { color: 0x95e1d3, name: 'Jellyfish', points: 25, size: 1.2 },
+  { color: 0xdda0dd, name: 'Tropical Fish', points: 30, size: 0.8 },
+  { color: 0xff4757, name: 'Clownfish', points: 35, size: 0.7 },
+  { color: 0x2ed573, name: 'Angelfish', points: 40, size: 1.3 },
+  { color: 0x3742fa, name: 'Blue Tang', points: 45, size: 0.9 },
+  { color: 0xff6348, name: 'Salmon', points: 50, size: 1.4 },
+  { color: 0xffd700, name: 'Legendary Goldfish', points: 100, size: 0.6, rare: true }
 ]
 
 const initThreeJS = () => {
@@ -154,22 +159,50 @@ const createFishingLine = () => {
 const createFish = () => {
   if (!scene.value) return
 
-  const fishType = fishTypes[Math.floor(Math.random() * fishTypes.length)]
+  // Select fish type based on rarity
+  let fishType
+  const rand = Math.random()
+  if (rand > 0.95) {
+    // 5% chance for rare fish
+    const rareFishes = fishTypes.filter(f => f.rare)
+    fishType = rareFishes[Math.floor(Math.random() * rareFishes.length)]
+  } else {
+    // 95% chance for regular fish
+    const regularFishes = fishTypes.filter(f => !f.rare)
+    fishType = regularFishes[Math.floor(Math.random() * regularFishes.length)]
+  }
 
   // Fish body
   const fishGroup = new THREE.Group()
-  const bodyGeometry = new THREE.ConeGeometry(0.3, 1, 8)
+  const bodyGeometry = new THREE.ConeGeometry(0.3 * fishType.size, 1 * fishType.size, 8)
   bodyGeometry.rotateZ(Math.PI / 2)
   const bodyMaterial = new THREE.MeshPhongMaterial({ color: fishType.color })
   const body = new THREE.Mesh(bodyGeometry, bodyMaterial)
   fishGroup.add(body)
 
   // Fish tail
-  const tailGeometry = new THREE.ConeGeometry(0.2, 0.3, 4)
+  const tailGeometry = new THREE.ConeGeometry(0.2 * fishType.size, 0.3 * fishType.size, 4)
   tailGeometry.rotateZ(-Math.PI / 2)
   const tail = new THREE.Mesh(tailGeometry, bodyMaterial)
-  tail.position.x = -0.6
+  tail.position.x = -0.6 * fishType.size
   fishGroup.add(tail)
+
+  // Add eyes for better fish
+  const eyeGeometry = new THREE.SphereGeometry(0.05 * fishType.size, 8, 8)
+  const eyeMaterial = new THREE.MeshPhongMaterial({ color: 0x000000 })
+  const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial)
+  leftEye.position.set(0.5 * fishType.size, 0.1 * fishType.size, 0.15 * fishType.size)
+  const rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial)
+  rightEye.position.set(0.5 * fishType.size, 0.1 * fishType.size, -0.15 * fishType.size)
+  fishGroup.add(leftEye)
+  fishGroup.add(rightEye)
+
+  // Add fin for better fish
+  const finGeometry = new THREE.ConeGeometry(0.1 * fishType.size, 0.3 * fishType.size, 4)
+  const fin = new THREE.Mesh(finGeometry, bodyMaterial)
+  fin.position.set(0, 0.2 * fishType.size, 0)
+  fin.rotation.x = Math.PI / 4
+  fishGroup.add(fin)
 
   // Position fish
   fishGroup.position.set(
@@ -234,10 +267,11 @@ const castLine = () => {
     progress += 0.05
     hook.position.y = startY - (startY - targetY) * progress
 
-    // Check for fish collision
+    // Check for fish collision (dynamic based on fish size)
     const caughtIndex = fishes.findIndex(fish => {
       const distance = hook.position.distanceTo(fish.position)
-      return distance < 0.8
+      const catchRadius = 0.6 + (fish.userData.size * 0.3)
+      return distance < catchRadius
     })
 
     if (caughtIndex !== -1) {
