@@ -100,7 +100,7 @@ const showKeyboardHelp = ref(false)
 
 // Keyboard shortcuts (Ticket #128)
 const { shortcuts, registerShortcut, isHelpOpen, toggleHelp } = useKeyboardShortcuts()
-showKeyboardHelp.value = isHelpOpen
+showKeyboardHelp.value = isHelpOpen.value
 
 // Breadcrumb navigation (Ticket #126)
 const breadcrumbs = computed(() => {
@@ -619,11 +619,10 @@ if (typeof window !== 'undefined') {
           </div>
         </div>
       </div>
+      <!-- Page Ticker (Ticket #155) -->
+      <PageTicker />
     </div>
   </nav>
-
-  <!-- Page Ticker (Ticket #155) -->
-  <PageTicker />
 
   <!-- Mobile Bottom Navigation (Ticket #110) -->
   <nav class="mobile-bottom-nav">
