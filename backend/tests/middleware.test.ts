@@ -221,15 +221,20 @@ describe('Middleware', () => {
     let mockNext: NextFunction;
     let nextCalled: boolean;
     let responseStatus: number;
+    let testIpCounter = 0;
 
     beforeEach(() => {
       nextCalled = false;
       responseStatus = 200;
 
+      // Use a unique IP for each test to avoid shared rate limit store pollution
+      testIpCounter++;
+      const uniqueIp = `10.0.0.${testIpCounter}`;
+
       mockRequest = {
-        ip: '127.0.0.1',
+        ip: uniqueIp,
         socket: {
-          remoteAddress: '127.0.0.1',
+          remoteAddress: uniqueIp,
         } as any,
       };
 

@@ -12,6 +12,7 @@ import {
   generateToken,
   validateToken,
   ApiKeyType,
+  registerApiKey,
 } from '../src/auth';
 import { Request, Response, NextFunction } from 'express';
 
@@ -22,6 +23,8 @@ describe('Authentication Module', () => {
   beforeEach(() => {
     // Generate a fresh API key for each test
     validApiKey = generateApiKey();
+    // Register the API key for testing
+    registerApiKey(validApiKey, ApiKeyType.ADMIN);
 
     // Create a mock request object
     testRequest = {

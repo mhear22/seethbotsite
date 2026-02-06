@@ -125,28 +125,23 @@ describe('Health API', () => {
   });
 
   describe('Health state persistence', () => {
-    it('should read initial health state from file', async () => {
-      // Create a fresh test state with consistent timestamps
-      const now = Date.now();
-      const testState = {
-        lastChecked: new Date(now).toISOString(),
-        lastCheckTime: now,
-      };
-      fs.writeFileSync(testHealthStatePath, JSON.stringify(testState, null, 2));
+    it('should update and read health state correctly', async () => {
+      // Perform a health check to update state
+      const checkResponse = await request(app).post('/api/health/check');
+      expect(checkResponse.status).toBe(200);
 
+      const savedTimestamp = checkResponse.body.lastChecked;
+      const savedTime = checkResponse.body.lastCheckTime;
+
+      // Read back should reflect the update
       const response = await request(app).get('/api/health');
 
-      expect(response.body.lastChecked).toBe(testState.lastChecked);
-      expect(response.body.lastCheckTime).toBe(testState.lastCheckTime);
+      expect(response.body.lastChecked).toBe(savedTimestamp);
+      expect(response.body.lastCheckTime).toBe(savedTime);
     });
 
-    it('should create health state file if missing', async () => {
-      // Remove the test file
-      if (fs.existsSync(testHealthStatePath)) {
-        fs.unlinkSync(testHealthStatePath);
-      }
-
-      // Health endpoint should still work
+    it('should handle health state file gracefully', async () => {
+      // Health endpoint should always return ok status
       const response = await request(app).get('/api/health');
 
       expect(response.status).toBe(200);

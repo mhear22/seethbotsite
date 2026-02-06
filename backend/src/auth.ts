@@ -101,6 +101,18 @@ export const validateApiKey = (apiKey: string): ApiKeyInfo | null => {
 };
 
 /**
+ * Register an API key (for testing purposes)
+ */
+export const registerApiKey = (apiKey: string, type: ApiKeyType = ApiKeyType.ADMIN): void => {
+  registeredKeys.set(apiKey, {
+    key: apiKey,
+    type,
+    description: 'Test API key',
+    createdAt: new Date()
+  });
+};
+
+/**
  * Extract API key from request
  * Checks Authorization header and X-API-Key header
  */
