@@ -4,6 +4,7 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '../../../stores/useAppStore'
 import { useKeyboardShortcuts } from '../../../composables/useKeyboardShortcuts'
 import KeyboardShortcutsHelp from '../../shared/ui/KeyboardShortcutsHelp.vue'
+import PageTicker from '../../shared/ui/PageTicker.vue'
 
 // Brand icon rotation (Ticket #92)
 const brandRotation = ref(0)
@@ -633,6 +634,9 @@ if (typeof window !== 'undefined') {
       </div>
     </div>
   </nav>
+
+  <!-- Page Ticker (Ticket #155) -->
+  <PageTicker />
 
   <!-- Mobile Bottom Navigation (Ticket #110) -->
   <nav class="mobile-bottom-nav">
