@@ -76,19 +76,6 @@ const dropdowns = ref<DropdownData[]>([
     ]
   },
   {
-    title: 'Community',
-    icon: '👥',
-    routes: [
-      { title: 'Messages', icon: '💬', path: '/messages' },
-      { title: 'Mold', icon: '🍄', path: '/mold' },
-      { title: 'Rankings', icon: '👻', path: '/rankings' },
-      { title: 'Movie Night', icon: '🎬', path: '/movies' },
-      { title: 'Tickets', icon: '🎫', path: '/tickets' },
-      { title: 'Moldbot Opinions', icon: '🤖', path: '/opinion' },
-      { title: 'Analytics', icon: '📊', path: '/analytics' }
-    ]
-  },
-  {
     title: 'Tools',
     icon: '🛠️',
     routes: [
