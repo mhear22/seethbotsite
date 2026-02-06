@@ -1,14 +1,16 @@
 {
-  "id": 140,
-  "title": "Tags/categories",
-  "description": "Group related content better",
+  "id": 143,
+  "title": "Caching better fish",
+  "description": "Add better fish to the fish game",
   "status": "pending",
   "response": null,
-  "created_at": "2026-02-05 03:45:54",
-  "updated_at": "2026-02-05 03:45:54",
+  "created_at": "2026-02-05 03:46:10",
+  "updated_at": "2026-02-05 14:21:16",
   "creator_id": null,
   "type": "feature",
   "priority": "medium",
+  "tags": null,
+  "category": null,
   "relevanceScore": 100,
   "daysSinceCreation": 0
 }

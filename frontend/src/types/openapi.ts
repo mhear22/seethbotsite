@@ -4,6 +4,597 @@
  */
 
 export interface paths {
+    "/api/activity-feed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get global activity feed
+         * @description Returns recent activities from all users
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Number of activities to return */
+                    limit?: number;
+                    /** @description Offset for pagination */
+                    offset?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Activity feed retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            activities?: {
+                                id?: number;
+                                userId?: string;
+                                userName?: string;
+                                userAvatar?: string;
+                                activityType?: string;
+                                description?: string;
+                                metadata?: Record<string, never>;
+                                pointsChange?: number;
+                                gameType?: string;
+                                /** Format: date-time */
+                                recordedAt?: string;
+                            }[];
+                            timestamp?: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/activity-feed/user/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get activity feed for a specific user
+         * @description Returns activities for a specific user
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Number of activities to return */
+                    limit?: number;
+                    /** @description Offset for pagination */
+                    offset?: number;
+                    /** @description Filter by activity type */
+                    type?: "points_earned" | "points_bulk" | "achievement_unlocked" | "high_score" | "challenge_completed" | "game_played" | "ranking_change" | "session_end";
+                    /** @description Filter by game type */
+                    gameType?: "clicker" | "fishing";
+                };
+                header?: never;
+                path: {
+                    /** @description User ID */
+                    userId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description User activity feed retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/activity-feed/stats/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get activity statistics for a user
+         * @description Returns aggregated statistics for a user's activities
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description User ID */
+                    userId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description User activity statistics retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            totalActivities?: number;
+                            pointsEarned?: number;
+                            achievementsUnlocked?: number;
+                            gamesPlayed?: number;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/activity-feed/types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get available activity types
+         * @description Returns list of all available activity types
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Activity types retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            types?: string[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/analytics/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get analytics summary
+         * @description Returns overall analytics stats including total clicks and active users
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Analytics summary retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @description Total page views recorded */
+                            totalClicks?: number;
+                            /** @description Number of currently active users (within 15 minutes) */
+                            activeUsers?: number;
+                            /**
+                             * Format: date-time
+                             * @description When the summary was generated
+                             */
+                            timestamp?: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/analytics/top-pages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get top pages by views
+         * @description Returns the most visited pages with their view counts
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Maximum number of pages to return */
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Top pages retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            pages?: {
+                                /** @description The page path */
+                                path?: string;
+                                /** @description Number of views for this page */
+                                views?: number;
+                            }[];
+                            /** Format: date-time */
+                            timestamp?: string;
+                        };
+                    };
+                };
+                /** @description Server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/analytics/track": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record a page view
+         * @description Records a page view for analytics tracking
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description The page path that was viewed */
+                        path: string;
+                        /** @description User ID (optional, for session tracking) */
+                        userId?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Page view recorded successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            success?: boolean;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/archive/opinions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get archived opinions
+         * @description Returns all archived opinions sorted by creation date (newest first)
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Maximum number of opinions to return */
+                    limit?: number;
+                    /** @description Filter by opinion type */
+                    type?: "random" | "build" | "all";
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Opinions retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            opinions?: {
+                                id?: string;
+                                text?: string;
+                                /** @enum {string} */
+                                type?: "random" | "build";
+                                /** Format: date-time */
+                                createdAt?: string;
+                            }[];
+                            total?: number;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Save an opinion to the archive
+         * @description Archives an opinion (random or build opinion)
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description The opinion text */
+                        text: string;
+                        /**
+                         * @description Type of opinion
+                         * @enum {string}
+                         */
+                        type: "random" | "build";
+                    };
+                };
+            };
+            responses: {
+                /** @description Opinion archived successfully */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/archive/rankings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get archived rankings snapshots
+         * @description Returns all archived rankings snapshots sorted by timestamp (newest first)
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Maximum number of snapshots to return */
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Rankings snapshots retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            snapshots?: {
+                                id?: string;
+                                /** Format: date-time */
+                                timestamp?: string;
+                                rankings?: {
+                                    avatar?: string;
+                                    name?: string;
+                                    score?: number;
+                                    isCurrentUser?: boolean;
+                                }[];
+                            }[];
+                            total?: number;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Save a rankings snapshot to the archive
+         * @description Archives a current rankings snapshot
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description Current leaderboard rankings */
+                        rankings: {
+                            avatar?: string;
+                            name?: string;
+                            score?: number;
+                            isCurrentUser?: boolean;
+                        }[];
+                    };
+                };
+            };
+            responses: {
+                /** @description Rankings snapshot archived successfully */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/archive/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get archive statistics
+         * @description Returns statistics about archived data
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Statistics retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            opinions?: {
+                                total?: number;
+                                random?: number;
+                                build?: number;
+                            };
+                            rankings?: {
+                                total?: number;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/register": {
         parameters: {
             query?: never;
@@ -1083,6 +1674,352 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/export/rankings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export rankings data
+         * @description Exports current rankings data in JSON or CSV format
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Export format (json or csv) */
+                    format?: "json" | "csv";
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Rankings data exported successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            rank?: number;
+                            name?: string;
+                            avatar?: string;
+                            score?: number;
+                            isCurrentUser?: boolean;
+                        }[];
+                        "text/csv": string;
+                    };
+                };
+                /** @description Invalid format parameter */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/export/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Export user stats data
+         * @description Exports user statistics data in JSON or CSV format
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description User ID */
+                        userId: string;
+                        /**
+                         * @description Game type filter (optional)
+                         * @enum {string}
+                         */
+                        gameType?: "clicker" | "fishing";
+                    };
+                };
+            };
+            responses: {
+                /** @description Stats data exported successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": Record<string, never>;
+                        "text/csv": string;
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/export/clicks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Export clicks stats history
+         * @description Exports click statistics history in JSON or CSV format
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description User ID */
+                        userId: string;
+                        /**
+                         * @description Maximum number of records to export
+                         * @default 100
+                         */
+                        limit?: number;
+                        /**
+                         * @default json
+                         * @enum {string}
+                         */
+                        format?: "json" | "csv";
+                    };
+                };
+            };
+            responses: {
+                /** @description Clicks data exported successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": unknown[];
+                        "text/csv": string;
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/export/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Export full stats history
+         * @description Exports complete statistics history in JSON or CSV format
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description User ID */
+                        userId: string;
+                        /**
+                         * @description Game type filter (optional)
+                         * @enum {string}
+                         */
+                        gameType?: "clicker" | "fishing";
+                        /** @description Stat type filter (optional) */
+                        statType?: string;
+                        /**
+                         * @description Maximum number of records to export
+                         * @default 500
+                         */
+                        limit?: number;
+                        /**
+                         * @default json
+                         * @enum {string}
+                         */
+                        format?: "json" | "csv";
+                    };
+                };
+            };
+            responses: {
+                /** @description History data exported successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": unknown[];
+                        "text/csv": string;
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/export/leaderboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Export leaderboard data
+         * @description Exports game leaderboard in JSON or CSV format
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        gameType: "clicker" | "fishing";
+                        /** @default 50 */
+                        limit?: number;
+                        /**
+                         * @default json
+                         * @enum {string}
+                         */
+                        format?: "json" | "csv";
+                    };
+                };
+            };
+            responses: {
+                /** @description Leaderboard data exported successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": unknown[];
+                        "text/csv": string;
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/phrenology": {
         parameters: {
             query?: never;
@@ -1391,6 +2328,429 @@ export interface paths {
         };
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/messages/conversations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get all conversations for current user
+         * @description Returns all conversations the authenticated user is participating in.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Conversations retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            conversations?: {
+                                id?: number;
+                                /** @enum {string} */
+                                type?: "direct" | "group";
+                                created_at?: string;
+                                updated_at?: string;
+                                participants?: Record<string, never>[];
+                                last_message?: Record<string, never>;
+                                unread_count?: number;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Create a new direct message conversation
+         * @description Creates a new direct message conversation between the authenticated user and another user.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description ID of the user to message */
+                        userId: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description Conversation created successfully */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            conversation?: {
+                                id?: number;
+                                type?: string;
+                                created_at?: string;
+                                updated_at?: string;
+                            };
+                        };
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/messages/conversations/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a specific conversation
+         * @description Returns details of a specific conversation, including participants and unread count.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Conversation retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conversation not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/messages/conversations/{id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get messages in a conversation
+         * @description Returns paginated messages from a conversation.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    limit?: number;
+                    offset?: number;
+                };
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Messages retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conversation not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Send a message to a conversation
+         * @description Sends a new message to the specified conversation.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        content: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Message sent successfully */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/messages/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Edit a message
+         * @description Edits a message sent by the authenticated user.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        content: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Message edited successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authorized to edit this message */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Message not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        /**
+         * Delete a message
+         * @description Soft-deletes a message sent by the authenticated user.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Message deleted successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authorized to delete this message */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Message not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/messages/conversations/{id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark conversation as read
+         * @description Marks all messages in the conversation as read for the current user.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Conversation marked as read */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conversation not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
@@ -3924,7 +5284,7 @@ export interface paths {
         head?: never;
         /**
          * Update last ticket collection timestamp
-         * @description Updates the timestamp of the last ticket collection. Requires API key authentication.
+         * @description Updates the timestamp of the last ticket collection. No authentication required.
          */
         patch: {
             parameters: {
@@ -3949,13 +5309,6 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description Unauthorized - invalid API key */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
             };
         };
         trace?: never;
@@ -3969,16 +5322,11 @@ export interface paths {
         };
         /**
          * Get all tickets
-         * @description Returns all tickets with optional filtering by status, type, and priority. Sorted by relevance by default (older pending tickets first).
+         * @description Returns all tickets with optional filtering by status, type, priority, tags, and category. Sorted by relevance by default (older pending tickets first).
          */
         get: {
             parameters: {
-                query?: {
-                    status?: "all" | "pending" | "needs-info" | "completed" | "declined" | "in-progress";
-                    type?: "all" | "feature" | "bug" | "feedback";
-                    priority?: "all" | "high" | "medium" | "low";
-                    sortBy?: "relevance" | "created_at" | "updated_at";
-                };
+                query?: never;
                 header?: never;
                 path?: never;
                 cookie?: never;
@@ -3997,13 +5345,13 @@ export interface paths {
                                 description?: string;
                                 /** @enum {string} */
                                 status?: "pending" | "needs-info" | "completed" | "declined";
-                                response?: string;
-                                created_at?: string;
-                                updated_at?: string;
                                 /** @enum {string} */
                                 ticketType?: "feature" | "bug" | "feedback";
                                 /** @enum {string} */
                                 priority?: "high" | "medium" | "low";
+                                response?: string;
+                                created_at?: string;
+                                updated_at?: string;
                                 /** @description Relevance score (0-100), higher = more relevant */
                                 relevanceScore?: number;
                                 /** @description Number of days since ticket creation */
@@ -4017,7 +5365,7 @@ export interface paths {
         put?: never;
         /**
          * Create a new ticket
-         * @description Creates a new ticket with title and description. Optionally includes type, priority, and creator_id for ticket ownership tracking.
+         * @description Creates a new ticket with title and description. Optionally includes type, priority, tags, category, and creator_id for ticket ownership tracking.
          */
         post: {
             parameters: {
@@ -4026,44 +5374,8 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        title: string;
-                        description?: string;
-                        /**
-                         * @description Type of ticket
-                         * @default feature
-                         * @enum {string}
-                         */
-                        ticketType?: "feature" | "bug" | "feedback";
-                        /**
-                         * @description Priority level of the ticket
-                         * @default medium
-                         * @enum {string}
-                         */
-                        priority?: "high" | "medium" | "low";
-                        /** @description Optional unique identifier for the ticket creator */
-                        creator_id?: string;
-                    };
-                };
-            };
-            responses: {
-                /** @description Ticket created successfully */
-                201: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Bad request - missing required fields */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
+            requestBody?: never;
+            responses: never;
         };
         delete?: never;
         options?: never;
@@ -4083,7 +5395,7 @@ export interface paths {
         post?: never;
         /**
          * Delete a ticket
-         * @description Deletes a ticket. Requires API key authentication for admins, or creator_id in request body or X-Creator-ID header for ticket creators.
+         * @description Deletes a ticket. No authentication required. Optionally provide creator_id to verify ownership.
          */
         delete: {
             parameters: {
@@ -4113,7 +5425,7 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description Unauthorized - invalid API key or not ticket creator */
+                /** @description Unauthorized - creator_id does not match */
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -4131,68 +5443,19 @@ export interface paths {
         };
         options?: never;
         head?: never;
-        /** Update a ticket */
+        /**
+         * Update a ticket
+         * @description Update ticket fields including status, response, title, description, tags, and category. No authentication required.
+         */
         patch: {
             parameters: {
                 query?: never;
                 header?: never;
-                path: {
-                    id: number;
-                };
+                path?: never;
                 cookie?: never;
             };
-            requestBody?: {
-                content: {
-                    "application/json": {
-                        title?: string;
-                        description?: string;
-                        /** @enum {string} */
-                        status?: "pending" | "needs-info" | "completed" | "declined" | "unresolved";
-                        response?: string;
-                        /**
-                         * @description Type of ticket
-                         * @enum {string}
-                         */
-                        type?: "feature" | "bug" | "feedback";
-                        /**
-                         * @description Priority level of the ticket
-                         * @enum {string}
-                         */
-                        priority?: "high" | "medium" | "low";
-                        creator_id?: string;
-                    };
-                };
-            };
-            responses: {
-                /** @description Ticket updated successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Bad request - invalid field values */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Unauthorized - invalid API key or not ticket creator */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Ticket not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
+            requestBody?: never;
+            responses: never;
         };
         trace?: never;
     };
@@ -4319,7 +5582,7 @@ export interface paths {
         };
         /**
          * Get all ticket appeals
-         * @description Returns all ticket appeals. Requires API key authentication for admins.
+         * @description Returns all ticket appeals. No authentication required.
          */
         get: {
             parameters: {
@@ -4376,7 +5639,7 @@ export interface paths {
         head?: never;
         /**
          * Review a ticket appeal
-         * @description Approve or reject a ticket appeal. Requires API key authentication for admins.
+         * @description Approve or reject a ticket appeal. No authentication required.
          */
         patch: {
             parameters: {
@@ -4416,13 +5679,6 @@ export interface paths {
                         };
                     };
                 };
-                /** @description Unauthorized - invalid API key */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
                 /** @description Appeal not found */
                 404: {
                     headers: {
@@ -4432,6 +5688,98 @@ export interface paths {
                 };
             };
         };
+        trace?: never;
+    };
+    "/api/tickets/tags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get all tags used across tickets
+         * @description Returns a list of all unique tags used in tickets, sorted by usage count
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Tags retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            tags?: {
+                                /** @example ui */
+                                name?: string;
+                                /** @example 5 */
+                                count?: number;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tickets/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get all categories used across tickets
+         * @description Returns a list of all unique categories used in tickets, sorted by usage count
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Categories retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            categories?: {
+                                /** @example ui */
+                                name?: string;
+                                /** @example 3 */
+                                count?: number;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/version": {

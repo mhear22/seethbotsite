@@ -507,6 +507,7 @@ router.get('/tickets', async (req: Request, res: Response) => {
  *     tags: [Tickets]
  *     summary: Create a new ticket
  *     description: Creates a new ticket with title and description. Optionally includes type, priority, tags, category, and creator_id for ticket ownership tracking.
+ */
 router.post('/tickets', async (req: Request, res: Response) => {
   try {
     const { title, description, creator_id, type, priority, tags, category } = req.body;
@@ -546,6 +547,7 @@ router.post('/tickets', async (req: Request, res: Response) => {
  *     tags: [Tickets]
  *     summary: Update a ticket
  *     description: Update ticket fields including status, response, title, description, tags, and category. No authentication required.
+ */
 router.patch('/tickets/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -910,8 +912,6 @@ router.get('/tickets/stats', async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Failed to fetch ticket stats' });
   }
 });
-
-export default router;
 
 /**
  * @openapi
@@ -1278,3 +1278,5 @@ router.get('/tickets/categories', async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Failed to fetch categories' });
   }
 });
+
+export default router;
