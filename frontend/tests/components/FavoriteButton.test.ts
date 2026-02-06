@@ -4,23 +4,23 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
-import FavoriteButton from '../../../components/shared/ui/FavoriteButton.vue'
 
-// Mock the useFavorites composable
-vi.mock('../../../composables/useFavorites', () => ({
+const mockIsFavorite = vi.fn(() => false)
+const mockToggleFavorite = vi.fn()
+
+vi.mock('../../composables/useFavorites', () => ({
   useFavorites: () => ({
-    isFavorite: vi.fn(() => false),
-    toggleFavorite: vi.fn(),
+    isFavorite: mockIsFavorite,
+    toggleFavorite: mockToggleFavorite,
   }),
 }))
 
-describe('FavoriteButton', () => {
-  let mockToggleFavorite: ReturnType<typeof vi.fn>
+import FavoriteButton from '../../components/shared/ui/FavoriteButton.vue'
 
+describe('FavoriteButton', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    const { useFavorites } = require('../../../composables/useFavorites')
-    mockToggleFavorite = useFavorites().toggleFavorite
+    mockIsFavorite.mockReturnValue(false)
   })
 
   it('renders with default size (medium)', () => {
@@ -110,8 +110,7 @@ describe('FavoriteButton', () => {
   })
 
   it('has correct title when not favorited', () => {
-    const { useFavorites } = require('../../../composables/useFavorites')
-    useFavorites().isFavorite.mockReturnValue(false)
+    mockIsFavorite.mockReturnValue(false)
 
     const wrapper = mount(FavoriteButton, {
       props: {
@@ -125,8 +124,7 @@ describe('FavoriteButton', () => {
   })
 
   it('has correct title when favorited', () => {
-    const { useFavorites } = require('../../../composables/useFavorites')
-    useFavorites().isFavorite.mockReturnValue(true)
+    mockIsFavorite.mockReturnValue(true)
 
     const wrapper = mount(FavoriteButton, {
       props: {
@@ -140,8 +138,7 @@ describe('FavoriteButton', () => {
   })
 
   it('applies favorited class when favorited', () => {
-    const { useFavorites } = require('../../../composables/useFavorites')
-    useFavorites().isFavorite.mockReturnValue(true)
+    mockIsFavorite.mockReturnValue(true)
 
     const wrapper = mount(FavoriteButton, {
       props: {
@@ -155,8 +152,7 @@ describe('FavoriteButton', () => {
   })
 
   it('does not apply favorited class when not favorited', () => {
-    const { useFavorites } = require('../../../composables/useFavorites')
-    useFavorites().isFavorite.mockReturnValue(false)
+    mockIsFavorite.mockReturnValue(false)
 
     const wrapper = mount(FavoriteButton, {
       props: {
