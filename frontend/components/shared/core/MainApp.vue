@@ -70,7 +70,7 @@ const rightModals = computed<ModalItem[]>(() => [
     id: 'activeUsers',
     title: 'Active Users',
     icon: '👥',
-    isOpen: appStore.panels.activeUsers || false,
+    isOpen: appStore.panels.activeUsers,
     position: 'right'
   }
 ])
