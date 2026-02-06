@@ -7,6 +7,54 @@ import fs from 'fs';
 const router = Router();
 
 /**
+ * Parse dependencies from ticket description
+ * Looks for patterns like "depends on #123", "requires #123", "blocked by #123"
+ * Returns array of ticket IDs
+ */
+function parseDependencies(description: string | null): number[] {
+  if (!description) return [];
+
+  const dependencies: number[] = [];
+  const patterns = [
+    /depends\s+on\s+#?(\d+)/gi,
+    /requires\s+#?(\d+)/gi,
+    /blocked\s+by\s+#?(\d+)/gi
+  ];
+
+  for (const pattern of patterns) {
+    let match;
+    while ((match = pattern.exec(description)) !== null) {
+      const ticketId = parseInt(match[1], 10);
+      if (!isNaN(ticketId) && !dependencies.includes(ticketId)) {
+        dependencies.push(ticketId);
+      }
+    }
+  }
+
+  return dependencies.sort((a, b) => a - b);
+}
+
+/**
+ * Check if a ticket is blocked based on its dependencies
+ * A ticket is blocked if any of its dependencies are not completed
+ */
+function isTicketBlocked(db: Database.Database, dependencies: number[]): boolean {
+  if (!dependencies || dependencies.length === 0) return false;
+
+  // Check if all dependency tickets are completed or declined
+  for (const depId of dependencies) {
+    const depTicket = db.prepare('SELECT status FROM tickets WHERE id = ?').get(depId) as { status: string } | undefined;
+
+    // If dependency doesn't exist or is not completed/declined, ticket is blocked
+    if (!depTicket || !['completed', 'declined'].includes(depTicket.status)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
  * Ticket Controller Performance Notes (Ticket #77)
  *
  * Current Implementation:
@@ -102,6 +150,13 @@ function getDB(): Database.Database {
   // Add category column if it doesn't exist (for ticket categorization - Ticket #140)
   try {
     db.exec(`ALTER TABLE tickets ADD COLUMN category TEXT`);
+  } catch (err) {
+    // Column already exists, ignore the error
+  }
+
+  // Add dependencies column if it doesn't exist (for ticket dependency tracking - Ticket #180)
+  try {
+    db.exec(`ALTER TABLE tickets ADD COLUMN dependencies TEXT`);
   } catch (err) {
     // Column already exists, ignore the error
   }
@@ -455,6 +510,11 @@ router.get('/tickets', async (req: Request, res: Response) => {
       const createdDate = new Date(ticket.created_at);
       const daysSinceCreation = Math.floor((now.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24));
 
+      // Parse dependencies from database
+      const dependencies = ticket.dependencies
+        ? JSON.parse(ticket.dependencies)
+        : [];
+
       // Relevance score calculation:
       // - Pending tickets: higher score for older tickets
       // - Completed/Declined: lower score
@@ -483,6 +543,8 @@ router.get('/tickets', async (req: Request, res: Response) => {
 
       return {
         ...ticket,
+        dependencies,
+        blocked: isTicketBlocked(db, dependencies),
         relevanceScore: baseScore,
         daysSinceCreation
       };
@@ -510,16 +572,28 @@ router.get('/tickets', async (req: Request, res: Response) => {
  */
 router.post('/tickets', async (req: Request, res: Response) => {
   try {
-    const { title, description, creator_id, type, priority, tags, category } = req.body;
+    const { title, description, creator_id, type, priority, tags, category, dependencies } = req.body;
 
     if (!title) {
       return res.status(400).json({ error: 'Title is required' });
     }
 
     const db = getDB();
+
+    // Parse dependencies from description if not explicitly provided
+    let parsedDependencies: number[] = [];
+    if (dependencies && Array.isArray(dependencies)) {
+      parsedDependencies = dependencies;
+    } else {
+      parsedDependencies = parseDependencies(description || null);
+    }
+
+    // Store dependencies as JSON string
+    const dependenciesJson = parsedDependencies.length > 0 ? JSON.stringify(parsedDependencies) : null;
+
     const stmt = db.prepare(`
-      INSERT INTO tickets (title, description, status, creator_id, type, priority, tags, category, created_at, updated_at)
-      VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      INSERT INTO tickets (title, description, status, creator_id, type, priority, tags, category, dependencies, created_at, updated_at)
+      VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
     `);
     const result = stmt.run(
       title,
@@ -528,12 +602,20 @@ router.post('/tickets', async (req: Request, res: Response) => {
       type || 'feature',
       priority || 'medium',
       tags || null,
-      category || null
+      category || null,
+      dependenciesJson
     );
 
     const newTicket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(result.lastInsertRowid);
 
-    res.status(201).json({ ticket: newTicket });
+    // Add computed fields to response
+    const ticketWithComputed = {
+      ...(newTicket as any),
+      dependencies: parsedDependencies,
+      blocked: isTicketBlocked(db, parsedDependencies)
+    };
+
+    res.status(201).json({ ticket: ticketWithComputed });
   } catch (error) {
     console.error('Error creating ticket:', error);
     res.status(500).json({ error: 'Failed to create ticket' });
@@ -551,10 +633,10 @@ router.post('/tickets', async (req: Request, res: Response) => {
 router.patch('/tickets/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { status, response, title, description, creator_id, type, priority, tags, category } = req.body;
+    const { status, response, title, description, creator_id, type, priority, tags, category, dependencies } = req.body;
 
     // Check if any field is provided
-    if (!status && !response && !title && !description && !tags && !category) {
+    if (!status && !response && !title && !description && !tags && !category && !dependencies) {
       return res.status(400).json({ error: 'At least one field must be provided' });
     }
 
@@ -630,14 +712,28 @@ router.patch('/tickets/:id', async (req: Request, res: Response) => {
       updates.push('category = ?');
       values.push(category.trim());
     }
+    if (dependencies !== undefined) {
+      // Allow manual override of dependencies
+      const depsArray = Array.isArray(dependencies) ? dependencies : [];
+      updates.push('dependencies = ?');
+      values.push(depsArray.length > 0 ? JSON.stringify(depsArray) : null);
+    }
     updates.push('updated_at = CURRENT_TIMESTAMP');
 
     const stmt = db.prepare(`UPDATE tickets SET ${updates.join(', ')} WHERE id = ?`);
     stmt.run(...values, id);
 
-    const updatedTicket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(id);
+    const updatedTicket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(id) as any;
 
-    res.json({ ticket: updatedTicket });
+    // Add computed fields to response
+    const depsArray = updatedTicket.dependencies ? JSON.parse(updatedTicket.dependencies) : [];
+    const ticketWithComputed = {
+      ...updatedTicket,
+      dependencies: depsArray,
+      blocked: isTicketBlocked(db, depsArray)
+    };
+
+    res.json({ ticket: ticketWithComputed });
   } catch (error) {
     console.error('Error updating ticket:', error);
     res.status(500).json({ error: 'Failed to update ticket' });
