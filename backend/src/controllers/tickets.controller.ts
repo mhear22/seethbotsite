@@ -43,7 +43,7 @@ function isTicketBlocked(db: Database.Database, dependencies: number[]): boolean
 
   // Check if all dependency tickets are completed or declined
   for (const depId of dependencies) {
-    const depTicket = db.prepare('SELECT status FROM tickets WHERE id = ?').get(depId) as { status: string } | undefined;
+    const depTicket = db.prepare('SELECT status FROM tickets WHERE id = ? AND is_deleted = 0').get(depId) as { status: string } | undefined;
 
     // If dependency doesn't exist or is not completed/declined, ticket is blocked
     if (!depTicket || !['completed', 'declined'].includes(depTicket.status)) {
@@ -117,6 +117,13 @@ function getDB(): Database.Database {
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  // Add is_deleted column if it doesn't exist (for soft deletes)
+  try {
+    db.exec(`ALTER TABLE tickets ADD COLUMN is_deleted BOOLEAN DEFAULT 0`);
+  } catch (err) {
+    // Column already exists, ignore the error
+  }
 
   // Add creator_id column if it doesn't exist (for existing databases)
   try {
@@ -305,6 +312,7 @@ router.get('/tickets/next-task', async (req: Request, res: Response) => {
     let ticket = db.prepare(`
       SELECT * FROM tickets
       WHERE status = 'needs-info'
+        AND is_deleted = 0
         AND (title NOT LIKE '%weiner%' AND title NOT LIKE '%fire%')
       ORDER BY created_at ASC
       LIMIT 1
@@ -316,6 +324,7 @@ router.get('/tickets/next-task', async (req: Request, res: Response) => {
       ticket = db.prepare(`
         SELECT * FROM tickets
         WHERE status = 'pending'
+          AND is_deleted = 0
           AND (updated_at < ? OR updated_at IS NULL)
           AND (title NOT LIKE '%weiner%' AND title NOT LIKE '%fire%')
         ORDER BY id ASC
@@ -453,7 +462,7 @@ router.get('/tickets', async (req: Request, res: Response) => {
     const db = getDB();
     const { status = 'all', type = 'all', priority = 'all', tag, category, sortBy = 'relevance' } = req.query;
 
-    let query = 'SELECT * FROM tickets WHERE 1=1';
+    let query = 'SELECT * FROM tickets WHERE is_deleted = 0';
     const params: any[] = [];
 
     // Map "in-progress" to "needs-info" for frontend compatibility
@@ -656,8 +665,8 @@ router.patch('/tickets/:id', async (req: Request, res: Response) => {
 
     const db = getDB();
 
-    // Check if ticket exists
-    const existing = db.prepare('SELECT * FROM tickets WHERE id = ?').get(id) as any;
+    // Check if ticket exists (exclude soft-deleted)
+    const existing = db.prepare('SELECT * FROM tickets WHERE id = ? AND is_deleted = 0').get(id) as any;
     if (!existing) {
       return res.status(404).json({ error: 'Ticket not found' });
     }
@@ -782,8 +791,8 @@ router.delete('/tickets/:id', async (req: Request, res: Response) => {
     const { id } = req.params;
     const db = getDB();
 
-    // Check if ticket exists
-    const existing = db.prepare('SELECT * FROM tickets WHERE id = ?').get(id) as any;
+    // Check if ticket exists (exclude soft-deleted)
+    const existing = db.prepare('SELECT * FROM tickets WHERE id = ? AND is_deleted = 0').get(id) as any;
     if (!existing) {
       return res.status(404).json({ error: 'Ticket not found' });
     }
@@ -801,7 +810,7 @@ router.delete('/tickets/:id', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Unauthorized: You can only delete your own tickets' });
     }
 
-    const stmt = db.prepare('DELETE FROM tickets WHERE id = ?');
+    const stmt = db.prepare('UPDATE tickets SET is_deleted = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?');
     stmt.run(id);
 
     res.json({ message: 'Ticket deleted successfully' });
@@ -845,6 +854,7 @@ router.get('/tickets/estimated-wait-time', async (req: Request, res: Response) =
       SELECT created_at, updated_at
       FROM tickets
       WHERE status IN ('completed', 'complete')
+        AND is_deleted = 0
       ORDER BY updated_at DESC
       LIMIT 10
     `).all() as { created_at: string; updated_at: string }[];
@@ -945,12 +955,13 @@ router.get('/tickets/stats', async (req: Request, res: Response) => {
     const db = getDB();
 
     // Get total ticket count
-    const totalTickets = db.prepare('SELECT COUNT(*) as count FROM tickets').get() as { count: number };
+    const totalTickets = db.prepare('SELECT COUNT(*) as count FROM tickets WHERE is_deleted = 0').get() as { count: number };
 
     // Get tickets by status
     const ticketsByStatus = db.prepare(`
       SELECT status, COUNT(*) as count
       FROM tickets
+      WHERE is_deleted = 0
       GROUP BY status
     `).all() as any;
 
@@ -967,6 +978,7 @@ router.get('/tickets/stats', async (req: Request, res: Response) => {
     const oldestTicket = db.prepare(`
       SELECT id, title, created_at
       FROM tickets
+      WHERE is_deleted = 0
       ORDER BY created_at ASC
       LIMIT 1
     `).get() as any;
@@ -975,6 +987,7 @@ router.get('/tickets/stats', async (req: Request, res: Response) => {
     const newestTicket = db.prepare(`
       SELECT id, title, created_at
       FROM tickets
+      WHERE is_deleted = 0
       ORDER BY created_at DESC
       LIMIT 1
     `).get() as any;
@@ -987,6 +1000,7 @@ router.get('/tickets/stats', async (req: Request, res: Response) => {
         MIN(CASE WHEN status = 'completed' THEN updated_at END) as oldestCompleted,
         MAX(CASE WHEN status = 'completed' THEN updated_at END) as newestCompleted
       FROM tickets
+      WHERE is_deleted = 0
     `).get() as any;
 
     const stats = {
@@ -1065,8 +1079,8 @@ router.post('/tickets/:id/appeal', async (req: Request, res: Response) => {
 
     const db = getDB();
 
-    // Check if ticket exists
-    const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(id) as any;
+    // Check if ticket exists (exclude soft-deleted)
+    const ticket = db.prepare('SELECT * FROM tickets WHERE id = ? AND is_deleted = 0').get(id) as any;
     if (!ticket) {
       return res.status(404).json({ error: 'Ticket not found' });
     }
@@ -1297,7 +1311,7 @@ router.get('/tickets/tags', async (req: Request, res: Response) => {
     const db = getDB();
 
     // Get all tickets with tags
-    const tickets = db.prepare('SELECT tags FROM tickets WHERE tags IS NOT NULL AND tags != ""').all() as { tags: string }[];
+    const tickets = db.prepare('SELECT tags FROM tickets WHERE tags IS NOT NULL AND tags != "" AND is_deleted = 0').all() as { tags: string }[];
 
     // Parse and count tags (tags are comma-separated)
     const tagCounts: Record<string, number> = {};
@@ -1352,7 +1366,7 @@ router.get('/tickets/categories', async (req: Request, res: Response) => {
     const db = getDB();
 
     // Get all tickets with categories
-    const tickets = db.prepare('SELECT category FROM tickets WHERE category IS NOT NULL AND category != ""').all() as { category: string }[];
+    const tickets = db.prepare('SELECT category FROM tickets WHERE category IS NOT NULL AND category != "" AND is_deleted = 0').all() as { category: string }[];
 
     // Count categories
     const categoryCounts: Record<string, number> = {};

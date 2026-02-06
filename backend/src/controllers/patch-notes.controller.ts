@@ -17,6 +17,7 @@ interface PatchNote {
   title: string;
   changes: Change[];
   createdAt: string;
+  isDeleted?: boolean;
 }
 
 // Storage for patch notes
@@ -105,7 +106,7 @@ loadPatchNotes();
  *                     description: When this patch note was created
  */
 router.get('/patch-notes', (req: Request, res: Response) => {
-  const notes = loadPatchNotes();
+  const notes = loadPatchNotes().filter(n => !n.isDeleted);
   // Sort by createdAt descending (newest first)
   const sorted = [...notes].sort((a, b) =>
     new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -144,7 +145,7 @@ router.get('/patch-notes', (req: Request, res: Response) => {
  *                   type: string
  */
 router.get('/patch-notes/latest', (req: Request, res: Response) => {
-  const notes = loadPatchNotes();
+  const notes = loadPatchNotes().filter(n => !n.isDeleted);
   if (notes.length === 0) {
     return res.status(404).json({ error: 'No patch notes found' });
   }
@@ -262,13 +263,13 @@ router.post('/patch-notes', (req: Request, res: Response) => {
  */
 router.delete('/patch-notes/:id', (req: Request, res: Response) => {
   const { id } = req.params;
-  const index = patchNotesCache.findIndex(note => note.id === id);
+  const note = patchNotesCache.find(n => n.id === id && !n.isDeleted);
 
-  if (index === -1) {
+  if (!note) {
     return res.status(404).json({ error: 'Patch note not found' });
   }
 
-  patchNotesCache.splice(index, 1);
+  note.isDeleted = true;
   savePatchNotes();
 
   res.json({ message: 'Patch note deleted successfully' });

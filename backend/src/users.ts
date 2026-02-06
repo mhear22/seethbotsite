@@ -25,6 +25,13 @@ export function initUsersDB(): Database.Database {
     )
   `);
 
+  // Add is_deleted column if it doesn't exist (for soft deletes)
+  try {
+    db.exec(`ALTER TABLE users ADD COLUMN is_deleted BOOLEAN DEFAULT 0`);
+  } catch (err) {
+    // Column already exists, ignore the error
+  }
+
   // Create sessions table for device tracking
   db.exec(`
     CREATE TABLE IF NOT EXISTS sessions (
@@ -95,7 +102,7 @@ export async function registerUser(
   const db = getUsersDB();
 
   // Check if email already exists
-  const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
+  const existing = db.prepare('SELECT id FROM users WHERE email = ? AND is_deleted = 0').get(email);
   if (existing) {
     throw new Error('Email already registered');
   }
@@ -111,7 +118,7 @@ export async function registerUser(
   `);
   const result = stmt.run(email, passwordHash, displayName || null);
 
-  const user = db.prepare('SELECT id, email, display_name, created_at, updated_at FROM users WHERE id = ?').get(result.lastInsertRowid) as User;
+  const user = db.prepare('SELECT id, email, display_name, created_at, updated_at FROM users WHERE id = ? AND is_deleted = 0').get(result.lastInsertRowid) as User;
 
   // Create session
   const token = generateJWT(user.id);
@@ -132,7 +139,7 @@ export async function loginUser(
   const db = getUsersDB();
 
   // Get user by email
-  const userWithHash = db.prepare('SELECT * FROM users WHERE email = ?').get(email) as any;
+  const userWithHash = db.prepare('SELECT * FROM users WHERE email = ? AND is_deleted = 0').get(email) as any;
 
   if (!userWithHash) {
     throw new Error('Invalid email or password');
@@ -179,7 +186,7 @@ export function validateTokenAndGetUser(token: string): { user: User; session: S
     db.prepare('UPDATE sessions SET last_used_at = CURRENT_TIMESTAMP WHERE id = ?').run(session.id);
 
     // Get user
-    const user = db.prepare('SELECT id, email, display_name, created_at, updated_at FROM users WHERE id = ?').get(session.user_id) as User;
+    const user = db.prepare('SELECT id, email, display_name, created_at, updated_at FROM users WHERE id = ? AND is_deleted = 0').get(session.user_id) as User;
 
     if (!user) {
       return null;
@@ -272,8 +279,8 @@ export function cleanupExpiredSessions(): number {
  */
 export function updateUserDisplayName(userId: number, displayName: string): User {
   const db = getUsersDB();
-  db.prepare('UPDATE users SET display_name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(displayName, userId);
-  const user = db.prepare('SELECT id, email, display_name, created_at, updated_at FROM users WHERE id = ?').get(userId) as User;
+  db.prepare('UPDATE users SET display_name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND is_deleted = 0').run(displayName, userId);
+  const user = db.prepare('SELECT id, email, display_name, created_at, updated_at FROM users WHERE id = ? AND is_deleted = 0').get(userId) as User;
   return user;
 }
 
@@ -284,7 +291,7 @@ export async function changeUserPassword(userId: number, oldPassword: string, ne
   const db = getUsersDB();
 
   // Get current password hash
-  const user = db.prepare('SELECT password_hash FROM users WHERE id = ?').get(userId) as { password_hash: string } | undefined;
+  const user = db.prepare('SELECT password_hash FROM users WHERE id = ? AND is_deleted = 0').get(userId) as { password_hash: string } | undefined;
 
   if (!user) {
     throw new Error('User not found');
@@ -315,7 +322,7 @@ export async function deleteUserAccount(userId: number, password: string): Promi
   const db = getUsersDB();
 
   // Verify password
-  const user = db.prepare('SELECT password_hash FROM users WHERE id = ?').get(userId) as { password_hash: string } | undefined;
+  const user = db.prepare('SELECT password_hash FROM users WHERE id = ? AND is_deleted = 0').get(userId) as { password_hash: string } | undefined;
 
   if (!user) {
     throw new Error('User not found');
@@ -327,6 +334,9 @@ export async function deleteUserAccount(userId: number, password: string): Promi
     throw new Error('Invalid password');
   }
 
-  // Delete user (cascades to sessions)
-  db.prepare('DELETE FROM users WHERE id = ?').run(userId);
+  // Soft delete user and anonymize email to free it up for re-registration
+  db.prepare("UPDATE users SET is_deleted = 1, email = 'deleted_' || id || '@deleted', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(userId);
+
+  // Still hard-delete sessions (ephemeral security tokens)
+  deleteAllSessions(userId);
 }

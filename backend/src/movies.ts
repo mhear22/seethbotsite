@@ -19,6 +19,7 @@ export interface Movie {
   notes?: string;
   createdAt: string;
   thumbnail?: string;
+  isDeleted?: boolean;
 }
 
 export interface Vote {
@@ -99,12 +100,12 @@ function saveVotingRound(round: VotingRound | null): void {
 
 // Movie operations
 export function getAllMovies(): Movie[] {
-  return loadMovies();
+  return loadMovies().filter(m => !m.isDeleted);
 }
 
 export function getMovieById(id: string): Movie | undefined {
   const movies = loadMovies();
-  return movies.find(m => m.id === id);
+  return movies.find(m => m.id === id && !m.isDeleted);
 }
 
 export function addMovie(movie: Omit<Movie, 'id' | 'createdAt'>): Movie {
@@ -121,11 +122,12 @@ export function addMovie(movie: Omit<Movie, 'id' | 'createdAt'>): Movie {
 
 export function deleteMovie(id: string): boolean {
   const movies = loadMovies();
-  const filtered = movies.filter(m => m.id !== id);
-  if (filtered.length === movies.length) {
+  const movie = movies.find(m => m.id === id && !m.isDeleted);
+  if (!movie) {
     return false;
   }
-  saveMovies(filtered);
+  movie.isDeleted = true;
+  saveMovies(movies);
   return true;
 }
 

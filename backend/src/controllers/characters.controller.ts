@@ -30,6 +30,13 @@ function getDB(): Database.Database {
     )
   `);
 
+  // Add is_deleted column if it doesn't exist (for soft deletes)
+  try {
+    db.exec(`ALTER TABLE characters ADD COLUMN is_deleted BOOLEAN DEFAULT 0`);
+  } catch (err) {
+    // Column already exists, ignore the error
+  }
+
   return db;
 }
 
@@ -48,6 +55,7 @@ router.get('/characters', async (req: Request, res: Response) => {
     const db = getDB();
     const characters = db.prepare(`
       SELECT * FROM characters
+      WHERE is_deleted = 0
       ORDER BY elo_rating DESC
     `).all();
 
@@ -73,7 +81,7 @@ router.get('/characters/random-pair', async (req: Request, res: Response) => {
     const db = getDB();
 
     // Get all character IDs
-    const allIds = db.prepare('SELECT id FROM characters').all() as { id: number }[];
+    const allIds = db.prepare('SELECT id FROM characters WHERE is_deleted = 0').all() as { id: number }[];
 
     if (allIds.length < 2) {
       return res.json({ characters: [] });
@@ -86,7 +94,7 @@ router.get('/characters/random-pair', async (req: Request, res: Response) => {
     // Fetch the two characters
     const characters = db.prepare(`
       SELECT * FROM characters
-      WHERE id IN (?, ?)
+      WHERE id IN (?, ?) AND is_deleted = 0
     `).all(pairIds[0], pairIds[1]);
 
     res.json({ characters });
@@ -133,7 +141,7 @@ router.post('/characters', async (req: Request, res: Response) => {
     `);
     const result = stmt.run(name.trim(), image_url || null);
 
-    const newCharacter = db.prepare('SELECT * FROM characters WHERE id = ?').get(result.lastInsertRowid);
+    const newCharacter = db.prepare('SELECT * FROM characters WHERE id = ? AND is_deleted = 0').get(result.lastInsertRowid);
 
     res.status(201).json({ character: newCharacter });
   } catch (error) {
@@ -179,8 +187,8 @@ router.post('/characters/vote', async (req: Request, res: Response) => {
     const db = getDB();
 
     // Get current ELO ratings
-    const winner = db.prepare('SELECT * FROM characters WHERE id = ?').get(winner_id) as any;
-    const loser = db.prepare('SELECT * FROM characters WHERE id = ?').get(loser_id) as any;
+    const winner = db.prepare('SELECT * FROM characters WHERE id = ? AND is_deleted = 0').get(winner_id) as any;
+    const loser = db.prepare('SELECT * FROM characters WHERE id = ? AND is_deleted = 0').get(loser_id) as any;
 
     if (!winner || !loser) {
       return res.status(404).json({ error: 'One or both characters not found' });
@@ -209,8 +217,8 @@ router.post('/characters/vote', async (req: Request, res: Response) => {
     `).run(newLoserElo, loser_id);
 
     // Fetch updated characters
-    const updatedWinner = db.prepare('SELECT * FROM characters WHERE id = ?').get(winner_id);
-    const updatedLoser = db.prepare('SELECT * FROM characters WHERE id = ?').get(loser_id);
+    const updatedWinner = db.prepare('SELECT * FROM characters WHERE id = ? AND is_deleted = 0').get(winner_id);
+    const updatedLoser = db.prepare('SELECT * FROM characters WHERE id = ? AND is_deleted = 0').get(loser_id);
 
     res.json({
       winner: updatedWinner,
@@ -245,7 +253,7 @@ router.delete('/characters/:id', async (req: Request, res: Response) => {
     const { id } = req.params;
     const db = getDB();
 
-    const stmt = db.prepare('DELETE FROM characters WHERE id = ?');
+    const stmt = db.prepare('UPDATE characters SET is_deleted = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?');
     stmt.run(id);
 
     res.json({ message: 'Character deleted successfully' });
