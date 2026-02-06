@@ -507,6 +507,8 @@ if (typeof window !== 'undefined') {
           title="Click to scroll to top"
         >🌸</span>
         <span class="brand-text">Mold</span>
+        <!-- Font Awesome icon demonstration -->
+        <font-awesome-icon :icon="['fas', 'child']" size="lg" class="fa-child-icon" title="Font Awesome - Child Icon" />
         <span class="build-indicator" v-if="buildInfo" :title="`Build #${buildInfo.buildCount} deployed ${timeAgo}`">
           #{{ buildInfo.buildCount }} ({{ timeAgo }})
         </span>
@@ -663,6 +665,22 @@ if (typeof window !== 'undefined') {
   display: inline-block;
   transition: transform 0.1s linear;
   font-size: 1.5rem;
+}
+
+/* Font Awesome Child Icon */
+.fa-child-icon {
+  margin-left: 8px;
+  color: #ff91a4;
+  transition: all 0.2s ease;
+}
+
+.dark .fa-child-icon {
+  color: #ffb6c1;
+}
+
+.fa-child-icon:hover {
+  transform: scale(1.2);
+  color: #ff6b8a;
 }
 
 /* Keyboard Help Button */
