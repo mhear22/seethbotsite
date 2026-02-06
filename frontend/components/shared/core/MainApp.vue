@@ -10,6 +10,7 @@ import MikaModal from '../modals/MikaModal.vue'
 import DigitalGoose from '../../panels/DigitalGoose.vue'
 import MiningPanel from '../../panels/MiningPanel.vue'
 import TorchEffect from '../ui/TorchEffect.vue'
+import ActiveUsers from '../ui/ActiveUsers.vue'
 import Router from './Router.vue'
 import SearchModal from '../ui/SearchModal.vue'
 import MobileFAB from '../ui/MobileFAB.vue'
@@ -56,13 +57,20 @@ const leftModals = computed<ModalItem[]>(() => [
   }
 ])
 
-// Modal items for right dock (Feed)
+// Modal items for right dock (Feed and Active Users)
 const rightModals = computed<ModalItem[]>(() => [
   {
     id: 'feed',
     title: 'Live Feeds',
     icon: '📰',
     isOpen: appStore.panels.feed,
+    position: 'right'
+  },
+  {
+    id: 'activeUsers',
+    title: 'Active Users',
+    icon: '👥',
+    isOpen: appStore.panels.activeUsers || false,
     position: 'right'
   }
 ])
@@ -125,7 +133,7 @@ onUnmounted(() => {
       </template>
     </ModalContainer>
 
-    <!-- Right Dock - Feed -->
+    <!-- Right Dock - Feed and Active Users -->
     <ModalContainer
       :modals="rightModals"
       @toggle="appStore.togglePanel"
@@ -135,6 +143,13 @@ onUnmounted(() => {
           v-if="isOpen"
           :is-open="isOpen"
           @toggle="appStore.togglePanel('feed')"
+        />
+      </template>
+      <template #modal-activeUsers="{ modal, isOpen }">
+        <ActiveUsers
+          v-if="isOpen"
+          :is-open="isOpen"
+          @toggle="appStore.togglePanel('activeUsers')"
         />
       </template>
     </ModalContainer>

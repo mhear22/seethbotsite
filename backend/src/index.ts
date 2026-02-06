@@ -29,6 +29,8 @@ import statsController from './controllers/stats.controller';
 import challengesController from './controllers/challenges.controller';
 import achievementsController from './controllers/achievements.controller';
 import archiveController from './controllers/archive.controller';
+import { setupWebSocketServer } from './controllers/presence.controller';
+import { createServer } from 'http';
 
 const app: Express = express();
 const PORT = process.env.PORT || 3001;
@@ -100,12 +102,16 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
 });
 
 // Start server
-app.listen(PORT, () => {
+const server = createServer(app);
+server.listen(PORT, () => {
   console.log(`🌸 Server running on http://localhost:${PORT}`);
   console.log(`📁 Serving static files from: ${SERVE_ROOT}`);
   console.log(`✨ Ready to serve the Vue.js app!`);
   console.log(`🔒 Security: API key authentication enabled for destructive endpoints`);
   console.log(`⚡ Rate limiting: 100 requests per minute per IP`);
 });
+
+// Setup WebSocket server for user presence
+setupWebSocketServer(server);
 
 export default app;
