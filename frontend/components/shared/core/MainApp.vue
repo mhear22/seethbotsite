@@ -11,10 +11,9 @@ import DigitalGoose from '../../panels/DigitalGoose.vue'
 import MiningPanel from '../../panels/MiningPanel.vue'
 import TorchEffect from '../ui/TorchEffect.vue'
 import Router from './Router.vue'
-import SwipeFeedback from '../ui/SwipeFeedback.vue'
 import SearchModal from '../ui/SearchModal.vue'
+import MobileFAB from '../ui/MobileFAB.vue'
 import { useAppStore } from '../../../stores/useAppStore'
-import { useSwipeGestures } from '../../../composables/useSwipeGestures'
 
 export interface RankingItem {
   name: string
@@ -45,18 +44,6 @@ const appStore = useAppStore()
 // Router
 const router = useRouter()
 const route = useRoute()
-
-// Swipe Gestures (Ticket #129)
-const {
-  swipeFeedback,
-  isEnabled: swipeEnabled,
-  isMobile,
-  manualSwipe
-} = useSwipeGestures({
-  enabledOnMobile: true,
-  enabledOnDesktop: false, // Swipe gestures enabled on mobile only for better UX
-  showVisualFeedback: true
-})
 
 // Modal items for left dock (Tachometer)
 const leftModals = computed<ModalItem[]>(() => [
@@ -187,13 +174,8 @@ onUnmounted(() => {
     <!-- Torch Effect for Darker Mode (Ticket #109) -->
     <TorchEffect />
 
-    <!-- Swipe Gesture Feedback (Ticket #129) -->
-    <SwipeFeedback
-      :visible="swipeFeedback.visible"
-      :direction="swipeFeedback.direction"
-      :icon="swipeFeedback.icon"
-      :message="swipeFeedback.message"
-    />
+    <!-- Mobile FAB for mode toggles -->
+    <MobileFAB />
 
     <!-- Search Modal (Ticket #139) -->
     <SearchModal

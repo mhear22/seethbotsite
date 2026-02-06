@@ -2004,42 +2004,9 @@ body.darker .mika-modal-box {
     display: none; /* Hide build indicator on mobile to prevent overflow */
   }
 
-  /* Move nav controls to avoid covering page navigation */
+  /* Hide desktop dock on mobile - replaced by MobileFAB */
   .nav-controls-wrapper {
-    bottom: 85px; /* Move above mobile bottom nav (70px + 15px spacing) */
-    right: 10px;
-    left: auto;
-    transform: none;
-    z-index: 1001;
-  }
-
-  .nav-controls-chevron {
-    padding: 6px 12px;
-    border-radius: 16px 16px 0 0;
-  }
-
-  .chevron-icon {
-    font-size: 12px;
-  }
-
-  .nav-controls {
-    gap: 6px;
-    padding: 8px 16px;
-    border-radius: 18px;
-  }
-
-  .control-btn {
-    width: 38px;
-    height: 38px;
-    font-size: 18px;
-  }
-
-  .control-btn:hover {
-    transform: scale(1.25) translateY(-4px);
-  }
-
-  .control-btn.active {
-    transform: scale(1.15) translateY(-3px);
+    display: none;
   }
 
   .mobile-menu-toggle {
@@ -2653,37 +2620,6 @@ body.darker .mika-modal-box {
 
 /* Small Mobile Devices (< 480px) */
 @media (max-width: 480px) {
-  .nav-controls-wrapper {
-    bottom: 85px; /* Keep above mobile-bottom-nav on small screens too */
-  }
-
-  .nav-controls-chevron {
-    padding: 5px 10px;
-  }
-
-  .chevron-icon {
-    font-size: 11px;
-  }
-
-  .nav-controls {
-    gap: 4px;
-    padding: 6px 12px;
-  }
-
-  .control-btn {
-    width: 36px;
-    height: 36px;
-    font-size: 16px;
-  }
-
-  .control-btn:hover {
-    transform: scale(1.2) translateY(-3px);
-  }
-
-  .control-btn.active {
-    transform: scale(1.1) translateY(-2px);
-  }
-
   .nav-brand {
     font-size: 16px;
   }
@@ -2748,11 +2684,6 @@ body.darker .mika-modal-box {
 
   .page-content {
     padding: 90px 15px 85px; /* Maintain bottom padding in landscape */
-  }
-
-  /* Adjust nav controls for landscape */
-  .nav-controls-wrapper {
-    bottom: 85px; /* Keep above mobile-bottom-nav */
   }
 }
 
