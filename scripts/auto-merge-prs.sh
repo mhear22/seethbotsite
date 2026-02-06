@@ -66,10 +66,8 @@ while IFS=':' read -r ticket_id ticket_title; do
 
     MERGED_ANY=1
 
-    # Update ticket status to "deployed" to avoid re-merging
-    curl -s -X PATCH "http://localhost:8081/api/tickets/$ticket_id" \
-      -H "Content-Type: application/json" \
-      -d '{"status":"deployed"}' > /dev/null
+    # Note: Tickets are left as "completed" status - the script will skip them
+    # if their branches no longer exist
   else
     echo "❌ Merge conflict on $BRANCH_NAME"
     echo "❌ Alerting channel about merge conflict..."
