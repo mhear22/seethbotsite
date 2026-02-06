@@ -2111,6 +2111,10 @@ body.darker .mika-modal-box {
 }
 
 /* ===== MOBILE BOTTOM NAVIGATION (Ticket #110) ===== */
+.mobile-bottom-nav {
+  display: none;
+}
+
 @media (max-width: 768px) {
   .mobile-bottom-nav {
     position: fixed;
