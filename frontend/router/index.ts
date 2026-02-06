@@ -27,6 +27,7 @@ import SettingsPage from '../components/pages/SettingsPage.vue'
 import CarPage from '../components/pages/CarPage.vue'
 import FavoritesPage from '../components/pages/FavoritesPage.vue'
 import DailyChallenges from '../components/pages/DailyChallenges.vue'
+import ArchiveHistoryPage from '../components/pages/ArchiveHistoryPage.vue'
 
 const routes = [
   {
@@ -168,6 +169,11 @@ const routes = [
     path: '/challenges',
     name: 'challenges',
     component: DailyChallenges
+  },
+  {
+    path: '/archive',
+    name: 'archive',
+    component: ArchiveHistoryPage
   }
 ]
 

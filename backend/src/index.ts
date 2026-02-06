@@ -28,6 +28,7 @@ import miningController from './controllers/mining.controller';
 import statsController from './controllers/stats.controller';
 import challengesController from './controllers/challenges.controller';
 import achievementsController from './controllers/achievements.controller';
+import archiveController from './controllers/archive.controller';
 
 const app: Express = express();
 const PORT = process.env.PORT || 3001;
@@ -72,6 +73,7 @@ app.use('/api', miningController);
 app.use('/api/stats', statsController);
 app.use('/api/challenges', challengesController);
 app.use('/api/achievements', achievementsController);
+app.use('/api', archiveController);
 
 // Serve raw OpenAPI JSON spec for type generation
 app.get('/api/openapi.json', (req: Request, res: Response) => {

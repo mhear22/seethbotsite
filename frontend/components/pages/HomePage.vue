@@ -100,6 +100,7 @@ const featureCategories = [
       { name: 'Clocks', icon: '🌍', path: '/clocks' },
       { name: 'Countdowns', icon: '⏰', path: '/countdowns' },
       { name: 'About', icon: 'ℹ️', path: '/about' },
+      { name: 'Archive', icon: '📜', path: '/archive' },
       { name: 'API Docs', icon: '📚', path: '/api-docs' }
     ]
   }
