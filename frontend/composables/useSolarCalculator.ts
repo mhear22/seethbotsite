@@ -58,9 +58,10 @@ function pointInPolygon(point: Point, polygon: Point[]): boolean {
 }
 
 // Inset polygon by distance (shrink inward using edge normals)
+// Positive distance = inset (shrink), negative distance = outset (expand)
 function insetPolygon(vertices: Point[], distance: number): Point[] {
   const n = vertices.length
-  if (n < 3 || distance <= 0) return [...vertices]
+  if (n < 3 || distance === 0) return [...vertices]
 
   // Ensure polygon is counter-clockwise
   let signedArea = 0
@@ -71,7 +72,7 @@ function insetPolygon(vertices: Point[], distance: number): Point[] {
   const ccw = signedArea > 0
   const pts = ccw ? [...vertices] : [...vertices].reverse()
 
-  // Compute inward-offset edges
+  // Compute inward-offset edges (or outward if distance is negative)
   const offsetEdges: { p1: Point; p2: Point }[] = []
   for (let i = 0; i < n; i++) {
     const j = (i + 1) % n
@@ -80,6 +81,7 @@ function insetPolygon(vertices: Point[], distance: number): Point[] {
     const len = Math.sqrt(dx * dx + dy * dy)
     if (len === 0) continue
     // Inward normal for CCW polygon: rotate edge direction -90 degrees
+    // For negative distance, this effectively creates an outward offset
     const nx = dy / len
     const ny = -dx / len
     offsetEdges.push({

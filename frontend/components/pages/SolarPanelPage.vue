@@ -205,7 +205,7 @@ function insetPathSvg() {
           </div>
           <div class="setting-field">
             <label>Edge Setback (m)</label>
-            <input type="number" v-model.number="calculator.settings.value.setback" min="0" max="3" step="0.1" />
+            <input type="number" v-model.number="calculator.settings.value.setback" min="-3" max="3" step="0.1" />
           </div>
           <div class="setting-field">
             <label>Watts per Panel</label>
