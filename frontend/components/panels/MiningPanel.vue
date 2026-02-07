@@ -139,11 +139,11 @@ const resetMining = () => {
         <div class="progress-bar">
           <div class="progress-fill" :style="{ width: `${progress}%` }"></div>
         </div>
-        <div class="progress-text">{{ Math.floor(progress) }}%</div>
+        <div class="progress-text" aria-live="polite">{{ Math.floor(progress) }}%</div>
       </div>
 
-      <div class="mining-status">
-        <div class="status-icon">
+      <div class="mining-status" role="status" aria-live="polite">
+        <div class="status-icon" aria-hidden="true">
           <span v-if="progress < 33">🔄</span>
           <span v-else-if="progress < 66">⚡</span>
           <span v-else>💎</span>
@@ -161,23 +161,23 @@ const resetMining = () => {
       </div>
     </div>
 
-    <div v-if="discoveredStock" class="mining-result">
+    <div v-if="discoveredStock" class="mining-result" role="status" aria-live="polite">
       <div class="result-success">🎉 New Stock Discovered!</div>
 
       <div class="discovered-stock">
-        <div class="stock-avatar">{{ discoveredStock.avatar }}</div>
+        <div class="stock-avatar" aria-hidden="true">{{ discoveredStock.avatar }}</div>
         <div class="stock-info">
           <div class="stock-name">{{ discoveredStock.name }}</div>
-          <div class="stock-price">€{{ discoveredStock.price }}</div>
+          <div class="stock-price" aria-label="Price: €{{ discoveredStock.price }}">€{{ discoveredStock.price }}</div>
         </div>
       </div>
 
-      <button class="reset-btn" @click="resetMining">
+      <button class="reset-btn" @click="resetMining" aria-label="Mine for another stock">
         Mine Another Stock
       </button>
     </div>
 
-    <div v-if="message && !mining && !discoveredStock" class="mining-message">
+    <div v-if="message && !mining && !discoveredStock" class="mining-message" role="alert" aria-live="assertive">
       {{ message }}
     </div>
   </div>

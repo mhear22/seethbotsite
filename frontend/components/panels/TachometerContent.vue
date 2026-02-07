@@ -71,38 +71,38 @@ watch(() => props.value, (newValue) => {
 </script>
 
 <template>
-  <div class="tachometer-content">
-    <div class="tachometer-dial">
+  <div class="tachometer-content" role="region" aria-label="Mold meter panel">
+    <div class="tachometer-dial" role="img" aria-label="Gauge showing mold level: {{ Math.round(value) }} percent">
       <!-- Ticks around the dial -->
-      <div class="tachometer-ticks">
+      <div class="tachometer-ticks" aria-hidden="true">
         <div v-for="i in 9" :key="i" class="tick" :class="{ major: i % 3 === 1 }" :style="{ transform: `rotate(${(i - 1) * 45}deg) translate(0, -45px)` }"></div>
       </div>
 
       <!-- Value labels -->
-      <div class="tachometer-labels">
+      <div class="tachometer-labels" aria-hidden="true">
         <span class="label label-0">0%</span>
         <span class="label label-50">50%</span>
         <span class="label label-100">100%</span>
       </div>
 
       <!-- Needle -->
-      <div class="tachometer-needle" :style="needleStyle">
+      <div class="tachometer-needle" :style="needleStyle" aria-hidden="true">
         <div class="needle-body"></div>
         <div class="needle-tip"></div>
       </div>
 
       <!-- Center cap -->
-      <div class="tachometer-cap"></div>
+      <div class="tachometer-cap" aria-hidden="true"></div>
 
       <!-- Digital readout -->
-      <div class="tachometer-value">{{ Math.round(value) }}%</div>
+      <div class="tachometer-value" aria-live="polite" aria-atomic="true">{{ Math.round(value) }}%</div>
     </div>
 
     <div class="tachometer-title">🍄 MOLD METER</div>
 
-    <div class="fart-count">💨 Farts: {{ fartCount }}</div>
+    <div class="fart-count" aria-live="polite">💨 Farts: {{ fartCount }}</div>
 
-    <button class="fart-btn" @click="onFart" :class="{ exploded: exploded }" :disabled="clicked">💨 Fart!</button>
+    <button class="fart-btn" @click="onFart" :class="{ exploded: exploded }" :disabled="clicked" aria-label="Increment fart count">💨 Fart!</button>
   </div>
 </template>
 

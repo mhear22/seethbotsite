@@ -9,23 +9,26 @@ const { presets, currentPreset, setPreset } = useTheme()
     <h3 class="theme-section-title">🎨 Theme</h3>
     <p class="theme-section-desc">Choose your favorite color theme</p>
 
-    <div class="theme-grid">
+    <div class="theme-grid" role="radiogroup" aria-label="Theme selection">
       <button
         v-for="preset in presets"
         :key="preset.id"
         @click="setPreset(preset.id)"
         class="theme-card"
         :class="{ active: currentPreset?.id === preset.id }"
+        :aria-label="`Select ${preset.name} theme: ${preset.description}`"
+        :aria-pressed="currentPreset?.id === preset.id"
+        role="radio"
       >
-        <div class="theme-icon">{{ preset.icon }}</div>
-        <div class="theme-preview">
+        <div class="theme-icon" aria-hidden="true">{{ preset.icon }}</div>
+        <div class="theme-preview" aria-hidden="true">
           <div class="color-swatch" :style="{ background: preset.colors.primary }"></div>
           <div class="color-swatch" :style="{ background: preset.colors.secondary }"></div>
           <div class="color-swatch" :style="{ background: preset.colors.accent }"></div>
         </div>
         <div class="theme-name">{{ preset.name }}</div>
         <div class="theme-desc">{{ preset.description }}</div>
-        <div v-if="currentPreset?.id === preset.id" class="selected-badge">
+        <div v-if="currentPreset?.id === preset.id" class="selected-badge" aria-hidden="true">
           ✓ Selected
         </div>
       </button>
