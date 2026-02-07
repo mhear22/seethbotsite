@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useAppStore } from '../../../stores/useAppStore'
 
 const appStore = useAppStore()
 const isOpen = ref(false)
+const fabPanel = ref<HTMLElement | null>(null)
+const fabButton = ref<HTMLElement | null>(null)
 
 const toggle = () => {
   isOpen.value = !isOpen.value
@@ -12,6 +14,95 @@ const toggle = () => {
 const close = () => {
   isOpen.value = false
 }
+
+// Close on Escape key
+const handleEscape = (e: KeyboardEvent) => {
+  if (e.key === 'Escape' && isOpen.value) {
+    close()
+    if (fabButton.value) {
+      fabButton.value.focus()
+    }
+  }
+}
+
+// Focus trap for FAB panel
+const handleTab = (e: KeyboardEvent) => {
+  if (!isOpen.value || !fabPanel.value) return
+
+  const focusableSelectors = [
+    'button:not([disabled])',
+    '[href]',
+    'input:not([disabled])',
+    'select:not([disabled])',
+    'textarea:not([disabled])',
+    '[tabindex]:not([tabindex="-1"])'
+  ]
+
+  const elements = Array.from(fabPanel.value.querySelectorAll(focusableSelectors.join(','))) as HTMLElement[]
+  if (elements.length === 0) return
+
+  const firstElement = elements[0]
+  const lastElement = elements[elements.length - 1]
+
+  if (e.key === 'Tab') {
+    if (e.shiftKey) {
+      // Shift + Tab: going backwards
+      if (document.activeElement === firstElement) {
+        e.preventDefault()
+        if (fabButton.value) {
+          fabButton.value.focus()
+        }
+      }
+    } else {
+      // Tab: going forwards
+      if (document.activeElement === lastElement) {
+        e.preventDefault()
+        if (fabButton.value) {
+          fabButton.value.focus()
+        }
+      }
+    }
+  }
+}
+
+// Handle FAB button keydown
+const handleFabKeydown = (e: KeyboardEvent) => {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault()
+    toggle()
+
+    // If panel was just opened, focus first item
+    if (isOpen.value) {
+      nextTick(() => {
+        const firstItem = fabPanel.value?.querySelector('.fab-item') as HTMLElement
+        if (firstItem) {
+          firstItem.focus()
+        }
+      })
+    }
+  } else if (e.key === 'Escape' && isOpen.value) {
+    e.preventDefault()
+    close()
+  }
+}
+
+// Watch for panel open/close to set up focus management
+watch(isOpen, (newVal) => {
+  if (newVal) {
+    document.addEventListener('keydown', handleTab)
+  } else {
+    document.removeEventListener('keydown', handleTab)
+  }
+})
+
+onMounted(() => {
+  document.addEventListener('keydown', handleEscape)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('keydown', handleEscape)
+  document.removeEventListener('keydown', handleTab)
+})
 
 // Dark mode icon based on current state
 const darkModeIcon = () => {
@@ -33,7 +124,7 @@ const darkModeLabel = () => {
 
   <!-- FAB Panel -->
   <Transition name="fab-panel">
-    <div v-if="isOpen" class="fab-panel">
+    <div v-if="isOpen" class="fab-panel" ref="fabPanel">
       <div class="fab-panel-header">
         <span class="fab-panel-title">Controls</span>
       </div>
@@ -166,7 +257,10 @@ const darkModeLabel = () => {
     class="mobile-fab"
     :class="{ open: isOpen }"
     @click="toggle"
+    @keydown="handleFabKeydown"
+    :aria-expanded="isOpen"
     aria-label="Toggle controls"
+    ref="fabButton"
   >
     <span class="fab-icon">{{ isOpen ? '✕' : '⚙️' }}</span>
   </button>
