@@ -1,19 +1,19 @@
 {
-  "id": 194,
-  "title": "Accessibility: Semantic HTML",
-  "description": "Part of larger accessibility ticket #148. Ensure proper semantic HTML structure throughout the application.\n\n**Requirements:**\n- Use proper heading hierarchy (h1, h2, h3 in order)\n- Use <nav> for navigation sections\n- Use <main> for primary content\n- Use <section> for logical sections\n- Use <article> for self-contained content\n- Use <aside> for sidebar content\n- Use <footer> for footer content\n- Use <button> for buttons, not <div> with click handler\n- Use <a> for links, not <div> with navigation\n\n**Implementation Steps:**\n1. Audit all pages for heading hierarchy issues\n2. Replace <div> buttons with <button> elements\n3. Replace <div> links with <a> elements\n4. Add semantic sectioning elements where missing\n5. Ensure navigation uses <nav>\n6. Ensure main content uses <main>\n7. Test with screen reader\n\n**Files:**\n- All page-level Vue components\n- Navigation components\n- Components with click handlers\n\n**Estimated Effort:** 2-3 hours\n**Priority:** Medium\n**Dependencies:** None\n\n**Note**: This is sub-task 3 of ticket #148 (Accessibility - 12-16 hours total)",
+  "id": 195,
+  "title": "Accessibility: Screen reader support",
+  "description": "Part of larger accessibility ticket #148. Add aria-live regions for dynamic content and screen reader compatibility.\n\n**Requirements:**\n- Add aria-live regions for dynamic content (notifications, errors, game updates)\n- Use aria-live=\"polite\" for non-urgent updates\n- Use aria-live=\"assertive\" for urgent messages\n- Add aria-labels to form inputs with clear descriptions\n- Use aria-labelledby to relate labels to inputs\n- Provide alternative text for images (alt attributes)\n- Add skip navigation link (skip to main content)\n\n**Implementation Steps:**\n1. Identify all dynamic content areas (notifications, errors, game updates)\n2. Add aria-live=\"polite\" to non-urgent dynamic content\n3. Add aria-live=\"assertive\" to urgent messages (errors)\n4. Add skip navigation link at top of app\n5. Add aria-labelledby to all form inputs\n6. Add alt text to all images\n7. Test with screen reader (NVDA, JAWS, VoiceOver)\n\n**Files:**\n- App.vue (skip link)\n- Components with dynamic content (notifications, game updates)\n- Form components\n- All <img> elements\n\n**Estimated Effort:** 2-3 hours\n**Priority:** Medium\n**Dependencies:** None\n\n**Note**: This is sub-task 4 of ticket #148 (Accessibility - 12-16 hours total)",
   "status": "pending",
   "response": null,
-  "created_at": "2026-02-07 07:00:18",
-  "updated_at": "2026-02-07 07:00:18",
+  "created_at": "2026-02-07 07:00:32",
+  "updated_at": "2026-02-07 07:00:32",
   "creator_id": null,
   "type": "feature",
-  "priority": "high",
+  "priority": "medium",
   "tags": null,
   "category": null,
   "dependencies": [],
   "is_deleted": 0,
   "blocked": false,
-  "relevanceScore": 96,
-  "daysSinceCreation": 2
+  "relevanceScore": 100,
+  "daysSinceCreation": 0
 }

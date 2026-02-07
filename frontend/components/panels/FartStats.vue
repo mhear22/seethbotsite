@@ -79,7 +79,7 @@ onMounted(() => {
       Loading fart statistics...
     </div>
     
-    <div v-else-if="error" class="error">
+    <div v-else-if="error" class="error" role="alert" aria-live="assertive">
       {{ error }}
     </div>
     

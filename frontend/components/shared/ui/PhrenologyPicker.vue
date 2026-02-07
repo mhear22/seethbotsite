@@ -140,8 +140,8 @@ const analyzePhrenology = async () => {
         </div>
       </div>
 
-      <div v-if="error" class="phrenology-error">
-        <div class="emoji">❌</div>
+      <div v-if="error" class="phrenology-error" role="alert" aria-live="assertive">
+        <div class="emoji" aria-hidden="true">❌</div>
         <p>{{ error }}</p>
       </div>
 
