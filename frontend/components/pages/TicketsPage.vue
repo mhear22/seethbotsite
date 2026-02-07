@@ -3,43 +3,15 @@ import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import Modal from '../shared/ui/Modal.vue'
 import TicketForm from '../shared/ui/TicketForm.vue'
 import { useFavorites } from '../../composables/useFavorites'
+import { useTicketsStore } from '../../stores/useTicketsStore'
+import { useAuthStore } from '../../stores/useAuthStore'
+import type { Ticket, TicketStats } from '../../stores/useTicketsStore'
 
-interface Ticket {
-  id: number
-  title: string
-  description: string
-  status: 'pending' | 'needs-info' | 'completed' | 'declined' | 'unresolved'
-  type: 'feature' | 'bug' | 'feedback'
-  priority: 'high' | 'medium' | 'low'
-  tags?: string
-  category?: string
-  response?: string
-  creator_id?: string
-  created_at: string
-  updated_at: string
-}
+// Use stores instead of local state
+const ticketsStore = useTicketsStore()
+const authStore = useAuthStore()
 
-interface TicketStats {
-  totalTickets: number
-  byStatus: { [key: string]: number }
-  oldestTicket: { id: number; title: string; created_at: string }
-  newestTicket: { id: number; title: string; created_at: string }
-  dates: {
-    oldestCreated: string
-    newestCreated: string
-    oldestCompleted: string | null
-    newestCompleted: string | null
-  } | null
-}
-
-const tickets = ref<Ticket[]>([])
-const loading = ref(false)
-const error = ref<string | null>(null)
-const ticketStats = ref<TicketStats | null>(null)
 const showNewTicketModal = ref(false)
-const ignoreMode = ref(false)
-const lastCollection = ref<string | null>(null)
-const estimatedWaitTime = ref<{ minutes: number | null; sampleSize: number } | null>(null)
 const notification = ref<{ show: boolean; message: string; type: 'success' | 'error' }>({
   show: false,
   message: '',
@@ -104,6 +76,9 @@ const editForm = ref({
   category: ''
 })
 
+// Local error state for form validation
+const formError = ref<string | null>(null)
+
 // Status colors
 const statusColors = {
   pending: 'bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900 dark:text-yellow-200 dark:border-yellow-700',
@@ -142,7 +117,7 @@ const priorityOptions = [
 
 // Computed property for filtered tickets
 const filteredTickets = computed(() => {
-  let result = tickets.value
+  let result = ticketsStore.tickets
 
   if (filterStatus.value) {
     const statusFilter = filterStatus.value === 'in-progress' ? 'needs-info' : filterStatus.value
@@ -160,7 +135,7 @@ const filteredTickets = computed(() => {
   // Filter by tag
   if (filterTag.value) {
     const tag = filterTag.value.toLowerCase().trim()
-    result = result.filter(t => 
+    result = result.filter(t =>
       t.tags && t.tags.toLowerCase().includes(tag)
     )
   }
@@ -168,7 +143,7 @@ const filteredTickets = computed(() => {
   // Filter by category
   if (filterCategory.value) {
     const category = filterCategory.value.toLowerCase().trim()
-    result = result.filter(t => 
+    result = result.filter(t =>
       t.category && t.category.toLowerCase() === category
     )
   }
@@ -176,8 +151,8 @@ const filteredTickets = computed(() => {
   // Search filter
   if (searchQuery.value.trim()) {
     const query = searchQuery.value.toLowerCase().trim()
-    result = result.filter(t => 
-      t.title.toLowerCase().includes(query) || 
+    result = result.filter(t =>
+      t.title.toLowerCase().includes(query) ||
       t.description.toLowerCase().includes(query)
     )
   }
@@ -188,9 +163,9 @@ const filteredTickets = computed(() => {
 // Kanban columns
 const kanbanColumns = computed(() => {
   return {
-    pending: tickets.value.filter(t => t.status === 'pending'),
-    inProgress: tickets.value.filter(t => t.status === 'needs-info'),
-    completed: tickets.value.filter(t => t.status === 'completed')
+    pending: ticketsStore.tickets.filter(t => t.status === 'pending'),
+    inProgress: ticketsStore.tickets.filter(t => t.status === 'needs-info'),
+    completed: ticketsStore.tickets.filter(t => t.status === 'completed')
   }
 })
 
@@ -238,32 +213,12 @@ const isTicketDescriptionExpanded = (ticketId: number): boolean => {
 
 // Load tickets
 const loadTickets = async () => {
-  loading.value = true
-  error.value = null
-  try {
-    // Always load all tickets and filter client-side for consistency
-    // Sort by updated_at descending to show most recent tickets first
-    const response = await fetch('/api/tickets?sortBy=updated_at')
-    if (!response.ok) throw new Error('Failed to load tickets')
-    const data = await response.json()
-    tickets.value = data.tickets || []
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Failed to load tickets'
-  } finally {
-    loading.value = false
-  }
+  await ticketsStore.loadTickets()
 }
 
 // Load ticket statistics
 const loadTicketStats = async () => {
-  try {
-    const response = await fetch('/api/tickets/stats')
-    if (!response.ok) throw new Error('Failed to load ticket stats')
-    const stats = await response.json()
-    ticketStats.value = stats
-  } catch (err) {
-    console.warn('Failed to load ticket stats:', err)
-  }
+  await ticketsStore.loadTicketStats()
 }
 
 // Watch for filter changes and reload tickets
@@ -290,31 +245,20 @@ const hideNotification = () => {
 // Submit new ticket
 const submitTicket = async () => {
   if (!newTicket.value.title.trim()) {
-    error.value = 'Title is required'
+    formError.value = 'Title is required'
     return
   }
 
-  loading.value = true
-  error.value = null
   try {
-    const response = await fetch('/api/tickets', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title: newTicket.value.title.trim(),
-        description: newTicket.value.description.trim() || null,
-        type: newTicket.value.type,
-        priority: newTicket.value.priority,
-        tags: newTicket.value.tags.trim() || null,
-        category: newTicket.value.category.trim() || null,
-        creator_id: creatorId.value
-      })
+    await ticketsStore.createTicket({
+      title: newTicket.value.title.trim(),
+      description: newTicket.value.description.trim() || null,
+      type: newTicket.value.type,
+      priority: newTicket.value.priority,
+      tags: newTicket.value.tags.trim() || null,
+      category: newTicket.value.category.trim() || null,
+      creator_id: creatorId.value
     })
-
-    if (!response.ok) {
-      const data = await response.json()
-      throw new Error(data.error || 'Failed to submit ticket')
-    }
 
     // Reset form and close modal
     newTicket.value = {
@@ -325,6 +269,7 @@ const submitTicket = async () => {
       tags: '',
       category: ''
     }
+    formError.value = null
     showNewTicketModal.value = false
 
     // Show success notification
@@ -333,15 +278,14 @@ const submitTicket = async () => {
     // Reload tickets
     await loadTickets()
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Failed to submit ticket'
-  } finally {
-    loading.value = false
+    // Error is already set in store
+    showNotification(ticketsStore.error || 'Failed to submit ticket', 'error')
   }
 }
 
 // Start editing a ticket
 const startEdit = (ticket: Ticket) => {
-  error.value = null
+  formError.value = null
   editingTicket.value = ticket
   editForm.value = {
     title: ticket.title,
@@ -372,33 +316,23 @@ const cancelEdit = () => {
 const saveEdit = async () => {
   if (!editingTicket.value) return
   if (!editForm.value.title.trim()) {
-    error.value = 'Title is required'
+    formError.value = 'Title is required'
     return
   }
 
-  loading.value = true
-  error.value = null
   try {
-    const response = await fetch(`/api/tickets/${editingTicket.value.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title: editForm.value.title.trim(),
-        description: editForm.value.description.trim() || null,
-        type: editForm.value.type,
-        priority: editForm.value.priority,
-        tags: editForm.value.tags.trim() || null,
-        category: editForm.value.category.trim() || null
-      })
+    await ticketsStore.updateTicket(editingTicket.value.id, {
+      title: editForm.value.title.trim(),
+      description: editForm.value.description.trim() || null,
+      type: editForm.value.type,
+      priority: editForm.value.priority,
+      tags: editForm.value.tags.trim() || null,
+      category: editForm.value.category.trim() || null
     })
-
-    if (!response.ok) {
-      const data = await response.json()
-      throw new Error(data.error || 'Failed to update ticket')
-    }
 
     // Reset edit state and close modal
     editingTicket.value = null
+    formError.value = null
     showEditModal.value = false
     editForm.value = {
       title: '',
@@ -415,21 +349,13 @@ const saveEdit = async () => {
     // Reload tickets
     await loadTickets()
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Failed to update ticket'
-  } finally {
-    loading.value = false
+    // Error is already set in store
+    showNotification(ticketsStore.error || 'Failed to update ticket', 'error')
   }
 }
 
 const formatDate = (dateString: string) => {
-  const date = new Date(dateString)
-  return date.toLocaleDateString(undefined, {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
+  return ticketsStore.formatDate(dateString)
 }
 
 // Toggle ignore mode
@@ -505,7 +431,7 @@ const loadEstimatedWaitTime = async () => {
 
 // Start closing a ticket
 const startCloseTicket = (ticket: Ticket) => {
-  error.value = null
+  formError.value = null
   closingTicket.value = ticket
   closeForm.value = {
     status: 'completed',
@@ -527,24 +453,11 @@ const cancelCloseTicket = () => {
 const closeTicket = async () => {
   if (!closingTicket.value) return
 
-  loading.value = true
-  error.value = null
   try {
-    const response = await fetch(`/api/tickets/${closingTicket.value.id}`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        status: closeForm.value.status,
-        response: closeForm.value.response
-      })
+    await ticketsStore.updateTicket(closingTicket.value.id, {
+      status: closeForm.value.status === 'completed' ? 'completed' : 'declined',
+      response: closeForm.value.response
     })
-
-    if (!response.ok) {
-      const data = await response.json()
-      throw new Error(data.error || 'Failed to close ticket')
-    }
 
     // Reset form
     closingTicket.value = null
@@ -559,15 +472,13 @@ const closeTicket = async () => {
     // Reload tickets
     await loadTickets()
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Failed to close ticket'
-  } finally {
-    loading.value = false
+    showNotification(ticketsStore.error || 'Failed to close ticket', 'error')
   }
 }
 
 // Start confirming a ticket
 const startConfirmTicket = (ticket: Ticket) => {
-  error.value = null
+  formError.value = null
   confirmingTicket.value = ticket
   showConfirmModal.value = true
 }
@@ -585,24 +496,11 @@ const cancelConfirmTicket = () => {
 const confirmTicket = async () => {
   if (!confirmingTicket.value) return
 
-  loading.value = true
-  error.value = null
   try {
-    const response = await fetch(`/api/tickets/${confirmingTicket.value.id}`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        status: 'completed',
-        response: confirmingTicket.value.response || (unresolvedForm.value.reason ? `Confirmed: ${unresolvedForm.value.reason}` : 'Confirmed by human reviewer')
-      })
+    await ticketsStore.updateTicket(confirmingTicket.value.id, {
+      status: 'completed',
+      response: confirmingTicket.value.response || (unresolvedForm.value.reason ? `Confirmed: ${unresolvedForm.value.reason}` : 'Confirmed by human reviewer')
     })
-
-    if (!response.ok) {
-      const data = await response.json()
-      throw new Error(data.error || 'Failed to confirm ticket')
-    }
 
     // Reset form
     confirmingTicket.value = null
@@ -617,9 +515,7 @@ const confirmTicket = async () => {
     // Reload tickets
     await loadTickets()
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Failed to confirm ticket'
-  } finally {
-    loading.value = false
+    showNotification(ticketsStore.error || 'Failed to confirm ticket', 'error')
   }
 }
 
@@ -627,28 +523,15 @@ const confirmTicket = async () => {
 const markUnresolved = async () => {
   if (!confirmingTicket.value) return
   if (!unresolvedForm.value.reason.trim()) {
-    error.value = 'Reason is required to mark ticket as unresolved'
+    formError.value = 'Reason is required to mark ticket as unresolved'
     return
   }
 
-  loading.value = true
-  error.value = null
   try {
-    const response = await fetch(`/api/tickets/${confirmingTicket.value.id}`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        status: 'unresolved',
-        response: `Unresolved: ${unresolvedForm.value.reason}`
-      })
+    await ticketsStore.updateTicket(confirmingTicket.value.id, {
+      status: 'unresolved',
+      response: `Unresolved: ${unresolvedForm.value.reason}`
     })
-
-    if (!response.ok) {
-      const data = await response.json()
-      throw new Error(data.error || 'Failed to mark ticket as unresolved')
-    }
 
     // Reset form
     confirmingTicket.value = null
@@ -663,30 +546,17 @@ const markUnresolved = async () => {
     // Reload tickets
     await loadTickets()
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Failed to mark ticket as unresolved'
-  } finally {
-    loading.value = false
+    showNotification(ticketsStore.error || 'Failed to mark ticket as unresolved', 'error')
   }
 }
 
 // Close own ticket (user)
 const closeOwnTicket = async (ticket: Ticket) => {
-  loading.value = true
-  error.value = null
   try {
-    const response = await fetch(`/api/tickets/${ticket.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        status: 'completed',
-        creator_id: creatorId.value
-      })
+    await ticketsStore.updateTicket(ticket.id, {
+      status: 'completed',
+      creator_id: creatorId.value
     })
-
-    if (!response.ok) {
-      const data = await response.json()
-      throw new Error(data.error || 'Failed to close ticket')
-    }
 
     // Show success notification
     showNotification('Ticket closed successfully!')
@@ -694,9 +564,7 @@ const closeOwnTicket = async (ticket: Ticket) => {
     // Reload tickets
     await loadTickets()
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Failed to close ticket'
-  } finally {
-    loading.value = false
+    showNotification(ticketsStore.error || 'Failed to close ticket', 'error')
   }
 }
 
@@ -706,36 +574,21 @@ const deleteOwnTicket = async (ticket: Ticket) => {
     return
   }
 
-  loading.value = true
-  error.value = null
   try {
-    const response = await fetch(`/api/tickets/${ticket.id}`, {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Creator-ID': creatorId.value
-      },
-      body: JSON.stringify({
-        creator_id: creatorId.value
-      })
-    })
-
-    if (!response.ok) {
-      const data = await response.json()
-      throw new Error(data.error || 'Failed to delete ticket')
-    }
+    await ticketsStore.deleteTicket(ticket.id, creatorId.value)
 
     // Reload tickets
     await loadTickets()
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Failed to delete ticket'
-  } finally {
-    loading.value = false
+    showNotification(ticketsStore.error || 'Failed to delete ticket', 'error')
   }
 }
 
 // Load on mount
-onMounted(() => {
+onMounted(async () => {
+  // Initialize auth store
+  await authStore.init()
+
   // Initialize creator ID
   creatorId.value = getOrCreateCreatorId()
   loadIgnoreMode()
@@ -799,9 +652,9 @@ onUnmounted(() => {
         </div>
 
         <!-- Last Collection Display -->
-        <div v-if="lastCollection" class="last-collection">
+        <div v-if="ticketsStore.lastCollection" class="last-collection">
           <span class="collection-icon">🕐</span>
-          <span class="collection-text">Last collected: {{ formatDate(lastCollection) }}</span>
+          <span class="collection-text">Last collected: {{ formatDate(ticketsStore.lastCollection) }}</span>
         </div>
 
         <!-- Ignore Mode Toggle -->
@@ -809,7 +662,7 @@ onUnmounted(() => {
           <label class="toggle-switch">
             <input
               type="checkbox"
-              :checked="ignoreMode"
+              :checked="ticketsStore.ignoreMode"
               @change="toggleIgnoreMode"
             />
             <span class="toggle-slider"></span>
@@ -821,7 +674,7 @@ onUnmounted(() => {
       </div>
 
       <!-- Ticket Statistics -->
-      <div v-if="ticketStats" class="ticket-stats-section">
+      <div v-if="ticketsStore.ticketStats" class="ticket-stats-section">
         <div class="stats-header">
           <span class="stats-icon">📊</span>
           <h3 class="stats-title">Ticket Statistics</h3>
@@ -832,7 +685,7 @@ onUnmounted(() => {
             <div class="stat-icon stat-icon-primary">🎫</div>
             <div class="stat-content">
               <span class="stat-label">Total Tickets</span>
-              <span class="stat-value">{{ ticketStats.totalTickets }}</span>
+              <span class="stat-value">{{ ticketsStore.ticketStats.totalTickets }}</span>
             </div>
           </div>
 
@@ -843,19 +696,19 @@ onUnmounted(() => {
               <span class="stat-label">By Status</span>
               <div class="status-breakdown">
                 <span :class="['status-badge', statusColors.pending]">
-                  ⏳ {{ ticketStats.byStatus.pending || 0 }}
+                  ⏳ {{ ticketsStore.ticketStats.byStatus.pending || 0 }}
                 </span>
                 <span :class="['status-badge', statusColors['needs-info']]">
-                  🔄 {{ ticketStats.byStatus['needs-info'] || 0 }}
+                  🔄 {{ ticketsStore.ticketStats.byStatus['needs-info'] || 0 }}
                 </span>
                 <span :class="['status-badge', statusColors.completed]">
-                  ✅ {{ ticketStats.byStatus.completed || 0 }}
+                  ✅ {{ ticketsStore.ticketStats.byStatus.completed || 0 }}
                 </span>
                 <span :class="['status-badge', statusColors.declined]">
-                  ❌ {{ ticketStats.byStatus.declined || 0 }}
+                  ❌ {{ ticketsStore.ticketStats.byStatus.declined || 0 }}
                 </span>
-                <span v-if="ticketStats.byStatus.unresolved" :class="['status-badge', statusColors.unresolved]">
-                  ⚠️ {{ ticketStats.byStatus.unresolved }}
+                <span v-if="ticketsStore.ticketStats.byStatus.unresolved" :class="['status-badge', statusColors.unresolved]">
+                  ⚠️ {{ ticketsStore.ticketStats.byStatus.unresolved }}
                 </span>
               </div>
             </div>
@@ -867,10 +720,10 @@ onUnmounted(() => {
             <div class="stat-content">
               <span class="stat-label">Oldest Ticket</span>
               <div class="ticket-info">
-                <span class="ticket-id">#{{ ticketStats.oldestTicket.id }}</span>
-                <span class="ticket-title">{{ ticketStats.oldestTicket.title }}</span>
+                <span class="ticket-id">#{{ ticketsStore.ticketStats.oldestTicket.id }}</span>
+                <span class="ticket-title">{{ ticketsStore.ticketStats.oldestTicket.title }}</span>
               </div>
-              <span class="ticket-date">{{ formatDate(ticketStats.oldestTicket.created_at) }}</span>
+              <span class="ticket-date">{{ formatDate(ticketsStore.ticketStats.oldestTicket.created_at) }}</span>
             </div>
           </div>
 
@@ -880,10 +733,10 @@ onUnmounted(() => {
             <div class="stat-content">
               <span class="stat-label">Newest Ticket</span>
               <div class="ticket-info">
-                <span class="ticket-id">#{{ ticketStats.newestTicket.id }}</span>
-                <span class="ticket-title">{{ ticketStats.newestTicket.title }}</span>
+                <span class="ticket-id">#{{ ticketsStore.ticketStats.newestTicket.id }}</span>
+                <span class="ticket-title">{{ ticketsStore.ticketStats.newestTicket.title }}</span>
               </div>
-              <span class="ticket-date">{{ formatDate(ticketStats.newestTicket.created_at) }}</span>
+              <span class="ticket-date">{{ formatDate(ticketsStore.ticketStats.newestTicket.created_at) }}</span>
             </div>
           </div>
 
@@ -895,15 +748,15 @@ onUnmounted(() => {
               <div class="date-range">
                 <div class="date-row">
                   <span class="date-label">Created:</span>
-                  <span class="date-value">{{ formatDate(ticketStats.dates.oldestCreated) }}</span>
+                  <span class="date-value">{{ formatDate(ticketsStore.ticketStats.dates.oldestCreated) }}</span>
                   <span class="date-separator">→</span>
-                  <span class="date-value">{{ formatDate(ticketStats.dates.newestCreated) }}</span>
+                  <span class="date-value">{{ formatDate(ticketsStore.ticketStats.dates.newestCreated) }}</span>
                 </div>
-                <div v-if="ticketStats.dates.oldestCompleted" class="date-row completed-date">
+                <div v-if="ticketsStore.ticketStats.dates.oldestCompleted" class="date-row completed-date">
                   <span class="date-label">Completed:</span>
-                  <span class="date-value">{{ formatDate(ticketStats.dates.oldestCompleted) }}</span>
+                  <span class="date-value">{{ formatDate(ticketsStore.ticketStats.dates.oldestCompleted) }}</span>
                   <span class="date-separator">→</span>
-                  <span class="date-value">{{ formatDate(ticketStats.dates.newestCompleted) }}</span>
+                  <span class="date-value">{{ formatDate(ticketsStore.ticketStats.dates.newestCompleted) }}</span>
                 </div>
               </div>
             </div>
@@ -919,10 +772,10 @@ onUnmounted(() => {
       </div>
 
       <!-- Error Message Display -->
-      <div v-if="error" class="error-message" role="alert" aria-live="assertive">
+      <div v-if="ticketsStore.error" class="error-message" role="alert" aria-live="assertive">
         <span class="error-icon" aria-hidden="true">❌</span>
-        <span class="error-text">{{ error }}</span>
-        <button @click="error = null" class="error-close" aria-label="Close error">&times;</button>
+        <span class="error-text">{{ ticketsStore.error }}</span>
+        <button @click="ticketsStore.error = null" class="error-close" aria-label="Close error">&times;</button>
       </div>
 
       <button
@@ -1022,7 +875,7 @@ onUnmounted(() => {
 
       <!-- Filtered Tickets List -->
       <div  class="tickets-list">
-        <div v-if="loading" class="loading-state" aria-live="polite" aria-busy="true">
+        <div v-if="ticketsStore.loading" class="loading-state" aria-live="polite" aria-busy="true">
           <div class="loading-spinner" aria-hidden="true"></div>
           <span>Loading tickets...</span>
         </div>
@@ -1092,7 +945,7 @@ onUnmounted(() => {
                 v-if="ticket.status === 'pending'"
                 @click="startEdit(ticket)"
                 class="edit-ticket-btn"
-                :disabled="loading"
+                :disabled="ticketsStore.loading"
                 title="Edit ticket"
               >
                 ✏️ Edit
@@ -1101,7 +954,7 @@ onUnmounted(() => {
                 v-if="isOwnTicket(ticket) && ticket.status === 'pending'"
                 @click="closeOwnTicket(ticket)"
                 class="close-ticket-btn"
-                :disabled="loading"
+                :disabled="ticketsStore.loading"
                 title="Mark as completed"
               >
                 ✅ Close
@@ -1110,7 +963,7 @@ onUnmounted(() => {
                 v-if="isOwnTicket(ticket) && ticket.status === 'pending'"
                 @click="deleteOwnTicket(ticket)"
                 class="delete-ticket-btn"
-                :disabled="loading"
+                :disabled="ticketsStore.loading"
                 title="Delete ticket"
               >
                 🗑️ Delete
@@ -1137,9 +990,9 @@ onUnmounted(() => {
         v-model:tags="newTicket.tags"
         v-model:category="newTicket.category"
         :is-editing="false"
-        :loading="loading"
-        :estimated-wait-time-minutes="estimatedWaitTime?.minutes ?? null"
-        :sample-size="estimatedWaitTime?.sampleSize ?? 0"
+        :loading="ticketsStore.loading"
+        :estimated-wait-time-minutes="ticketsStore.estimatedWaitTime?.minutes ?? null"
+        :sample-size="ticketsStore.estimatedWaitTime?.sampleSize ?? 0"
         @submit="submitTicket"
         @cancel="showNewTicketModal = false"
       />
@@ -1157,7 +1010,7 @@ onUnmounted(() => {
         v-model:tags="editForm.tags"
         v-model:category="editForm.category"
         :is-editing="true"
-        :loading="loading"
+        :loading="ticketsStore.loading"
         @submit="saveEdit"
         @cancel="cancelEdit"
       />
@@ -1184,7 +1037,7 @@ onUnmounted(() => {
             <button
               @click="confirmTicket"
               class="btn-confirm"
-              :disabled="loading"
+              :disabled="ticketsStore.loading"
             >
               ✅ Confirm Completion
             </button>
@@ -1201,7 +1054,7 @@ onUnmounted(() => {
               <button
                 @click="markUnresolved"
                 class="btn-unresolved"
-                :disabled="loading || !unresolvedForm.reason.trim()"
+                :disabled="ticketsStore.loading || !unresolvedForm.reason.trim()"
               >
                 ⚠️ Mark as Unresolved
               </button>
