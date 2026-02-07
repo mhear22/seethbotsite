@@ -59,37 +59,42 @@ const anyOpen = computed(() => openModals.value.length > 0)
 </script>
 
 <template>
-  <div class="modal-dock" :class="[containerClass, { collapsed }]">
+  <div class="modal-dock" :class="[containerClass, { collapsed }]" role="region" :aria-label="containerClass === 'left-dock' ? 'Left panel dock' : 'Right panel dock'">
     <!-- Toggle Button -->
     <button
       class="dock-toggle"
       @click="toggleContainer"
+      :aria-label="collapsed ? 'Show panels' : 'Hide panels'"
+      :aria-expanded="!collapsed"
       :title="collapsed ? 'Show modals' : 'Hide modals'"
     >
       {{ collapsed ? '◀' : '▶' }}
     </button>
 
     <!-- Modal List -->
-    <div class="modal-list">
+    <div class="modal-list" role="list">
       <div
         v-for="modal in modals"
         :key="modal.id"
         class="modal-item"
         :class="{ 'modal-open': modal.isOpen }"
+        role="listitem"
       >
         <!-- Toggle Button -->
         <button
           class="modal-toggle-btn"
           @click="toggleModal(modal.id)"
           :class="{ active: modal.isOpen }"
+          :aria-expanded="modal.isOpen"
+          :aria-controls="`modal-${modal.id}-content`"
           :title="`${modal.isOpen ? 'Close' : 'Open'} ${modal.title}`"
         >
-          <span class="modal-icon">{{ modal.icon }}</span>
+          <span class="modal-icon" aria-hidden="true">{{ modal.icon }}</span>
           <span class="modal-title">{{ modal.title }}</span>
         </button>
 
         <!-- Modal Content Slot -->
-        <div class="modal-content-wrapper">
+        <div :id="`modal-${modal.id}-content`" class="modal-content-wrapper" role="region" :aria-hidden="!modal.isOpen">
           <slot :name="`modal-${modal.id}`" :modal="modal" :isOpen="modal.isOpen">
             <div v-if="modal.isOpen" class="modal-placeholder">
               {{ modal.title }} content

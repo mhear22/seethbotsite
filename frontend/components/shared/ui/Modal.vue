@@ -33,11 +33,11 @@ onUnmounted(() => {
 
 <template>
   <Teleport to="body">
-    <div v-if="isOpen" class="modal-overlay" @click.self="close">
+    <div v-if="isOpen" class="modal-overlay" @click.self="close" role="dialog" aria-modal="true" :aria-labelledby="modal-title">
       <div class="modal-container">
         <div class="modal-header">
-          <h2 class="modal-title">{{ title }}</h2>
-          <button class="modal-close-btn" @click="close" aria-label="Close">&times;</button>
+          <h2 id="modal-title" class="modal-title">{{ title }}</h2>
+          <button class="modal-close-btn" @click="close" aria-label="Close modal">&times;</button>
         </div>
         <div class="modal-body">
           <slot></slot>

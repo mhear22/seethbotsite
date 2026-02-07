@@ -117,21 +117,24 @@ onBeforeUnmount(() => {
       :class="[buttonClass, { 'is-exporting': isExporting }]"
       @click="showMenu = !showMenu"
       :disabled="isExporting"
+      :aria-label="`${isExporting ? 'Exporting' : 'Export data'}. ${showMenu ? 'Menu open' : 'Click to choose format'}`"
+      :aria-expanded="showMenu"
+      :aria-haspopup="true"
     >
-      <span v-if="isExporting">⏳</span>
-      <span v-else>📥</span>
+      <span v-if="isExporting" aria-hidden="true">⏳</span>
+      <span v-else aria-hidden="true">📥</span>
       {{ buttonLabel }}
     </button>
 
     <Transition name="dropdown">
-      <div v-if="showMenu" class="export-menu">
+      <div v-if="showMenu" class="export-menu" role="menu">
         <div class="menu-header">Export as:</div>
-        <button class="menu-item" @click="handleExport('json')">
-          <span class="format-icon">{ }</span>
+        <button class="menu-item" @click="handleExport('json')" role="menuitem">
+          <span class="format-icon" aria-hidden="true">{ }</span>
           <span class="format-name">JSON</span>
         </button>
-        <button class="menu-item" @click="handleExport('csv')">
-          <span class="format-icon">📊</span>
+        <button class="menu-item" @click="handleExport('csv')" role="menuitem">
+          <span class="format-icon" aria-hidden="true">📊</span>
           <span class="format-name">CSV</span>
         </button>
       </div>

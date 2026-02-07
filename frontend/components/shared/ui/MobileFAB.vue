@@ -37,14 +37,16 @@ const darkModeLabel = () => {
       <div class="fab-panel-header">
         <span class="fab-panel-title">Controls</span>
       </div>
-      <div class="fab-grid">
+      <div class="fab-grid" role="group" aria-label="Quick controls">
         <!-- Dark Mode (cycles) -->
         <button
           class="fab-item"
           :class="{ active: appStore.darkMode }"
           @click="appStore.toggleDarkMode()"
+          :aria-label="`${darkModeLabel()} mode`"
+          :aria-pressed="appStore.darkMode"
         >
-          <span class="fab-item-icon">{{ darkModeIcon() }}</span>
+          <span class="fab-item-icon" aria-hidden="true">{{ darkModeIcon() }}</span>
           <span class="fab-item-label">{{ darkModeLabel() }}</span>
         </button>
 
@@ -53,8 +55,10 @@ const darkModeLabel = () => {
           class="fab-item"
           :class="{ active: appStore.chaosMode }"
           @click="appStore.toggleChaosMode()"
+          :aria-label="`Toggle chaos mode ${appStore.chaosMode ? 'off' : 'on'}`"
+          :aria-pressed="appStore.chaosMode"
         >
-          <span class="fab-item-icon">🌀</span>
+          <span class="fab-item-icon" aria-hidden="true">🌀</span>
           <span class="fab-item-label">Chaos</span>
         </button>
 
@@ -63,8 +67,10 @@ const darkModeLabel = () => {
           class="fab-item"
           :class="{ active: appStore.moldMode }"
           @click="appStore.toggleMoldMode()"
+          :aria-label="`Toggle mold mode ${appStore.moldMode ? 'off' : 'on'}`"
+          :aria-pressed="appStore.moldMode"
         >
-          <span class="fab-item-icon">🦠</span>
+          <span class="fab-item-icon" aria-hidden="true">🦠</span>
           <span class="fab-item-label">Mold</span>
         </button>
 
@@ -73,8 +79,10 @@ const darkModeLabel = () => {
           class="fab-item"
           :class="{ active: appStore.musicPlaying }"
           @click="appStore.toggleMusic()"
+          :aria-label="`${appStore.musicPlaying ? 'Pause' : 'Play'} music`"
+          :aria-pressed="appStore.musicPlaying"
         >
-          <span class="fab-item-icon">🎵</span>
+          <span class="fab-item-icon" aria-hidden="true">🎵</span>
           <span class="fab-item-label">Music</span>
         </button>
 
@@ -83,8 +91,10 @@ const darkModeLabel = () => {
           class="fab-item"
           :class="{ active: !appStore.isMuted }"
           @click="appStore.toggleMute()"
+          :aria-label="`${appStore.isMuted ? 'Unmute' : 'Mute'} sound`"
+          :aria-pressed="!appStore.isMuted"
         >
-          <span class="fab-item-icon">{{ appStore.isMuted ? '🔇' : '🔊' }}</span>
+          <span class="fab-item-icon" aria-hidden="true">{{ appStore.isMuted ? '🔇' : '🔊' }}</span>
           <span class="fab-item-label">{{ appStore.isMuted ? 'Muted' : 'Sound' }}</span>
         </button>
 
@@ -93,8 +103,10 @@ const darkModeLabel = () => {
           class="fab-item"
           :class="{ active: appStore.panels.rankings }"
           @click="appStore.togglePanel('rankings')"
+          :aria-label="`${appStore.panels.rankings ? 'Hide' : 'Show'} rankings panel`"
+          :aria-pressed="appStore.panels.rankings"
         >
-          <span class="fab-item-icon">👻</span>
+          <span class="fab-item-icon" aria-hidden="true">👻</span>
           <span class="fab-item-label">Rankings</span>
         </button>
 
@@ -103,8 +115,10 @@ const darkModeLabel = () => {
           class="fab-item"
           :class="{ active: appStore.panels.cat }"
           @click="appStore.togglePanel('cat')"
+          :aria-label="`${appStore.panels.cat ? 'Hide' : 'Show'} cat panel`"
+          :aria-pressed="appStore.panels.cat"
         >
-          <span class="fab-item-icon">🐱</span>
+          <span class="fab-item-icon" aria-hidden="true">🐱</span>
           <span class="fab-item-label">Cat</span>
         </button>
 
@@ -113,8 +127,10 @@ const darkModeLabel = () => {
           class="fab-item"
           :class="{ active: appStore.panels.feed }"
           @click="appStore.togglePanel('feed')"
+          :aria-label="`${appStore.panels.feed ? 'Hide' : 'Show'} feed panel`"
+          :aria-pressed="appStore.panels.feed"
         >
-          <span class="fab-item-icon">📰</span>
+          <span class="fab-item-icon" aria-hidden="true">📰</span>
           <span class="fab-item-label">Feed</span>
         </button>
 
@@ -123,8 +139,10 @@ const darkModeLabel = () => {
           class="fab-item"
           :class="{ active: appStore.panels.digitalGoose }"
           @click="appStore.togglePanel('digitalGoose')"
+          :aria-label="`${appStore.panels.digitalGoose ? 'Hide' : 'Show'} goose`"
+          :aria-pressed="appStore.panels.digitalGoose"
         >
-          <span class="fab-item-icon">🦆</span>
+          <span class="fab-item-icon" aria-hidden="true">🦆</span>
           <span class="fab-item-label">Goose</span>
         </button>
 
@@ -133,8 +151,10 @@ const darkModeLabel = () => {
           class="fab-item"
           :class="{ active: appStore.panels.mining }"
           @click="appStore.togglePanel('mining')"
+          :aria-label="`${appStore.panels.mining ? 'Hide' : 'Show'} mining panel`"
+          :aria-pressed="appStore.panels.mining"
         >
-          <span class="fab-item-icon">⛏️</span>
+          <span class="fab-item-icon" aria-hidden="true">⛏️</span>
           <span class="fab-item-label">Mining</span>
         </button>
       </div>

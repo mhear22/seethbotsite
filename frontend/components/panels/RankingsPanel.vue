@@ -22,20 +22,20 @@ const toggle = () => {
 </script>
 
 <template>
-  <div class="rankings-panel" :class="{ collapsed: !isOpen || !isOnHomeRoute }">
+  <div class="rankings-panel" :class="{ collapsed: !isOpen || !isOnHomeRoute }" role="region" aria-label="Coolness rankings panel">
     <div class="rankings-header">
       <h3>👻 Coolness Rankings</h3>
-      <button class="rankings-close" @click="toggle">✕</button>
+      <button class="rankings-close" @click="toggle" aria-label="Close rankings panel">✕</button>
     </div>
-    <div class="rankings-list">
-      <div v-for="(rank, index) in rankings" :key="index" class="rank-item">
-        <div class="rank-avatar">
+    <ol class="rankings-list">
+      <li v-for="(rank, index) in rankings" :key="index" class="rank-item" :aria-label="`Rank ${index + 1}: ${rank.name} with ${rank.score} points${rank.isCurrentUser ? ', this is you' : ''}`">
+        <div class="rank-avatar" aria-hidden="true">
           <EmojiRenderer :emoji="rank.avatar" :size="32" />
         </div>
         <div class="rank-name" :class="{ 'current-user': rank.isCurrentUser }">{{ rank.name }}</div>
-        <div class="rank-score">{{ rank.score }}</div>
+        <div class="rank-score" aria-label="Score">{{ rank.score }}</div>
         <div class="rank-label">pts</div>
-      </div>
-    </div>
+      </li>
+    </ol>
   </div>
 </template>

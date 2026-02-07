@@ -33,33 +33,40 @@ const toggle = () => {
 </script>
 
 <template>
-  <div class="cat-panel" :class="{ collapsed: !isOpen, centered }">
+  <div class="cat-panel" :class="{ collapsed: !isOpen, centered }" role="region" aria-label="Random cats panel">
     <div class="cat-header">
       <h3>🐱 Random Cats</h3>
-      <button class="cat-close" @click="toggle" v-if="!centered">✕</button>
+      <button class="cat-close" @click="toggle" v-if="!centered" aria-label="Close cats panel">✕</button>
     </div>
     <div class="cat-content">
       <div v-if="!loading" class="cat-image-wrapper">
-        <img :src="catImage" class="cat-image" alt="Random cat" />
+        <img :src="catImage" class="cat-image" alt="Random cat photo" />
         <button
           @click="handleFavorite"
           :class="['favorite-btn', { favorited: isFavorited }]"
-          :title="isFavorited ? 'Remove from favorites' : 'Add to favorites'"
+          :aria-label="isFavorited ? 'Remove this cat from favorites' : 'Add this cat to favorites'"
+          :aria-pressed="isFavorited"
         >
           ⭐
         </button>
       </div>
-      <div v-if="loading" class="cat-loading">Loading... 🐱</div>
-      <button class="cute-btn" @click="$emit('new-cat')" :disabled="loading">🔄 New Cat</button>
+      <div v-if="loading" class="cat-loading" aria-live="polite">Loading... 🐱</div>
+      <button
+        class="cute-btn"
+        @click="$emit('new-cat')"
+        :disabled="loading"
+        aria-label="Get a new random cat image"
+      >🔄 New Cat</button>
 
-      <div class="cat-game-container">
+      <div class="cat-game-container" role="complementary" aria-label="Virtual Toy Synth game">
         <iframe
           src="https://itch.io/embed-game/3165293"
           width="100%"
           height="500"
           frameborder="0"
           class="cat-game-iframe"
-          allowfullscreen>
+          allowfullscreen
+          title="OTS-01 Virtual Toy Synth game">
           <a href="https://bellicapelli.itch.io/ots-01" target="_blank">OTS-01 by bellicapelli</a>
         </iframe>
         <div class="cat-game-fallback">

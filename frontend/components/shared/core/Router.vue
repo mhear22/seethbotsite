@@ -525,40 +525,123 @@ if (typeof window !== 'undefined') {
           <span class="chevron-icon">▲</span>
         </div>
         <div class="nav-controls">
-          <button @click="appStore.toggleSearchModal" class="control-btn search-btn" :class="{ active: appStore.searchModalOpen }" title="Search (Ctrl+K)">
+          <button
+          @click="appStore.toggleSearchModal"
+          class="control-btn search-btn"
+          :class="{ active: appStore.searchModalOpen }"
+          :aria-label="appStore.searchModalOpen ? 'Close search' : 'Open search (Ctrl+K)'"
+          :aria-pressed="appStore.searchModalOpen"
+          title="Search (Ctrl+K)"
+        >
              🔍
           </button>
-          <button @click="appStore.toggleDarkMode" class="control-btn" :class="{ active: appStore.darkMode }" :title="appStore.darkerMode ? 'Midnight mode (click for light)' : (appStore.darkMode ? 'Dark mode (click for midnight)' : 'Light mode (click for dark)')">
+          <button
+            @click="appStore.toggleDarkMode"
+            class="control-btn"
+            :class="{ active: appStore.darkMode }"
+            :aria-label="appStore.darkerMode ? 'Switch to light mode' : (appStore.darkMode ? 'Switch to midnight mode' : 'Switch to dark mode')"
+            title=""
+          >
             {{ appStore.darkerMode ? '🌑' : (appStore.darkMode ? '🌙' : '☀️') }}
           </button>
-          <button @click="appStore.toggleLanguage" class="control-btn" :class="{ active: appStore.isAustralian }" :title="appStore.isAustralian ? 'Australian English (click for US)' : 'US English (click for Australian)'">
+          <button
+            @click="appStore.toggleLanguage"
+            class="control-btn"
+            :class="{ active: appStore.isAustralian }"
+            :aria-label="appStore.isAustralian ? 'Switch to US English' : 'Switch to Australian English'"
+            :aria-pressed="appStore.isAustralian"
+            title=""
+          >
             {{ appStore.isAustralian ? '🇦🇺' : '🇺🇸' }}
           </button>
-          <button @click="appStore.toggleMute" class="control-btn" :class="{ active: !appStore.isMuted }" title="Toggle mute">
+          <button
+            @click="appStore.toggleMute"
+            class="control-btn"
+            :class="{ active: !appStore.isMuted }"
+            :aria-label="appStore.isMuted ? 'Unmute sound' : 'Mute sound'"
+            :aria-pressed="!appStore.isMuted"
+            title=""
+          >
             {{ appStore.isMuted ? '🔇' : '🔊' }}
           </button>
-          <button @click="appStore.togglePanel('tachometer')" class="control-btn" :class="{ active: appStore.panels.tachometer }" title="Toggle mold meter">
+          <button
+            @click="appStore.togglePanel('tachometer')"
+            class="control-btn"
+            :class="{ active: appStore.panels.tachometer }"
+            :aria-label="appStore.panels.tachometer ? 'Hide mold meter' : 'Show mold meter'"
+            :aria-pressed="appStore.panels.tachometer"
+            title=""
+          >
              🍄
           </button>
-          <button @click="appStore.togglePanel('rankings')" class="control-btn" :class="{ active: appStore.panels.rankings }" title="Toggle rankings">
+          <button
+            @click="appStore.togglePanel('rankings')"
+            class="control-btn"
+            :class="{ active: appStore.panels.rankings }"
+            :aria-label="appStore.panels.rankings ? 'Hide rankings' : 'Show rankings'"
+            :aria-pressed="appStore.panels.rankings"
+            title=""
+          >
              👻
           </button>
-          <button @click="appStore.togglePanel('cat')" class="control-btn" :class="{ active: appStore.panels.cat }" title="Toggle cats">
+          <button
+            @click="appStore.togglePanel('cat')"
+            class="control-btn"
+            :class="{ active: appStore.panels.cat }"
+            :aria-label="appStore.panels.cat ? 'Hide cats' : 'Show cats'"
+            :aria-pressed="appStore.panels.cat"
+            title=""
+          >
              🐱
           </button>
-          <button @click="appStore.togglePanel('feed')" class="control-btn" :class="{ active: appStore.panels.feed }" title="Toggle feed">
+          <button
+            @click="appStore.togglePanel('feed')"
+            class="control-btn"
+            :class="{ active: appStore.panels.feed }"
+            :aria-label="appStore.panels.feed ? 'Hide feed' : 'Show feed'"
+            :aria-pressed="appStore.panels.feed"
+            title=""
+          >
              📰
           </button>
-          <button @click="appStore.toggleMoldMode" class="control-btn" :class="{ active: appStore.moldMode }" title="Toggle mold mode">
+          <button
+            @click="appStore.toggleMoldMode"
+            class="control-btn"
+            :class="{ active: appStore.moldMode }"
+            :aria-label="appStore.moldMode ? 'Disable mold mode' : 'Enable mold mode'"
+            :aria-pressed="appStore.moldMode"
+            title=""
+          >
              🦠
           </button>
-          <button @click="appStore.togglePanel('digitalGoose')" class="control-btn" :class="{ active: appStore.panels.digitalGoose }" title="Toggle goose">
+          <button
+            @click="appStore.togglePanel('digitalGoose')"
+            class="control-btn"
+            :class="{ active: appStore.panels.digitalGoose }"
+            :aria-label="appStore.panels.digitalGoose ? 'Hide goose' : 'Show goose'"
+            :aria-pressed="appStore.panels.digitalGoose"
+            title=""
+          >
              🦆
           </button>
-          <button @click="appStore.togglePanel('mining')" class="control-btn" :class="{ active: appStore.panels.mining }" title="Toggle GPU mining">
+          <button
+            @click="appStore.togglePanel('mining')"
+            class="control-btn"
+            :class="{ active: appStore.panels.mining }"
+            :aria-label="appStore.panels.mining ? 'Hide GPU mining' : 'Show GPU mining'"
+            :aria-pressed="appStore.panels.mining"
+            title=""
+          >
              ⛏️
           </button>
-          <button @click="appStore.toggleChaosMode" class="control-btn chaos-btn" :class="{ active: appStore.chaosMode }" title="Toggle chaos mode">
+          <button
+            @click="appStore.toggleChaosMode"
+            class="control-btn chaos-btn"
+            :class="{ active: appStore.chaosMode }"
+            :aria-label="appStore.chaosMode ? 'Disable chaos mode' : 'Enable chaos mode'"
+            :aria-pressed="appStore.chaosMode"
+            title=""
+          >
              🌀
           </button>
         </div>
@@ -580,10 +663,11 @@ if (typeof window !== 'undefined') {
           :to="routeData.path"
           class="router-link"
           :class="{ active: route.path === routeData.path }"
+          :aria-current="route.path === routeData.path ? 'page' : undefined"
           :title="routeData.title"
           @click="closeMobileMenu"
         >
-          <span class="link-icon">{{ routeData.icon }}</span>
+          <span class="link-icon" aria-hidden="true">{{ routeData.icon }}</span>
           <span class="link-text">{{ routeData.title }}</span>
         </RouterLink>
 
@@ -598,24 +682,28 @@ if (typeof window !== 'undefined') {
           <button
             class="dropdown-btn"
             :class="{ active: dropdown.routes.some(r => route.path === r.path) }"
+            :aria-expanded="isDropdownOpen(dropdown.title)"
+            :aria-haspopup="true"
             @click="toggleDropdown(dropdown.title)"
           >
-            <span class="link-icon">{{ dropdown.icon }}</span>
+            <span class="link-icon" aria-hidden="true">{{ dropdown.icon }}</span>
             <span class="link-text">{{ dropdown.title }}</span>
-            <span class="dropdown-arrow">▼</span>
+            <span class="dropdown-arrow" aria-hidden="true">▼</span>
           </button>
 
-          <div class="dropdown-menu">
+          <div class="dropdown-menu" role="menu">
             <RouterLink
               v-for="routeData in dropdown.routes"
               :key="routeData.path"
               :to="routeData.path"
               class="dropdown-item"
               :class="{ active: route.path === routeData.path }"
+              :aria-current="route.path === routeData.path ? 'page' : undefined"
+              role="menuitem"
               :title="routeData.title"
               @click="closeMobileMenu"
             >
-              <span class="link-icon">{{ routeData.icon }}</span>
+              <span class="link-icon" aria-hidden="true">{{ routeData.icon }}</span>
               <span class="link-text">{{ routeData.title }}</span>
             </RouterLink>
           </div>
@@ -627,16 +715,17 @@ if (typeof window !== 'undefined') {
   </nav>
 
   <!-- Mobile Bottom Navigation (Ticket #110) -->
-  <nav class="mobile-bottom-nav">
+  <nav class="mobile-bottom-nav" role="navigation" aria-label="Mobile navigation">
     <RouterLink
       v-for="item in quickNavItems"
       :key="item.path"
       :to="item.path"
       class="mobile-nav-item"
       :class="{ active: route.path === item.path }"
+      :aria-current="route.path === item.path ? 'page' : undefined"
       :title="item.title"
     >
-      <span class="mobile-nav-icon">{{ item.icon }}</span>
+      <span class="mobile-nav-icon" aria-hidden="true">{{ item.icon }}</span>
       <span class="mobile-nav-label">{{ item.title }}</span>
     </RouterLink>
   </nav>

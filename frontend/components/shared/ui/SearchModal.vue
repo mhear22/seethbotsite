@@ -261,57 +261,62 @@ onUnmounted(() => {
 <template>
   <Teleport to="body">
     <Transition name="modal">
-      <div v-if="isOpen" class="search-modal-overlay" @click="emit('close')">
-        <div class="search-modal" @click.stop>
+      <div v-if="isOpen" class="search-modal-overlay" @click="emit('close')" role="dialog" aria-modal="true" aria-labelledby="search-label">
+        <div class="search-modal" @click.stop role="search">
           <div class="search-header">
-            <div class="search-icon">🔍</div>
+            <div class="search-icon" aria-hidden="true">🔍</div>
             <input
+              id="search-input"
               v-model="searchQuery"
               type="text"
               placeholder="Search pages, opinions, tickets..."
               class="search-input"
+              aria-label="Search"
               @keydown="handleKeyDown"
             />
-            <div class="keyboard-shortcut">ESC</div>
+            <div class="keyboard-shortcut" aria-hidden="true">ESC</div>
           </div>
 
-          <div class="search-results">
-            <div v-if="isLoading" class="search-loading">
-              <div class="loading-spinner"></div>
+          <div class="search-results" role="listbox" :aria-label="searchResults.length > 0 ? `${searchResults.length} search results` : 'No results'" aria-live="polite">
+            <div v-if="isLoading" class="search-loading" aria-live="polite">
+              <div class="loading-spinner" aria-hidden="true"></div>
               <span>Loading tickets...</span>
             </div>
-            
+
             <div v-else-if="!searchQuery" class="search-empty">
-              <div class="empty-icon">🔍</div>
-              <p>Start typing to search</p>
+              <div class="empty-icon" aria-hidden="true">🔍</div>
+              <p id="search-label">Start typing to search</p>
               <div class="search-hints">
-                <span class="hint"><kbd>↑↓</kbd> Navigate</span>
-                <span class="hint"><kbd>Enter</kbd> Select</span>
-                <span class="hint"><kbd>ESC</kbd> Close</span>
+                <span class="hint"><kbd aria-hidden="true">↑↓</kbd> Navigate</span>
+                <span class="hint"><kbd aria-hidden="true">Enter</kbd> Select</span>
+                <span class="hint"><kbd aria-hidden="true">ESC</kbd> Close</span>
               </div>
             </div>
 
-            <div v-else-if="searchResults.length === 0" class="search-empty">
-              <div class="empty-icon">🤷</div>
+            <div v-else-if="searchResults.length === 0" class="search-empty" aria-live="polite">
+              <div class="empty-icon" aria-hidden="true">🤷</div>
               <p>No results found</p>
             </div>
 
-            <div v-else class="results-list">
-              <div
+            <ul v-else class="results-list">
+              <li
                 v-for="(result, index) in searchResults"
                 :key="result.id"
                 :class="['result-item', { active: index === selectedIndex }]"
                 @click="selectResult(result)"
                 @mouseenter="selectedIndex = index"
+                role="option"
+                :aria-selected="index === selectedIndex"
+                :aria-label="`${result.title}${result.subtitle ? ', ' + result.subtitle : ''}`"
               >
-                <span class="result-icon">{{ result.icon }}</span>
+                <span class="result-icon" aria-hidden="true">{{ result.icon }}</span>
                 <div class="result-content">
                   <div class="result-title">{{ result.title }}</div>
                   <div class="result-subtitle">{{ result.subtitle }}</div>
                 </div>
-                <div v-if="index === selectedIndex" class="result-hint">↵</div>
-              </div>
-            </div>
+                <div v-if="index === selectedIndex" class="result-hint" aria-hidden="true">↵</div>
+              </li>
+            </ul>
           </div>
         </div>
       </div>

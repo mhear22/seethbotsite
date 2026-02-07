@@ -479,16 +479,19 @@ onUnmounted(() => {
             class="click-button"
             @click="handleClick"
             :disabled="isClicking"
+            :aria-label="`Click to earn ${formatNumber(clickPower)} points`"
           >
-            <span class="mushroom-icon">🍄</span>
+            <span class="mushroom-icon" aria-hidden="true">🍄</span>
 
             <!-- Particles -->
-            <TransitionGroup name="particle">
+            <TransitionGroup name="particle" aria-live="polite">
               <div
                 v-for="particle in clickParticles"
                 :key="particle.id"
                 class="particle"
                 :style="{ left: particle.x + 'px', top: particle.y + 'px' }"
+                :aria-label="`Earned ${particle.value} points`"
+                role="status"
               >
                 +{{ particle.value }}
               </div>
@@ -500,29 +503,32 @@ onUnmounted(() => {
         <!-- Upgrades -->
         <div class="upgrades-section">
           <h2>✨ Upgrades</h2>
-          <div class="upgrades-grid">
-            <div
+          <div class="upgrades-grid" role="list">
+            <button
               v-for="upgrade in upgrades"
               :key="upgrade.id"
               class="upgrade-card"
               :class="{ disabled: !canAfford(upgrade.cost), 'click-upgrade': upgrade.type === 'click', 'auto-upgrade': upgrade.type === 'auto' }"
               @click="purchaseUpgrade(upgrade)"
+              :disabled="!canAfford(upgrade.cost)"
+              :aria-label="`Purchase ${upgrade.name} for ${formatNumber(upgrade.cost)} points. Increases ${upgrade.type === 'click' ? 'click power' : 'auto-clicks'} by ${upgrade.power}. Currently owned: ${upgrade.purchased}`"
+              role="listitem"
             >
-              <div class="upgrade-icon">{{ upgrade.icon }}</div>
+              <div class="upgrade-icon" aria-hidden="true">{{ upgrade.icon }}</div>
               <div class="upgrade-info">
                 <h3>{{ upgrade.name }}</h3>
                 <p class="upgrade-cost">Cost: {{ formatNumber(upgrade.cost) }}</p>
                 <p class="upgrade-power">+{{ upgrade.power }} {{ upgrade.type === 'click' ? 'click' : 'auto' }}/sec</p>
                 <p class="upgrade-purchased">Owned: {{ upgrade.purchased }}</p>
               </div>
-            </div>
+            </button>
           </div>
         </div>
 
         <!-- Actions -->
         <div class="actions-section">
-          <button class="action-btn back-btn" @click="goBack">← Back Home</button>
-          <button class="action-btn reset-btn" @click="resetClicks">🔄 Reset</button>
+          <button class="action-btn back-btn" @click="goBack" aria-label="Return to home page">← Back Home</button>
+          <button class="action-btn reset-btn" @click="resetClicks" aria-label="Reset all progress">🔄 Reset</button>
         </div>
       </div>
     </div>

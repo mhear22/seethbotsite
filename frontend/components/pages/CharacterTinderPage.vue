@@ -147,17 +147,22 @@ onMounted(async () => {
       <h1>🎭 Fictional Character Tinder</h1>
       <p>Vote for your favourite characters and see who reigns supreme!</p>
       <div class="header-actions">
-        <button @click="showAddModal = true" class="action-btn add-btn">
+        <button @click="showAddModal = true" class="action-btn add-btn" aria-label="Add a new character">
           ➕ Add Character
         </button>
-        <button @click="showLeaderboard = !showLeaderboard" class="action-btn leaderboard-btn">
+        <button
+          @click="showLeaderboard = !showLeaderboard"
+          class="action-btn leaderboard-btn"
+          :aria-label="showLeaderboard ? 'Start voting' : 'Show leaderboard'"
+          :aria-pressed="showLeaderboard"
+        >
           {{ showLeaderboard ? '🎮 Start Voting' : '🏆 Leaderboard' }}
         </button>
       </div>
     </div>
 
     <!-- Vote Result Popup -->
-    <div v-if="showVoteResult && lastVote" class="vote-result-popup">
+    <div v-if="showVoteResult && lastVote" class="vote-result-popup" role="status" aria-live="polite">
       <div class="vote-result-content">
         <div class="winner-result">
           <h3>🏆 {{ lastVote.winner.name }} wins!</h3>
@@ -171,33 +176,36 @@ onMounted(async () => {
     </div>
 
     <!-- Voting Section -->
-    <div v-if="!showLeaderboard" class="voting-section">
-      <div v-if="loading" class="loading">
+    <div v-if="!showLeaderboard" class="voting-section" role="region" aria-label="Voting area">
+      <div v-if="loading" class="loading" aria-live="polite">
         Loading characters...
       </div>
       <div v-else-if="!currentPair" class="empty-state">
         <h2>🎭 No characters yet!</h2>
         <p>Be the first to add a character to start voting.</p>
-        <button @click="showAddModal = true" class="add-first-btn">
+        <button @click="showAddModal = true" class="add-first-btn" aria-label="Add the first character">
           ➕ Add First Character
         </button>
       </div>
-      <div v-else class="character-pair">
-        <div
+      <div v-else class="character-pair" role="list">
+        <button
           v-for="character in currentPair"
           :key="character.id"
           class="character-card"
           @click="vote(character.id)"
           :class="{ voting: voting }"
+          :disabled="voting"
+          :aria-label="`Vote for ${character.name}. Current ELO rating: ${character.elo_rating}, ${character.wins} wins, ${character.losses} losses`"
+          role="listitem"
         >
           <div class="character-image">
             <img
               v-if="character.image_url"
               :src="character.image_url"
-              :alt="character.name"
+              :alt="`Portrait of ${character.name}`"
             />
             <div v-else class="placeholder-image">
-              <span class="placeholder-emoji">🎭</span>
+              <span class="placeholder-emoji" aria-hidden="true">🎭</span>
             </div>
           </div>
           <div class="character-info">
@@ -205,32 +213,33 @@ onMounted(async () => {
             <div class="character-stats">
               <span class="elo">ELO:{{ character.elo_rating }} (</span>
               <span class="wins">{{ character.wins }}W</span>
-              <span> - </span>
+              <span aria-hidden="true"> - </span>
               <span class="losses">{{ character.losses }}L</span>
               <span class="elo">)</span>
             </div>
           </div>
-        </div>
+        </button>
       </div>
     </div>
 
     <!-- Leaderboard Section -->
-    <div v-if="showLeaderboard" class="leaderboard-section">
-      <div v-if="loading" class="loading">
+    <div v-if="showLeaderboard" class="leaderboard-section" role="region" aria-label="Leaderboard">
+      <div v-if="loading" class="loading" aria-live="polite">
         Loading leaderboard...
       </div>
       <div v-else-if="characters.length === 0" class="empty-state">
         <h2>🏆 Leaderboard</h2>
         <p>No characters yet. Add some to start the competition!</p>
       </div>
-      <div v-else class="leaderboard">
-        <div
+      <ol v-else class="leaderboard">
+        <li
           v-for="(character, index) in characters"
           :key="character.id"
           class="leaderboard-item"
           :class="{ 'top-3': index < 3 }"
+          :aria-label="`Rank ${index + 1}: ${character.name}. ELO rating: ${character.elo_rating}, ${character.wins} wins, ${character.losses} losses`"
         >
-          <div class="rank">
+          <div class="rank" aria-hidden="true">
             <span v-if="index === 0">🥇</span>
             <span v-else-if="index === 1">🥈</span>
             <span v-else-if="index === 2">🥉</span>
@@ -241,23 +250,23 @@ onMounted(async () => {
               <img
                 v-if="character.image_url"
                 :src="character.image_url"
-                :alt="character.name"
+                :alt="`Portrait of ${character.name}`"
               />
-              <div v-else class="avatar-placeholder">🎭</div>
+              <div v-else class="avatar-placeholder" aria-hidden="true">🎭</div>
             </div>
             <div class="character-details">
               <h4>{{ character.name }}</h4>
               <div class="stats">
                 <span class="elo">ELO:{{ character.elo_rating }} (</span>
                 <span class="wins">{{ character.wins }}W</span>
-                <span> - </span>
+                <span aria-hidden="true"> - </span>
                 <span class="losses">{{ character.losses }}L</span>
                 <span class="elo">)</span>
               </div>
             </div>
           </div>
-        </div>
-      </div>
+        </li>
+      </ol>
     </div>
 
     <!-- Add Character Modal -->

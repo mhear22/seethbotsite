@@ -41,9 +41,11 @@ const handleClick = (e: Event) => {
   <button
     @click="handleClick"
     :class="['favorite-button', sizeClasses[size].btn, { favorited }]"
+    :aria-label="favorited ? 'Remove from favorites' : 'Add to favorites'"
+    :aria-pressed="favorited"
     :title="favorited ? 'Remove from favorites' : 'Add to favorites'"
   >
-    <span :class="['favorite-icon', sizeClasses[size].icon]">⭐</span>
+    <span :class="['favorite-icon', sizeClasses[size].icon]" aria-hidden="true">⭐</span>
   </button>
 </template>
 
