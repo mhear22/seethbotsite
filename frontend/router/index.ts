@@ -31,6 +31,7 @@ import ArchiveHistoryPage from '../components/pages/ArchiveHistoryPage.vue'
 import MessagesPage from '../components/pages/MessagesPage.vue'
 import AnalyticsPage from '../components/pages/AnalyticsPage.vue'
 import SolarPanelPage from '../components/pages/SolarPanelPage.vue'
+import BatteryCalculatorPage from '../components/pages/BatteryCalculatorPage.vue'
 
 const routes = [
   {
@@ -192,6 +193,11 @@ const routes = [
     path: '/solar',
     name: 'solar',
     component: SolarPanelPage
+  },
+  {
+    path: '/solar/battery',
+    name: 'solar-battery',
+    component: BatteryCalculatorPage
   }
 ]
 

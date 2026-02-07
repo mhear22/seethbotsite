@@ -1,12 +1,21 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAppStore } from '../../stores/useAppStore'
 import { useSolarCalculator } from '../../composables/useSolarCalculator'
 import { useSolarCanvas } from '../../composables/useSolarCanvas'
+import { useSolarStore } from '../../composables/useSolarStore'
 
 const store = useAppStore()
+const router = useRouter()
 const calculator = useSolarCalculator()
 const canvas = useSolarCanvas()
+const solarStore = useSolarStore()
+
+// Sync calculator results to shared store for battery page
+watch(() => calculator.results.value, (r) => {
+  solarStore.setSolarResults(r)
+}, { immediate: true })
 const svgRef = ref<SVGSVGElement | null>(null)
 
 // Sync canvas vertices to calculator (in meters)
@@ -229,6 +238,14 @@ function insetPathSvg() {
         <div class="orientation-info">
           Optimal orientation: <strong>{{ calculator.results.value.orientation }}</strong>
         </div>
+      </div>
+
+      <!-- Next Step -->
+      <div class="card next-step-card" v-if="calculator.results.value">
+        <button class="next-btn" @click="router.push('/solar/battery')">
+          Next: Battery Calculator &rarr;
+        </button>
+        <p class="next-hint">Size your battery storage based on these panel results</p>
       </div>
     </div>
   </div>
@@ -603,6 +620,40 @@ function insetPathSvg() {
 .orientation-info strong {
   color: #ff91a4;
   text-transform: capitalize;
+}
+
+/* Next step */
+.next-step-card {
+  text-align: center;
+}
+
+.next-btn {
+  width: 100%;
+  padding: 14px 24px;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #ff91a4, #ffb347);
+  color: white;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.next-btn:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(255, 145, 164, 0.3);
+}
+
+.next-hint {
+  margin: 8px 0 0;
+  font-size: 0.85rem;
+  color: #888;
+}
+
+.solar-page.dark .next-hint {
+  color: #777;
 }
 
 /* Responsive */
