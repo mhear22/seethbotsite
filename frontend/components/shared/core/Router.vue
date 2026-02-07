@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '../../../stores/useAppStore'
 import { useKeyboardShortcuts } from '../../../composables/useKeyboardShortcuts'
@@ -467,6 +467,63 @@ const closeDropdowns = () => {
   openDropdown.value = null
 }
 
+// Handle keyboard navigation for dropdowns
+const handleDropdownKeydown = (e: KeyboardEvent, dropdownTitle: string) => {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault()
+    toggleDropdown(dropdownTitle)
+
+    // If dropdown was just opened, focus first item
+    if (openDropdown.value === dropdownTitle) {
+      nextTick(() => {
+        const dropdownMenu = document.querySelector(`.dropdown.open .dropdown-menu`) as HTMLElement
+        const firstItem = dropdownMenu?.querySelector('.dropdown-item') as HTMLElement
+        if (firstItem) {
+          firstItem.focus()
+        }
+      })
+    }
+  } else if (e.key === 'Escape') {
+    e.preventDefault()
+    closeDropdowns()
+  }
+}
+
+// Handle arrow key navigation within dropdown menu
+const handleDropdownMenuKeydown = (e: KeyboardEvent, dropdownIndex: number) => {
+  const dropdown = document.querySelectorAll('.dropdown')[dropdownIndex] as HTMLElement
+  if (!dropdown) return
+
+  const menuItems = Array.from(dropdown.querySelectorAll('.dropdown-item')) as HTMLElement[]
+  if (menuItems.length === 0) return
+
+  const currentIndex = menuItems.findIndex(item => item === document.activeElement)
+
+  if (e.key === 'ArrowDown') {
+    e.preventDefault()
+    const nextIndex = currentIndex < menuItems.length - 1 ? currentIndex + 1 : 0
+    menuItems[nextIndex].focus()
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault()
+    const prevIndex = currentIndex > 0 ? currentIndex - 1 : menuItems.length - 1
+    menuItems[prevIndex].focus()
+  } else if (e.key === 'Escape') {
+    e.preventDefault()
+    closeDropdowns()
+    const dropdownBtn = dropdown.querySelector('.dropdown-btn') as HTMLElement
+    if (dropdownBtn) {
+      dropdownBtn.focus()
+    }
+  } else if (e.key === 'Tab' || (e.key === 'Tab' && e.shiftKey)) {
+    // Let Tab work normally, but close dropdown when leaving
+    setTimeout(() => {
+      if (!dropdown.contains(document.activeElement)) {
+        closeDropdowns()
+      }
+    }, 10)
+  }
+}
+
 // Handle clicking outside to close mobile menu
 const handleClickOutside = (event: MouseEvent) => {
   const target = event.target as HTMLElement
@@ -673,7 +730,7 @@ if (typeof window !== 'undefined') {
 
         <!-- Dropdown Menus -->
         <div
-          v-for="dropdown in dropdowns"
+          v-for="(dropdown, index) in dropdowns"
           :key="dropdown.title"
           class="dropdown"
           :class="{ open: isDropdownOpen(dropdown.title) }"
@@ -685,13 +742,14 @@ if (typeof window !== 'undefined') {
             :aria-expanded="isDropdownOpen(dropdown.title)"
             :aria-haspopup="true"
             @click="toggleDropdown(dropdown.title)"
+            @keydown="handleDropdownKeydown($event, dropdown.title)"
           >
             <span class="link-icon" aria-hidden="true">{{ dropdown.icon }}</span>
             <span class="link-text">{{ dropdown.title }}</span>
             <span class="dropdown-arrow" aria-hidden="true">▼</span>
           </button>
 
-          <div class="dropdown-menu" role="menu">
+          <div class="dropdown-menu" role="menu" @keydown="handleDropdownMenuKeydown($event, index)">
             <RouterLink
               v-for="routeData in dropdown.routes"
               :key="routeData.path"

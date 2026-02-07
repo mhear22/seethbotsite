@@ -14,6 +14,7 @@ import ActiveUsers from '../ui/ActiveUsers.vue'
 import Router from './Router.vue'
 import SearchModal from '../ui/SearchModal.vue'
 import MobileFAB from '../ui/MobileFAB.vue'
+import SkipLink from '../ui/SkipLink.vue'
 import { useAppStore } from '../../../stores/useAppStore'
 
 export interface RankingItem {
@@ -108,9 +109,12 @@ onUnmounted(() => {
 
 <template>
   <div class="main-app" :class="{ dark: appStore.darkMode, 'centered': appStore.currentRoute === 'home' }">
+    <!-- Skip link for keyboard accessibility (Ticket #193) -->
+    <SkipLink />
+
     <Router />
 
-    <div class="content-wrapper">
+    <div class="content-wrapper" id="main-content">
       <router-view />
     </div>
 

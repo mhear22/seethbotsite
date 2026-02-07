@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
+
 const props = defineProps<{
   isOpen: boolean
   title: string
@@ -8,33 +10,109 @@ const emit = defineEmits<{
   close: []
 }>()
 
+const modalContainer = ref<HTMLElement | null>(null)
+const previouslyFocused = ref<HTMLElement | null>(null)
+const focusableElements = ref<HTMLElement[]>([])
+
 const close = () => {
+  // Restore focus to previously focused element
+  if (previouslyFocused.value) {
+    previouslyFocused.value.focus()
+  }
   emit('close')
 }
 
 // Close on Escape key
 const handleEscape = (e: KeyboardEvent) => {
-  if (e.key === 'Escape') {
+  if (e.key === 'Escape' && props.isOpen) {
     close()
   }
 }
 
-// Add/remove escape key listener
-import { onMounted, onUnmounted } from 'vue'
+// Get all focusable elements within modal
+const getFocusableElements = (container: HTMLElement): HTMLElement[] => {
+  const focusableSelectors = [
+    'button:not([disabled])',
+    '[href]',
+    'input:not([disabled])',
+    'select:not([disabled])',
+    'textarea:not([disabled])',
+    '[tabindex]:not([tabindex="-1"])'
+  ]
+  return Array.from(container.querySelectorAll(focusableSelectors.join(',')))
+}
 
+// Focus trap - keep focus within modal
+const handleTab = (e: KeyboardEvent) => {
+  if (!modalContainer.value) return
+
+  const elements = focusableElements.value
+  if (elements.length === 0) return
+
+  const firstElement = elements[0]
+  const lastElement = elements[elements.length - 1]
+
+  if (e.key === 'Tab') {
+    if (e.shiftKey) {
+      // Shift + Tab: going backwards
+      if (document.activeElement === firstElement) {
+        e.preventDefault()
+        lastElement.focus()
+      }
+    } else {
+      // Tab: going forwards
+      if (document.activeElement === lastElement) {
+        e.preventDefault()
+        firstElement.focus()
+      }
+    }
+  }
+}
+
+// Set up focus management when modal opens
+const setupFocusManagement = async () => {
+  if (props.isOpen && modalContainer.value) {
+    // Save previously focused element
+    previouslyFocused.value = document.activeElement as HTMLElement
+
+    // Get focusable elements
+    focusableElements.value = getFocusableElements(modalContainer.value)
+
+    // Focus the close button or first focusable element
+    await nextTick()
+    const closeBtn = modalContainer.value.querySelector('.modal-close-btn') as HTMLElement
+    if (closeBtn) {
+      closeBtn.focus()
+    } else if (focusableElements.value.length > 0) {
+      focusableElements.value[0].focus()
+    }
+
+    // Add tab event listener for focus trapping
+    document.addEventListener('keydown', handleTab)
+  } else {
+    // Remove tab event listener when modal closes
+    document.removeEventListener('keydown', handleTab)
+  }
+}
+
+// Watch for modal open/close
+watch(() => props.isOpen, setupFocusManagement)
+
+// Add/remove escape key listener
 onMounted(() => {
   document.addEventListener('keydown', handleEscape)
 })
 
 onUnmounted(() => {
   document.removeEventListener('keydown', handleEscape)
+  document.removeEventListener('keydown', handleTab)
 })
 </script>
 
 <template>
   <Teleport to="body">
     <div v-if="isOpen" class="modal-overlay" @click.self="close" role="dialog" aria-modal="true" :aria-labelledby="modal-title">
-      <div class="modal-container">
+      <div class="modal-container" ref="modalContainer">
         <div class="modal-header">
           <h2 id="modal-title" class="modal-title">{{ title }}</h2>
           <button class="modal-close-btn" @click="close" aria-label="Close modal">&times;</button>
