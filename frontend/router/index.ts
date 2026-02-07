@@ -28,6 +28,8 @@ import CarPage from '../components/pages/CarPage.vue'
 import FavoritesPage from '../components/pages/FavoritesPage.vue'
 import DailyChallenges from '../components/pages/DailyChallenges.vue'
 import ArchiveHistoryPage from '../components/pages/ArchiveHistoryPage.vue'
+import MessagesPage from '../components/pages/MessagesPage.vue'
+import AnalyticsPage from '../components/pages/AnalyticsPage.vue'
 
 const routes = [
   {
@@ -174,6 +176,16 @@ const routes = [
     path: '/archive',
     name: 'archive',
     component: ArchiveHistoryPage
+  },
+  {
+    path: '/messages',
+    name: 'messages',
+    component: MessagesPage
+  },
+  {
+    path: '/analytics',
+    name: 'analytics',
+    component: AnalyticsPage
   }
 ]
 

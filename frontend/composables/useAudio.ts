@@ -1,7 +1,11 @@
 import { ref } from 'vue'
 
 export function useAudio() {
+  const muted = ref(false)
+
   const playSound = (elementId: string, options?: { volume?: number; startTime?: number; rate?: number }) => {
+    if (muted.value) return
+
     const audio = document.getElementById(elementId) as HTMLAudioElement
     if (!audio) return
 
@@ -26,6 +30,8 @@ export function useAudio() {
   }
 
   const playFart = async (volume?: number, forceSimple: boolean = false) => {
+    if (muted.value) return
+
     // Try to use enhanced fart audio processing if available
     try {
       const { useFartAudio } = await import('./useFartAudio')
@@ -41,13 +47,27 @@ export function useAudio() {
     const music = document.getElementById('newMusic') as HTMLAudioElement
     if (!music) return
 
-    if (playing) {
+    if (playing && !muted.value) {
       // Set music to 50% volume (ticket #172)
       music.volume = 0.5
       music.play().catch(err => console.log('Music play failed:', err))
     } else {
       music.pause()
     }
+  }
+
+  const muteAll = () => {
+    muted.value = true
+    // Pause all audio elements
+    const audioIds = ['newMusic', 'fartSound', 'buttonSound', 'gooseHonk']
+    audioIds.forEach(id => {
+      const el = document.getElementById(id) as HTMLAudioElement
+      if (el) el.pause()
+    })
+  }
+
+  const unmuteAll = () => {
+    muted.value = false
   }
 
   // Sound effect for button clicks - 50% volume (ticket #172)
@@ -112,6 +132,8 @@ export function useAudio() {
     playPanelToggle,
     playLevelUp,
     playPurchase,
-    toggleMusic
+    toggleMusic,
+    muteAll,
+    unmuteAll
   }
 }

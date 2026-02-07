@@ -185,15 +185,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div
-    v-if="isOpen"
-    class="active-users-panel"
-  >
-    <div class="panel-header">
-      <span class="panel-title">Active Users</span>
-      <button class="close-btn" @click="emit('toggle')">×</button>
-    </div>
-
+  <div class="active-users-content-wrapper">
     <div class="users-list">
       <div
         v-for="user in activeUsers"
@@ -226,64 +218,15 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.active-users-panel {
-  position: fixed;
-  top: 100px;
-  right: 20px;
-  width: 280px;
-  max-height: 400px;
-  background: var(--bg-secondary, #ffffff);
-  border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+.active-users-content-wrapper {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 0 0 12px 12px;
   overflow: hidden;
-  z-index: 1000;
-  transition: transform 0.3s ease, opacity 0.3s ease;
-  animation: slideIn 0.3s ease;
+  margin-top: -2px;
 }
 
-@keyframes slideIn {
-  from {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
-.panel-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  border-radius: 12px 12px 0 0;
-}
-
-.panel-title {
-  font-weight: 600;
-  font-size: 14px;
-}
-
-.close-btn {
-  background: rgba(255, 255, 255, 0.2);
-  border: none;
-  color: white;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18px;
-  transition: background 0.2s ease;
-}
-
-.close-btn:hover {
-  background: rgba(255, 255, 255, 0.3);
+.dark .active-users-content-wrapper {
+  background: rgba(40, 44, 52, 0.95);
 }
 
 .users-list {
@@ -298,34 +241,27 @@ onUnmounted(() => {
   gap: 12px;
   padding: 10px;
   border-radius: 8px;
-  transition: background 0.2s ease;
-  animation: fadeIn 0.3s ease;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  transition: background 0.2s ease, transform 0.2s ease;
 }
 
 .user-item:hover {
-  background: var(--bg-tertiary, #f5f5f5);
+  background: rgba(0, 0, 0, 0.05);
+  transform: scale(1.005);
+}
+
+.dark .user-item:hover {
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .user-avatar {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 20px;
+  font-size: 18px;
   flex-shrink: 0;
 }
 
@@ -337,18 +273,26 @@ onUnmounted(() => {
 .user-name {
   font-weight: 500;
   font-size: 14px;
-  color: var(--text-primary, #333);
+  color: #333;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+.dark .user-name {
+  color: #e0e0e0;
+}
+
 .user-status {
   font-size: 12px;
-  color: var(--text-secondary, #666);
+  color: #666;
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+.dark .user-status {
+  color: #aaa;
 }
 
 .user-status.online::before {
@@ -376,8 +320,12 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   padding: 32px 16px;
-  color: var(--text-secondary, #666);
+  color: #666;
   text-align: center;
+}
+
+.dark .no-users {
+  color: #aaa;
 }
 
 .no-users-icon {
@@ -392,8 +340,13 @@ onUnmounted(() => {
 
 .panel-footer {
   padding: 12px 16px;
-  border-top: 1px solid var(--border-color, #e0e0e0);
-  background: var(--bg-secondary, #f9f9f9);
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  background: rgba(245, 245, 245, 0.5);
+}
+
+.dark .panel-footer {
+  border-top-color: rgba(255, 255, 255, 0.1);
+  background: rgba(30, 30, 40, 0.5);
 }
 
 .you-indicator {
@@ -401,53 +354,27 @@ onUnmounted(() => {
   align-items: center;
   gap: 10px;
   font-size: 13px;
-  color: var(--text-secondary, #666);
+  color: #666;
+}
+
+.dark .you-indicator {
+  color: #aaa;
 }
 
 .you-avatar {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
+  font-size: 14px;
   flex-shrink: 0;
 }
 
 .you-text {
   flex: 1;
-}
-
-/* Dark mode support */
-.main-app.dark .active-users-panel {
-  background: #1a1a2e;
-}
-
-.main-app.dark .panel-header {
-  background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
-}
-
-.main-app.dark .user-item:hover {
-  background: #2a2a4e;
-}
-
-.main-app.dark .user-name {
-  color: #e0e0e0;
-}
-
-.main-app.dark .user-status {
-  color: #b0b0b0;
-}
-
-.main-app.dark .panel-footer {
-  background: #151525;
-  border-top-color: #2a2a4e;
-}
-
-.main-app.dark .you-indicator {
-  color: #b0b0b0;
 }
 
 /* Scrollbar styling */
@@ -460,23 +387,19 @@ onUnmounted(() => {
 }
 
 .users-list::-webkit-scrollbar-thumb {
-  background: var(--border-color, #e0e0e0);
+  background: rgba(0, 0, 0, 0.15);
   border-radius: 3px;
 }
 
 .users-list::-webkit-scrollbar-thumb:hover {
-  background: var(--text-secondary, #666);
+  background: rgba(0, 0, 0, 0.25);
 }
 
-/* Mobile responsive */
-@media (max-width: 768px) {
-  .active-users-panel {
-    top: auto;
-    bottom: 80px;
-    right: 10px;
-    left: 10px;
-    width: auto;
-    max-height: 300px;
-  }
+.dark .users-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.dark .users-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
 }
 </style>

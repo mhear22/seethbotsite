@@ -108,6 +108,10 @@ const formatQuote = (quote: string) => {
   box-shadow: 0 6px 16px rgba(246, 211, 101, 0.5);
 }
 
+.dark .quote-section {
+  background: rgba(40, 44, 52, 0.95);
+}
+
 .dark .favorite-btn {
   background: rgba(45, 55, 72, 0.95);
   border-color: #4a5568;

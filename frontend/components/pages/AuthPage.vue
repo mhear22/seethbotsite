@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, reactive } from 'vue'
 import { useAuth } from '../../composables/useAuth'
 
-const auth = useAuth()
+const auth = reactive(useAuth())
 
 // Form mode: 'login' | 'register' | 'profile'
 const mode = ref<'login' | 'register' | 'profile'>('login')

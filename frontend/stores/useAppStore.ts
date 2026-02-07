@@ -111,7 +111,6 @@ export const useAppStore = defineStore('app', () => {
     localStorage.setItem('darkerMode', darkerMode.value.toString())
     document.body.classList.toggle('dark', darkMode.value)
     document.body.classList.toggle('darker', darkerMode.value)
-    if (!isMuted.value) audio.playButtonClick()
   }
 
   const toggleDarkerMode = () => {
@@ -266,8 +265,10 @@ export const useAppStore = defineStore('app', () => {
       audio.muteAll()
     } else {
       audio.unmuteAll()
-      // Play button sound to indicate unmuted
-      audio.playButtonClick()
+      // Resume music if it was playing before mute
+      if (musicPlaying.value) {
+        audio.toggleMusic(true)
+      }
     }
   }
 

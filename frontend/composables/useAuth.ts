@@ -1,4 +1,5 @@
 import { ref, computed } from 'vue'
+import { buildUrl } from '../utils/api'
 
 const API_BASE = '/api'
 
@@ -66,7 +67,7 @@ const validateToken = async (): Promise<boolean> => {
   if (!state.value.token) return false
 
   try {
-    const response = await fetch(`${API_BASE}/auth/me`, {
+    const response = await fetch(buildUrl(`${API_BASE}/auth/me`), {
       headers: {
         'Authorization': `Bearer ${state.value.token}`
       }
@@ -74,7 +75,7 @@ const validateToken = async (): Promise<boolean> => {
 
     if (response.ok) {
       const data = await response.json()
-      state.value.user = data
+      state.value.user = data.user
       return true
     } else {
       console.error('Token validation failed')
@@ -100,7 +101,7 @@ const register = async (
   state.value.error = null
 
   try {
-    const response = await fetch(`${API_BASE}/auth/register`, {
+    const response = await fetch(buildUrl(`${API_BASE}/auth/register`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -141,7 +142,7 @@ const login = async (
   state.value.error = null
 
   try {
-    const response = await fetch(`${API_BASE}/auth/login`, {
+    const response = await fetch(buildUrl(`${API_BASE}/auth/login`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -179,7 +180,7 @@ const logout = async () => {
   }
 
   try {
-    const response = await fetch(`${API_BASE}/auth/logout`, {
+    const response = await fetch(buildUrl(`${API_BASE}/auth/logout`), {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${state.value.token}`
@@ -207,7 +208,7 @@ const updateProfile = async (displayName: string) => {
   state.value.error = null
 
   try {
-    const response = await fetch(`${API_BASE}/auth/profile`, {
+    const response = await fetch(buildUrl(`${API_BASE}/auth/profile`), {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -249,7 +250,7 @@ const changePassword = async (
   state.value.error = null
 
   try {
-    const response = await fetch(`${API_BASE}/auth/password`, {
+    const response = await fetch(buildUrl(`${API_BASE}/auth/password`), {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -287,7 +288,7 @@ const deleteAccount = async (password: string) => {
   state.value.error = null
 
   try {
-    const response = await fetch(`${API_BASE}/auth/account`, {
+    const response = await fetch(buildUrl(`${API_BASE}/auth/account`), {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
@@ -321,7 +322,7 @@ const getSessions = async (): Promise<Session[]> => {
   }
 
   try {
-    const response = await fetch(`${API_BASE}/auth/sessions`, {
+    const response = await fetch(buildUrl(`${API_BASE}/auth/sessions`), {
       headers: {
         'Authorization': `Bearer ${state.value.token}`
       }
@@ -349,7 +350,7 @@ const logoutSession = async (sessionId: number) => {
   }
 
   try {
-    const response = await fetch(`${API_BASE}/auth/sessions/${sessionId}`, {
+    const response = await fetch(buildUrl(`${API_BASE}/auth/sessions/${sessionId}`), {
       method: 'DELETE',
       headers: {
         'Authorization': `Bearer ${state.value.token}`
@@ -372,7 +373,7 @@ const logoutAll = async () => {
   }
 
   try {
-    const response = await fetch(`${API_BASE}/auth/sessions`, {
+    const response = await fetch(buildUrl(`${API_BASE}/auth/sessions`), {
       method: 'DELETE',
       headers: {
         'Authorization': `Bearer ${state.value.token}`

@@ -109,7 +109,7 @@ router.post('/auth/register', async (req: Request, res: Response) => {
     // Register user
     const result = await registerUser(email, password, displayName);
 
-    res.status(201).json(result);
+    res.status(201).json({ success: true, ...result });
   } catch (error: any) {
     if (error.message === 'Email already registered') {
       return res.status(400).json({ error: error.message });
@@ -185,7 +185,7 @@ router.post('/auth/login', async (req: Request, res: Response) => {
     // Login user
     const result = await loginUser(email, password, deviceName, deviceType);
 
-    res.json(result);
+    res.json({ success: true, ...result });
   } catch (error: any) {
     if (error.message === 'Invalid email or password') {
       return res.status(401).json({ error: error.message });
@@ -450,7 +450,7 @@ router.patch('/auth/profile', (req: Request, res: Response) => {
     }
 
     const user = updateUserDisplayName(result.user.id, displayName);
-    res.json({ user });
+    res.json({ success: true, user });
   } catch (error) {
     console.error('Error updating profile:', error);
     res.status(500).json({ error: 'Failed to update profile' });
@@ -504,7 +504,7 @@ router.patch('/auth/password', async (req: Request, res: Response) => {
     }
 
     await changeUserPassword(result.user.id, oldPassword, newPassword);
-    res.json({ message: 'Password changed successfully. Please login again on all devices.' });
+    res.json({ success: true, message: 'Password changed successfully. Please login again on all devices.' });
   } catch (error: any) {
     if (error.message === 'Invalid current password') {
       return res.status(401).json({ error: error.message });

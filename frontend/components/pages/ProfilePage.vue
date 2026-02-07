@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuth } from '../../composables/useAuth'
 
 const route = useRoute()
-const auth = useAuth()
+const auth = reactive(useAuth())
 
 // View mode: 'own' for viewing own profile, 'view' for viewing another user's profile
 const viewMode = computed(() => {
   const userId = parseInt(route.params.id as string)
-  if (!isNaN(userId) && userId !== auth.user.value?.id) {
+  if (!isNaN(userId) && userId !== auth.user?.id) {
     return 'view'
   }
   return 'own'
@@ -57,11 +57,11 @@ const loadOtherProfile = async () => {
 
 // Start editing profile
 const startEditing = () => {
-  if (auth.user.value) {
+  if (auth.user) {
     profileForm.value = {
-      displayName: auth.user.value.display_name || '',
-      avatarUrl: (auth.user.value as any).avatar_url || '',
-      bio: (auth.user.value as any).bio || ''
+      displayName: auth.user.display_name || '',
+      avatarUrl: (auth.user as any).avatar_url || '',
+      bio: (auth.user as any).bio || ''
     }
   }
   isEditing.value = true
@@ -82,7 +82,7 @@ const handleSaveProfile = async () => {
     let hasUpdates = false
 
     // Update display name if changed
-    if (profileForm.value.displayName !== auth.user.value?.display_name) {
+    if (profileForm.value.displayName !== auth.user?.display_name) {
       const result = await auth.updateProfile(profileForm.value.displayName)
       if (!result.success) {
         errorMessage.value = result.error || 'Failed to update display name'
@@ -92,7 +92,7 @@ const handleSaveProfile = async () => {
     }
 
     // Update avatar if changed
-    const currentAvatarUrl = (auth.user.value as any)?.avatar_url || ''
+    const currentAvatarUrl = (auth.user as any)?.avatar_url || ''
     if (profileForm.value.avatarUrl !== currentAvatarUrl) {
       const result = await updateAvatar(profileForm.value.avatarUrl || null)
       if (!result.success) {
@@ -103,7 +103,7 @@ const handleSaveProfile = async () => {
     }
 
     // Update bio if changed
-    const currentBio = (auth.user.value as any)?.bio || ''
+    const currentBio = (auth.user as any)?.bio || ''
     if (profileForm.value.bio !== currentBio) {
       const result = await updateBio(profileForm.value.bio || null)
       if (!result.success) {

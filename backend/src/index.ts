@@ -29,7 +29,9 @@ import statsController from './controllers/stats.controller';
 import challengesController from './controllers/challenges.controller';
 import achievementsController from './controllers/achievements.controller';
 import archiveController from './controllers/archive.controller';
+import messagesController from './controllers/messages.controller';
 import fartsController from './controllers/farts.controller';
+import analyticsController from './controllers/analytics.controller';
 import { setupWebSocketServer } from './controllers/presence.controller';
 import { createServer } from 'http';
 
@@ -78,6 +80,8 @@ app.use('/api/challenges', challengesController);
 app.use('/api/achievements', achievementsController);
 app.use('/api', archiveController);
 app.use('/api/farts', fartsController);
+app.use('/api', messagesController);
+app.use('/api', analyticsController);
 
 // Serve raw OpenAPI JSON spec for type generation
 app.get('/api/openapi.json', (req: Request, res: Response) => {
