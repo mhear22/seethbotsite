@@ -203,8 +203,11 @@ onMounted(async () => {
           <div class="character-info">
             <h3>{{ character.name }}</h3>
             <div class="character-stats">
-              <span class="elo">⭐ {{ character.elo_rating }} ELO</span>
-              <span class="record">{{ character.wins }}W - {{ character.losses }}L</span>
+              <span class="elo">ELO:{{ character.elo_rating }} (</span>
+              <span class="wins">{{ character.wins }}W</span>
+              <span> - </span>
+              <span class="losses">{{ character.losses }}L</span>
+              <span class="elo">)</span>
             </div>
           </div>
         </div>
@@ -245,8 +248,11 @@ onMounted(async () => {
             <div class="character-details">
               <h4>{{ character.name }}</h4>
               <div class="stats">
-                <span class="elo">⭐ {{ character.elo_rating }}</span>
-                <span class="record">{{ character.wins }}W - {{ character.losses }}L</span>
+                <span class="elo">ELO:{{ character.elo_rating }} (</span>
+                <span class="wins">{{ character.wins }}W</span>
+                <span> - </span>
+                <span class="losses">{{ character.losses }}L</span>
+                <span class="elo">)</span>
               </div>
             </div>
           </div>
@@ -534,6 +540,16 @@ onMounted(async () => {
 
 .elo,
 .record {
+  font-weight: 600;
+}
+
+.wins {
+  color: #48bb78;
+  font-weight: 600;
+}
+
+.losses {
+  color: #f56565;
   font-weight: 600;
 }
 
