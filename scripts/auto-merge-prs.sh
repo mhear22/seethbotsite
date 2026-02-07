@@ -64,6 +64,13 @@ while IFS=':' read -r ticket_id ticket_title; do
     # Delete local branch
     git branch -D "$BRANCH_NAME" 2>/dev/null || true
 
+    # Remove worktree if it exists
+    WORKTREE_PATH="$WORKDIR/worktrees/ticket-$ticket_id"
+    if [ -d "$WORKTREE_PATH" ]; then
+      echo "🧹 Cleaning up worktree at $WORKTREE_PATH"
+      git worktree remove "$WORKTREE_PATH" 2>/dev/null || rm -rf "$WORKTREE_PATH"
+    fi
+
     MERGED_ANY=1
 
     # Note: Tickets are left as "completed" status - the script will skip them

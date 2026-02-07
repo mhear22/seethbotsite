@@ -52,6 +52,7 @@ fi
 
 TITLE=$(echo "$TICKET_JSON" | jq -r '.title' | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g' | tr -s '-')
 BRANCH_NAME="ticket-$TICKET_ID-$TITLE"
+WORKTREE_PATH="$WORKTREE_DIR/ticket-$TICKET_ID"
 
 # Check if worktree already exists
 if [ -d "$WORKTREE_PATH" ]; then
