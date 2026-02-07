@@ -10,7 +10,8 @@ import {
   updateUserDisplayName,
   changeUserPassword,
   deleteUserAccount,
-  cleanupExpiredSessions
+  cleanupExpiredSessions,
+  refreshToken
 } from '../users';
 import { extractApiKey } from '../auth';
 
@@ -192,6 +193,80 @@ router.post('/auth/login', async (req: Request, res: Response) => {
     }
     console.error('Error logging in user:', error);
     res.status(500).json({ error: 'Failed to login' });
+  }
+});
+
+/**
+ * @openapi
+ * /api/auth/refresh:
+ *   post:
+ *     tags: [Authentication]
+ *     summary: Refresh access token
+ *     description: Get a new JWT token using an existing valid token. Useful for extending sessions without re-login.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [token]
+ *             properties:
+ *               token:
+ *                 type: string
+ *                 description: Current valid JWT token
+ *     responses:
+ *       200:
+ *         description: Token refreshed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                     email:
+ *                       type: string
+ *                     display_name:
+ *                       type: string
+ *                     created_at:
+ *                       type: string
+ *                     updated_at:
+ *                       type: string
+ *                 token:
+ *                   type: string
+ *                   description: New JWT authentication token
+ *       401:
+ *         description: Invalid or expired token
+ */
+router.post('/auth/refresh', (req: Request, res: Response) => {
+  try {
+    const { token } = req.body;
+
+    if (!token || typeof token !== 'string') {
+      return res.status(400).json({ error: 'Token is required' });
+    }
+
+    // Refresh token
+    const newToken = refreshToken(token);
+
+    if (!newToken) {
+      return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+
+    // Validate new token to get user info
+    const result = validateTokenAndGetUser(newToken);
+
+    if (!result) {
+      return res.status(500).json({ error: 'Failed to create session' });
+    }
+
+    res.json({ success: true, user: result.user, token: newToken });
+  } catch (error) {
+    console.error('Error refreshing token:', error);
+    res.status(500).json({ error: 'Failed to refresh token' });
   }
 });
 

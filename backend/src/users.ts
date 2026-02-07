@@ -237,8 +237,14 @@ export function deleteAllSessions(userId: number): number {
  * Generate a JWT token
  */
 function generateJWT(userId: number): string {
+  // Add timestamp to make each token unique
+  const payload = {
+    userId,
+    ts: Date.now() // timestamp to ensure uniqueness
+  };
+
   return jwt.sign(
-    { userId },
+    payload,
     JWT_SECRET,
     { expiresIn: JWT_EXPIRY } as any
   );
@@ -263,6 +269,37 @@ function createSession(
     INSERT INTO sessions (user_id, token, device_name, device_type, expires_at)
     VALUES (?, ?, ?, ?, ?)
   `).run(userId, token, deviceName || null, deviceType || null, expiryDate.toISOString());
+}
+
+/**
+ * Refresh a user's session token
+ * Invalidates the old token and creates a new one
+ *
+ * @param oldToken - The old JWT token to invalidate
+ * @returns The new token, or null if the old token was invalid
+ */
+export function refreshToken(oldToken: string): string | null {
+  const result = validateTokenAndGetUser(oldToken);
+
+  if (!result) {
+    return null;
+  }
+
+  // Invalidate old token
+  logoutUser(oldToken);
+
+  // Generate new token
+  const newToken = generateJWT(result.user.id);
+
+  // Create new session (convert null to undefined for optional parameters)
+  createSession(
+    result.user.id,
+    newToken,
+    result.session.device_name || undefined,
+    result.session.device_type || undefined
+  );
+
+  return newToken;
 }
 
 /**
