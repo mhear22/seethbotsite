@@ -1,193 +1,23 @@
 import { Router, Request, Response } from 'express';
-import { validateApiKey, extractApiKey } from '../auth';
-import Database from 'better-sqlite3';
-import path from 'path';
-import fs from 'fs';
+import {
+  getIgnoreMode,
+  setIgnoreMode,
+  getDB
+} from '../services/tickets-db';
+import {
+  ticketsService,
+  CreateTicketDTO,
+  UpdateTicketDTO
+} from '../services/tickets.service';
+import {
+  ticketsFilterService,
+  TicketFilters
+} from '../services/tickets-filter.service';
+import {
+  ticketsStatsService
+} from '../services/tickets-stats.service';
 
 const router = Router();
-
-/**
- * Parse dependencies from ticket description
- * Looks for patterns like "depends on #123", "requires #123", "blocked by #123"
- * Returns array of ticket IDs
- */
-function parseDependencies(description: string | null): number[] {
-  if (!description) return [];
-
-  const dependencies: number[] = [];
-  const patterns = [
-    /depends\s+on\s+#?(\d+)/gi,
-    /requires\s+#?(\d+)/gi,
-    /blocked\s+by\s+#?(\d+)/gi
-  ];
-
-  for (const pattern of patterns) {
-    let match;
-    while ((match = pattern.exec(description)) !== null) {
-      const ticketId = parseInt(match[1], 10);
-      if (!isNaN(ticketId) && !dependencies.includes(ticketId)) {
-        dependencies.push(ticketId);
-      }
-    }
-  }
-
-  return dependencies.sort((a, b) => a - b);
-}
-
-/**
- * Check if a ticket is blocked based on its dependencies
- * A ticket is blocked if any of its dependencies are not completed
- */
-function isTicketBlocked(db: Database.Database, dependencies: number[]): boolean {
-  if (!dependencies || dependencies.length === 0) return false;
-
-  // Check if all dependency tickets are completed or declined
-  for (const depId of dependencies) {
-    const depTicket = db.prepare('SELECT status FROM tickets WHERE id = ? AND is_deleted = 0').get(depId) as { status: string } | undefined;
-
-    // If dependency doesn't exist or is not completed/declined, ticket is blocked
-    if (!depTicket || !['completed', 'declined'].includes(depTicket.status)) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-/**
- * Ticket Controller Performance Notes (Ticket #77)
- *
- * Current Implementation:
- * - Each request creates a new database connection
- * - Table creation checks on every request (cached by SQLite)
- * - Indexes added for status, created_at, updated_at for faster filtering
- *
- * Performance Optimizations Applied:
- * - Added indexes on frequently queried columns (status, created_at, updated_at)
- *
- * Future Optimizations Recommended:
- * - Share database connection across requests (reduce connection overhead)
- * - Move table initialization to startup, not per-request
- * - Use prepared statements for repeated queries
- * - Consider connection pooling for high-traffic scenarios
- * - Move relevance score calculation to SQL for better performance
- */
-
-// Database setup
-// In production: __dirname is /app/backend/dist/controllers, data is at /app/backend/data
-// Go up two levels: /app/backend/dist/controllers -> /app/backend/dist -> /app/backend
-const DB_PATH = path.join(__dirname, '..', '..', 'data', 'tickets.db');
-
-// Settings helpers
-function getIgnoreMode(): boolean {
-  const db = getDB();
-  const row = db.prepare('SELECT value FROM settings WHERE key = ?').get('ignore_mode') as { value: string } | undefined;
-  return row?.value === 'true';
-}
-
-function setIgnoreMode(enabled: boolean): void {
-  const db = getDB();
-  db.prepare(`
-    INSERT INTO settings (key, value) VALUES ('ignore_mode', ?)
-    ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = CURRENT_TIMESTAMP
-  `).run(String(enabled), String(enabled));
-}
-
-function getDB(): Database.Database {
-  // Ensure data directory exists
-  // In production: __dirname is /app/backend/dist/controllers, data is at /app/backend/data
-  // Go up two levels: /app/backend/dist/controllers -> /app/backend/dist -> /app/backend
-  const dataDir = path.join(__dirname, '..', '..', 'data');
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
-  }
-
-  const db = new Database(DB_PATH);
-
-  // Create tickets table if it doesn't exist
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS tickets (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      title TEXT NOT NULL,
-      description TEXT NOT NULL,
-      status TEXT DEFAULT 'pending',
-      response TEXT,
-      creator_id TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-
-  // Add is_deleted column if it doesn't exist (for soft deletes)
-  try {
-    db.exec(`ALTER TABLE tickets ADD COLUMN is_deleted BOOLEAN DEFAULT 0`);
-  } catch (err) {
-    // Column already exists, ignore the error
-  }
-
-  // Add creator_id column if it doesn't exist (for existing databases)
-  try {
-    db.exec(`ALTER TABLE tickets ADD COLUMN creator_id TEXT`);
-  } catch (err) {
-    // Column already exists, ignore the error
-    // SQLite throws error when trying to add a duplicate column
-  }
-
-  // Add type column if it doesn't exist (for ticket filtering - Ticket #151)
-  try {
-    db.exec(`ALTER TABLE tickets ADD COLUMN type TEXT DEFAULT 'feature'`);
-  } catch (err) {
-    // Column already exists, ignore the error
-  }
-
-  // Add priority column if it doesn't exist (for ticket filtering - Ticket #151)
-  try {
-    db.exec(`ALTER TABLE tickets ADD COLUMN priority TEXT DEFAULT 'medium'`);
-  } catch (err) {
-    // Column already exists, ignore the error
-  }
-
-  // Add tags column if it doesn't exist (for ticket categorization - Ticket #140)
-  try {
-    db.exec(`ALTER TABLE tickets ADD COLUMN tags TEXT`);
-  } catch (err) {
-    // Column already exists, ignore the error
-  }
-
-  // Add category column if it doesn't exist (for ticket categorization - Ticket #140)
-  try {
-    db.exec(`ALTER TABLE tickets ADD COLUMN category TEXT`);
-  } catch (err) {
-    // Column already exists, ignore the error
-  }
-
-  // Add dependencies column if it doesn't exist (for ticket dependency tracking - Ticket #180)
-  try {
-    db.exec(`ALTER TABLE tickets ADD COLUMN dependencies TEXT`);
-  } catch (err) {
-    // Column already exists, ignore the error
-  }
-
-  // Create settings table if it doesn't exist
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS settings (
-      key TEXT PRIMARY KEY,
-      value TEXT NOT NULL,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-
-  // Create indexes for faster filtering and sorting (Ticket #77)
-  try {
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(status)`);
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_tickets_created_at ON tickets(created_at)`);
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_tickets_updated_at ON tickets(updated_at)`);
-  } catch (err) {
-    // Indexes might already exist, ignore
-  }
-
-  return db;
-}
 
 /**
  * @openapi
@@ -459,112 +289,21 @@ router.patch('/tickets/settings/last-collection', async (req: Request, res: Resp
  */
 router.get('/tickets', async (req: Request, res: Response) => {
   try {
-    const db = getDB();
-    const { status = 'all', type = 'all', priority = 'all', tag, category, sortBy = 'relevance' } = req.query;
+    const { status, type, priority, tag, category, sortBy = 'relevance', page, limit } = req.query;
 
-    let query = 'SELECT * FROM tickets WHERE is_deleted = 0';
-    const params: any[] = [];
+    const filters: TicketFilters & { page?: number; limit?: number; sortBy?: any } = {
+      status: status as string,
+      type: type as string,
+      priority: priority as string,
+      tag: tag as string,
+      category: category as string,
+      sortBy: sortBy as 'relevance' | 'created_at' | 'updated_at',
+      page: page ? parseInt(page as string) : undefined,
+      limit: limit ? parseInt(limit as string) : undefined
+    };
 
-    // Map "in-progress" to "needs-info" for frontend compatibility
-    const statusFilter = status === 'in-progress' ? 'needs-info' : status;
-
-    if (statusFilter !== 'all') {
-      query += ' AND status = ?';
-      params.push(statusFilter);
-    }
-
-    if (type !== 'all') {
-      query += ' AND type = ?';
-      params.push(type);
-    }
-
-    if (priority !== 'all') {
-      query += ' AND priority = ?';
-      params.push(priority);
-    }
-
-    // Filter by tag (tags are comma-separated, so we use LIKE)
-    if (tag && typeof tag === 'string') {
-      query += ' AND tags LIKE ?';
-      params.push(`%${tag}%`);
-    }
-
-    // Filter by category
-    if (category && typeof category === 'string') {
-      query += ' AND category = ?';
-      params.push(category);
-    }
-
-    // Sort options: relevance (default), created_at, updated_at
-    if (sortBy === 'relevance') {
-      // Sort by relevance: older pending tickets first, then newer
-      query += ' ORDER BY CASE status ' +
-                'WHEN \'pending\' THEN 1 ' +
-                'WHEN \'needs-info\' THEN 2 ' +
-                'WHEN \'unresolved\' THEN 2.5 ' +
-                'WHEN \'completed\' THEN 3 ' +
-                'WHEN \'declined\' THEN 4 ' +
-                'ELSE 5 END, created_at ASC';
-    } else if (sortBy === 'created_at' || sortBy === 'updated_at') {
-      query += ` ORDER BY ${sortBy} DESC`;
-    } else {
-      query += ' ORDER BY created_at ASC';
-    }
-
-    const tickets = db.prepare(query).all(...params);
-
-    // Calculate relevance score for each ticket
-    const ticketsWithRelevance = tickets.map((ticket: any) => {
-      const now = new Date();
-      const createdDate = new Date(ticket.created_at);
-      const daysSinceCreation = Math.floor((now.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24));
-
-      // Parse dependencies from database
-      const dependencies = ticket.dependencies
-        ? JSON.parse(ticket.dependencies)
-        : [];
-
-      // Relevance score calculation:
-      // - Pending tickets: higher score for older tickets
-      // - Completed/Declined: lower score
-      // - Base score depends on status
-      // - Age multiplier increases score for pending tickets
-      let baseScore = 0;
-      switch (ticket.status) {
-        case 'pending':
-          baseScore = 100 - Math.min(daysSinceCreation * 2, 50); // 100-50, decreases with age
-          break;
-        case 'needs-info':
-          baseScore = 90 - Math.min(daysSinceCreation * 2, 40); // 90-50
-          break;
-        case 'unresolved':
-          baseScore = 85 - Math.min(daysSinceCreation * 2, 35); // 85-50, high priority
-          break;
-        case 'completed':
-          baseScore = 30; // Completed tickets are less relevant
-          break;
-        case 'declined':
-          baseScore = 10; // Declined tickets are least relevant
-          break;
-        default:
-          baseScore = 50;
-      }
-
-      return {
-        ...ticket,
-        dependencies,
-        blocked: isTicketBlocked(db, dependencies),
-        relevanceScore: baseScore,
-        daysSinceCreation
-      };
-    });
-
-    // If sorting by relevance, sort the results
-    if (sortBy === 'relevance') {
-      ticketsWithRelevance.sort((a: any, b: any) => b.relevanceScore - a.relevanceScore);
-    }
-
-    res.json({ tickets: ticketsWithRelevance });
+    const result = await ticketsFilterService.getFilteredTickets(filters);
+    res.json(result);
   } catch (error) {
     console.error('Error fetching tickets:', error);
     res.status(500).json({ error: 'Failed to fetch tickets' });
@@ -581,53 +320,14 @@ router.get('/tickets', async (req: Request, res: Response) => {
  */
 router.post('/tickets', async (req: Request, res: Response) => {
   try {
-    const { title, description, creator_id, type, priority, tags, category, dependencies } = req.body;
+    const data: CreateTicketDTO = req.body;
 
-    if (!title) {
-      return res.status(400).json({ error: 'Title is required' });
-    }
-
-    const db = getDB();
-
-    // Parse dependencies from description if not explicitly provided
-    let parsedDependencies: number[] = [];
-    if (dependencies && Array.isArray(dependencies)) {
-      parsedDependencies = dependencies;
-    } else {
-      parsedDependencies = parseDependencies(description || null);
-    }
-
-    // Store dependencies as JSON string
-    const dependenciesJson = parsedDependencies.length > 0 ? JSON.stringify(parsedDependencies) : null;
-
-    const stmt = db.prepare(`
-      INSERT INTO tickets (title, description, status, creator_id, type, priority, tags, category, dependencies, created_at, updated_at)
-      VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-    `);
-    const result = stmt.run(
-      title,
-      description || null,
-      creator_id || null,
-      type || 'feature',
-      priority || 'medium',
-      tags || null,
-      category || null,
-      dependenciesJson
-    );
-
-    const newTicket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(result.lastInsertRowid);
-
-    // Add computed fields to response
-    const ticketWithComputed = {
-      ...(newTicket as any),
-      dependencies: parsedDependencies,
-      blocked: isTicketBlocked(db, parsedDependencies)
-    };
-
-    res.status(201).json({ ticket: ticketWithComputed });
+    const ticket = await ticketsService.createTicket(data);
+    res.status(201).json({ ticket });
   } catch (error) {
     console.error('Error creating ticket:', error);
-    res.status(500).json({ error: 'Failed to create ticket' });
+    const message = (error as Error).message;
+    res.status(message === 'Title is required' ? 400 : 500).json({ error: message });
   }
 });
 
@@ -642,110 +342,23 @@ router.post('/tickets', async (req: Request, res: Response) => {
 router.patch('/tickets/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { status, response, title, description, creator_id, type, priority, tags, category, dependencies } = req.body;
+    const data: UpdateTicketDTO = req.body;
 
-    // Check if any field is provided
-    if (!status && !response && !title && !description && !tags && !category && !dependencies) {
-      return res.status(400).json({ error: 'At least one field must be provided' });
-    }
-
-    // Validate status if provided
-    if (status && !['pending', 'needs-info', 'completed', 'declined', 'unresolved'].includes(status)) {
-      return res.status(400).json({ error: 'Invalid status value' });
-    }
-
-    // Validate title/description if provided
-    if (title !== undefined && (typeof title !== 'string' || title.trim().length === 0)) {
-      return res.status(400).json({ error: 'Title must be a non-empty string' });
-    }
-
-    if (description !== undefined && (typeof description !== 'string' || description.trim().length === 0)) {
-      return res.status(400).json({ error: 'Description must be a non-empty string' });
-    }
-
-    const db = getDB();
-
-    // Check if ticket exists (exclude soft-deleted)
-    const existing = db.prepare('SELECT * FROM tickets WHERE id = ? AND is_deleted = 0').get(id) as any;
-    if (!existing) {
-      return res.status(404).json({ error: 'Ticket not found' });
-    }
-
-    // Prevent editing tickets that are not in 'pending' status
-    // Users can only edit tickets they own that are still pending
-    const isEditing = title !== undefined || description !== undefined;
-    if (isEditing && existing.status !== 'pending') {
-      return res.status(403).json({ error: 'Cannot edit tickets that are not in pending status' });
-    }
-
-    // Build update query dynamically
-    const updates: string[] = [];
-    const values: any[] = [];
-
-    // Auto-reset from "needs-info" to "pending" when user edits title/description
-    const shouldResetStatus = (title !== undefined || description !== undefined) && existing.status === 'needs-info';
-
-    if (status) {
-      updates.push('status = ?');
-      values.push(status);
-    } else if (shouldResetStatus) {
-      updates.push('status = ?');
-      values.push('pending');
-    }
-
-    if (response !== undefined) {
-      updates.push('response = ?');
-      values.push(response);
-    }
-    if (title !== undefined) {
-      updates.push('title = ?');
-      values.push(title.trim());
-    }
-    if (description !== undefined) {
-      updates.push('description = ?');
-      values.push(description.trim());
-    }
-    if (type !== undefined) {
-      updates.push('type = ?');
-      values.push(type);
-    }
-    if (priority !== undefined) {
-      updates.push('priority = ?');
-      values.push(priority);
-    }
-    if (tags !== undefined) {
-      updates.push('tags = ?');
-      values.push(tags.trim());
-    }
-    if (category !== undefined) {
-      updates.push('category = ?');
-      values.push(category.trim());
-    }
-    if (dependencies !== undefined) {
-      // Allow manual override of dependencies
-      const depsArray = Array.isArray(dependencies) ? dependencies : [];
-      updates.push('dependencies = ?');
-      values.push(depsArray.length > 0 ? JSON.stringify(depsArray) : null);
-    }
-    updates.push('updated_at = CURRENT_TIMESTAMP');
-
-    const stmt = db.prepare(`UPDATE tickets SET ${updates.join(', ')} WHERE id = ?`);
-    stmt.run(...values, id);
-
-    const updatedTicket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(id) as any;
-
-    // Add computed fields to response
-    const depsArray = updatedTicket.dependencies ? JSON.parse(updatedTicket.dependencies) : [];
-    const ticketWithComputed = {
-      ...updatedTicket,
-      dependencies: depsArray,
-      blocked: isTicketBlocked(db, depsArray)
-    };
-
-    res.json({ ticket: ticketWithComputed });
+    const ticket = await ticketsService.updateTicket(parseInt(id, 10), data);
+    res.json({ ticket });
   } catch (error) {
     console.error('Error updating ticket:', error);
-    res.status(500).json({ error: 'Failed to update ticket' });
+    const message = (error as Error).message;
+
+    if (message === 'Ticket not found') {
+      res.status(404).json({ error: message });
+    } else if (message.includes('Cannot edit') || message.includes('Invalid status')) {
+      res.status(403).json({ error: message });
+    } else if (message.includes('Title') || message.includes('Description')) {
+      res.status(400).json({ error: message });
+    } else {
+      res.status(500).json({ error: message || 'Failed to update ticket' });
+    }
   }
 });
 
@@ -789,34 +402,24 @@ router.patch('/tickets/:id', async (req: Request, res: Response) => {
 router.delete('/tickets/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const db = getDB();
-
-    // Check if ticket exists (exclude soft-deleted)
-    const existing = db.prepare('SELECT * FROM tickets WHERE id = ? AND is_deleted = 0').get(id) as any;
-    if (!existing) {
-      return res.status(404).json({ error: 'Ticket not found' });
-    }
 
     // Extract creator_id from body or headers
     const creator_id = req.body.creator_id || req.headers['x-creator-id'] as string;
 
-    // Users can delete tickets by providing creator_id
-    if (creator_id && existing.creator_id === creator_id) {
-      // User is deleting their own ticket
-    } else if (!creator_id) {
-      // No creator_id provided - allow deletion
-    } else {
-      // Creator_id doesn't match
-      return res.status(401).json({ error: 'Unauthorized: You can only delete your own tickets' });
-    }
-
-    const stmt = db.prepare('UPDATE tickets SET is_deleted = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?');
-    stmt.run(id);
+    await ticketsService.deleteTicket(parseInt(id, 10), creator_id);
 
     res.json({ message: 'Ticket deleted successfully' });
   } catch (error) {
     console.error('Error deleting ticket:', error);
-    res.status(500).json({ error: 'Failed to delete ticket' });
+    const message = (error as Error).message;
+
+    if (message === 'Ticket not found') {
+      res.status(404).json({ error: message });
+    } else if (message.includes('Unauthorized')) {
+      res.status(401).json({ error: message });
+    } else {
+      res.status(500).json({ error: message || 'Failed to delete ticket' });
+    }
   }
 });
 
@@ -847,44 +450,8 @@ router.delete('/tickets/:id', async (req: Request, res: Response) => {
  */
 router.get('/tickets/estimated-wait-time', async (req: Request, res: Response) => {
   try {
-    const db = getDB();
-
-    // Get the last 10 completed tickets (status = 'completed' or 'complete')
-    const completedTickets = db.prepare(`
-      SELECT created_at, updated_at
-      FROM tickets
-      WHERE status IN ('completed', 'complete')
-        AND is_deleted = 0
-      ORDER BY updated_at DESC
-      LIMIT 10
-    `).all() as { created_at: string; updated_at: string }[];
-
-    // If we have fewer than 2 completed tickets, return null (not enough data)
-    if (completedTickets.length < 2) {
-      return res.json({
-        estimatedWaitTimeMinutes: null,
-        sampleSize: completedTickets.length,
-        averageCompletionTimeHours: null
-      });
-    }
-
-    // Calculate the average completion time
-    let totalCompletionTime = 0;
-    for (const ticket of completedTickets) {
-      const created = new Date(ticket.created_at);
-      const updated = new Date(ticket.updated_at);
-      const completionTimeHours = (updated.getTime() - created.getTime()) / (1000 * 60 * 60);
-      totalCompletionTime += completionTimeHours;
-    }
-
-    const averageCompletionTimeHours = totalCompletionTime / completedTickets.length;
-    const estimatedWaitTimeMinutes = Math.round(averageCompletionTimeHours * 60);
-
-    res.json({
-      estimatedWaitTimeMinutes,
-      sampleSize: completedTickets.length,
-      averageCompletionTimeHours: Math.round(averageCompletionTimeHours * 100) / 100
-    });
+    const result = ticketsStatsService.getEstimatedWaitTime();
+    res.json(result);
   } catch (error) {
     console.error('Error calculating estimated wait time:', error);
     res.status(500).json({ error: 'Failed to calculate estimated wait time' });
@@ -943,7 +510,7 @@ router.get('/tickets/estimated-wait-time', async (req: Request, res: Response) =
  *                   properties:
  *                     oldestCreated:
  *                       type: string
- *                       newestCreated:
+ *                     newestCreated:
  *                       type: string
  *                     oldestCompleted:
  *                       type: string
@@ -952,70 +519,7 @@ router.get('/tickets/estimated-wait-time', async (req: Request, res: Response) =
  */
 router.get('/tickets/stats', async (req: Request, res: Response) => {
   try {
-    const db = getDB();
-
-    // Get total ticket count
-    const totalTickets = db.prepare('SELECT COUNT(*) as count FROM tickets WHERE is_deleted = 0').get() as { count: number };
-
-    // Get tickets by status
-    const ticketsByStatus = db.prepare(`
-      SELECT status, COUNT(*) as count
-      FROM tickets
-      WHERE is_deleted = 0
-      GROUP BY status
-    `).all() as any;
-
-    // Convert to object format
-    const byStatus: Record<string, number> = (ticketsByStatus as any[]).reduce<Record<string, number>>(
-      (acc: Record<string, number>, row: any): Record<string, number> => {
-        acc[row.status] = row.count;
-        return acc;
-      },
-      {} as Record<string, number>
-    );
-
-    // Get oldest ticket
-    const oldestTicket = db.prepare(`
-      SELECT id, title, created_at
-      FROM tickets
-      WHERE is_deleted = 0
-      ORDER BY created_at ASC
-      LIMIT 1
-    `).get() as any;
-
-    // Get newest ticket
-    const newestTicket = db.prepare(`
-      SELECT id, title, created_at
-      FROM tickets
-      WHERE is_deleted = 0
-      ORDER BY created_at DESC
-      LIMIT 1
-    `).get() as any;
-
-    // Get date ranges
-    const dates = db.prepare(`
-      SELECT
-        MIN(created_at) as oldestCreated,
-        MAX(created_at) as newestCreated,
-        MIN(CASE WHEN status = 'completed' THEN updated_at END) as oldestCompleted,
-        MAX(CASE WHEN status = 'completed' THEN updated_at END) as newestCompleted
-      FROM tickets
-      WHERE is_deleted = 0
-    `).get() as any;
-
-    const stats = {
-      totalTickets: totalTickets.count,
-      byStatus,
-      oldestTicket,
-      newestTicket,
-      dates: {
-        oldestCreated: dates.oldestCreated,
-        newestCreated: dates.newestCreated,
-        oldestCompleted: dates.oldestCompleted || null,
-        newestCompleted: dates.newestCompleted || null
-      }
-    };
-
+    const stats = ticketsStatsService.getDashboardStats();
     res.json(stats);
   } catch (error) {
     console.error('Error fetching ticket stats:', error);
@@ -1088,24 +592,6 @@ router.post('/tickets/:id/appeal', async (req: Request, res: Response) => {
     // Only allow appeals for completed or declined tickets
     if (!['completed', 'declined'].includes(ticket.status)) {
       return res.status(400).json({ error: 'Only completed or declined tickets can be appealed' });
-    }
-
-    // Create appeals table if it doesn't exist
-    try {
-      db.exec(`
-        CREATE TABLE IF NOT EXISTS ticket_appeals (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          ticket_id INTEGER NOT NULL,
-          reason TEXT NOT NULL,
-          creator_id TEXT NOT NULL,
-          status TEXT DEFAULT 'pending',
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          reviewed_at DATETIME,
-          FOREIGN KEY (ticket_id) REFERENCES tickets(id)
-        )
-      `);
-    } catch (err) {
-      // Table already exists, ignore
     }
 
     // Create appeal
@@ -1308,26 +794,8 @@ router.patch('/tickets/appeals/:id/review', async (req: Request, res: Response) 
  */
 router.get('/tickets/tags', async (req: Request, res: Response) => {
   try {
-    const db = getDB();
-
-    // Get all tickets with tags
-    const tickets = db.prepare('SELECT tags FROM tickets WHERE tags IS NOT NULL AND tags != "" AND is_deleted = 0').all() as { tags: string }[];
-
-    // Parse and count tags (tags are comma-separated)
-    const tagCounts: Record<string, number> = {};
-    for (const ticket of tickets) {
-      const tags = ticket.tags.split(',').map(t => t.trim()).filter(t => t.length > 0);
-      for (const tag of tags) {
-        tagCounts[tag] = (tagCounts[tag] || 0) + 1;
-      }
-    }
-
-    // Sort by count (most used first)
-    const sortedTags = Object.entries(tagCounts)
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count);
-
-    res.json({ tags: sortedTags });
+    const tags = ticketsStatsService.getAllTags();
+    res.json({ tags });
   } catch (error) {
     console.error('Error fetching tags:', error);
     res.status(500).json({ error: 'Failed to fetch tags' });
@@ -1363,26 +831,8 @@ router.get('/tickets/tags', async (req: Request, res: Response) => {
  */
 router.get('/tickets/categories', async (req: Request, res: Response) => {
   try {
-    const db = getDB();
-
-    // Get all tickets with categories
-    const tickets = db.prepare('SELECT category FROM tickets WHERE category IS NOT NULL AND category != "" AND is_deleted = 0').all() as { category: string }[];
-
-    // Count categories
-    const categoryCounts: Record<string, number> = {};
-    for (const ticket of tickets) {
-      const category = ticket.category.trim();
-      if (category.length > 0) {
-        categoryCounts[category] = (categoryCounts[category] || 0) + 1;
-      }
-    }
-
-    // Sort by count (most used first)
-    const sortedCategories = Object.entries(categoryCounts)
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count);
-
-    res.json({ categories: sortedCategories });
+    const categories = ticketsStatsService.getAllCategories();
+    res.json({ categories });
   } catch (error) {
     console.error('Error fetching categories:', error);
     res.status(500).json({ error: 'Failed to fetch categories' });
