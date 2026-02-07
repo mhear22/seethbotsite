@@ -1,7 +1,5 @@
 import { ref, computed } from 'vue'
-import { buildUrl } from '../utils/api'
-
-const API_BASE = '/api'
+import { apiGet, apiPost, apiPatch, apiDelete, buildUrl, getAuthToken, setAuthToken, clearAuthToken, handleApiError } from '../utils/api'
 
 const TOKEN_KEY = 'auth_token'
 
@@ -67,7 +65,7 @@ const validateToken = async (): Promise<boolean> => {
   if (!state.value.token) return false
 
   try {
-    const response = await fetch(buildUrl(`${API_BASE}/auth/me`), {
+    const response = await fetch(buildUrl('/api/auth/me'), {
       headers: {
         'Authorization': `Bearer ${state.value.token}`
       }
@@ -101,21 +99,15 @@ const register = async (
   state.value.error = null
 
   try {
-    const response = await fetch(buildUrl(`${API_BASE}/auth/register`), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email,
-        password,
-        displayName: displayName || null,
-        deviceName: detectDeviceName(),
-        deviceType: detectDeviceType()
-      })
+    const data = await apiPost<{ success: boolean; user: User; message?: string }>('/api/auth/register', {
+      email,
+      password,
+      displayName: displayName || null,
+      deviceName: detectDeviceName(),
+      deviceType: detectDeviceType()
     })
 
-    const data = await response.json()
-
-    if (response.ok && data.success) {
+    if (data.success) {
       state.value.user = data.user
       return { success: true, user: data.user }
     } else {
@@ -124,7 +116,7 @@ const register = async (
     }
   } catch (error) {
     console.error('Registration failed:', error)
-    state.value.error = 'Registration failed. Please try again.'
+    state.value.error = handleApiError(error, 'Registration failed. Please try again.')
     return { success: false, error: state.value.error }
   } finally {
     state.value.loading = false
@@ -142,20 +134,14 @@ const login = async (
   state.value.error = null
 
   try {
-    const response = await fetch(buildUrl(`${API_BASE}/auth/login`), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email,
-        password,
-        deviceName: detectDeviceName(),
-        deviceType: detectDeviceType()
-      })
+    const data = await apiPost<{ success: boolean; user: User; token?: string; message?: string }>('/api/auth/login', {
+      email,
+      password,
+      deviceName: detectDeviceName(),
+      deviceType: detectDeviceType()
     })
 
-    const data = await response.json()
-
-    if (response.ok && data.success) {
+    if (data.success && data.token) {
       setAuth(data.token, data.user)
       return { success: true, user: data.user }
     } else {
@@ -164,7 +150,7 @@ const login = async (
     }
   } catch (error) {
     console.error('Login failed:', error)
-    state.value.error = 'Login failed. Please try again.'
+    state.value.error = handleApiError(error, 'Login failed. Please try again.')
     return { success: false, error: state.value.error }
   } finally {
     state.value.loading = false
@@ -180,13 +166,7 @@ const logout = async () => {
   }
 
   try {
-    const response = await fetch(buildUrl(`${API_BASE}/auth/logout`), {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${state.value.token}`
-      }
-    })
-
+    await apiPost('/api/auth/logout')
     clearAuth()
     return { success: true }
   } catch (error) {
@@ -208,18 +188,11 @@ const updateProfile = async (displayName: string) => {
   state.value.error = null
 
   try {
-    const response = await fetch(buildUrl(`${API_BASE}/auth/profile`), {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${state.value.token}`
-      },
-      body: JSON.stringify({ displayName })
+    const data = await apiPatch<{ success: boolean; user?: User; message?: string }>('/api/auth/profile', {
+      displayName
     })
 
-    const data = await response.json()
-
-    if (response.ok && data.success) {
+    if (data.success && data.user) {
       state.value.user = data.user
       return { success: true, user: data.user }
     } else {
@@ -228,7 +201,7 @@ const updateProfile = async (displayName: string) => {
     }
   } catch (error) {
     console.error('Update failed:', error)
-    state.value.error = 'Update failed. Please try again.'
+    state.value.error = handleApiError(error, 'Update failed. Please try again.')
     return { success: false, error: state.value.error }
   } finally {
     state.value.loading = false
@@ -250,18 +223,12 @@ const changePassword = async (
   state.value.error = null
 
   try {
-    const response = await fetch(buildUrl(`${API_BASE}/auth/password`), {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${state.value.token}`
-      },
-      body: JSON.stringify({ oldPassword, newPassword })
+    const data = await apiPatch<{ success: boolean; message?: string }>('/api/auth/password', {
+      oldPassword,
+      newPassword
     })
 
-    const data = await response.json()
-
-    if (response.ok && data.success) {
+    if (data.success) {
       return { success: true }
     } else {
       state.value.error = data.message || 'Password change failed'
@@ -269,7 +236,7 @@ const changePassword = async (
     }
   } catch (error) {
     console.error('Password change failed:', error)
-    state.value.error = 'Password change failed. Please try again.'
+    state.value.error = handleApiError(error, 'Password change failed. Please try again.')
     return { success: false, error: state.value.error }
   } finally {
     state.value.loading = false
@@ -288,25 +255,15 @@ const deleteAccount = async (password: string) => {
   state.value.error = null
 
   try {
-    const response = await fetch(buildUrl(`${API_BASE}/auth/account`), {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${state.value.token}`
-      },
-      body: JSON.stringify({ password })
+    await apiDelete<{ success: boolean; message?: string }>('/api/auth/account', {
+      password
     })
 
-    if (response.ok) {
-      clearAuth()
-      return { success: true }
-    } else {
-      state.value.error = 'Account deletion failed. Please try again.'
-      return { success: false, error: state.value.error }
-    }
+    clearAuth()
+    return { success: true }
   } catch (error) {
     console.error('Account deletion failed:', error)
-    state.value.error = 'Account deletion failed. Please try again.'
+    state.value.error = handleApiError(error, 'Account deletion failed. Please try again.')
     return { success: false, error: state.value.error }
   } finally {
     state.value.loading = false
@@ -322,19 +279,7 @@ const getSessions = async (): Promise<Session[]> => {
   }
 
   try {
-    const response = await fetch(buildUrl(`${API_BASE}/auth/sessions`), {
-      headers: {
-        'Authorization': `Bearer ${state.value.token}`
-      }
-    })
-
-    if (response.ok) {
-      const data = await response.json()
-      return data || []
-    } else {
-      console.error('Failed to fetch sessions', response.status)
-      return []
-    }
+    return await apiGet<Session[]>('/api/auth/sessions')
   } catch (error) {
     console.error('Failed to fetch sessions:', error)
     return []
@@ -350,16 +295,10 @@ const logoutSession = async (sessionId: number) => {
   }
 
   try {
-    const response = await fetch(buildUrl(`${API_BASE}/auth/sessions/${sessionId}`), {
-      method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${state.value.token}`
-      }
-    })
-
+    await apiDelete(`/api/auth/sessions/${sessionId}`)
     return { success: true }
   } catch (error) {
-    console.error('Failed to delete session', error)
+    console.error('Failed to delete session:', error)
     return { success: false, error: 'Failed to delete session' }
   }
 }
@@ -373,17 +312,11 @@ const logoutAll = async () => {
   }
 
   try {
-    const response = await fetch(buildUrl(`${API_BASE}/auth/sessions`), {
-      method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${state.value.token}`
-      }
-    })
-
+    await apiDelete('/api/auth/sessions')
     clearAuth()
     return { success: true }
   } catch (error) {
-    console.error('Failed to logout from all devices', error)
+    console.error('Failed to logout from all devices:', error)
     return { success: false, error: 'Failed to logout from all devices' }
   }
 }
@@ -450,15 +383,16 @@ const detectDeviceType = (): string => {
 }
 
 /**
- * Fetch with auth headers
+ * Fetch with auth headers (convenience method using shared utility)
  */
 const fetchWithAuth = async (url: string, options?: RequestInit) => {
+  const token = getAuthToken()
   const headers: HeadersInit = {
     ...(options?.headers || {}),
   }
 
-  if (state.value.token) {
-    headers['Authorization'] = `Bearer ${state.value.token}`
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
   }
 
   return fetch(url, {

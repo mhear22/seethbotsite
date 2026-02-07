@@ -1,9 +1,9 @@
 /**
  * Export Repository
- * Handles data export functionality
+ * Handles data export functionality using shared API utility
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+import { apiGet, apiPost, buildUrl } from '../utils/api';
 
 export interface ExportRankingsParams {
   format?: 'json' | 'csv';
@@ -36,21 +36,17 @@ export interface ExportLeaderboardParams {
 }
 
 class ExportRepository {
-  private apiUrl: string;
-
-  constructor() {
-    this.apiUrl = API_BASE_URL;
-  }
-
   /**
    * Export rankings data
    */
   async exportRankings(params: ExportRankingsParams = {}): Promise<void> {
     const { format = 'json' } = params;
-    const response = await fetch(`${this.apiUrl}/export/rankings?format=${format}`);
+
+    const response = await fetch(buildUrl(`/api/export/rankings?format=${format}`));
 
     if (!response.ok) {
-      throw new Error('Failed to export rankings');
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to export rankings');
     }
 
     const blob = await response.blob();
@@ -62,7 +58,7 @@ class ExportRepository {
    */
   async exportStats(params: ExportStatsParams): Promise<void> {
     const { userId, gameType, format = 'json' } = params;
-    const response = await fetch(`${this.apiUrl}/export/stats`, {
+    const response = await fetch(buildUrl('/api/export/stats'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -71,7 +67,8 @@ class ExportRepository {
     });
 
     if (!response.ok) {
-      throw new Error('Failed to export stats');
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to export stats');
     }
 
     const blob = await response.blob();
@@ -83,7 +80,7 @@ class ExportRepository {
    */
   async exportClicks(params: ExportClicksParams): Promise<void> {
     const { userId, limit = 100, format = 'json' } = params;
-    const response = await fetch(`${this.apiUrl}/export/clicks`, {
+    const response = await fetch(buildUrl('/api/export/clicks'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -92,7 +89,8 @@ class ExportRepository {
     });
 
     if (!response.ok) {
-      throw new Error('Failed to export clicks');
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to export clicks');
     }
 
     const blob = await response.blob();
@@ -104,7 +102,7 @@ class ExportRepository {
    */
   async exportHistory(params: ExportHistoryParams): Promise<void> {
     const { userId, gameType, statType, limit = 500, format = 'json' } = params;
-    const response = await fetch(`${this.apiUrl}/export/history`, {
+    const response = await fetch(buildUrl('/api/export/history'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -113,7 +111,8 @@ class ExportRepository {
     });
 
     if (!response.ok) {
-      throw new Error('Failed to export history');
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to export history');
     }
 
     const blob = await response.blob();
@@ -125,7 +124,7 @@ class ExportRepository {
    */
   async exportLeaderboard(params: ExportLeaderboardParams): Promise<void> {
     const { gameType, limit = 50, format = 'json' } = params;
-    const response = await fetch(`${this.apiUrl}/export/leaderboard`, {
+    const response = await fetch(buildUrl('/api/export/leaderboard'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -134,7 +133,8 @@ class ExportRepository {
     });
 
     if (!response.ok) {
-      throw new Error('Failed to export leaderboard');
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to export leaderboard');
     }
 
     const blob = await response.blob();

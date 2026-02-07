@@ -1,9 +1,74 @@
 /**
- * API Utility Functions for seethbotsite frontend
- * Simplified without authentication requirements
+ * Shared API Utility
+ *
+ * Provides a consistent interface for all API calls with:
+ * - Automatic authentication header injection
+ * - Centralized error handling
+ * - Type-safe response handling
+ * - Request/response interceptors
  */
 
 import { getApiBaseUrl } from '../config/api.config';
+
+// ============================================================================
+// Types
+// ============================================================================
+
+export interface ApiRequestOptions extends RequestInit {
+  headers?: HeadersInit;
+  skipAuth?: boolean;
+}
+
+export interface ApiResponse<T = unknown> {
+  data: T;
+  error?: ApiError;
+}
+
+export interface ApiError {
+  message: string;
+  status?: number;
+  code?: string;
+  details?: Array<{ field: string; message: string }>;
+}
+
+// ============================================================================
+// Auth Management
+// ============================================================================
+
+const AUTH_TOKEN_KEY = 'auth_token';
+
+/**
+ * Get the stored auth token
+ */
+export const getAuthToken = (): string | null => {
+  return localStorage.getItem(AUTH_TOKEN_KEY);
+};
+
+/**
+ * Set the auth token
+ */
+export const setAuthToken = (token: string): void => {
+  localStorage.setItem(AUTH_TOKEN_KEY, token);
+};
+
+/**
+ * Clear the auth token
+ */
+export const clearAuthToken = (): void => {
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+};
+
+/**
+ * Get auth headers for requests
+ */
+export const getAuthHeaders = (): HeadersInit => {
+  const token = getAuthToken();
+  return token ? { 'Authorization': `Bearer ${token}` } : {};
+};
+
+// ============================================================================
+// URL Building
+// ============================================================================
 
 /**
  * Build a full URL by prepending the configured base URL
@@ -25,31 +90,28 @@ export const buildUrl = (path: string): string => {
   return `${normalizedBase}${normalizedPath}`;
 };
 
+// ============================================================================
+// Error Handling
+// ============================================================================
+
 /**
- * Simple fetch wrapper with error handling
+ * Parse an error response from the API
  */
-export const apiFetch = async (url: string, options: RequestInit = {}): Promise<Response> => {
-  const headers = {
-    'Content-Type': 'application/json',
-    ...options.headers
-  };
-
-  const fullUrl = buildUrl(url);
-
-  const response = await fetch(fullUrl, {
-    ...options,
-    headers
-  });
-
-  // Handle rate limiting
-  if (response.status === 429) {
-    const errorData = await response.json();
-    const retryAfter = errorData.retryAfter || 60;
-    console.error(`Rate limited. Please wait ${retryAfter} seconds before retrying`);
-    throw new Error('RATE_LIMITED');
+export const parseApiError = async (response: Response): Promise<ApiError> => {
+  try {
+    const data = await response.json();
+    return {
+      message: data.error || data.message || 'An error occurred',
+      status: response.status,
+      code: data.code,
+      details: data.details,
+    };
+  } catch {
+    return {
+      message: response.statusText || 'An error occurred',
+      status: response.status,
+    };
   }
-
-  return response;
 };
 
 /**
@@ -57,6 +119,7 @@ export const apiFetch = async (url: string, options: RequestInit = {}): Promise<
  * Parses validation details if available
  */
 export const handleApiError = (error: unknown, defaultMessage: string = 'An error occurred'): string => {
+  // Handle Error instances
   if (error instanceof Error) {
     switch (error.message) {
       case 'RATE_LIMITED':
@@ -95,14 +158,76 @@ export const handleApiError = (error: unknown, defaultMessage: string = 'An erro
 };
 
 /**
+ * Create an error from a response
+ */
+export const createApiError = async (response: Response): Promise<Error> => {
+  const errorData = await parseApiError(response);
+
+  // Handle rate limiting
+  if (response.status === 429) {
+    return new Error('RATE_LIMITED');
+  }
+
+  return new Error(errorData.message);
+};
+
+// ============================================================================
+// Core Fetch Function
+// ============================================================================
+
+/**
+ * Core fetch wrapper with error handling and auth headers
+ */
+export const apiFetch = async (url: string, options: ApiRequestOptions = {}): Promise<Response> => {
+  const { skipAuth = false, headers = {}, ...restOptions } = options;
+
+  // Merge headers
+  const requestHeaders: HeadersInit = {
+    'Content-Type': 'application/json',
+    ...headers,
+  };
+
+  // Add auth headers if not skipped
+  if (!skipAuth) {
+    Object.assign(requestHeaders, getAuthHeaders());
+  }
+
+  const fullUrl = buildUrl(url);
+
+  const response = await fetch(fullUrl, {
+    ...restOptions,
+    headers: requestHeaders,
+  });
+
+  // Handle rate limiting
+  if (response.status === 429) {
+    const errorData = await response.json();
+    const retryAfter = errorData.retryAfter || 60;
+    console.error(`Rate limited. Please wait ${retryAfter} seconds before retrying`);
+    throw new Error('RATE_LIMITED');
+  }
+
+  return response;
+};
+
+// ============================================================================
+// HTTP Method Wrappers
+// ============================================================================
+
+/**
  * Generic API GET request
  */
-export const apiGet = async <T = unknown>(url: string): Promise<T> => {
-  const response = await apiFetch(url, { method: 'GET' });
+export const apiGet = async <T = unknown>(
+  url: string,
+  options: Omit<ApiRequestOptions, 'method' | 'body'> = {}
+): Promise<T> => {
+  const response = await apiFetch(url, {
+    ...options,
+    method: 'GET',
+  });
 
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'GET request failed');
+    throw await createApiError(response);
   }
 
   return response.json();
@@ -111,15 +236,61 @@ export const apiGet = async <T = unknown>(url: string): Promise<T> => {
 /**
  * Generic API POST request
  */
-export const apiPost = async <T = unknown>(url: string, data?: unknown): Promise<T> => {
+export const apiPost = async <T = unknown>(
+  url: string,
+  data?: unknown,
+  options: Omit<ApiRequestOptions, 'method' | 'body'> = {}
+): Promise<T> => {
   const response = await apiFetch(url, {
+    ...options,
     method: 'POST',
-    body: data ? JSON.stringify(data) : undefined
+    body: data ? JSON.stringify(data) : undefined,
   });
 
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'POST request failed');
+    throw await createApiError(response);
+  }
+
+  return response.json();
+};
+
+/**
+ * Generic API PUT request
+ */
+export const apiPut = async <T = unknown>(
+  url: string,
+  data?: unknown,
+  options: Omit<ApiRequestOptions, 'method' | 'body'> = {}
+): Promise<T> => {
+  const response = await apiFetch(url, {
+    ...options,
+    method: 'PUT',
+    body: data ? JSON.stringify(data) : undefined,
+  });
+
+  if (!response.ok) {
+    throw await createApiError(response);
+  }
+
+  return response.json();
+};
+
+/**
+ * Generic API PATCH request
+ */
+export const apiPatch = async <T = unknown>(
+  url: string,
+  data?: unknown,
+  options: Omit<ApiRequestOptions, 'method' | 'body'> = {}
+): Promise<T> => {
+  const response = await apiFetch(url, {
+    ...options,
+    method: 'PATCH',
+    body: data ? JSON.stringify(data) : undefined,
+  });
+
+  if (!response.ok) {
+    throw await createApiError(response);
   }
 
   return response.json();
@@ -128,16 +299,25 @@ export const apiPost = async <T = unknown>(url: string, data?: unknown): Promise
 /**
  * Generic API DELETE request
  */
-export const apiDelete = async <T = unknown>(url: string): Promise<T> => {
-  const response = await apiFetch(url, { method: 'DELETE' });
+export const apiDelete = async <T = unknown>(
+  url: string,
+  options: Omit<ApiRequestOptions, 'method' | 'body'> = {}
+): Promise<T> => {
+  const response = await apiFetch(url, {
+    ...options,
+    method: 'DELETE',
+  });
 
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'DELETE request failed');
+    throw await createApiError(response);
   }
 
   return response.json();
 };
+
+// ============================================================================
+// Utilities
+// ============================================================================
 
 /**
  * Show an error message
@@ -185,17 +365,40 @@ export const API_ENDPOINTS = {
   CLICK_RESET: '/api/clicks/reset',
 
   // Gender
-  GENDER: '/api/gender'
+  GENDER: '/api/gender',
 } as const;
 
+// ============================================================================
+// Default Export
+// ============================================================================
+
 export default {
+  // Auth
+  getAuthToken,
+  setAuthToken,
+  clearAuthToken,
+  getAuthHeaders,
+
+  // URL
   buildUrl,
-  apiFetch,
+
+  // Error handling
+  parseApiError,
   handleApiError,
+  createApiError,
+
+  // Core fetch
+  apiFetch,
+
+  // HTTP methods
   apiGet,
   apiPost,
+  apiPut,
+  apiPatch,
   apiDelete,
+
+  // Utilities
   showError,
   showSuccess,
-  API_ENDPOINTS
+  API_ENDPOINTS,
 };
