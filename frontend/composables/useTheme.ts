@@ -136,6 +136,34 @@ export const THEME_PRESETS: ThemePreset[] = [
     },
     description: 'Peaceful forest greens for a nature-inspired theme',
     icon: '🌲'
+  },
+  {
+    name: 'Sky Blue',
+    id: 'skyblue',
+    colors: {
+      primary: '#0ea5e9',
+      secondary: '#38bdf8',
+      accent: '#7dd3fc',
+      background: 'linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%)',
+      text: '#0c4a6e',
+      cardBackground: 'rgba(255, 255, 255, 0.95)'
+    },
+    description: 'Bright sky blues for a fresh, airy feel',
+    icon: '☁️'
+  },
+  {
+    name: 'OLED Black',
+    id: 'oled',
+    colors: {
+      primary: '#ff6b9d',
+      secondary: '#ff8a80',
+      accent: '#ffb6c1',
+      background: '#000000',
+      text: '#e5e5e5',
+      cardBackground: 'rgba(20, 20, 20, 0.95)'
+    },
+    description: 'True black background for OLED displays - saves battery and maximizes contrast',
+    icon: '⚫'
   }
 ]
 
