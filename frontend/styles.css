@@ -1461,6 +1461,44 @@ body.dark p {
   z-index: 1000;
 }
 
+/* Mega heart - enlarged heart with glow effect (Ticket #189) */
+.heart.mega-heart {
+  animation: floatUp 4s ease-in infinite;
+  text-shadow:
+    0 0 20px rgba(255, 107, 157, 0.8),
+    0 0 40px rgba(255, 107, 157, 0.6),
+    0 0 60px rgba(255, 107, 157, 0.4),
+    0 0 80px rgba(255, 182, 193, 0.3);
+  filter: drop-shadow(0 0 30px rgba(255, 107, 157, 0.5));
+  transition: font-size 0.5s ease, transform 0.5s ease;
+}
+
+/* Mega heart glow animation (Ticket #189) */
+.heart.mega-heart::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  height: 100%;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle, rgba(255, 182, 193, 0.4) 0%, transparent 70%);
+  border-radius: 50%;
+  animation: megaGlow 2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes megaGlow {
+  0%, 100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.5;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.3);
+    opacity: 0.8;
+  }
+}
+
 @keyframes floatUp {
   0% { opacity: 0; transform: translateY(100vh); }
   10% { opacity: 1; }

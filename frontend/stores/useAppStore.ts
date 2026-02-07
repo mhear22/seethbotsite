@@ -379,6 +379,39 @@ export const useAppStore = defineStore('app', () => {
     heart.style.fontSize = currentSize + 'px'
     ;(window as any).heartSize = currentSize + 1
 
+    // Mega heart logic (Ticket #189): 0.2% chance to enlarge to 750px at top
+    const isMegaHeart = Math.random() < 0.002
+    if (isMegaHeart) {
+      heart.classList.add('mega-heart')
+      // Track heart for mega transformation at top
+      let hasTransformed = false
+      const checkPosition = () => {
+        if (!heart.parentNode) {
+          // Heart removed, stop checking
+          return
+        }
+        const rect = heart.getBoundingClientRect()
+        const viewportHeight = window.innerHeight
+        // When heart reaches top 20% of viewport
+        if (rect.top < viewportHeight * 0.2 && !hasTransformed) {
+          hasTransformed = true
+          // Enlarge to 750px
+          heart.style.transition = 'font-size 0.5s ease, transform 0.5s ease'
+          heart.style.fontSize = '750px'
+          heart.style.zIndex = '9999'
+          // Remove position checker
+          return
+        }
+        // Check if heart reached bottom (after transformation)
+        if (rect.top > viewportHeight && hasTransformed) {
+          // Reset size (already handled by removal)
+          return
+        }
+        requestAnimationFrame(checkPosition)
+      }
+      requestAnimationFrame(checkPosition)
+    }
+
     document.body.appendChild(heart)
 
     // Remove heart only after animation completes, ensuring it stays within viewport
