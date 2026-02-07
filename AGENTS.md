@@ -673,6 +673,7 @@ The Dockerfile uses a multi-stage build process:
 - **Memory leaks** - Clean up event listeners and DOM elements
 - **Large assets** - Compress media files before deployment
 - **Type safety** - Use TypeScript interfaces for API responses
+- **Root-level scripts** - NEVER create one-off scripts in project root. Use `node cli.js` instead (see Sub-Agent section above)
 
 ### 💡 Pro Tips
 1. Use `git rm -r --cached` to untrack files without deleting them
@@ -699,5 +700,108 @@ The Dockerfile uses a multi-stage build process:
 
 ---
 
-*Last Updated: 2026-02-01*
-*Version: 3.0 (Vite + TypeScript + Pinia)*
+## Sub-Agent Development Workflow
+
+### CLI Tool Usage
+
+The project uses a unified CLI tool (`cli.js`) for common ticket operations. Sub-agents should use this instead of creating new scripts.
+
+**Location:** `/home/seethbotsite/cli.js`
+
+### Available CLI Commands
+
+```bash
+# List tickets with filters
+node cli.js ticket list
+node cli.js ticket list --status pending,needs-info
+node cli.js ticket list --limit 10
+
+# Show ticket details
+node cli.js ticket show --id 128
+
+# Complete a ticket with response
+node cli.js ticket complete --id 128 --response "Implemented feature X"
+
+# Decline a ticket with reason
+node cli.js ticket decline --id 128 --response "Duplicate of #123"
+
+# Show system status
+node cli.js status
+```
+
+### CLI Features
+- **Colored output:** Easy-to-read terminal messages with status indicators
+- **Flexible filtering:** Filter by status, limit results
+- **API integration:** Communicates with backend ticket system
+- **Database access:** Direct ticket queries for performance
+- **Help documentation:** `node cli.js help` for all commands
+
+### When Sub-Agents Should Use CLI
+
+**DO use CLI for:**
+- Checking ticket status before starting work
+- Listing tickets in a specific category
+- Marking tickets as completed
+- Declining tickets with reasons
+- Quick system health checks
+
+**DO NOT:**
+- Create new one-off scripts in the project root
+- Duplicate existing CLI functionality
+- Hardcode database queries in scripts
+- Create scripts that only work for specific ticket IDs
+
+### Example Sub-Agent Workflow
+
+```bash
+# 1. Check current ticket status
+cd /home/seethbotsite
+node cli.js ticket list --status pending --limit 5
+
+# 2. Show ticket details for work
+node cli.js ticket show --id 128
+
+# 3. Work on the ticket (make code changes, test, commit)
+git checkout -b ticket-128-feature-name
+# ... make changes ...
+git add .
+git commit -m "Fixes #128: Brief description"
+git push origin ticket-128-feature-name
+
+# 4. Mark ticket as completed with response
+node cli.js ticket complete --id 128 --response "Implemented feature, tested, deployed"
+
+# 5. Update ticket status via API (if needed)
+curl -s -X PATCH "http://localhost:8081/api/tickets/128" \
+  -H "Content-Type: application/json" \
+  -d '{"status":"completed"}'
+```
+
+### CLI Architecture
+
+The CLI tool provides two main exports for programmatic use:
+
+```javascript
+const { apiRequest, getTicketsFromDB } = require('./cli.js')
+
+// Make API request
+const result = await apiRequest('PATCH', '/api/tickets/128', {
+  status: 'completed',
+  response: 'Done'
+})
+
+// Query database directly
+const tickets = getTicketsFromDB({ status: ['pending', 'needs-info'] })
+```
+
+### Important Notes
+
+- **Do not create new root-level scripts** - The CLI replaces all 145+ utility scripts
+- **Use the CLI for all ticket operations** - Keeps the codebase clean and consistent
+- **Document new CLI commands** - If you add features to cli.js, update this section
+- **Test CLI changes** - Ensure new commands work before using them in sub-agent workflows
+
+---
+
+*Last Updated: 2026-02-07*
+*Version: 3.1 (Vite + TypeScript + Pinia + CLI)*

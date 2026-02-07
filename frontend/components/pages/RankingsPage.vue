@@ -25,7 +25,7 @@ const isRankingFavorite = (rank: RankingItem) => {
 <template>
   <div class="page rankings-page">
     <div class="rankings-container">
-      <h2 class="rankings-title">👻 Coolness Rankings</h2>
+      <h1 class="rankings-title">👻 Coolness Rankings</h1>
       <div class="rankings-list">
         <div v-for="(rank, index) in appStore.rankings" :key="index" class="rank-item">
           <div class="rank-number">{{ index + 1 }}</div>

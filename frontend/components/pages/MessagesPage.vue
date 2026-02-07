@@ -75,7 +75,7 @@ const showLoginPrompt = computed(() => !isAuthenticated.value)
 <template>
   <div class="messages-page">
     <div v-if="showLoginPrompt" class="login-prompt">
-      <h2>Messages</h2>
+      <h1>Messages</h1>
       <p>Please log in to send and receive messages.</p>
       <router-link to="/auth" class="login-button">Log In</router-link>
     </div>
@@ -122,7 +122,7 @@ const showLoginPrompt = computed(() => !isAuthenticated.value)
   text-align: center;
 }
 
-.login-prompt h2 {
+.login-prompt h1 {
   font-size: 2rem;
   margin-bottom: 1rem;
 }
