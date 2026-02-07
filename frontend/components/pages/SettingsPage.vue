@@ -1,46 +1,31 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, watch } from 'vue'
 import { useAppStore } from '../../stores/useAppStore'
 
 const appStore = useAppStore()
 
-// Settings state
-const maxHearts = ref(20)
-const heartSpawnRate = ref(125)
-const moldGrowthRate = ref(1)
-const maxMoldCircles = ref(27)
-const moldSpawnRate = ref(15)
-const showHearts = ref(true)
-const showMold = ref(true)
+// Mold settings (local, not yet in store)
+const moldGrowthRate = ref(parseFloat(localStorage.getItem('moldGrowthRate') || '1'))
+const maxMoldCircles = ref(parseInt(localStorage.getItem('maxMoldCircles') || '27'))
+const moldSpawnRate = ref(parseInt(localStorage.getItem('moldSpawnRate') || '15'))
+const showMold = ref(localStorage.getItem('showMold') !== 'false')
 const settingsSaved = ref(false)
 
-// Load settings from localStorage
-const loadSettings = () => {
-  const savedMaxHearts = localStorage.getItem('maxHearts')
-  const savedHeartSpawnRate = localStorage.getItem('heartSpawnRate')
-  const savedMoldGrowthRate = localStorage.getItem('moldGrowthRate')
-  const savedMaxMoldCircles = localStorage.getItem('maxMoldCircles')
-  const savedMoldSpawnRate = localStorage.getItem('moldSpawnRate')
-  const savedShowHearts = localStorage.getItem('showHearts')
-  const savedShowMold = localStorage.getItem('showMold')
+// Persist heart settings to localStorage when store values change
+watch([() => appStore.showHearts, () => appStore.maxHearts, () => appStore.heartSpawnRate], () => {
+  localStorage.setItem('showHearts', appStore.showHearts.toString())
+  localStorage.setItem('maxHearts', appStore.maxHearts.toString())
+  localStorage.setItem('heartSpawnRate', appStore.heartSpawnRate.toString())
+})
 
-  if (savedMaxHearts) maxHearts.value = parseInt(savedMaxHearts)
-  if (savedHeartSpawnRate) heartSpawnRate.value = parseInt(savedHeartSpawnRate)
-  if (savedMoldGrowthRate) moldGrowthRate.value = parseFloat(savedMoldGrowthRate)
-  if (savedMaxMoldCircles) maxMoldCircles.value = parseInt(savedMaxMoldCircles)
-  if (savedMoldSpawnRate) moldSpawnRate.value = parseInt(savedMoldSpawnRate)
-  if (savedShowHearts) showHearts.value = savedShowHearts === 'true'
-  if (savedShowMold) showMold.value = savedShowMold === 'true'
-}
-
-// Save settings to localStorage
+// Save all settings to localStorage
 const saveSettings = () => {
-  localStorage.setItem('maxHearts', maxHearts.value.toString())
-  localStorage.setItem('heartSpawnRate', heartSpawnRate.value.toString())
+  localStorage.setItem('maxHearts', appStore.maxHearts.toString())
+  localStorage.setItem('heartSpawnRate', appStore.heartSpawnRate.toString())
+  localStorage.setItem('showHearts', appStore.showHearts.toString())
   localStorage.setItem('moldGrowthRate', moldGrowthRate.value.toString())
   localStorage.setItem('maxMoldCircles', maxMoldCircles.value.toString())
   localStorage.setItem('moldSpawnRate', moldSpawnRate.value.toString())
-  localStorage.setItem('showHearts', showHearts.value.toString())
   localStorage.setItem('showMold', showMold.value.toString())
 
   // Show saved confirmation
@@ -50,30 +35,17 @@ const saveSettings = () => {
   }, 2000)
 }
 
-// Apply settings immediately when changed
-watch([maxHearts, heartSpawnRate, showHearts], () => {
-  // Update window.MAX_HEARTS for heart creation
-  ;(window as any).MAX_HEARTS = maxHearts.value
-})
-
 // Reset to defaults
 const resetToDefaults = () => {
-  maxHearts.value = 20
-  heartSpawnRate.value = 125
+  appStore.maxHearts = 20
+  appStore.heartSpawnRate = 125
+  appStore.showHearts = true
   moldGrowthRate.value = 1
   maxMoldCircles.value = 27
   moldSpawnRate.value = 15
-  showHearts.value = true
   showMold.value = true
   saveSettings()
 }
-
-// Load settings on mount
-onMounted(() => {
-  loadSettings()
-  // Apply initial settings
-  ;(window as any).MAX_HEARTS = maxHearts.value
-})
 </script>
 
 <template>
@@ -90,47 +62,47 @@ onMounted(() => {
             <span class="label-desc">Enable falling hearts on the site</span>
           </label>
           <button
-            @click="showHearts = !showHearts"
+            @click="appStore.showHearts = !appStore.showHearts"
             class="toggle-btn"
-            :class="{ active: showHearts }"
+            :class="{ active: appStore.showHearts }"
           >
-            {{ showHearts ? '🟢 On' : '🔴 Off' }}
+            {{ appStore.showHearts ? '🟢 On' : '🔴 Off' }}
           </button>
         </div>
 
         <div class="setting-item">
           <label class="setting-label">
             <span class="label-text">Max Hearts</span>
-            <span class="label-desc">Maximum number of hearts on screen ({{ maxHearts }})</span>
+            <span class="label-desc">Maximum number of hearts on screen ({{ appStore.maxHearts }})</span>
           </label>
           <div class="range-container">
             <input
               type="range"
-              v-model.number="maxHearts"
+              v-model.number="appStore.maxHearts"
               min="5"
               max="100"
               step="1"
               class="range-input"
             />
-            <span class="range-value">{{ maxHearts }}</span>
+            <span class="range-value">{{ appStore.maxHearts }}</span>
           </div>
         </div>
 
         <div class="setting-item">
           <label class="setting-label">
             <span class="label-text">Spawn Rate</span>
-            <span class="label-desc">How fast hearts spawn ({{ heartSpawnRate }}ms)</span>
+            <span class="label-desc">How fast hearts spawn ({{ appStore.heartSpawnRate }}ms)</span>
           </label>
           <div class="range-container">
             <input
               type="range"
-              v-model.number="heartSpawnRate"
+              v-model.number="appStore.heartSpawnRate"
               min="50"
               max="1000"
               step="25"
               class="range-input"
             />
-            <span class="range-value">{{ heartSpawnRate }}ms</span>
+            <span class="range-value">{{ appStore.heartSpawnRate }}ms</span>
           </div>
         </div>
       </div>

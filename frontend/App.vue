@@ -19,7 +19,11 @@ watch(() => route.path, (newPath) => {
 // Lifecycle
 onMounted(() => {
   document.body.classList.toggle('dark', appStore.darkMode)
-  setInterval(appStore.createHeart, 125)
+  const spawnHeart = () => {
+    appStore.createHeart()
+    setTimeout(spawnHeart, appStore.heartSpawnRate)
+  }
+  spawnHeart()
 
   // Initialize mold visual effects (Ticket #32) - only if mold mode is enabled (Ticket #112)
   if (appStore.moldMode) {

@@ -25,6 +25,9 @@ export const useAppStore = defineStore('app', () => {
   const darkerMode = ref(savedDarkerMode === 'true')
   const chaosMode = ref(savedChaosMode === 'true')
   const moldMode = ref(savedMoldMode !== 'false') // Default to true
+  const showHearts = ref(localStorage.getItem('showHearts') !== 'false')
+  const maxHearts = ref(parseInt(localStorage.getItem('maxHearts') || '20'))
+  const heartSpawnRate = ref(parseInt(localStorage.getItem('heartSpawnRate') || '125'))
   const musicPlaying = ref(false)
   const isMuted = ref(false) // Mute state (Ticket #172)
   const currentQuoteIndex = ref(0)
@@ -344,8 +347,10 @@ export const useAppStore = defineStore('app', () => {
   }
 
   const createHeart = () => {
-    // Limit to max 20 hearts on screen at once (Mika's request)
-    const MAX_HEARTS = 20
+    if (!showHearts.value) return
+
+    // Limit hearts on screen (configurable via settings page)
+    const MAX_HEARTS = maxHearts.value
     const currentHearts = document.querySelectorAll('.heart')
     if (currentHearts.length >= MAX_HEARTS) {
       return
@@ -574,6 +579,9 @@ export const useAppStore = defineStore('app', () => {
     darkerMode,
     chaosMode,
     moldMode,
+    showHearts,
+    maxHearts,
+    heartSpawnRate,
     musicPlaying,
     isMuted,
     currentQuoteIndex,
