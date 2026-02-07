@@ -16,6 +16,12 @@ export const useAppStore = defineStore('app', () => {
   const language = useLanguage()
   const auth = useAuth()
 
+  // Detect if on mobile device
+  const isMobileDevice = () => {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+           window.innerWidth <= 768
+  }
+
   // Load dark mode preference from localStorage
   const savedDarkMode = localStorage.getItem('darkMode')
   const savedDarkerMode = localStorage.getItem('darkerMode')
@@ -24,10 +30,18 @@ export const useAppStore = defineStore('app', () => {
   const darkMode = ref(savedDarkMode === 'true')
   const darkerMode = ref(savedDarkerMode === 'true')
   const chaosMode = ref(savedChaosMode === 'true')
-  const moldMode = ref(savedMoldMode !== 'false') // Default to true
+
+  // Mobile-friendly defaults: disable mold mode on mobile by default
+  const moldMode = ref(savedMoldMode !== null
+    ? savedMoldMode === 'true'
+    : !isMobileDevice() // Default to false on mobile, true on desktop
+  )
+
   const showHearts = ref(localStorage.getItem('showHearts') !== 'false')
-  const maxHearts = ref(parseInt(localStorage.getItem('maxHearts') || '20'))
-  const heartSpawnRate = ref(parseInt(localStorage.getItem('heartSpawnRate') || '125'))
+
+  // Mobile-friendly heart settings: fewer hearts, slower spawn rate
+  const maxHearts = ref(parseInt(localStorage.getItem('maxHearts') || (isMobileDevice() ? '5' : '20')))
+  const heartSpawnRate = ref(parseInt(localStorage.getItem('heartSpawnRate') || (isMobileDevice() ? '1000' : '125')))
   const musicPlaying = ref(false)
   const isMuted = ref(false) // Mute state (Ticket #172)
   const currentQuoteIndex = ref(0)

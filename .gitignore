@@ -10,6 +10,8 @@ webdist/
 .env.local
 .env.*.local
 
+backend/build-info.json
+
 # Logs
 *.log
 npm-debug.log*

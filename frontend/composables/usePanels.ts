@@ -11,6 +11,13 @@ export interface PanelState {
   activeUsers: boolean
 }
 
+// Detect if on mobile device
+const isMobileDevice = () => {
+  if (typeof window === 'undefined') return false
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+         window.innerWidth <= 768
+}
+
 const DEFAULT_PANELS: PanelState = {
   rankings: true,  // Only rankings open by default to avoid overlap on mobile
   cat: false,      // Cat panel closed by default
@@ -20,6 +27,18 @@ const DEFAULT_PANELS: PanelState = {
   coolnessPanel: true,
   mining: false,
   activeUsers: true // Active Users panel open by default
+}
+
+// Mobile-friendly defaults: hide feed, mold meter, and active users on mobile
+const MOBILE_DEFAULT_PANELS: PanelState = {
+  rankings: false,
+  cat: false,
+  feed: false,
+  digitalGoose: false,
+  tachometer: false,
+  coolnessPanel: false,
+  mining: false,
+  activeUsers: false
 }
 
 // Mobile-exclusive panels that should not overlap
@@ -32,13 +51,15 @@ const loadPanelsFromStorage = (): PanelState => {
   try {
     const saved = localStorage.getItem('panels')
     if (saved) {
+      // User has saved preferences, use those
       return { ...DEFAULT_PANELS, ...JSON.parse(saved) }
     }
   } catch (error) {
     console.error('Failed to load panels from localStorage:', error)
   }
 
-  return DEFAULT_PANELS
+  // No saved preferences, use mobile or desktop defaults
+  return isMobileDevice() ? MOBILE_DEFAULT_PANELS : DEFAULT_PANELS
 }
 
 // Save panel state to localStorage

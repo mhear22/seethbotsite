@@ -996,7 +996,7 @@ if (typeof window !== 'undefined') {
   width: 100%;
   height: calc(100vh - 56px);
   background: rgba(0, 0, 0, 0.5);
-  z-index: 1999;
+  z-index: 0;
   animation: fadeIn 0.2s ease;
 }
 
