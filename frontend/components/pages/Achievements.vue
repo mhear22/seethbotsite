@@ -80,7 +80,7 @@ onMounted(() => {
 <template>
   <div class="achievements">
     <div class="achievements-header">
-      <h2>🏆 Achievements</h2>
+      <h1>🏆 Achievements</h1>
       <p v-if="progress" class="progress-summary">
         {{ progress.unlocked }} / {{ progress.total }} unlocked
         <span class="progress-percent">({{ progress.percentage }}%)</span>
@@ -176,12 +176,13 @@ onMounted(() => {
   margin-bottom: 20px;
 }
 
-.achievements-header h2 {
+.achievements-header h1 {
   margin: 0 0 8px 0;
   background: linear-gradient(135deg, #ffd700, #ffb347, #ff6b6b);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  font-size: 2.5rem;
 }
 
 .progress-summary {

@@ -105,7 +105,7 @@ onMounted(() => {
 <template>
   <div class="daily-challenges">
     <div class="challenges-header">
-      <h2>🎯 Daily Challenges</h2>
+      <h1>🎯 Daily Challenges</h1>
       <p v-if="todayDate">Today: {{ todayDate }}</p>
     </div>
 
@@ -188,12 +188,13 @@ onMounted(() => {
   margin-bottom: 20px;
 }
 
-.challenges-header h2 {
+.challenges-header h1 {
   margin: 0 0 8px 0;
   background: linear-gradient(135deg, #ff6b9d, #ff8a80, #ffb6c1);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  font-size: 2.5rem;
 }
 
 .challenges-header p {

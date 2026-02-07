@@ -114,9 +114,9 @@ onUnmounted(() => {
 
     <Router />
 
-    <div class="content-wrapper" id="main-content">
+    <main class="content-wrapper" id="main-content">
       <router-view />
-    </div>
+    </main>
 
     <!-- Digital Goose (Independent - not in modal container per ticket requirements) -->
     <DigitalGoose v-if="appStore.panels.digitalGoose" />

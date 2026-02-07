@@ -194,7 +194,7 @@ onMounted(() => {
     <div class="market-container">
       <!-- Left Panel: Stock List -->
       <div class="stock-list">
-        <h2>📈 Coolness Stocks</h2>
+        <h1>📈 Coolness Stocks</h1>
         <div class="header-info">
           <span class="user-id">ID: {{ userId.slice(0, 12) }}...</span>
           <span class="cash-balance">{{ formatCurrency(portfolioValue) }}</span>
@@ -363,7 +363,7 @@ body.dark .stock-list {
   background: rgba(40, 44, 52, 0.95);
 }
 
-.stock-list h2 {
+.stock-list h1 {
   color: #ff6b9d;
   margin-bottom: 15px;
   font-size: 24px;

@@ -49,6 +49,9 @@ onUnmounted(() => {
 <template>
   <div class="car-page">
     <div class="car-display">
+      <!-- Page Title (hidden visually but available for screen readers) -->
+      <h1 class="sr-only">🚗 Car Display</h1>
+
       <!-- Header with time and date -->
       <div class="car-header">
         <div class="time-display">
@@ -114,6 +117,19 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+/* Screen reader only class for accessibility */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
 .car-page {
   min-height: 100vh;
   padding: 20px;
