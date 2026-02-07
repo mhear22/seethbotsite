@@ -158,78 +158,90 @@ onMounted(() => {
     <div v-if="showAddForm" class="add-form">
       <h3>🎬 Add New Movie Suggestion</h3>
       <div class="form-group">
-        <label>Movie Title *</label>
+        <label for="movie-title">Movie Title *</label>
         <input
+          id="movie-title"
           v-model="newMovie.title"
           type="text"
           placeholder="Enter movie title..."
           required
           :class="{ 'has-error': validationErrors.title }"
+          :aria-describedby="validationErrors.title ? 'movie-title-error' : undefined"
         />
-        <div v-if="validationErrors.title" class="field-error">
+        <div v-if="validationErrors.title" id="movie-title-error" class="field-error" role="alert">
           {{ validationErrors.title }}
         </div>
       </div>
       <div class="form-group">
-        <label>Your Name *</label>
+        <label for="movie-suggestedBy">Your Name *</label>
         <input
+          id="movie-suggestedBy"
           v-model="newMovie.suggestedBy"
           type="text"
           placeholder="Your name..."
           required
           :class="{ 'has-error': validationErrors.suggestedBy }"
+          :aria-describedby="validationErrors.suggestedBy ? 'movie-suggestedBy-error' : undefined"
         />
-        <div v-if="validationErrors.suggestedBy" class="field-error">
+        <div v-if="validationErrors.suggestedBy" id="movie-suggestedBy-error" class="field-error" role="alert">
           {{ validationErrors.suggestedBy }}
         </div>
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label>Year</label>
+          <label for="movie-year">Year</label>
           <input
+            id="movie-year"
             v-model="newMovie.year"
             type="text"
             placeholder="2024"
             :class="{ 'has-error': validationErrors.year }"
+            :aria-describedby="validationErrors.year ? 'movie-year-error' : undefined"
           />
-          <div v-if="validationErrors.year" class="field-error">
+          <div v-if="validationErrors.year" id="movie-year-error" class="field-error" role="alert">
             {{ validationErrors.year }}
           </div>
         </div>
         <div class="form-group">
-          <label>Genre</label>
+          <label for="movie-genre">Genre</label>
           <input
+            id="movie-genre"
             v-model="newMovie.genre"
             type="text"
             placeholder="Action, Comedy..."
             :class="{ 'has-error': validationErrors.genre }"
+            :aria-describedby="validationErrors.genre ? 'movie-genre-error' : undefined"
           />
-          <div v-if="validationErrors.genre" class="field-error">
+          <div v-if="validationErrors.genre" id="movie-genre-error" class="field-error" role="alert">
             {{ validationErrors.genre }}
           </div>
         </div>
       </div>
       <div class="form-group">
-        <label>Notes</label>
+        <label for="movie-notes">Notes</label>
         <textarea
+          id="movie-notes"
           v-model="newMovie.notes"
           placeholder="Why this movie? Any details..."
           rows="3"
           :class="{ 'has-error': validationErrors.notes }"
+          :aria-describedby="validationErrors.notes ? 'movie-notes-error' : undefined"
         ></textarea>
-        <div v-if="validationErrors.notes" class="field-error">
+        <div v-if="validationErrors.notes" id="movie-notes-error" class="field-error" role="alert">
           {{ validationErrors.notes }}
         </div>
       </div>
       <div class="form-group">
-        <label>Thumbnail URL</label>
+        <label for="movie-thumbnail">Thumbnail URL</label>
         <input
+          id="movie-thumbnail"
           v-model="newMovie.thumbnail"
           type="text"
           placeholder="https://example.com/poster.jpg"
           :class="{ 'has-error': validationErrors.thumbnail }"
+          :aria-describedby="validationErrors.thumbnail ? 'movie-thumbnail-error' : undefined"
         />
-        <div v-if="validationErrors.thumbnail" class="field-error">
+        <div v-if="validationErrors.thumbnail" id="movie-thumbnail-error" class="field-error" role="alert">
           {{ validationErrors.thumbnail }}
         </div>
       </div>

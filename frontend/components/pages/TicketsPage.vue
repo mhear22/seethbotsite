@@ -912,17 +912,17 @@ onUnmounted(() => {
       </div>
 
       <!-- Notification Toast -->
-      <div v-if="notification.show" class="notification" :class="`notification-${notification.type}`">
-        <span class="notification-icon">{{ notification.type === 'success' ? '✅' : '❌' }}</span>
+      <div v-if="notification.show" class="notification" :class="`notification-${notification.type}`" role="status" aria-live="polite">
+        <span class="notification-icon" aria-hidden="true">{{ notification.type === 'success' ? '✅' : '❌' }}</span>
         <span class="notification-message">{{ notification.message }}</span>
-        <button @click="hideNotification" class="notification-close">&times;</button>
+        <button @click="hideNotification" class="notification-close" aria-label="Close notification">&times;</button>
       </div>
 
       <!-- Error Message Display -->
-      <div v-if="error" class="error-message">
-        <span class="error-icon">❌</span>
+      <div v-if="error" class="error-message" role="alert" aria-live="assertive">
+        <span class="error-icon" aria-hidden="true">❌</span>
         <span class="error-text">{{ error }}</span>
-        <button @click="error = null" class="error-close">&times;</button>
+        <button @click="error = null" class="error-close" aria-label="Close error">&times;</button>
       </div>
 
       <button
@@ -1022,11 +1022,11 @@ onUnmounted(() => {
 
       <!-- Filtered Tickets List -->
       <div  class="tickets-list">
-        <div v-if="loading" class="loading-state">
-          <div class="loading-spinner"></div>
+        <div v-if="loading" class="loading-state" aria-live="polite" aria-busy="true">
+          <div class="loading-spinner" aria-hidden="true"></div>
           <span>Loading tickets...</span>
         </div>
-        <div v-else-if="filteredTickets.length === 0" class="empty-state">
+        <div v-else-if="filteredTickets.length === 0" class="empty-state" role="status">
           No tickets match your filters.
         </div>
         <div

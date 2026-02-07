@@ -487,8 +487,8 @@ const fetchHolidays = async () => {
         <p>Loading holidays...</p>
       </div>
 
-      <div v-else-if="holidaysError" class="holidays-error">
-        <span class="error-icon">⚠️</span>
+      <div v-else-if="holidaysError" class="holidays-error" role="alert" aria-live="assertive">
+        <span class="error-icon" aria-hidden="true">⚠️</span>
         <p>{{ holidaysError }}</p>
       </div>
 
@@ -522,8 +522,8 @@ const fetchHolidays = async () => {
         <p>Finding a bird song...</p>
       </div>
 
-      <div v-else-if="birdSoundError" class="bird-sounds-error">
-        <span class="error-icon">🪹</span>
+      <div v-else-if="birdSoundError" class="bird-sounds-error" role="alert" aria-live="assertive">
+        <span class="error-icon" aria-hidden="true">🪹</span>
         <p>{{ birdSoundError }}</p>
         <button class="retry-button" @click="fetchBirdSound">🔄 Try Again</button>
       </div>

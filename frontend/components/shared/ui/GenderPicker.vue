@@ -194,8 +194,8 @@ const detectGender = async () => {
         <p v-if="result.confidence">Confidence: {{ result.confidence }}</p>
       </div>
 
-      <div v-if="error" class="gender-error">
-        <div class="emoji">❌</div>
+      <div v-if="error" class="gender-error" role="alert" aria-live="assertive">
+        <div class="emoji" aria-hidden="true">❌</div>
         <p>{{ error }}</p>
       </div>
 

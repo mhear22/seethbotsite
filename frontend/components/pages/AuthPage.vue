@@ -187,10 +187,10 @@ const handleDeleteAccount = async () => {
       </div>
 
       <!-- Messages -->
-      <div v-if="successMessage" class="auth-message auth-message-success">
+      <div v-if="successMessage" class="auth-message auth-message-success" role="status" aria-live="polite">
         ✅ {{ successMessage }}
       </div>
-      <div v-if="errorMessage" class="auth-message auth-message-error">
+      <div v-if="errorMessage" class="auth-message auth-message-error" role="alert" aria-live="assertive">
         ❌ {{ errorMessage }}
       </div>
 

@@ -95,7 +95,7 @@ const handleClearAll = () => {
             >
               <img
                 :src="fav.data.url"
-                alt="Favorite cat"
+                :alt="`Favorite cat photo, added on ${formatDate(fav.createdAt)}`"
                 class="cat-image"
                 @click="navigateToCat"
               />
