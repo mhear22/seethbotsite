@@ -101,7 +101,8 @@ const featureCategories = [
       { name: 'Countdowns', icon: '⏰', path: '/countdowns' },
       { name: 'About', icon: 'ℹ️', path: '/about' },
       { name: 'Archive', icon: '📜', path: '/archive' },
-      { name: 'API Docs', icon: '📚', path: '/api-docs' }
+      { name: 'API Docs', icon: '📚', path: '/api-docs' },
+      { name: 'Solar Calculator', icon: '☀️', path: '/solar' }
     ]
   }
 ]
