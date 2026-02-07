@@ -54,6 +54,33 @@ app.use('/api/', rateLimiter(100, 60 * 1000)); // 100 requests per minute
 // Log authentication attempts
 app.use('/api/', logAuthAttempt);
 
+// Cache control middleware for static files
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const urlPath = req.path;
+
+  // Skip cache headers for API routes
+  if (urlPath.startsWith('/api')) {
+    return next();
+  }
+
+  // Never cache index.html - always revalidate to get latest asset references
+  if (urlPath === '/' || urlPath === '/index.html' || urlPath.endsWith('.html')) {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  }
+  // Long-term cache for hashed assets (Vite generates files like index-DL4ebBic.js)
+  else if (/\.(js|css)$/.test(urlPath) && /-[a-zA-Z0-9]{8,}\.(js|css)$/.test(urlPath)) {
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+  }
+  // Moderate cache for other static assets (images, fonts, manifest, etc.)
+  else if (/\.(jpg|jpeg|png|gif|ico|svg|woff|woff2|ttf|eot|webp|json)$/.test(urlPath)) {
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+  }
+
+  next();
+});
+
 // Serve static files from the Vue.js app
 app.use(express.static(SERVE_ROOT));
 
@@ -98,6 +125,10 @@ app.get('/api-docs', swaggerUi.setup(swaggerSpec, {
 
 // Vue.js SPA fallback - all other routes serve index.html
 app.get('*', (req: Request, res: Response) => {
+  // Ensure index.html is never cached
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   res.sendFile(path.join(SERVE_ROOT, 'index.html'));
 });
 
