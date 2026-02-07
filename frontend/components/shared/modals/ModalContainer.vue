@@ -311,4 +311,11 @@ const anyOpen = computed(() => openModals.value.length > 0)
 .modal-list::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 107, 157, 0.7);
 }
+
+/* Mobile: Hide modal docks completely */
+@media (max-width: 768px) {
+  .modal-dock {
+    display: none !important;
+  }
+}
 </style>
