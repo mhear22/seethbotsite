@@ -69,6 +69,9 @@ const closeForm = ref({
   response: ''
 })
 
+// Expanded descriptions state (Set of ticket IDs that are expanded)
+const expandedTicketIds = ref<Set<number>>(new Set())
+
 // Ticket completion confirmation state
 const confirmingTicket = ref<Ticket | null>(null)
 const showConfirmModal = ref(false)
@@ -215,6 +218,22 @@ const handleTicketFavorite = (ticket: Ticket, e: Event) => {
 
 const isTicketFavorite = (ticket: Ticket): boolean => {
   return isFavorite('ticket', ticket)
+}
+
+// Expand/collapse ticket description
+const toggleTicketDescription = (ticketId: number, e: Event) => {
+  e.stopPropagation()
+  if (expandedTicketIds.value.has(ticketId)) {
+    expandedTicketIds.value.delete(ticketId)
+  } else {
+    expandedTicketIds.value.add(ticketId)
+  }
+  // Force reactivity by creating a new Set
+  expandedTicketIds.value = new Set(expandedTicketIds.value)
+}
+
+const isTicketDescriptionExpanded = (ticketId: number): boolean => {
+  return expandedTicketIds.value.has(ticketId)
 }
 
 // Load tickets
@@ -1030,7 +1049,25 @@ onUnmounted(() => {
               </button>
             </div>
           </div>
-          <div class="ticket-description">{{ ticket.description }}</div>
+
+          <!-- Expandable Description -->
+          <button
+            @click="toggleTicketDescription(ticket.id, $event)"
+            class="ticket-expand-btn"
+            :class="{ expanded: isTicketDescriptionExpanded(ticket.id) }"
+          >
+            <span class="expand-icon">{{ isTicketDescriptionExpanded(ticket.id) ? '▼' : '▶' }}</span>
+            <span class="expand-text">
+              {{ isTicketDescriptionExpanded(ticket.id) ? 'Show Less' : 'More Details' }}
+            </span>
+          </button>
+
+          <div
+            v-if="isTicketDescriptionExpanded(ticket.id)"
+            class="ticket-description"
+          >
+            {{ ticket.description }}
+          </div>
 
           <!-- Tags and Category -->
           <div v-if="ticket.tags || ticket.category" class="ticket-tags-category">
@@ -2017,6 +2054,44 @@ onUnmounted(() => {
   margin-bottom: 12px;
 }
 
+.ticket-expand-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: #f7fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  color: #4a5568;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 8px;
+}
+
+.ticket-expand-btn:hover {
+  background: #edf2f7;
+  border-color: #cbd5e0;
+  transform: translateY(-1px);
+}
+
+.ticket-expand-btn .expand-icon {
+  font-size: 10px;
+  transition: transform 0.2s;
+}
+
+.ticket-expand-btn.expanded {
+  background: #ebf8ff;
+  border-color: #bee3f8;
+  color: #2b6cb0;
+}
+
+.ticket-expand-btn.expanded:hover {
+  background: #e6fffa;
+  border-color: #9ae6b4;
+}
+
 .ticket-meta {
   display: flex;
   justify-content: space-between;
@@ -2131,6 +2206,28 @@ onUnmounted(() => {
 .dark .ticket-title,
 .dark .response-label {
   color: #e2e8f0;
+}
+
+.dark .ticket-expand-btn {
+  background: #2d3748;
+  border-color: #4a5568;
+  color: #cbd5e0;
+}
+
+.dark .ticket-expand-btn:hover {
+  background: #4a5568;
+  border-color: #718096;
+}
+
+.dark .ticket-expand-btn.expanded {
+  background: #2a4365;
+  border-color: #4a6fa5;
+  color: #90cdf4;
+}
+
+.dark .ticket-expand-btn.expanded:hover {
+  background: #285e61;
+  border-color: #38b2ac;
 }
 
 .dark .ticket-description,

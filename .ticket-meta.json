@@ -1,19 +1,19 @@
 {
-  "id": 194,
-  "title": "Accessibility: Semantic HTML",
-  "description": "Part of larger accessibility ticket #148. Ensure proper semantic HTML structure throughout the application.\n\n**Requirements:**\n- Use proper heading hierarchy (h1, h2, h3 in order)\n- Use <nav> for navigation sections\n- Use <main> for primary content\n- Use <section> for logical sections\n- Use <article> for self-contained content\n- Use <aside> for sidebar content\n- Use <footer> for footer content\n- Use <button> for buttons, not <div> with click handler\n- Use <a> for links, not <div> with navigation\n\n**Implementation Steps:**\n1. Audit all pages for heading hierarchy issues\n2. Replace <div> buttons with <button> elements\n3. Replace <div> links with <a> elements\n4. Add semantic sectioning elements where missing\n5. Ensure navigation uses <nav>\n6. Ensure main content uses <main>\n7. Test with screen reader\n\n**Files:**\n- All page-level Vue components\n- Navigation components\n- Components with click handlers\n\n**Estimated Effort:** 2-3 hours\n**Priority:** Medium\n**Dependencies:** None\n\n**Note**: This is sub-task 3 of ticket #148 (Accessibility - 12-16 hours total)",
+  "id": 198,
+  "title": "Ticket naming",
+  "description": "Tickets should only show the title, with a \"more details\" button to show the full description.\n\n**Requirements:**\n- Display only ticket title in list view\n- Add \"More Details\" button to expand full description\n- Toggle show/hide functionality for description\n- Keep title visible at all times\n\n**Implementation Steps:**\n1. Modify TicketList.vue component\n2. Add collapsible description section\n3. Add \"More Details\" / \"Show Less\" button\n4. Test expand/collapse functionality\n\n**Files:**\n- /home/seethbotsite/frontend/src/components/tickets/TicketList.vue\n\n**Estimated Effort:** 1-2 hours\n**Priority:** Medium\n**Dependencies:** None",
   "status": "pending",
   "response": null,
-  "created_at": "2026-02-07 07:00:18",
-  "updated_at": "2026-02-07 07:00:18",
-  "creator_id": null,
+  "created_at": "2026-02-07 08:01:34",
+  "updated_at": "2026-02-07 08:14:14",
+  "creator_id": "user_oz2y02j9jydvcnfl9t0xj9",
   "type": "feature",
-  "priority": "high",
+  "priority": "medium",
   "tags": null,
   "category": null,
   "dependencies": [],
   "is_deleted": 0,
   "blocked": false,
-  "relevanceScore": 96,
-  "daysSinceCreation": 2
+  "relevanceScore": 100,
+  "daysSinceCreation": 0
 }
