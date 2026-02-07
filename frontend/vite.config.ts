@@ -9,6 +9,15 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    emptyOutDir: true
+    emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vue-vendor': ['vue', 'vue-router', 'pinia'],
+          'three': ['three'],
+          'api': ['openapi-fetch']
+        }
+      }
+    }
   }
 })
