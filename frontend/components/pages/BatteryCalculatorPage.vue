@@ -70,7 +70,11 @@ const batteryLinePoints = computed(() => {
     .join(' ')
 })
 
-const usageY = computed(() => kwToY(hourlyData.value[0]?.usageKW ?? 0))
+const usageLinePoints = computed(() => {
+  return hourlyData.value
+    .map(p => `${hourToX(p.hour).toFixed(1)},${kwToY(p.usageKW).toFixed(1)}`)
+    .join(' ')
+})
 
 const hoverData = computed(() => {
   if (hoverHour.value === null) return null
@@ -149,6 +153,10 @@ const chartHourLabels = [0, 3, 6, 9, 12, 15, 18, 21, 24]
           <div class="setting-field">
             <label>Days of Autonomy</label>
             <input type="number" v-model.number="battery.settings.value.daysOfAutonomy" min="1" max="7" step="1" />
+          </div>
+          <div class="setting-field">
+            <label>Daylight Hours</label>
+            <input type="number" v-model.number="battery.settings.value.daylightHours" min="6" max="18" step="0.5" />
           </div>
         </div>
       </div>
@@ -236,7 +244,7 @@ const chartHourLabels = [0, 3, 6, 9, 12, 15, 18, 21, 24]
           <path :d="solarAreaPath" class="solar-area" />
 
           <!-- Usage line -->
-          <line :x1="CL" :y1="usageY" :x2="CR" :y2="usageY" class="usage-line" />
+          <polyline :points="usageLinePoints" class="usage-line" />
 
           <!-- Battery line -->
           <polyline :points="batteryLinePoints" class="battery-line" />
@@ -277,7 +285,7 @@ const chartHourLabels = [0, 3, 6, 9, 12, 15, 18, 21, 24]
               class="hover-line"
             />
             <circle :cx="hourToX(hoverHour)" :cy="kwToY(hoverData.solarKW)" r="4" class="dot-solar" />
-            <circle :cx="hourToX(hoverHour)" :cy="usageY" r="4" class="dot-usage" />
+            <circle :cx="hourToX(hoverHour)" :cy="kwToY(hoverData.usageKW)" r="4" class="dot-usage" />
             <circle :cx="hourToX(hoverHour)" :cy="kwhToY(hoverData.batteryKWh)" r="4" class="dot-battery" />
 
             <!-- Tooltip -->
@@ -893,9 +901,11 @@ const chartHourLabels = [0, 3, 6, 9, 12, 15, 18, 21, 24]
 }
 
 .usage-line {
+  fill: none;
   stroke: #ff91a4;
   stroke-width: 2;
   stroke-dasharray: 6 4;
+  stroke-linejoin: round;
 }
 
 .battery-line {

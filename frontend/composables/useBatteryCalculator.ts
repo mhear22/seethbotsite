@@ -19,6 +19,7 @@ export interface BatterySettings {
   peakSunHours: number
   dailyUsageKWh: number
   daysOfAutonomy: number
+  daylightHours: number
 }
 
 export interface BatteryResults {
@@ -96,11 +97,23 @@ export const BATTERY_PRESETS: BatteryPreset[] = [
   }
 ]
 
+// Average hourly power consumption in watts (from real usage data)
+// Index = hour of day (UTC), value = average watts during that hour
+// Data based on mikas apartment for 2 people
+const HOURLY_USAGE_PROFILE = [
+  395.7, 446.7, 469.7, 490.9, 470.1, 511.0, 482.9, 465.3,
+  502.8, 567.2, 563.6, 538.4, 512.6, 486.3, 440.1, 404.7,
+  391.3, 372.2, 358.5, 356.2, 355.5, 352.3, 352.6, 384.4
+]
+
+const PROFILE_TOTAL = HOURLY_USAGE_PROFILE.reduce((a, b) => a + b, 0)
+
 export function useBatteryCalculator() {
   const settings = ref<BatterySettings>({
     peakSunHours: 5,
     dailyUsageKWh: 30,
-    daysOfAutonomy: 1
+    daysOfAutonomy: 1,
+    daylightHours: 12
   })
 
   const selectedBatteries = ref<SelectedBattery[]>([])
@@ -197,30 +210,43 @@ export function useBatteryCalculator() {
     }
   }
 
+  // Half-cosine solar irradiance model (matches real-world measurements)
+  // Integral of peak * cos(π(t-12)/D) from sunrise to sunset = peak * 2D/π
+  // So peak = dailyGen * π / (2D) to preserve total energy
   function solarKWAtTime(t: number, estimatedKW: number): number {
+    const D = settings.value.daylightHours
+    const sunrise = 12 - D / 2
+    const sunset = 12 + D / 2
     const dailyGen = estimatedKW * settings.value.peakSunHours
-    if (dailyGen <= 0 || t <= 6 || t >= 18) return 0
-    const peak = dailyGen / 8
-    return Math.max(0, peak * (1 - ((t - 12) / 6) ** 2))
+    if (dailyGen <= 0 || t <= sunrise || t >= sunset) return 0
+    const peak = dailyGen * Math.PI / (2 * D)
+    return Math.max(0, peak * Math.cos(Math.PI * (t - 12) / D))
+  }
+
+  function usageKWAtHour(h: number): number {
+    const hour = Math.floor(h) % 24
+    // Scale the profile so the total matches dailyUsageKWh
+    // Profile is in watts, convert to kW and scale
+    return (HOURLY_USAGE_PROFILE[hour] / PROFILE_TOTAL) * settings.value.dailyUsageKWh
   }
 
   function generateHourlyData(estimatedKW: number): HourlyDataPoint[] {
-    const usageRate = settings.value.dailyUsageKWh / 24
     const eff = weightedEfficiency.value / 100
     const cap = totalCapacity.value
     const points: HourlyDataPoint[] = []
     let batt = cap
 
     for (let h = 0; h <= 24; h++) {
+      const usage = usageKWAtHour(h)
       points.push({
         hour: h,
         solarKW: solarKWAtTime(h, estimatedKW),
-        usageKW: usageRate,
+        usageKW: usage,
         batteryKWh: batt
       })
       if (h < 24) {
         const avgSolar = (solarKWAtTime(h, estimatedKW) + solarKWAtTime(h + 1, estimatedKW)) / 2
-        const net = avgSolar - usageRate
+        const net = avgSolar - usage
         if (net > 0) {
           batt = Math.min(cap, batt + net * eff)
         } else {
@@ -247,6 +273,7 @@ export function useBatteryCalculator() {
     clearAll,
     calculateResults,
     solarKWAtTime,
+    usageKWAtHour,
     generateHourlyData
   }
 }
