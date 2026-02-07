@@ -55,8 +55,7 @@ FROM node:20-alpine
 
 WORKDIR /app/backend
 
-# Install runtime dependencies for native modules
-RUN apk add --no-cache python3 make g++
+# No build tools needed at runtime - native modules are pre-built
 
 # Copy backend built files and dependencies
 COPY --from=backend-builder /app/backend/dist ./dist
