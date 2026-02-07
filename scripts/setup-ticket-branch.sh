@@ -70,7 +70,8 @@ else
     git worktree add "$WORKTREE_PATH" "origin/$BRANCH_NAME"
   else
     echo "✅ Creating new branch $BRANCH_NAME and worktree"
-    git worktree add -b "$BRANCH_NAME" "$WORKTREE_PATH" main
+    # Use git worktree add with -b to create both branch and worktree
+    git worktree add -b "$BRANCH_NAME" "$WORKTREE_PATH" HEAD
   fi
 fi
 

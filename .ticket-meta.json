@@ -1,19 +1,19 @@
 {
-  "id": 190,
-  "title": "Character Tinder Leaderboard shows incorrect numbers",
-  "description": "Fix Character Tinder leaderboard to show ELO, Wins, and Losses instead of just ELO.\n\n**Requirements:**\n- Display format: \"ELO:{elo} ({wins}W - {losses}L)\"\n- Example: \"ELO:1450 (25W - 12L)\"\n- Each character should show this formatted string\n\n**Implementation Steps:**\n1. Find Character Tinder component: Search for \"CharacterTinder.vue\" or \"leaderboard\" in `/home/seethbotsite/frontend/components/`\n2. Locate where ELO is currently displayed (search for \"elo_rating\" or similar)\n3. Update template to include wins/losses: `{{ character.wins || 0 }}W - {{ character.losses || 0 }}L`\n4. Add optional CSS styling (green for wins, red for losses)\n5. Test leaderboard display format\n\n**Files:**\n- `/home/seethbotsite/frontend/components/games/CharacterTinder.vue` (main component)\n\n**Estimated Effort:** 30 minutes - 1 hour\n**Priority:** Medium\n**Dependencies:** None (backend already provides wins/losses data)",
+  "id": 171,
+  "title": "Create documentation folder for app decisions",
+  "description": "Create comprehensive documentation folder structure for app decisions and design patterns.\n\n**Requirements:**\n- Document existing architecture decisions\n- Create feature documentation for all major features\n- Add guidelines for code style and organization\n- Improve onboarding for future work\n\n**Implementation Steps:**\n\n1. Create Documentation Folder Structure\n   ```bash\n   cd /home/seethbotsite\n   mkdir -p docs/{architecture,features,guidelines}\n   ```\n\n2. Create Architecture Documentation\n   - docs/architecture/frontend-stack.md\n   - docs/architecture/backend-stack.md\n   - docs/architecture/api-routes.md\n   - docs/architecture/database-schema.md\n\n3. Create Feature Documentation\n   - docs/features/ranking-system.md\n   - docs/features/clicker-game.md\n   - docs/features/fishing-game.md\n   - docs/features/character-tinder.md\n   - docs/features/ticket-system.md\n\n4. Create Guidelines Documentation\n   - docs/guidelines/component-naming.md\n   - docs/guidelines/file-organization.md\n   - docs/guidelines/code-style.md\n   - docs/guidelines/testing.md\n\n5. Update AGENTS.md\n   - Add reference to documentation folder\n\n6. Create README\n   - File: docs/README.md\n   - Table of contents for all documentation\n\n**Files to Create:**\n- docs/README.md\n- docs/architecture/frontend-stack.md\n- docs/architecture/backend-stack.md\n- docs/architecture/api-routes.md\n- docs/architecture/database-schema.md\n- docs/features/ranking-system.md\n- docs/features/clicker-game.md\n- docs/features/fishing-game.md\n- docs/features/character-tinder.md\n- docs/features/ticket-system.md\n- docs/guidelines/component-naming.md\n- docs/guidelines/file-organization.md\n- docs/guidelines/code-style.md\n- docs/guidelines/testing.md\n\n**Files to Modify:**\n- AGENTS.md (add documentation reference)\n\n**Estimated Effort:** 4-6 hours\n**Priority:** HIGH - Critical for onboarding and consistency\n**Dependencies:** None\n\n**Note**: Start with architecture docs, then features, then guidelines. This foundational work will save time on all future tickets. Review and update documentation as the project evolves.",
   "status": "pending",
   "response": null,
-  "created_at": "2026-02-06 09:19:38",
-  "updated_at": "2026-02-07 06:59:25",
-  "creator_id": "user_6eje85c2rqp2vzn0c0l5kf",
+  "created_at": "2026-02-05 07:54:27",
+  "updated_at": "2026-02-07 08:15:10",
+  "creator_id": null,
   "type": "feature",
-  "priority": "medium",
+  "priority": "high",
   "tags": null,
   "category": null,
   "dependencies": [],
   "is_deleted": 0,
   "blocked": false,
-  "relevanceScore": 100,
-  "daysSinceCreation": 0
+  "relevanceScore": 96,
+  "daysSinceCreation": 2
 }
