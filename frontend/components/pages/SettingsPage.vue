@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { useAppStore } from '../../stores/useAppStore'
+import ThemeSwitcher from '../settings/ThemeSwitcher.vue'
 
 const appStore = useAppStore()
 
@@ -52,6 +53,10 @@ const resetToDefaults = () => {
   <div class="settings-page">
     <div class="settings-container">
       <h1 class="settings-title">⚙️ Settings</h1>
+
+      <div class="settings-section">
+        <ThemeSwitcher />
+      </div>
 
       <div class="settings-section">
         <h2 class="section-title">💖 Hearts & Eggs</h2>

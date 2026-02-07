@@ -3,12 +3,16 @@ import { onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import MainApp from './components/shared/core/MainApp.vue'
 import { useAppStore } from './stores/useAppStore'
+import { useTheme } from './composables/useTheme'
 
 // Store
 const appStore = useAppStore()
 
 // Router
 const route = useRoute()
+
+// Initialize theme
+const { applyTheme } = useTheme()
 
 // Sync route path with store currentRoute
 watch(() => route.path, (newPath) => {
