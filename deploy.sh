@@ -37,6 +37,7 @@ $DOCKER rm "$CONTAINER_NAME" 2>/dev/null || true
 echo "🚀 Starting container..."
 $DOCKER run -d \
   --name "$CONTAINER_NAME" \
+  --restart=on-failure \
   -p 8081:3000 \
   -v seethbot-data:/app/backend/data \
   -e NODE_ENV=production \
