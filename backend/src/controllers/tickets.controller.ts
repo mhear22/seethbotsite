@@ -839,4 +839,117 @@ router.get('/tickets/categories', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * @openapi
+ * /api/tickets/search:
+ *   get:
+ *     tags: [Tickets]
+ *     summary: Search tickets by term
+ *     description: Search tickets by a search term that matches title or description. Supports optional filtering by status, type, priority, tag, and category.
+ *     parameters:
+ *       - in: query
+ *         name: q
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Search term to match in title or description
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [all, pending, needs-info, completed, declined]
+ *           default: all
+ *         description: Filter by status
+ *       - in: query
+ *         name: type
+ *         schema:
+ *           type: string
+ *           enum: [all, feature, bug, feedback]
+ *           default: all
+ *         description: Filter by type
+ *       - in: query
+ *         name: priority
+ *         schema:
+ *           type: string
+ *           enum: [all, high, medium, low]
+ *           default: all
+ *         description: Filter by priority
+ *       - in: query
+ *         name: tag
+ *         schema:
+ *           type: string
+ *         description: Filter by tag
+ *       - in: query
+ *         name: category
+ *         schema:
+ *           type: string
+ *         description: Filter by category
+ *     responses:
+ *       200:
+ *         description: Search results retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 tickets:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: integer
+ *                       title:
+ *                         type: string
+ *                       description:
+ *                         type: string
+ *                       status:
+ *                         type: string
+ *                       type:
+ *                         type: string
+ *                       priority:
+ *                         type: string
+ *                       created_at:
+ *                         type: string
+ *                       updated_at:
+ *                         type: string
+ *                 query:
+ *                   type: string
+ *                   description: The search term used
+ *       400:
+ *         description: Bad request - missing search term
+ *       500:
+ *         description: Internal server error
+ */
+router.get('/tickets/search', async (req: Request, res: Response) => {
+  try {
+    const { q, status, type, priority, tag, category } = req.query;
+
+    // Validate search term
+    if (!q || typeof q !== 'string' || q.trim().length === 0) {
+      return res.status(400).json({ error: 'Search term "q" is required' });
+    }
+
+    // Build filters
+    const filters: TicketFilters = {
+      status: status as string || 'all',
+      type: type as string || 'all',
+      priority: priority as string || 'all',
+      tag: tag as string,
+      category: category as string
+    };
+
+    // Search tickets
+    const tickets = ticketsFilterService.searchTickets(filters, q.trim());
+
+    res.json({
+      tickets,
+      query: q.trim()
+    });
+  } catch (error) {
+    console.error('Error searching tickets:', error);
+    res.status(500).json({ error: 'Failed to search tickets' });
+  }
+});
+
 export default router;
