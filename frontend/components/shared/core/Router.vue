@@ -89,7 +89,15 @@ const showKeyboardHelp = ref(isHelpOpen.value)
 const buildInfo = ref<{ buildCount: number; buildTime: string } | null>(null)
 const timeAgo = ref('')
 
-loadBuildInfo()
+const updateTimeAgo = () => {
+  if (!buildInfo.value) return
+  const now = Date.now()
+  const buildDate = new Date(buildInfo.value.buildTime).getTime()
+  const diffMins = Math.floor((now - buildDate) / 60000)
+  const diffHours = Math.floor(diffMins / 60)
+  const diffDays = Math.floor(diffHours / 24)
+  timeAgo.value = diffMins < 1 ? 'just now' : diffMins < 60 ? `${diffMins}m ago` : diffHours < 24 ? `${diffHours}h ago` : `${diffDays}d ago`
+}
 
 const loadBuildInfo = async () => {
   try {
@@ -101,15 +109,7 @@ const loadBuildInfo = async () => {
   } catch (error) { console.warn('Could not load build info:', error) }
 }
 
-const updateTimeAgo = () => {
-  if (!buildInfo.value) return
-  const now = Date.now()
-  const buildDate = new Date(buildInfo.value.buildTime).getTime()
-  const diffMins = Math.floor((now - buildDate) / 60000)
-  const diffHours = Math.floor(diffMins / 60)
-  const diffDays = Math.floor(diffHours / 24)
-  timeAgo.value = diffMins < 1 ? 'just now' : diffMins < 60 ? `${diffMins}m ago` : diffHours < 24 ? `${diffHours}h ago` : `${diffDays}d ago`
-}
+loadBuildInfo()
 
 onMounted(() => {
   window.addEventListener('scroll', handleScroll)

@@ -4,6 +4,7 @@ import App from './App.vue'
 import router from './router'
 import './styles.css'
 import './theme-base.css'
+import { useAuthStore } from './stores/useAuthStore'
 
 // Font Awesome integration
 import { library } from '@fortawesome/fontawesome-svg-core'
@@ -39,9 +40,8 @@ app.component('font-awesome-icon', FontAwesomeIcon)
 app.mount('#app')
 
 // Initialize auth after mounting
-const initAuth = async () => {
+const initAuth = () => {
   try {
-    const { useAuthStore } = await import('./stores/useAuthStore')
     const authStore = useAuthStore()
     authStore.initAuth()
     console.log('[Auth] Auth store initialized')
