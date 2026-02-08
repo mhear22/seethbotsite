@@ -35,4 +35,20 @@ app.use(router)
 // Register Font Awesome component globally
 app.component('font-awesome-icon', FontAwesomeIcon)
 
+// Initialize auth store on app load
 app.mount('#app')
+
+// Initialize auth after mounting
+const initAuth = async () => {
+  try {
+    const { useAuthStore } = await import('./stores/useAuthStore')
+    const authStore = useAuthStore()
+    authStore.initAuth()
+    console.log('[Auth] Auth store initialized')
+  } catch (error) {
+    console.error('[Auth] Failed to initialize auth store:', error)
+  }
+}
+
+// Initialize auth on app load
+initAuth()

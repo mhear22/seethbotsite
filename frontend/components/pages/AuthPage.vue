@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
-import { useAuth } from '../../composables/useAuth'
+import { ref } from 'vue'
+import { useAuthStore } from '../../stores/useAuthStore'
 
-const auth = reactive(useAuth())
+// Store
+const authStore = useAuthStore()
 
 // Form mode: 'login' | 'register' | 'profile'
 const mode = ref<'login' | 'register' | 'profile'>('login')
@@ -41,8 +42,8 @@ const setMode = (newMode: 'login' | 'register' | 'profile') => {
   mode.value = newMode
   clearMessages()
   // Pre-fill profile form
-  if (newMode === 'profile' && auth.user.value) {
-    profileForm.value.displayName = auth.user.value.display_name || ''
+  if (newMode === 'profile' && authStore.user) {
+    profileForm.value.displayName = authStore.user.display_name || ''
   }
 }
 
@@ -59,12 +60,12 @@ const handleLogin = async () => {
     return
   }
 
-  const result = await auth.login(
+  const result = await authStore.login(
     loginForm.value.email,
     loginForm.value.password
   )
 
-  if (result.success) {
+  if (result.success && result.user) {
     successMessage.value = 'Login successful!'
     loginForm.value = { email: '', password: '' }
     setTimeout(() => setMode('profile'), 1000)
@@ -91,13 +92,13 @@ const handleRegister = async () => {
     return
   }
 
-  const result = await auth.register(
+  const result = await authStore.register(
     registerForm.value.email,
     registerForm.value.password,
     registerForm.value.displayName
   )
 
-  if (result.success) {
+  if (result.success && result.user) {
     successMessage.value = 'Registration successful!'
     registerForm.value = { email: '', password: '', confirmPassword: '', displayName: '' }
     setTimeout(() => setMode('login'), 1500)
@@ -114,9 +115,9 @@ const handleUpdateProfile = async () => {
     return
   }
 
-  const result = await auth.updateProfile(profileForm.value.displayName)
+  const result = await authStore.updateProfile(profileForm.value.displayName)
 
-  if (result.success) {
+  if (result.success && result.user) {
     successMessage.value = 'Profile updated successfully!'
   } else if (result.error) {
     errorMessage.value = result.error
@@ -141,7 +142,7 @@ const handleChangePassword = async () => {
     return
   }
 
-  const result = await auth.changePassword(
+  const result = await authStore.changePassword(
     changePasswordForm.value.oldPassword,
     changePasswordForm.value.newPassword
   )
@@ -156,7 +157,7 @@ const handleChangePassword = async () => {
 
 const handleLogout = async () => {
   if (confirm('Are you sure you want to logout?')) {
-    await auth.logout()
+    await authStore.logout()
     successMessage.value = 'Logged out successfully'
     setMode('login')
   }
@@ -167,7 +168,7 @@ const handleDeleteAccount = async () => {
     const password = prompt('Please enter your password to confirm account deletion:')
     if (!password) return
 
-    const result = await auth.deleteAccount(password)
+    const result = await authStore.deleteAccount(password)
     if (result.success) {
       successMessage.value = 'Account deleted successfully'
       setMode('login')
@@ -183,7 +184,7 @@ const handleDeleteAccount = async () => {
     <div class="auth-container">
       <div class="auth-header">
         <h1>🔐 Account</h1>
-        <p v-if="auth.isAuthenticated">Welcome, {{ auth.user?.display_name || auth.user?.email }}!</p>
+        <p v-if="authStore.isAuthenticated">Welcome, {{ authStore.user?.display_name || authStore.user?.email }}!</p>
       </div>
 
       <!-- Messages -->
@@ -195,7 +196,7 @@ const handleDeleteAccount = async () => {
       </div>
 
       <!-- Mode Tabs (only when authenticated) -->
-      <div v-if="auth.isAuthenticated" class="auth-tabs">
+      <div v-if="authStore.isAuthenticated" class="auth-tabs">
         <button
           :class="{ active: mode === 'profile' }"
           @click="setMode('profile')"
@@ -220,7 +221,7 @@ const handleDeleteAccount = async () => {
             type="email"
             placeholder="your@email.com"
             @keyup.enter="handleLogin"
-            :disabled="auth.loading"
+            :disabled="authStore.loading"
           />
         </div>
 
@@ -231,15 +232,15 @@ const handleDeleteAccount = async () => {
             :type="showPassword ? 'text' : 'password'"
             placeholder="••••••••"
             @keyup.enter="handleLogin"
-            :disabled="auth.loading"
+            :disabled="authStore.loading"
           />
           <button class="toggle-password" @click="showPassword = !showPassword">
             {{ showPassword ? '🙈' : '👁️' }}
           </button>
         </div>
 
-        <button class="auth-btn auth-btn-primary" @click="handleLogin" :disabled="auth.loading">
-          {{ auth.loading ? 'Signing in...' : 'Sign In' }}
+        <button class="auth-btn auth-btn-primary" @click="handleLogin" :disabled="authStore.loading">
+          {{ authStore.loading ? 'Signing in...' : 'Sign In' }}
         </button>
 
         <p class="auth-switch">
@@ -259,7 +260,7 @@ const handleDeleteAccount = async () => {
             type="email"
             placeholder="your@email.com"
             @keyup.enter="handleRegister"
-            :disabled="auth.loading"
+            :disabled="authStore.loading"
           />
         </div>
 
@@ -270,7 +271,7 @@ const handleDeleteAccount = async () => {
             type="text"
             placeholder="Your Name"
             @keyup.enter="handleRegister"
-            :disabled="auth.loading"
+            :disabled="authStore.loading"
           />
         </div>
 
@@ -280,7 +281,7 @@ const handleDeleteAccount = async () => {
             v-model="registerForm.password"
             :type="showPassword ? 'text' : 'password'"
             placeholder="••••••••"
-            :disabled="auth.loading"
+            :disabled="authStore.loading"
           />
         </div>
 
@@ -291,15 +292,15 @@ const handleDeleteAccount = async () => {
             :type="showPassword ? 'text' : 'password'"
             placeholder="••••••••"
             @keyup.enter="handleRegister"
-            :disabled="auth.loading"
+            :disabled="authStore.loading"
           />
           <button class="toggle-password" @click="showPassword = !showPassword">
             {{ showPassword ? '🙈' : '👁️' }}
           </button>
         </div>
 
-        <button class="auth-btn auth-btn-primary" @click="handleRegister" :disabled="auth.loading">
-          {{ auth.loading ? 'Creating...' : 'Create Account' }}
+        <button class="auth-btn auth-btn-primary" @click="handleRegister" :disabled="authStore.loading">
+          {{ authStore.loading ? 'Creating...' : 'Create Account' }}
         </button>
 
         <p class="auth-switch">
@@ -309,13 +310,13 @@ const handleDeleteAccount = async () => {
       </div>
 
       <!-- Profile Form -->
-      <div v-if="mode === 'profile' && auth.isAuthenticated" class="auth-form">
+      <div v-if="mode === 'profile' && authStore.isAuthenticated" class="auth-form">
         <h2>Profile Settings</h2>
 
         <div class="form-group">
           <label>Email</label>
           <input
-            :value="auth.user?.email"
+            :value="authStore.user?.email"
             type="email"
             disabled
             class="disabled-input"
@@ -328,12 +329,12 @@ const handleDeleteAccount = async () => {
             v-model="profileForm.displayName"
             type="text"
             @keyup.enter="handleUpdateProfile"
-            :disabled="auth.loading"
+            :disabled="authStore.loading"
           />
         </div>
 
-        <button class="auth-btn auth-btn-primary" @click="handleUpdateProfile" :disabled="auth.loading">
-          {{ auth.loading ? 'Updating...' : 'Update Profile' }}
+        <button class="auth-btn auth-btn-primary" @click="handleUpdateProfile" :disabled="authStore.loading">
+          {{ authStore.loading ? 'Updating...' : 'Update Profile' }}
         </button>
 
         <hr class="auth-divider" />
@@ -346,7 +347,7 @@ const handleDeleteAccount = async () => {
             v-model="changePasswordForm.oldPassword"
             :type="showPassword ? 'text' : 'password'"
             placeholder="••••••••"
-            :disabled="auth.loading"
+            :disabled="authStore.loading"
           />
         </div>
 
@@ -356,7 +357,7 @@ const handleDeleteAccount = async () => {
             v-model="changePasswordForm.newPassword"
             :type="showPassword ? 'text' : 'password'"
             placeholder="••••••••"
-            :disabled="auth.loading"
+            :disabled="authStore.loading"
           />
         </div>
 
@@ -367,25 +368,25 @@ const handleDeleteAccount = async () => {
             :type="showPassword ? 'text' : 'password'"
             placeholder="••••••••"
             @keyup.enter="handleChangePassword"
-            :disabled="auth.loading"
+            :disabled="authStore.loading"
           />
           <button class="toggle-password" @click="showPassword = !showPassword">
             {{ showPassword ? '🙈' : '👁️' }}
           </button>
         </div>
 
-        <button class="auth-btn auth-btn-secondary" @click="handleChangePassword" :disabled="auth.loading">
-          {{ auth.loading ? 'Changing...' : 'Change Password' }}
+        <button class="auth-btn auth-btn-secondary" @click="handleChangePassword" :disabled="authStore.loading">
+          {{ authStore.loading ? 'Changing...' : 'Change Password' }}
         </button>
 
         <hr class="auth-divider" />
 
-        <button class="auth-btn auth-btn-danger" @click="handleDeleteAccount" :disabled="auth.loading">
+        <button class="auth-btn auth-btn-danger" @click="handleDeleteAccount" :disabled="authStore.loading">
           🗑️ Delete Account
         </button>
 
         <p class="auth-info">
-          Account created: {{ new Date(auth.user?.created_at || '').toLocaleDateString() }}
+          Account created: {{ new Date(authStore.user?.created_at || '').toLocaleDateString() }}
         </p>
       </div>
     </div>

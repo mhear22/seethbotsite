@@ -3,10 +3,12 @@ import { onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import MainApp from './components/shared/core/MainApp.vue'
 import { useAppStore } from './stores/useAppStore'
+import { useAuthStore } from './stores/useAuthStore'
 import { useTheme } from './composables/useTheme'
 
-// Store
+// Stores
 const appStore = useAppStore()
+const authStore = useAuthStore()
 
 // Router
 const route = useRoute()
@@ -54,6 +56,13 @@ onMounted(() => {
 
   // Refresh rankings every 30 seconds
   setInterval(appStore.loadRankings, 30000)
+
+  // Check auth state on mount (Ticket #197)
+  // This ensures the auth store is properly initialized
+  if (authStore.isInitialized) {
+    console.log('[Auth] Already initialized, validating token...')
+    authStore.validateToken()
+  }
 })
 </script>
 

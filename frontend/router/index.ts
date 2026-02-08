@@ -17,6 +17,8 @@ import ClickerPage from '../components/pages/ClickerPage.vue'
 import ShopPage from '../components/pages/ShopPage.vue'
 import ApiDocsPage from '../components/pages/ApiDocsPage.vue'
 import AuthPage from '../components/pages/AuthPage.vue'
+import Login from '../components/auth/Login.vue'
+import Register from '../components/auth/Register.vue'
 import FishingPage from '../components/pages/FishingPage.vue'
 import StatsPage from '../components/pages/StatsPage.vue'
 import CharacterTinderPage from '../components/pages/CharacterTinderPage.vue'
@@ -138,6 +140,16 @@ const routes = [
     path: '/auth',
     name: 'auth',
     component: AuthPage
+  },
+  {
+    path: '/login',
+    name: 'login',
+    component: Login
+  },
+  {
+    path: '/register',
+    name: 'register',
+    component: Register
   },
   {
     path: '/wordcloud',
