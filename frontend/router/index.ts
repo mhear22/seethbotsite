@@ -34,6 +34,8 @@ import MessagesPage from '../components/pages/MessagesPage.vue'
 import AnalyticsPage from '../components/pages/AnalyticsPage.vue'
 import SolarPanelPage from '../components/pages/SolarPanelPage.vue'
 import BatteryCalculatorPage from '../components/pages/BatteryCalculatorPage.vue'
+import MechBuilderPage from '../components/pages/MechBuilderPage.vue'
+import MechBattlePage from '../components/pages/MechBattlePage.vue'
 
 const routes = [
   {
@@ -210,6 +212,16 @@ const routes = [
     path: '/solar/battery',
     name: 'solar-battery',
     component: BatteryCalculatorPage
+  },
+  {
+    path: '/mech-builder',
+    name: 'mech-builder',
+    component: MechBuilderPage
+  },
+  {
+    path: '/mech-battle',
+    name: 'mech-battle',
+    component: MechBattlePage
   }
 ]
 
