@@ -47,6 +47,7 @@ COPY frontend/router ./router/
 COPY frontend/utils ./utils/
 COPY frontend/composables ./composables/
 COPY frontend/stores ./stores/
+COPY frontend/lib ./lib/
 COPY frontend/*.css frontend/*.mp3 frontend/*.html ./
 COPY frontend/public ./public/
 
