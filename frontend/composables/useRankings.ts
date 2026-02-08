@@ -1,37 +1,26 @@
-import { ref } from 'vue'
-import { generalRepository } from '../repositories/general.repository'
+/**
+ * Rankings Composable
+ *
+ * Thin wrapper around useRankingsStore Pinia store.
+ * Provides backward compatibility while delegating to centralized store.
+ * @deprecated Prefer using useRankingsStore directly for new code
+ */
 
-export interface RankingItem {
-  name: string
-  score: number
-  avatar: string
-  isCurrentUser?: boolean
-}
+import { useRankingsStore } from '../stores/useRankingsStore'
 
+// Re-export types from store
+export type { RankingItem } from '../stores/useRankingsStore'
+
+// Export composable that wraps to store
 export function useRankings() {
-  const rankings = ref<RankingItem[]>([])
-  const loading = ref(false)
-
-  const loadRankings = async () => {
-    try {
-      loading.value = true
-      rankings.value = await generalRepository.getRankings()
-    } catch (err) {
-      console.error('Failed to load rankings:', err)
-    } finally {
-      loading.value = false
-    }
-  }
-
-  const getTrendClass = (index: number) => {
-    const trends = ['trend-up', 'trend-down', 'trend-same']
-    return trends[index % trends.length]
-  }
+  const rankingsStore = useRankingsStore()
 
   return {
-    rankings,
-    loading,
-    loadRankings,
-    getTrendClass
+    rankings: rankingsStore.rankings,
+    loading: rankingsStore.loading,
+    error: rankingsStore.error,
+    loadRankings: rankingsStore.loadRankings,
+    getTrendClass: rankingsStore.getTrendClass,
+    clearRankings: rankingsStore.clearRankings
   }
 }

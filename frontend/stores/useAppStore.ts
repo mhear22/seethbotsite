@@ -2,19 +2,21 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useAudio } from '../composables/useAudio'
 import { useCat } from '../composables/useCat'
-import { useRankings } from '../composables/useRankings'
 import { usePanels } from '../composables/usePanels'
 import { useLanguage } from '../composables/useLanguage'
-import { useAuth } from '../composables/useAuth'
+import { useAuthStore } from './useAuthStore'
+import { useRankingsStore } from './useRankingsStore'
 
 export const useAppStore = defineStore('app', () => {
   // Composables
   const audio = useAudio()
   const cat = useCat()
-  const rankingsStore = useRankings()
   const panels = usePanels()
   const language = useLanguage()
-  const auth = useAuth()
+
+  // Stores (global state)
+  const authStore = useAuthStore()
+  const rankingsStore = useRankingsStore()
 
   // Detect if on mobile device
   const isMobileDevice = () => {
@@ -650,8 +652,15 @@ export const useAppStore = defineStore('app', () => {
     panels: panels.panels,
     catImage: cat.catImage,
     catLoading: cat.catLoading,
+
+    // Stores (expose for backward compatibility)
+    auth: authStore,
+    user: authStore.user,
+    isAuthenticated: authStore.isAuthenticated,
+    authLoading: authStore.loading,
     rankings: rankingsStore.rankings,
     rankingsLoading: rankingsStore.loading,
+    rankingsError: rankingsStore.error,
 
     // Language (Ticket #95)
     languageRegion: language.languageRegion,
@@ -684,6 +693,12 @@ export const useAppStore = defineStore('app', () => {
     stopMoldSpawner,
     clearMoldCircles,
     updateMoldEffects,
-    getTrendClass: rankingsStore.getTrendClass
+    getTrendClass: rankingsStore.getTrendClass,
+
+    // Auth actions (for backward compatibility)
+    login: authStore.login,
+    logout: authStore.logout,
+    register: authStore.register,
+    updateProfile: authStore.updateProfile
   }
 })

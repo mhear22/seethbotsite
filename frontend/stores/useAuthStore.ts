@@ -1,6 +1,12 @@
+/**
+ * Auth Store
+ *
+ * Pinia store for global authentication state.
+ * Handles user authentication, session management, and profile operations.
+ */
+
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { buildUrl } from '../utils/api'
 
 const API_BASE = '/api'
 const TOKEN_KEY = 'auth_token'
@@ -43,40 +49,40 @@ export const useAuthStore = defineStore('auth', () => {
   // State
   const user = ref<User | null>(null)
   const token = ref<string | null>(null)
-  const isAuthenticated = ref(false)
   const loading = ref(false)
   const error = ref<string | null>(null)
   const sessions = ref<Session[]>([])
 
+  let initialized = false
   let refreshTimer: NodeJS.Timeout | null = null
 
-  // Computed
-  const isInitialized = computed(() => {
-    return token.value !== null
-  })
+  // Getters
+  const isAuthenticated = computed(() => !!token.value && !!user.value)
+  const isInitialized = computed(() => token.value !== null)
 
   /**
    * Initialize auth state from localStorage
    */
-  const initAuth = () => {
+  const init = async () => {
+    if (initialized) return
+
     const savedToken = localStorage.getItem(TOKEN_KEY)
     if (savedToken) {
       token.value = savedToken
-      isAuthenticated.value = true
-      validateToken()
+      await validateToken()
     }
+
+    initialized = true
   }
 
   /**
    * Validate current token with server
    */
   const validateToken = async (): Promise<boolean> => {
-    if (!token.value) {
-      return false
-    }
+    if (!token.value) return false
 
     try {
-      const response = await fetch(buildUrl(`${API_BASE}/auth/me`), {
+      const response = await fetch(`${API_BASE}/auth/me`, {
         headers: {
           'Authorization': `Bearer ${token.value}`
         }
@@ -98,8 +104,8 @@ export const useAuthStore = defineStore('auth', () => {
         clearAuth()
         return false
       }
-    } catch (err) {
-      console.error('Token validation error:', err)
+    } catch (error) {
+      console.error('Token validation error:', error)
       clearAuth()
       return false
     }
@@ -140,7 +146,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     try {
       // Simply call /auth/me to refresh the session
-      const response = await fetch(buildUrl(`${API_BASE}/auth/me`), {
+      const response = await fetch(`${API_BASE}/auth/me`, {
         headers: {
           'Authorization': `Bearer ${token.value}`
         }
@@ -174,12 +180,12 @@ export const useAuthStore = defineStore('auth', () => {
     email: string,
     password: string,
     displayName?: string
-  ): Promise<{ success: boolean; user?: User; error?: string }> => {
+  ) => {
     loading.value = true
     error.value = null
 
     try {
-      const response = await fetch(buildUrl(`${API_BASE}/auth/register`), {
+      const response = await fetch(`${API_BASE}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -197,11 +203,11 @@ export const useAuthStore = defineStore('auth', () => {
         setAuth(data.token, data.user)
         return { success: true, user: data.user }
       } else {
-        error.value = data.error || 'Registration failed'
+        error.value = data.message || 'Registration failed'
         return { success: false, error: error.value }
       }
-    } catch (err) {
-      console.error('Registration failed:', err)
+    } catch (error) {
+      console.error('Registration failed:', error)
       error.value = 'Registration failed. Please try again.'
       return { success: false, error: error.value }
     } finally {
@@ -215,12 +221,12 @@ export const useAuthStore = defineStore('auth', () => {
   const login = async (
     email: string,
     password: string
-  ): Promise<{ success: boolean; user?: User; error?: string }> => {
+  ) => {
     loading.value = true
     error.value = null
 
     try {
-      const response = await fetch(buildUrl(`${API_BASE}/auth/login`), {
+      const response = await fetch(`${API_BASE}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -237,11 +243,11 @@ export const useAuthStore = defineStore('auth', () => {
         setAuth(data.token, data.user)
         return { success: true, user: data.user }
       } else {
-        error.value = data.error || 'Login failed'
+        error.value = data.message || 'Login failed'
         return { success: false, error: error.value }
       }
-    } catch (err) {
-      console.error('Login failed:', err)
+    } catch (error) {
+      console.error('Login failed:', error)
       error.value = 'Login failed. Please try again.'
       return { success: false, error: error.value }
     } finally {
@@ -252,13 +258,13 @@ export const useAuthStore = defineStore('auth', () => {
   /**
    * Logout from current device
    */
-  const logout = async (): Promise<{ success: boolean; error?: string }> => {
+  const logout = async () => {
     if (!token.value) {
       return { success: false, error: 'Not authenticated' }
     }
 
     try {
-      const response = await fetch(buildUrl(`${API_BASE}/auth/logout`), {
+      const response = await fetch(`${API_BASE}/auth/logout`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token.value}`
@@ -267,8 +273,8 @@ export const useAuthStore = defineStore('auth', () => {
 
       clearAuth()
       return { success: true }
-    } catch (err) {
-      console.error('Logout failed:', err)
+    } catch (error) {
+      console.error('Logout failed:', error)
       clearAuth()
       return { success: true }
     }
@@ -277,9 +283,7 @@ export const useAuthStore = defineStore('auth', () => {
   /**
    * Update user profile
    */
-  const updateProfile = async (
-    displayName: string
-  ): Promise<{ success: boolean; user?: User; error?: string }> => {
+  const updateProfile = async (displayName: string) => {
     if (!token.value) {
       return { success: false, error: 'Not authenticated' }
     }
@@ -288,7 +292,7 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = null
 
     try {
-      const response = await fetch(buildUrl(`${API_BASE}/auth/profile`), {
+      const response = await fetch(`${API_BASE}/auth/profile`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -303,11 +307,11 @@ export const useAuthStore = defineStore('auth', () => {
         user.value = data.user
         return { success: true, user: data.user }
       } else {
-        error.value = data.error || 'Update failed'
+        error.value = data.message || 'Update failed'
         return { success: false, error: error.value }
       }
-    } catch (err) {
-      console.error('Update failed:', err)
+    } catch (error) {
+      console.error('Update failed:', error)
       error.value = 'Update failed. Please try again.'
       return { success: false, error: error.value }
     } finally {
@@ -321,7 +325,7 @@ export const useAuthStore = defineStore('auth', () => {
   const changePassword = async (
     oldPassword: string,
     newPassword: string
-  ): Promise<{ success: boolean; error?: string }> => {
+  ) => {
     if (!token.value) {
       return { success: false, error: 'Not authenticated' }
     }
@@ -330,7 +334,7 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = null
 
     try {
-      const response = await fetch(buildUrl(`${API_BASE}/auth/password`), {
+      const response = await fetch(`${API_BASE}/auth/password`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -346,11 +350,11 @@ export const useAuthStore = defineStore('auth', () => {
         clearAuth()
         return { success: true }
       } else {
-        error.value = data.error || 'Password change failed'
+        error.value = data.message || 'Password change failed'
         return { success: false, error: error.value }
       }
-    } catch (err) {
-      console.error('Password change failed:', err)
+    } catch (error) {
+      console.error('Password change failed:', error)
       error.value = 'Password change failed. Please try again.'
       return { success: false, error: error.value }
     } finally {
@@ -361,9 +365,7 @@ export const useAuthStore = defineStore('auth', () => {
   /**
    * Delete account
    */
-  const deleteAccount = async (
-    password: string
-  ): Promise<{ success: boolean; error?: string }> => {
+  const deleteAccount = async (password: string) => {
     if (!token.value) {
       return { success: false, error: 'Not authenticated' }
     }
@@ -372,7 +374,7 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = null
 
     try {
-      const response = await fetch(buildUrl(`${API_BASE}/auth/account`), {
+      const response = await fetch(`${API_BASE}/auth/account`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -389,8 +391,8 @@ export const useAuthStore = defineStore('auth', () => {
         error.value = data.error || 'Account deletion failed. Please try again.'
         return { success: false, error: error.value }
       }
-    } catch (err) {
-      console.error('Account deletion failed:', err)
+    } catch (error) {
+      console.error('Account deletion failed:', error)
       error.value = 'Account deletion failed. Please try again.'
       return { success: false, error: error.value }
     } finally {
@@ -407,7 +409,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     try {
-      const response = await fetch(buildUrl(`${API_BASE}/auth/sessions`), {
+      const response = await fetch(`${API_BASE}/auth/sessions`, {
         headers: {
           'Authorization': `Bearer ${token.value}`
         }
@@ -430,15 +432,13 @@ export const useAuthStore = defineStore('auth', () => {
   /**
    * Logout from a specific session
    */
-  const logoutSession = async (
-    sessionId: number
-  ): Promise<{ success: boolean; error?: string }> => {
+  const logoutSession = async (sessionId: number) => {
     if (!token.value) {
       return { success: false, error: 'Not authenticated' }
     }
 
     try {
-      const response = await fetch(buildUrl(`${API_BASE}/auth/sessions/${sessionId}`), {
+      const response = await fetch(`${API_BASE}/auth/sessions/${sessionId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token.value}`
@@ -463,13 +463,13 @@ export const useAuthStore = defineStore('auth', () => {
   /**
    * Logout from all devices
    */
-  const logoutAll = async (): Promise<{ success: boolean; error?: string }> => {
+  const logoutAll = async () => {
     if (!token.value) {
       return { success: false, error: 'Not authenticated' }
     }
 
     try {
-      const response = await fetch(buildUrl(`${API_BASE}/auth/sessions/all`), {
+      const response = await fetch(`${API_BASE}/auth/sessions/all`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token.value}`
@@ -558,7 +558,6 @@ export const useAuthStore = defineStore('auth', () => {
   const setAuth = (newToken: string, newUser: User) => {
     user.value = newUser
     token.value = newToken
-    isAuthenticated.value = true
     localStorage.setItem(TOKEN_KEY, newToken)
   }
 
@@ -568,7 +567,6 @@ export const useAuthStore = defineStore('auth', () => {
   const clearAuth = () => {
     user.value = null
     token.value = null
-    isAuthenticated.value = false
     sessions.value = []
 
     // Clear refresh timer
@@ -621,20 +619,38 @@ export const useAuthStore = defineStore('auth', () => {
     return 'desktop'
   }
 
+  /**
+   * Fetch with auth headers
+   */
+  const fetchWithAuth = async (url: string, options?: RequestInit) => {
+    const headers: HeadersInit = {
+      ...(options?.headers || {}),
+    }
+
+    if (token.value) {
+      headers['Authorization'] = `Bearer ${token.value}`
+    }
+
+    return fetch(url, {
+      ...options,
+      headers
+    })
+  }
+
   return {
     // State
     user,
     token,
-    isAuthenticated,
     loading,
     error,
     sessions,
 
-    // Computed
+    // Getters
+    isAuthenticated,
     isInitialized,
 
     // Actions
-    initAuth,
+    init,
     validateToken,
     refreshToken,
     register,
@@ -648,6 +664,7 @@ export const useAuthStore = defineStore('auth', () => {
     logoutAll,
     loadSettings,
     saveSettings,
-    clearAuth
+    clearAuth,
+    fetchWithAuth
   }
 })
