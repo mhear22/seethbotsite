@@ -2,7 +2,7 @@
  * Tickets Repository
  *
  * Handles all ticket-related API calls including fetching, creating, updating, and deleting tickets.
- * Uses type-safe openapi-fetch client for API communication.
+ * Uses shared API utility for consistent error handling and auth headers.
  */
 
 import { apiClient } from '../utils/apiClient';
