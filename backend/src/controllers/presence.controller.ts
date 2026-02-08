@@ -101,6 +101,11 @@ export function setupWebSocketServer(server: any) {
 
   // Handle WebSocket upgrade requests
   server.on('upgrade', (request: IncomingMessage, socket: any, head: Buffer) => {
+    // Only handle /ws path
+    const pathname = new URL(request.url || '', `http://${request.headers.host}`).pathname;
+    if (pathname !== '/ws' && pathname !== '/presence') {
+      return;
+    }
     // Parse query parameters
     const url = new URL(request.url || '', `http://${request.headers.host}`);
 
