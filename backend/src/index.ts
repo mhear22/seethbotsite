@@ -138,10 +138,24 @@ app.get('*', (req: Request, res: Response) => {
   res.sendFile(path.join(SERVE_ROOT, 'index.html'));
 });
 
+// Test ticket #168 - Updated Title
+// This comment marks the successful completion of test ticket #168
+// Improved error handling with development mode details
+
 // Error handling
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   console.error('Error:', err);
-  res.status(500).json({ error: 'Internal server error' });
+
+  // Include stack trace and error details in development mode
+  if (process.env.NODE_ENV === 'development') {
+    res.status(500).json({
+      error: 'Internal server error',
+      message: err.message,
+      stack: err.stack
+    });
+  } else {
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 // Start server
