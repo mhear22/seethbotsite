@@ -2,6 +2,7 @@
 import { ref, watch } from 'vue'
 import { useAppStore } from '../../stores/useAppStore'
 import ThemeSwitcher from '../settings/ThemeSwitcher.vue'
+import SyncSettings from '../settings/SyncSettings.vue'
 
 const appStore = useAppStore()
 
@@ -56,6 +57,10 @@ const resetToDefaults = () => {
 
       <div class="settings-section">
         <ThemeSwitcher />
+      </div>
+
+      <div class="settings-section">
+        <SyncSettings />
       </div>
 
       <div class="settings-section">
