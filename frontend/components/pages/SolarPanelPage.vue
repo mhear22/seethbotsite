@@ -23,6 +23,11 @@ watch([() => canvas.verticesInMeters.value, () => canvas.isClosed.value], () => 
   calculator.setVertices(canvas.verticesInMeters.value, canvas.isClosed.value)
 }, { deep: true })
 
+// Sync exclusion zones to calculator
+watch(() => canvas.exclusionZonesInMeters.value, (zones) => {
+  calculator.exclusionZones.value = zones
+}, { deep: true })
+
 function onCanvasClick(event: MouseEvent) {
   if (!svgRef.value) return
   canvas.addVertex(event, svgRef.value)
@@ -87,11 +92,15 @@ function insetPathSvg() {
           </div>
           <div class="step">
             <span class="step-num">2</span>
-            <span>Right-click or press "Close" to complete the shape</span>
+            <span>Right-click or press "Close Roof" to complete the shape</span>
           </div>
           <div class="step">
             <span class="step-num">3</span>
-            <span>View optimized panel layout and results below</span>
+            <span>Optional: Click "Add Exclusion" to mark areas for chimneys, vents, etc.</span>
+          </div>
+          <div class="step">
+            <span class="step-num">4</span>
+            <span>View optimized panel layout and adjust settings as needed</span>
           </div>
         </div>
       </div>
@@ -99,14 +108,37 @@ function insetPathSvg() {
       <!-- SVG Canvas -->
       <div class="card canvas-card">
         <div class="canvas-toolbar">
-          <button class="toolbar-btn" @click="handleUndo" :disabled="canvas.vertices.value.length === 0 && !canvas.isClosed.value">
+          <div class="mode-buttons">
+            <button
+              class="toolbar-btn"
+              :class="{ active: canvas.drawMode.value === 'roof' }"
+              @click="canvas.setDrawMode('roof')"
+            >
+              Draw Roof
+            </button>
+            <button
+              class="toolbar-btn"
+              :class="{ active: canvas.drawMode.value === 'exclusion' }"
+              @click="canvas.setDrawMode('exclusion')"
+              :disabled="!canvas.isClosed.value"
+            >
+              Add Exclusion
+            </button>
+          </div>
+          <div class="divider"></div>
+          <button class="toolbar-btn" @click="handleUndo">
             Undo
           </button>
-          <button class="toolbar-btn" @click="handleReset" :disabled="canvas.vertices.value.length === 0">
-            Clear
+          <button class="toolbar-btn" @click="handleReset" :disabled="canvas.vertices.value.length === 0 && canvas.exclusionZones.value.length === 0">
+            Clear All
           </button>
-          <button class="toolbar-btn primary" @click="canvas.closePolygon()" :disabled="canvas.vertices.value.length < 3 || canvas.isClosed.value">
-            Close Polygon
+          <button
+            class="toolbar-btn primary"
+            @click="canvas.closePolygon()"
+            :disabled="(canvas.drawMode.value === 'roof' && (canvas.vertices.value.length < 3 || canvas.isClosed.value)) ||
+                       (canvas.drawMode.value === 'exclusion' && canvas.exclusionVertices.value.length < 3)"
+          >
+            {{ canvas.drawMode.value === 'roof' ? 'Close Roof' : 'Finish Exclusion' }}
           </button>
           <label class="snap-toggle">
             <input type="checkbox" v-model="canvas.config.value.snapToGrid" />
@@ -135,6 +167,21 @@ function insetPathSvg() {
             v-if="canvas.isClosed.value && insetPathSvg()"
             :d="insetPathSvg()"
             class="inset-polygon"
+          />
+
+          <!-- Exclusion zones (completed) -->
+          <path
+            v-for="(zone, i) in canvas.exclusionZones.value"
+            :key="'exclusion-' + i"
+            :d="zone.map((v, j) => `${j === 0 ? 'M' : 'L'}${v.x},${v.y}`).join(' ') + ' Z'"
+            class="exclusion-zone"
+          />
+
+          <!-- Current exclusion being drawn -->
+          <path
+            v-if="canvas.drawMode.value === 'exclusion' && canvas.exclusionPolygonPath.value"
+            :d="canvas.exclusionPolygonPath.value"
+            class="exclusion-drawing"
           />
 
           <!-- Panels -->
@@ -166,7 +213,7 @@ function insetPathSvg() {
             class="preview-line"
           />
 
-          <!-- Vertices -->
+          <!-- Roof vertices -->
           <circle
             v-for="(v, i) in canvas.vertices.value"
             :key="'vertex-' + i"
@@ -174,20 +221,50 @@ function insetPathSvg() {
             class="vertex"
           />
 
+          <!-- Exclusion vertices (current drawing) -->
+          <circle
+            v-for="(v, i) in canvas.exclusionVertices.value"
+            :key="'ex-vertex-' + i"
+            :cx="v.x" :cy="v.y" r="5"
+            class="vertex exclusion-vertex"
+          />
+
+          <!-- Exclusion zone vertices (completed) -->
+          <template v-for="(zone, zi) in canvas.exclusionZones.value" :key="'zone-' + zi">
+            <circle
+              v-for="(v, vi) in zone"
+              :key="'zone-' + zi + '-vertex-' + vi"
+              :cx="v.x" :cy="v.y" r="4"
+              class="vertex exclusion-vertex"
+            />
+          </template>
+
           <!-- Hover point -->
           <circle
-            v-if="canvas.hoverPoint.value && !canvas.isClosed.value"
+            v-if="canvas.hoverPoint.value"
             :cx="canvas.hoverPoint.value.x"
             :cy="canvas.hoverPoint.value.y"
             r="4"
-            class="hover-point"
+            :class="['hover-point', { 'exclusion-hover': canvas.drawMode.value === 'exclusion' }]"
           />
         </svg>
 
         <div class="canvas-info">
           <span>Grid: 1m per major square</span>
-          <span>Vertices: {{ canvas.vertices.value.length }}</span>
+          <span>Mode: {{ canvas.drawMode.value === 'roof' ? 'Drawing Roof' : 'Adding Exclusion' }}</span>
           <span v-if="calculator.roofArea.value > 0">Roof Area: {{ calculator.roofArea.value.toFixed(1) }} m²</span>
+          <span v-if="canvas.exclusionZones.value.length > 0">Exclusions: {{ canvas.exclusionZones.value.length }}</span>
+        </div>
+
+        <!-- Exclusion zones list -->
+        <div v-if="canvas.exclusionZones.value.length > 0" class="exclusion-list">
+          <h4>Exclusion Zones</h4>
+          <div class="exclusion-items">
+            <div v-for="(zone, i) in canvas.exclusionZones.value" :key="'ex-list-' + i" class="exclusion-item">
+              <span>Exclusion {{ i + 1 }} ({{ zone.length }} vertices)</span>
+              <button class="delete-btn" @click="canvas.removeExclusionZone(i)">×</button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -509,6 +586,11 @@ function insetPathSvg() {
   pointer-events: none;
 }
 
+.hover-point.exclusion-hover {
+  fill: rgba(220, 38, 38, 0.5);
+  stroke: #dc2626;
+}
+
 .canvas-info {
   display: flex;
   gap: 16px;
@@ -656,6 +738,133 @@ function insetPathSvg() {
   color: #777;
 }
 
+/* Mode buttons */
+.mode-buttons {
+  display: flex;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 8px;
+  padding: 4px;
+}
+
+.solar-page.dark .mode-buttons {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.toolbar-btn.active {
+  background: linear-gradient(135deg, #ff91a4, #ffb347);
+  color: white;
+  border: none;
+}
+
+.divider {
+  width: 1px;
+  background: #ddd;
+  margin: 0 4px;
+}
+
+.solar-page.dark .divider {
+  background: #444;
+}
+
+/* Exclusion zones */
+.exclusion-zone {
+  fill: rgba(220, 38, 38, 0.2);
+  stroke: #dc2626;
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.solar-page.dark .exclusion-zone {
+  fill: rgba(239, 68, 68, 0.15);
+  stroke: #ef4444;
+}
+
+.exclusion-drawing {
+  fill: rgba(220, 38, 38, 0.1);
+  stroke: #dc2626;
+  stroke-width: 2;
+  stroke-dasharray: 5 5;
+  stroke-linejoin: round;
+}
+
+.exclusion-vertex {
+  fill: #dc2626;
+  stroke: white;
+}
+
+.solar-page.dark .exclusion-vertex {
+  fill: #ef4444;
+  stroke: #1a1a2e;
+}
+
+.exclusion-list {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.solar-page.dark .exclusion-list {
+  border-top-color: #444;
+}
+
+.exclusion-list h4 {
+  margin: 0 0 8px;
+  font-size: 0.9rem;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.solar-page.dark .exclusion-list h4 {
+  color: #aaa;
+}
+
+.exclusion-items {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.exclusion-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(220, 38, 38, 0.05);
+  border: 1px solid rgba(220, 38, 38, 0.2);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: #333;
+}
+
+.solar-page.dark .exclusion-item {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.2);
+  color: #eee;
+}
+
+.delete-btn {
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 4px;
+  background: #dc2626;
+  color: white;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.delete-btn:hover {
+  background: #b91c1c;
+  transform: scale(1.1);
+}
+
 /* Responsive */
 @media (max-width: 600px) {
   .solar-page {
@@ -676,6 +885,23 @@ function insetPathSvg() {
 
   .results-grid {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .canvas-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .mode-buttons {
+    width: 100%;
+  }
+
+  .divider {
+    display: none;
+  }
+
+  .snap-toggle {
+    margin-left: 0;
   }
 }
 </style>

@@ -125,7 +125,8 @@ function placePanels(
   panelW: number,
   panelH: number,
   offsetX: number,
-  offsetY: number
+  offsetY: number,
+  exclusions: Point[][] = []
 ): Panel[] {
   if (polygon.length < 3) return []
 
@@ -151,7 +152,24 @@ function placePanels(
         { x: x + panelW, y: y + panelH },
         { x, y: y + panelH }
       ]
-      if (corners.every(c => pointInPolygon(c, polygon))) {
+
+      // Panel must be fully inside the polygon
+      if (!corners.every(c => pointInPolygon(c, polygon))) {
+        continue
+      }
+
+      // Panel must not overlap with any exclusion zone
+      let overlapsExclusion = false
+      for (const exclusion of exclusions) {
+        if (exclusion.length < 3) continue
+        // Check if any corner is inside an exclusion zone
+        if (corners.some(c => pointInPolygon(c, exclusion))) {
+          overlapsExclusion = true
+          break
+        }
+      }
+
+      if (!overlapsExclusion) {
         panels.push({
           x,
           y,
@@ -167,7 +185,7 @@ function placePanels(
 }
 
 // Multi-strategy optimizer: 2 orientations x 3 offsets = 6 strategies
-function optimizePlacement(polygon: Point[], panelWidth: number, panelHeight: number): { panels: Panel[], orientation: string } {
+function optimizePlacement(polygon: Point[], panelWidth: number, panelHeight: number, exclusions: Point[][] = []): { panels: Panel[], orientation: string } {
   let bestPanels: Panel[] = []
   let bestOrientation = 'landscape'
 
@@ -184,7 +202,7 @@ function optimizePlacement(polygon: Point[], panelWidth: number, panelHeight: nu
     ]
 
     for (const [ox, oy] of offsets) {
-      const panels = placePanels(polygon, w, h, ox, oy)
+      const panels = placePanels(polygon, w, h, ox, oy, exclusions)
       if (panels.length > bestPanels.length) {
         bestPanels = panels
         bestOrientation = label
@@ -199,12 +217,13 @@ export function useSolarCalculator() {
   const settings = ref<SolarSettings>({
     panelWidth: 1.7,
     panelHeight: 1.0,
-    setback: 0.3,
+    setback: -0.3,
     wattsPerPanel: 400
   })
 
   const roofVertices = ref<Point[]>([])
   const isClosed = ref(false)
+  const exclusionZones = ref<Point[][]>([]) // Array of polygons to subtract
 
   const results = computed<SolarResults | null>(() => {
     if (!isClosed.value || roofVertices.value.length < 3) return null
@@ -226,7 +245,8 @@ export function useSolarCalculator() {
     const { panels, orientation } = optimizePlacement(
       inset,
       settings.value.panelWidth,
-      settings.value.panelHeight
+      settings.value.panelHeight,
+      exclusionZones.value
     )
 
     const panelArea = settings.value.panelWidth * settings.value.panelHeight
@@ -257,19 +277,38 @@ export function useSolarCalculator() {
     isClosed.value = closed
   }
 
+  function addExclusionZone(vertices: Point[]) {
+    if (vertices.length >= 3) {
+      exclusionZones.value.push([...vertices])
+    }
+  }
+
+  function removeExclusionZone(index: number) {
+    exclusionZones.value.splice(index, 1)
+  }
+
+  function clearExclusionZones() {
+    exclusionZones.value = []
+  }
+
   function reset() {
     roofVertices.value = []
     isClosed.value = false
+    exclusionZones.value = []
   }
 
   return {
     settings,
     roofVertices,
     isClosed,
+    exclusionZones,
     results,
     insetVertices,
     roofArea,
     setVertices,
+    addExclusionZone,
+    removeExclusionZone,
+    clearExclusionZones,
     reset
   }
 }

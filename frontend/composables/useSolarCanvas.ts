@@ -9,6 +9,8 @@ export interface CanvasConfig {
   metersPerPixel: number
 }
 
+export type DrawMode = 'roof' | 'exclusion'
+
 export function useSolarCanvas() {
   const config = ref<CanvasConfig>({
     width: 800,
@@ -21,6 +23,12 @@ export function useSolarCanvas() {
   const vertices = ref<Point[]>([])
   const isClosed = ref(false)
   const hoverPoint = ref<Point | null>(null)
+
+  // Exclusion zones
+  const exclusionVertices = ref<Point[]>([])
+  const exclusionZones = ref<Point[][]>([])
+  const exclusionClosed = ref(false)
+  const drawMode = ref<DrawMode>('roof')
 
   function snapPoint(p: Point): Point {
     if (!config.value.snapToGrid) return p
@@ -49,6 +57,10 @@ export function useSolarCanvas() {
     return vertices.value.map(v => svgToMeters(v))
   })
 
+  const exclusionZonesInMeters = computed<Point[][]>(() => {
+    return exclusionZones.value.map(zone => zone.map(v => svgToMeters(v)))
+  })
+
   function getSvgPoint(event: MouseEvent, svgEl: SVGSVGElement): Point {
     const rect = svgEl.getBoundingClientRect()
     const scaleX = config.value.width / rect.width
@@ -60,39 +72,79 @@ export function useSolarCanvas() {
   }
 
   function addVertex(event: MouseEvent, svgEl: SVGSVGElement) {
-    if (isClosed.value) return
     const raw = getSvgPoint(event, svgEl)
     const point = snapPoint(raw)
-    vertices.value.push(point)
+
+    if (drawMode.value === 'roof') {
+      if (isClosed.value) return
+      vertices.value.push(point)
+    } else {
+      if (exclusionClosed.value) return
+      exclusionVertices.value.push(point)
+    }
   }
 
   function handleMouseMove(event: MouseEvent, svgEl: SVGSVGElement) {
-    if (isClosed.value) return
     const raw = getSvgPoint(event, svgEl)
     hoverPoint.value = snapPoint(raw)
-  }
 
-  function closePolygon() {
-    if (vertices.value.length >= 3) {
-      isClosed.value = true
+    if (drawMode.value === 'roof' && isClosed.value) {
+      hoverPoint.value = null
+    }
+    if (drawMode.value === 'exclusion' && exclusionClosed.value) {
       hoverPoint.value = null
     }
   }
 
+  function closePolygon() {
+    if (drawMode.value === 'roof') {
+      if (vertices.value.length >= 3) {
+        isClosed.value = true
+        hoverPoint.value = null
+      }
+    } else {
+      if (exclusionVertices.value.length >= 3) {
+        exclusionZones.value.push([...exclusionVertices.value])
+        exclusionVertices.value = []
+        exclusionClosed.value = false
+        hoverPoint.value = null
+      }
+    }
+  }
+
   function undo() {
-    if (isClosed.value) {
-      isClosed.value = false
-      return
+    if (drawMode.value === 'roof') {
+      if (isClosed.value) {
+        isClosed.value = false
+        return
+      }
+      if (vertices.value.length > 0) {
+        vertices.value.pop()
+      }
+    } else {
+      if (exclusionVertices.value.length > 0) {
+        exclusionVertices.value.pop()
+      }
     }
-    if (vertices.value.length > 0) {
-      vertices.value.pop()
-    }
+  }
+
+  function removeExclusionZone(index: number) {
+    exclusionZones.value.splice(index, 1)
+  }
+
+  function setDrawMode(mode: DrawMode) {
+    drawMode.value = mode
+    hoverPoint.value = null
   }
 
   function reset() {
     vertices.value = []
     isClosed.value = false
+    exclusionVertices.value = []
+    exclusionZones.value = []
+    exclusionClosed.value = false
     hoverPoint.value = null
+    drawMode.value = 'roof'
   }
 
   // Polygon path string for SVG
@@ -102,11 +154,25 @@ export function useSolarCanvas() {
       (isClosed.value ? ' Z' : '')
   })
 
+  // Current exclusion polygon being drawn
+  const exclusionPolygonPath = computed(() => {
+    if (exclusionVertices.value.length === 0) return ''
+    return exclusionVertices.value.map((v, i) => `${i === 0 ? 'M' : 'L'}${v.x},${v.y}`).join(' ')
+  })
+
   // Preview line from last vertex to hover point
   const previewLine = computed(() => {
-    if (isClosed.value || vertices.value.length === 0 || !hoverPoint.value) return null
-    const last = vertices.value[vertices.value.length - 1]
-    return { x1: last.x, y1: last.y, x2: hoverPoint.value.x, y2: hoverPoint.value.y }
+    if (!hoverPoint.value) return null
+
+    if (drawMode.value === 'roof') {
+      if (isClosed.value || vertices.value.length === 0) return null
+      const last = vertices.value[vertices.value.length - 1]
+      return { x1: last.x, y1: last.y, x2: hoverPoint.value.x, y2: hoverPoint.value.y }
+    } else {
+      if (exclusionVertices.value.length === 0) return null
+      const last = exclusionVertices.value[exclusionVertices.value.length - 1]
+      return { x1: last.x, y1: last.y, x2: hoverPoint.value.x, y2: hoverPoint.value.y }
+    }
   })
 
   // Grid lines for SVG background
@@ -133,11 +199,18 @@ export function useSolarCanvas() {
     polygonPath,
     previewLine,
     gridLines,
+    exclusionVertices,
+    exclusionZones,
+    exclusionZonesInMeters,
+    exclusionPolygonPath,
+    drawMode,
     addVertex,
     handleMouseMove,
     closePolygon,
     undo,
     reset,
+    removeExclusionZone,
+    setDrawMode,
     snapPoint,
     svgToMeters,
     metersToSvg

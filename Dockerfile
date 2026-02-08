@@ -27,7 +27,7 @@ FROM node:20-alpine AS frontend-builder
 
 WORKDIR /app/frontend
 
-# Install build dependencies for native modules (cwebp-bin)
+# Install build dependencies for native modules
 RUN apk add --no-cache python3 make g++
 
 # Copy frontend package files
