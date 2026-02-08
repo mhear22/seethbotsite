@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive } from 'vue'
 import { useAuth } from '../../composables/useAuth'
+import { formatDate } from '../../utils/format'
 
 const auth = reactive(useAuth())
 
@@ -385,7 +386,7 @@ const handleDeleteAccount = async () => {
         </button>
 
         <p class="auth-info">
-          Account created: {{ new Date(auth.user?.created_at || '').toLocaleDateString() }}
+          Account created: {{ formatDate(auth.user?.created_at || '') }}
         </p>
       </div>
     </div>

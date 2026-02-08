@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { formatDateForTimezone } from '../../../utils/format'
 
 export interface ClockData {
   title: string
@@ -52,16 +53,6 @@ const formatTime = (timezone: string) => {
     minute: '2-digit',
     second: '2-digit',
     hour12: false
-  })
-}
-
-const formatDate = (timezone: string) => {
-  const now = new Date()
-  return now.toLocaleDateString('en-US', {
-    timeZone: timezone,
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric'
   })
 }
 

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useAppStore } from '../../stores/useAppStore'
+import { formatDate, formatTimeAgo } from '../../utils/format'
 
 const appStore = useAppStore()
 
@@ -61,34 +62,6 @@ const changeTypes = {
   improved: { icon: '🚀', label: 'Improved', color: '#4299e1' },
   fixed: { icon: '🔧', label: 'Fixed', color: '#ed8936' },
   removed: { icon: '🗑️', label: 'Removed', color: '#f56565' }
-}
-
-const formatDate = (dateString: string) => {
-  const date = new Date(dateString)
-  return date.toLocaleDateString(undefined, {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
-
-const formatRelativeTime = (dateString: string) => {
-  const date = new Date(dateString)
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffMins = Math.floor(diffMs / 60000)
-  const diffHours = Math.floor(diffMs / 3600000)
-  const diffDays = Math.floor(diffMs / 86400000)
-
-  if (diffMins < 60) {
-    return `${diffMins}m ago`
-  } else if (diffHours < 24) {
-    return `${diffHours}h ago`
-  } else {
-    return `${diffDays}d ago`
-  }
 }
 
 const filteredOpinions = computed(() => {
@@ -226,7 +199,7 @@ onMounted(() => {
             <span class="opinion-type">
               {{ opinion.type === 'build' ? '🏗️ Build' : '🎲 Random' }}
             </span>
-            <span class="opinion-date">{{ formatRelativeTime(opinion.createdAt) }}</span>
+            <span class="opinion-date">{{ formatTimeAgo(opinion.createdAt) }}</span>
           </div>
           <p class="opinion-text">{{ opinion.text }}</p>
           <div class="opinion-footer">
@@ -257,7 +230,7 @@ onMounted(() => {
         >
           <div class="patch-note-header">
             <div class="version-badge">v{{ note.version }}</div>
-            <div class="build-info">Build #{{ note.buildNumber }} • {{ formatRelativeTime(note.buildTime) }}</div>
+            <div class="build-info">Build #{{ note.buildNumber }} • {{ formatTimeAgo(note.buildTime) }}</div>
           </div>
 
           <h2 class="patch-title">{{ note.title }}</h2>

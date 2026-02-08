@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useAppStore } from '../../stores/useAppStore'
+import { formatDate } from '../../utils/format'
 
 interface GameRelease {
   title: string
@@ -124,7 +125,7 @@ const sortedReleases = computed(() => {
         <div class="game-info">
           <h3 class="game-title">{{ release.title }}</h3>
           <p class="game-description">{{ release.description }}</p>
-          <p class="release-date">Release: {{ release.date.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' }) }}</p>
+          <p class="release-date">Release: {{ formatDate(release.date, false, 'long') }}</p>
         </div>
         <div class="countdown-display">
           <div v-if="getTimeUntil(release.date).released" class="released-badge">

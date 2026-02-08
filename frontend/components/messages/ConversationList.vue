@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import type { Conversation } from '../../repositories/types/messages.types'
 import { messagesRepository } from '../../repositories/messages.repository'
+import { formatTimeAgo } from '../../utils/format'
 
 interface Props {
   conversations: Conversation[]
@@ -22,20 +23,6 @@ const showCreateModal = ref(false)
 const newUserId = ref('')
 const createError = ref<string | null>(null)
 const creating = ref(false)
-
-// Format timestamp
-const formatTime = (timestamp: string) => {
-  const date = new Date(timestamp)
-  const now = new Date()
-  const diff = now.getTime() - date.getTime()
-
-  if (diff < 60000) return 'now'
-  if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`
-  if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`
-  if (diff < 604800000) return `${Math.floor(diff / 86400000)}d ago`
-
-  return date.toLocaleDateString()
-}
 
 // Get other participant's display name
 const getDisplayName = (conversation: Conversation) => {
@@ -133,7 +120,7 @@ const truncateMessage = (content: string, maxLength = 50) => {
         <div class="conversation-content">
           <div class="conversation-header-row">
             <span class="conversation-name">{{ getDisplayName(conversation) }}</span>
-            <span class="conversation-time">{{ formatTime(conversation.updated_at) }}</span>
+            <span class="conversation-time">{{ formatTimeAgo(conversation.updated_at) }}</span>
           </div>
 
           <div class="conversation-preview">

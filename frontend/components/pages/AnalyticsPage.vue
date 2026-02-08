@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
+import { formatTimeAgo } from '../../utils/format'
 
 interface AnalyticsSummary {
   totalClicks: number
@@ -75,20 +76,6 @@ const formatNumber = (num: number): string => {
 const formatPath = (path: string): string => {
   if (path === '/') return 'Home'
   return path.replace(/^\//, '').replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
-}
-
-const formatTime = (timestamp: string): string => {
-  const date = new Date(timestamp)
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffMins = Math.floor(diffMs / 60000)
-
-  if (diffMins < 1) return 'Just now'
-  if (diffMins < 60) return `${diffMins}m ago`
-  const diffHours = Math.floor(diffMins / 60)
-  if (diffHours < 24) return `${diffHours}h ago`
-  const diffDays = Math.floor(diffHours / 24)
-  return `${diffDays}d ago`
 }
 
 onMounted(() => {
@@ -173,7 +160,7 @@ onUnmounted(() => {
     <!-- Last Updated -->
     <section class="last-updated">
       <p class="updated-text">
-        Last updated: {{ summary?.timestamp ? formatTime(summary.timestamp) : 'N/A' }}
+        Last updated: {{ summary?.timestamp ? formatTimeAgo(summary.timestamp) : 'N/A' }}
       </p>
     </section>
   </div>

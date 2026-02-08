@@ -3,6 +3,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { statsRepository } from '../../repositories/stats.repository'
 import type { LeaderboardEntry, UserStats } from '../../repositories/types/stats.types'
+import { formatDate, formatHistoryTime } from '../../utils/format'
 import DailyChallenges from './DailyChallenges.vue'
 import Achievements from './Achievements.vue'
 
@@ -103,15 +104,6 @@ const formatNumber = (num: number) => {
   return num.toString()
 }
 
-const formatDate = (dateString: string) => {
-  const date = new Date(dateString)
-  return date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric'
-  })
-}
-
 const gameTitle = computed(() => {
   return selectedGame.value === 'clicker' ? '🍄 Clicker' : '🎣 Fishing'
 })
@@ -144,21 +136,6 @@ const formatHistoryType = (statType: string): string => {
     default:
       return statType
   }
-}
-
-const formatHistoryTime = (dateString: string): string => {
-  const date = new Date(dateString)
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffMins = Math.floor(diffMs / 60000)
-  const diffHours = Math.floor(diffMs / 3600000)
-  const diffDays = Math.floor(diffMs / 86400000)
-
-  if (diffMins < 1) return 'Just now'
-  if (diffMins < 60) return `${diffMins}m ago`
-  if (diffHours < 24) return `${diffHours}h ago`
-  if (diffDays < 7) return `${diffDays}d ago`
-  return formatDate(dateString)
 }
 
 const goBack = () => {

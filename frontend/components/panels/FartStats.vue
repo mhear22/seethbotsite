@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
+import { formatTimeAgo } from '../../utils/format'
 
 interface FartStats {
   totalFarts: number
@@ -25,18 +26,6 @@ const error = ref<string | null>(null)
 
 const formatNumber = (num: number): string => {
   return new Intl.NumberFormat().format(num)
-}
-
-const formatDate = (dateString: string): string => {
-  const date = new Date(dateString)
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffMins = Math.floor(diffMs / 60000)
-  
-  if (diffMins < 1) return 'Just now'
-  if (diffMins < 60) return `${diffMins}m ago`
-  if (diffMins < 1440) return `${Math.floor(diffMins / 60)}h ago`
-  return `${Math.floor(diffMins / 1440)}d ago`
 }
 
 const fetchFartStats = async () => {
@@ -125,7 +114,7 @@ onMounted(() => {
             <div class="user">{{ entry.user_id }}</div>
             <div class="farts">{{ formatNumber(entry.total_farts) }}</div>
             <div class="volume">{{ entry.avg_volume.toFixed(2) }}</div>
-            <div class="last">{{ formatDate(entry.last_fart) }}</div>
+            <div class="last">{{ formatTimeAgo(entry.last_fart) }}</div>
           </div>
         </div>
       </div>

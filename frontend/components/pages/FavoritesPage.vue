@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useFavorites, type FavoriteItem } from '../../composables/useFavorites'
 import { useAppStore } from '../../stores/useAppStore'
 import EmojiRenderer from '../shared/ui/EmojiRenderer.vue'
+import { formatDate } from '../../utils/format'
 
 const router = useRouter()
 const appStore = useAppStore()
@@ -34,15 +35,6 @@ const navigateToRankings = () => {
 
 const navigateToTickets = () => {
   router.push('/tickets')
-}
-
-const formatDate = (timestamp: number) => {
-  const date = new Date(timestamp)
-  return date.toLocaleDateString(undefined, {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric'
-  })
 }
 
 const handleClearAll = () => {
