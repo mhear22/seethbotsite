@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { getDB, parseDependencies, isTicketBlocked } from './tickets-db';
+import { getDB, parseDependencies, isTicketBlocked, safeJsonParse } from './tickets-db';
 
 /**
  * Create ticket DTO
@@ -133,9 +133,7 @@ export class TicketsService {
     }
 
     // Parse dependencies from database
-    const dependencies = ticket.dependencies
-      ? JSON.parse(ticket.dependencies)
-      : [];
+    const dependencies = safeJsonParse<number[]>(ticket.dependencies, []);
 
     return {
       ...ticket,
@@ -197,9 +195,7 @@ export class TicketsService {
 
     // Add computed fields to each ticket
     return tickets.map((ticket: any) => {
-      const dependencies = ticket.dependencies
-        ? JSON.parse(ticket.dependencies)
-        : [];
+      const dependencies = safeJsonParse<number[]>(ticket.dependencies, []);
 
       return {
         ...ticket,
@@ -305,7 +301,7 @@ export class TicketsService {
     const updatedTicket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(id) as any;
 
     // Add computed fields to response
-    const depsArray = updatedTicket.dependencies ? JSON.parse(updatedTicket.dependencies) : [];
+    const depsArray = safeJsonParse<number[]>(updatedTicket.dependencies, []);
     return {
       ...updatedTicket,
       dependencies: depsArray,

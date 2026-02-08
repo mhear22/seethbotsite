@@ -7,6 +7,25 @@ import createClient from 'openapi-fetch';
 import type { paths } from '../types/openapi';
 import { getApiBaseUrl } from '../config/api.config';
 
+// Safe error message conversion to handle non-serializable objects
+function getErrorMessage(error: unknown): string {
+  if (error === null || error === undefined) {
+    return 'Unknown error';
+  }
+  if (typeof error === 'string') {
+    return error;
+  }
+  if (typeof error === 'object') {
+    try {
+      return JSON.stringify(error, null, 2);
+    } catch (e) {
+      // If stringify fails, return a string representation
+      return String(error);
+    }
+  }
+  return String(error);
+}
+
 // Create the API client with the generated types
 export const apiClient = createClient<paths>({
   baseUrl: getApiBaseUrl() || '/api',
@@ -28,7 +47,7 @@ export async function apiGet<T extends keyof paths>(
   const response = await apiClient.GET(path, init);
 
   if (response.error) {
-    throw new Error(JSON.stringify(response.error));
+    throw new Error(getErrorMessage(response.error));
   }
 
   return response.data;
@@ -44,7 +63,7 @@ export async function apiPost<T extends keyof paths>(
   const response = await apiClient.POST(path, init);
 
   if (response.error) {
-    throw new Error(JSON.stringify(response.error));
+    throw new Error(getErrorMessage(response.error));
   }
 
   return response.data;
@@ -60,7 +79,7 @@ export async function apiPut<T extends keyof paths>(
   const response = await apiClient.PUT(path, init);
 
   if (response.error) {
-    throw new Error(JSON.stringify(response.error));
+    throw new Error(getErrorMessage(response.error));
   }
 
   return response.data;
@@ -76,7 +95,7 @@ export async function apiPatch<T extends keyof paths>(
   const response = await apiClient.PATCH(path, init);
 
   if (response.error) {
-    throw new Error(JSON.stringify(response.error));
+    throw new Error(getErrorMessage(response.error));
   }
 
   return response.data;
@@ -92,7 +111,7 @@ export async function apiDelete<T extends keyof paths>(
   const response = await apiClient.DELETE(path, init);
 
   if (response.error) {
-    throw new Error(JSON.stringify(response.error));
+    throw new Error(getErrorMessage(response.error));
   }
 
   return response.data;
