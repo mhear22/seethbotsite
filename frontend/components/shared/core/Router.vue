@@ -3,7 +3,6 @@ import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '../../../stores/useAppStore'
 import { useKeyboardShortcuts } from '../../../composables/useKeyboardShortcuts'
-import { useRouteNavigation } from '../../../composables/useRouteNavigation'
 import KeyboardShortcutsHelp from '../../shared/ui/KeyboardShortcutsHelp.vue'
 import PageTicker from '../../shared/ui/PageTicker.vue'
 
@@ -14,7 +13,11 @@ const appStore = useAppStore()
 const route = useRoute()
 const router = useRouter()
 const { shortcuts, registerShortcut, isHelpOpen, toggleHelp } = useKeyboardShortcuts()
-const { breadcrumbs, scrollToTop } = useRouteNavigation()
+
+// Simple scroll to top function
+const scrollToTop = () => {
+  window.scrollTo(0, 0)
+}
 
 const brandRotation = ref(0)
 const brandClicking = ref(false)
@@ -371,16 +374,6 @@ if (typeof window !== 'undefined') {
       <span class="mobile-nav-icon" aria-hidden="true">{{ item.icon }}</span>
       <span class="mobile-nav-label">{{ item.title }}</span>
     </RouterLink>
-  </nav>
-
-  <!-- Breadcrumb Navigation (Ticket #126) -->
-  <nav v-if="route.path !== '/'" class="breadcrumbs" aria-label="Breadcrumb navigation">
-    <RouterLink to="/" class="breadcrumb-item">Home</RouterLink>
-    <template v-for="(crumb, index) in breadcrumbs.slice(1)" :key="crumb.path">
-      <span class="breadcrumb-separator">/</span>
-      <RouterLink v-if="index !== breadcrumbs.length - 2" :to="crumb.path" class="breadcrumb-item">{{ crumb.title }}</RouterLink>
-      <span v-else class="breadcrumb-item breadcrumb-current">{{ crumb.title }}</span>
-    </template>
   </nav>
 
   <!-- Keyboard Shortcuts Help Modal (Ticket #128) -->

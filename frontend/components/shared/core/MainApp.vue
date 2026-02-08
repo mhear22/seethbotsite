@@ -16,6 +16,7 @@ import SearchModal from '../ui/SearchModal.vue'
 import MobileFAB from '../ui/MobileFAB.vue'
 import SkipLink from '../ui/SkipLink.vue'
 import KeyboardShortcutsHelp from '../ui/KeyboardShortcutsHelp.vue'
+import Breadcrumb from '../Breadcrumb.vue'
 import { useAppStore } from '../../../stores/useAppStore'
 import { useKeyboardShortcuts } from '../../../composables/useKeyboardShortcuts'
 
@@ -227,6 +228,9 @@ onUnmounted(() => {
     <SkipLink />
 
     <Router />
+
+    <!-- Breadcrumb Navigation (Ticket #126) -->
+    <Breadcrumb />
 
     <main class="content-wrapper" id="main-content">
       <router-view />
