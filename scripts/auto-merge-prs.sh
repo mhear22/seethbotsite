@@ -16,8 +16,8 @@ cd "$WORKDIR"
 
 echo "Checking for completed tickets with branches..."
 
-# Get all completed tickets
-COMPLETED_TICKETS=$(curl -s "$TICKET_API" | \
+# Get all completed tickets (increase limit to capture all)
+COMPLETED_TICKETS=$(curl -s "$TICKET_API?limit=500" | \
   jq -r '.tickets[] | select(.status == "completed") | "\(.id):\(.title)"')
 
 if [ -z "$COMPLETED_TICKETS" ]; then
