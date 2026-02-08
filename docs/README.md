@@ -35,6 +35,26 @@ This folder contains documentation for the seethbotsite project. All developers 
 
 ---
 
+## 📋 Development Guidelines
+
+The `guidelines/` folder contains coding standards and best practices for maintaining consistency across the codebase.
+
+### Available Guidelines
+
+- **[Component Naming](guidelines/component-naming.md)** - Naming conventions for components, utilities, stores, and composables
+- **[File Organization](guidelines/file-organization.md)** - Standard folder structure and file placement guidelines
+- **[Code Style](guidelines/code-style.md)** - TypeScript, Vue.js, and JavaScript best practices
+- **[Testing](guidelines/testing.md)** - Testing patterns, coverage goals, and best practices
+
+### When to Read Guidelines
+
+- **Before starting new features** - Ensure your code follows established patterns
+- **During code reviews** - Verify adherence to standards
+- **Onboarding new developers** - Provide consistency for team members
+- **Refactoring** - Maintain style consistency across changes
+
+---
+
 ## 🔗 Other Documentation
 
 The following documentation is located in the project root:

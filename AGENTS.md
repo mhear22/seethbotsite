@@ -35,6 +35,21 @@
    - Environment variables
    - Troubleshooting deployment issues
 
+4. **`docs/` folder** - Additional Documentation
+   - **`docs/README.md`** - Documentation index and quick reference
+   - **`docs/DECISIONS.md`** - Architectural decisions (also in root)
+   - **`docs/guidelines/`** - Development standards and best practices
+     - Component naming conventions
+     - File organization structure
+     - Code style standards (TypeScript, Vue.js, JavaScript)
+     - Testing guidelines and patterns
+   - **`docs/features/`** - Feature-specific documentation
+     - Ranking system
+     - Clicker game
+     - Ticket system
+     - Character Tinder
+     - Fishing game
+
 ### Why This Matters:
 
 - **Avoid conflicts** - Don't make changes that contradict existing decisions
