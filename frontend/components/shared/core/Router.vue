@@ -1,40 +1,31 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '../../../stores/useAppStore'
 import { useKeyboardShortcuts } from '../../../composables/useKeyboardShortcuts'
+import { useRouteNavigation } from '../../../composables/useRouteNavigation'
 import KeyboardShortcutsHelp from '../../shared/ui/KeyboardShortcutsHelp.vue'
 import PageTicker from '../../shared/ui/PageTicker.vue'
 
-// Brand icon rotation (Ticket #92)
+interface RouteData { title: string; icon: string; path: string }
+interface DropdownData { title: string; icon: string; routes: RouteData[] }
+
+const appStore = useAppStore()
+const route = useRoute()
+const router = useRouter()
+const { shortcuts, registerShortcut, isHelpOpen, toggleHelp } = useKeyboardShortcuts()
+const { breadcrumbs, scrollToTop } = useRouteNavigation()
+
 const brandRotation = ref(0)
 const brandClicking = ref(false)
 
 const handleScroll = () => {
   const scrollTop = window.pageYOffset || document.documentElement.scrollTop
   const maxScroll = document.documentElement.scrollHeight - window.innerHeight
-  const scrollPercent = scrollTop / maxScroll
-  brandRotation.value = scrollPercent * 360
+  brandRotation.value = (scrollTop / maxScroll) * 360
 }
 
-interface RouteData {
-  title: string
-  icon: string
-  path: string
-}
-
-interface DropdownData {
-  title: string
-  icon: string
-  routes: RouteData[]
-}
-
-// Organized navigation structure with dropdowns
-const mainRoutes = ref<RouteData[]>([
-  { title: 'Home', icon: '🌸', path: '/' }
-])
-
-// Quick navigation for mobile bottom nav (Ticket #110)
+const mainRoutes = ref<RouteData[]>([{ title: 'Home', icon: '🌸', path: '/' }])
 const quickNavItems = ref<RouteData[]>([
   { title: 'Home', icon: '🌸', path: '/' },
   { title: 'Movies', icon: '🎬', path: '/movies' },
@@ -92,357 +83,89 @@ const dropdowns = ref<DropdownData[]>([
   }
 ])
 
-const route = useRoute()
-const router = useRouter()
-const appStore = useAppStore()
 const mobileMenuOpen = ref(false)
 const openDropdown = ref<string | null>(null)
-const showKeyboardHelp = ref(false)
-
-// Keyboard shortcuts (Ticket #128)
-const { shortcuts, registerShortcut, isHelpOpen, toggleHelp } = useKeyboardShortcuts()
-showKeyboardHelp.value = isHelpOpen.value
-
-// Breadcrumb navigation (Ticket #126)
-const breadcrumbs = computed(() => {
-  const crumbPath: Array<{ title: string; path: string }> = []
-  const pathSegments = route.path.split('/').filter(Boolean)
-
-  // Always add Home
-  crumbPath.push({ title: 'Home', path: '/' })
-
-  // Add each segment
-  let currentPath = ''
-  pathSegments.forEach((segment, index) => {
-    currentPath += `/${segment}`
-    const title = segment
-      .split('-')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ')
-
-    // Find matching route title from dropdowns or main routes
-    let routeTitle = title
-    const allRoutes = [
-      ...mainRoutes.value,
-      ...dropdowns.value.flatMap(d => d.routes)
-    ]
-    const matchingRoute = allRoutes.find(r => r.path === currentPath)
-    if (matchingRoute) {
-      routeTitle = matchingRoute.title
-    }
-
-    crumbPath.push({ title: routeTitle, path: currentPath })
-  })
-
-  // Limit breadcrumbs to prevent overcrowding
-  if (crumbPath.length > 4) {
-    const first = crumbPath[0]
-    const last = crumbPath[crumbPath.length - 1]
-    const prev = crumbPath[crumbPath.length - 2]
-    crumbPath.splice(1, crumbPath.length - 3, { title: '...', path: prev.path })
-  }
-
-  return crumbPath
-})
-
-// Build info (Ticket #56)
+const showKeyboardHelp = ref(isHelpOpen.value)
 const buildInfo = ref<{ buildCount: number; buildTime: string } | null>(null)
 const timeAgo = ref('')
 
-// Load build info on mount
+loadBuildInfo()
+
 const loadBuildInfo = async () => {
   try {
     const response = await fetch('/api/version')
     const data = await response.json()
-    buildInfo.value = {
-      buildCount: data.buildCount || 1,
-      buildTime: data.buildTime
-    }
+    buildInfo.value = { buildCount: data.buildCount || 1, buildTime: data.buildTime }
     updateTimeAgo()
-    // Update time ago every minute
     setInterval(updateTimeAgo, 60000)
-  } catch (error) {
-    console.warn('Could not load build info:', error)
-  }
+  } catch (error) { console.warn('Could not load build info:', error) }
 }
 
 const updateTimeAgo = () => {
   if (!buildInfo.value) return
-  const buildDate = new Date(buildInfo.value.buildTime)
-  const now = new Date()
-  const diffMs = now.getTime() - buildDate.getTime()
-  const diffMins = Math.floor(diffMs / 60000)
+  const now = Date.now()
+  const buildDate = new Date(buildInfo.value.buildTime).getTime()
+  const diffMins = Math.floor((now - buildDate) / 60000)
   const diffHours = Math.floor(diffMins / 60)
   const diffDays = Math.floor(diffHours / 24)
-
-  if (diffMins < 1) {
-    timeAgo.value = 'just now'
-  } else if (diffMins < 60) {
-    timeAgo.value = `${diffMins}m ago`
-  } else if (diffHours < 24) {
-    timeAgo.value = `${diffHours}h ago`
-  } else {
-    timeAgo.value = `${diffDays}d ago`
-  }
+  timeAgo.value = diffMins < 1 ? 'just now' : diffMins < 60 ? `${diffMins}m ago` : diffHours < 24 ? `${diffHours}h ago` : `${diffDays}d ago`
 }
 
-// Load build info when component mounts
-loadBuildInfo()
-
-// Add scroll listener for brand icon rotation (Ticket #92)
 onMounted(() => {
   window.addEventListener('scroll', handleScroll)
-  handleScroll() // Initial rotation
+  handleScroll()
 
-  // Register keyboard shortcuts (Ticket #128)
-  registerShortcut({
-    key: '?',
-    description: 'Show keyboard shortcuts help',
-    action: () => {
-      toggleHelp()
-      showKeyboardHelp.value = isHelpOpen.value
-    }
-  })
+  // Keyboard shortcuts configuration
+  const shortcutsConfig = [
+    { key: '?', description: 'Show keyboard shortcuts help', action: () => { toggleHelp(); showKeyboardHelp.value = isHelpOpen.value } },
+    { key: 'k', ctrl: true, description: 'Open search', action: () => appStore.toggleSearchModal() },
+    { key: 'h', description: 'Go to Home', action: () => navigate('/') },
+    { key: 't', description: 'Go to Tickets', action: () => navigate('/tickets') },
+    { key: 'm', description: 'Go to Movies', action: () => navigate('/movies') },
+    { key: 'r', description: 'Go to Rankings', action: () => navigate('/rankings') },
+    { key: 's', description: 'Go to Stocks', action: () => navigate('/stocks') },
+    { key: 'k', description: 'Go to Clicker', action: () => navigate('/clicker') },
+    { key: 'f', description: 'Go to Fishing', action: () => navigate('/fishing') },
+    { key: 'g', description: 'Go to Stats', action: () => navigate('/stats') },
+    { key: 'o', description: 'Go to Shop', action: () => navigate('/shop') },
+    { key: ',', description: 'Go to Settings', action: () => navigate('/settings') },
+    { key: 'd', description: 'Toggle dark mode', action: () => appStore.toggleDarkMode() },
+    { key: 'u', description: 'Toggle music', action: () => appStore.toggleMusic() },
+    { key: 'z', description: 'Toggle chaos mode', action: () => appStore.toggleChaosMode() },
+    { key: 'q', description: 'Toggle mold mode', action: () => appStore.toggleMoldMode() },
+    { key: '1', description: 'Toggle mold meter', action: () => appStore.togglePanel('tachometer') },
+    { key: '2', description: 'Toggle rankings panel', action: () => appStore.togglePanel('rankings') },
+    { key: '3', description: 'Toggle cat panel', action: () => appStore.togglePanel('cat') },
+    { key: '4', description: 'Toggle feed panel', action: () => appStore.togglePanel('feed') },
+    { key: '5', description: 'Toggle goose', action: () => appStore.togglePanel('digitalGoose') },
+    { key: '6', description: 'Toggle GPU mining', action: () => appStore.togglePanel('mining') },
+    { key: '7', description: 'Toggle coolness panel', action: () => appStore.togglePanel('coolnessPanel') },
+    { key: 'c', description: 'Toggle cat panel', action: () => appStore.togglePanel('cat') },
+    { key: 'p', description: 'Toggle GPU mining', action: () => appStore.togglePanel('mining') },
+    { key: 'g', shift: true, description: 'Toggle goose', action: () => appStore.togglePanel('digitalGoose') },
+    { key: 'Escape', description: 'Close modal/menu', action: () => { if (showKeyboardHelp.value) { toggleHelp(); showKeyboardHelp.value = false } if (mobileMenuOpen.value) closeMobileMenu() } }
+  ]
 
-  // Search shortcut (Ticket #139)
-  registerShortcut({
-    key: 'k',
-    ctrl: true,
-    description: 'Open search',
-    action: () => {
-      appStore.toggleSearchModal()
-    }
-  })
-
-  // Navigation shortcuts
-  registerShortcut({
-    key: 'h',
-    description: 'Go to Home',
-    action: () => {
-      router.push('/')
-    }
-  })
-
-  registerShortcut({
-    key: 't',
-    description: 'Go to Tickets',
-    action: () => {
-      router.push('/tickets')
-    }
-  })
-
-  registerShortcut({
-    key: 'm',
-    description: 'Go to Movies',
-    action: () => {
-      router.push('/movies')
-    }
-  })
-
-  registerShortcut({
-    key: 'r',
-    description: 'Go to Rankings',
-    action: () => {
-      router.push('/rankings')
-    }
-  })
-
-  registerShortcut({
-    key: 's',
-    description: 'Go to Stocks',
-    action: () => {
-      router.push('/stocks')
-    }
-  })
-
-  registerShortcut({
-    key: 'k',
-    description: 'Go to Clicker',
-    action: () => {
-      router.push('/clicker')
-    }
-  })
-
-  registerShortcut({
-    key: 'f',
-    description: 'Go to Fishing',
-    action: () => {
-      router.push('/fishing')
-    }
-  })
-
-  registerShortcut({
-    key: 'g',
-    description: 'Go to Stats',
-    action: () => {
-      router.push('/stats')
-    }
-  })
-
-  registerShortcut({
-    key: 'o',
-    description: 'Go to Shop',
-    action: () => {
-      router.push('/shop')
-    }
-  })
-
-  registerShortcut({
-    key: ',',
-    description: 'Go to Settings',
-    action: () => {
-      router.push('/settings')
-    }
-  })
-
-  // Toggle shortcuts
-  registerShortcut({
-    key: 'd',
-    description: 'Toggle dark mode',
-    action: () => {
-      appStore.toggleDarkMode()
-    }
-  })
-
-  registerShortcut({
-    key: 'u',
-    description: 'Toggle music',
-    action: () => {
-      appStore.toggleMusic()
-    }
-  })
-
-  registerShortcut({
-    key: 'z',
-    description: 'Toggle chaos mode',
-    action: () => {
-      appStore.toggleChaosMode()
-    }
-  })
-
-  registerShortcut({
-    key: 'q',
-    description: 'Toggle mold mode',
-    action: () => {
-      appStore.toggleMoldMode()
-    }
-  })
-
-  // Panel shortcuts (number keys - standard for panel toggles)
-  registerShortcut({
-    key: '1',
-    description: 'Toggle mold meter',
-    action: () => {
-      appStore.togglePanel('tachometer')
-    }
-  })
-
-  registerShortcut({
-    key: '2',
-    description: 'Toggle rankings panel',
-    action: () => {
-      appStore.togglePanel('rankings')
-    }
-  })
-
-  registerShortcut({
-    key: '3',
-    description: 'Toggle cat panel',
-    action: () => {
-      appStore.togglePanel('cat')
-    }
-  })
-
-  registerShortcut({
-    key: '4',
-    description: 'Toggle feed panel',
-    action: () => {
-      appStore.togglePanel('feed')
-    }
-  })
-
-  registerShortcut({
-    key: '5',
-    description: 'Toggle goose',
-    action: () => {
-      appStore.togglePanel('digitalGoose')
-    }
-  })
-
-  registerShortcut({
-    key: '6',
-    description: 'Toggle GPU mining',
-    action: () => {
-      appStore.togglePanel('mining')
-    }
-  })
-
-  registerShortcut({
-    key: '7',
-    description: 'Toggle coolness panel',
-    action: () => {
-      appStore.togglePanel('coolnessPanel')
-    }
-  })
-
-  // Panel shortcuts (letter keys - quick access)
-  registerShortcut({
-    key: 'c',
-    description: 'Toggle cat panel',
-    action: () => {
-      appStore.togglePanel('cat')
-    }
-  })
-
-  registerShortcut({
-    key: 'p',
-    description: 'Toggle GPU mining',
-    action: () => {
-      appStore.togglePanel('mining')
-    }
-  })
-
-  registerShortcut({
-    key: 'g',
-    shift: true,
-    description: 'Toggle goose',
-    action: () => {
-      appStore.togglePanel('digitalGoose')
-    }
-  })
-
-  // Escape to close
-  registerShortcut({
-    key: 'Escape',
-    description: 'Close modal/menu',
-    action: () => {
-      if (showKeyboardHelp.value) {
-        toggleHelp()
-        showKeyboardHelp.value = false
-      }
-      if (mobileMenuOpen.value) {
-        closeMobileMenu()
-      }
-    }
-  })
+  shortcutsConfig.forEach(config => registerShortcut(config))
 })
 
 onUnmounted(() => {
   window.removeEventListener('scroll', handleScroll)
 })
 
-const scrollToTop = () => {
-  window.scrollTo(0, 0)
+// Helper function for navigation shortcuts
+const navigate = (path: string) => {
+  router.push(path)
 }
 
+// Brand icon click handler
 const handleBrandIconClick = () => {
   brandClicking.value = true
-  setTimeout(() => {
-    brandClicking.value = false
-  }, 400)
+  setTimeout(() => { brandClicking.value = false }, 400)
   scrollToTop()
 }
 
+// Mobile menu handlers
 const toggleMobileMenu = () => {
   mobileMenuOpen.value = !mobileMenuOpen.value
 }
@@ -452,12 +175,9 @@ const closeMobileMenu = () => {
   scrollToTop()
 }
 
+// Dropdown handlers
 const toggleDropdown = (dropdownTitle: string) => {
-  if (openDropdown.value === dropdownTitle) {
-    openDropdown.value = null
-  } else {
-    openDropdown.value = dropdownTitle
-  }
+  openDropdown.value = openDropdown.value === dropdownTitle ? null : dropdownTitle
 }
 
 const isDropdownOpen = (dropdownTitle: string) => {
@@ -468,60 +188,14 @@ const closeDropdowns = () => {
   openDropdown.value = null
 }
 
-// Handle keyboard navigation for dropdowns
+// Keyboard navigation for dropdowns
 const handleDropdownKeydown = (e: KeyboardEvent, dropdownTitle: string) => {
   if (e.key === 'Enter' || e.key === ' ') {
     e.preventDefault()
     toggleDropdown(dropdownTitle)
-
-    // If dropdown was just opened, focus first item
-    if (openDropdown.value === dropdownTitle) {
-      nextTick(() => {
-        const dropdownMenu = document.querySelector(`.dropdown.open .dropdown-menu`) as HTMLElement
-        const firstItem = dropdownMenu?.querySelector('.dropdown-item') as HTMLElement
-        if (firstItem) {
-          firstItem.focus()
-        }
-      })
-    }
   } else if (e.key === 'Escape') {
     e.preventDefault()
     closeDropdowns()
-  }
-}
-
-// Handle arrow key navigation within dropdown menu
-const handleDropdownMenuKeydown = (e: KeyboardEvent, dropdownIndex: number) => {
-  const dropdown = document.querySelectorAll('.dropdown')[dropdownIndex] as HTMLElement
-  if (!dropdown) return
-
-  const menuItems = Array.from(dropdown.querySelectorAll('.dropdown-item')) as HTMLElement[]
-  if (menuItems.length === 0) return
-
-  const currentIndex = menuItems.findIndex(item => item === document.activeElement)
-
-  if (e.key === 'ArrowDown') {
-    e.preventDefault()
-    const nextIndex = currentIndex < menuItems.length - 1 ? currentIndex + 1 : 0
-    menuItems[nextIndex].focus()
-  } else if (e.key === 'ArrowUp') {
-    e.preventDefault()
-    const prevIndex = currentIndex > 0 ? currentIndex - 1 : menuItems.length - 1
-    menuItems[prevIndex].focus()
-  } else if (e.key === 'Escape') {
-    e.preventDefault()
-    closeDropdowns()
-    const dropdownBtn = dropdown.querySelector('.dropdown-btn') as HTMLElement
-    if (dropdownBtn) {
-      dropdownBtn.focus()
-    }
-  } else if (e.key === 'Tab' || (e.key === 'Tab' && e.shiftKey)) {
-    // Let Tab work normally, but close dropdown when leaving
-    setTimeout(() => {
-      if (!dropdown.contains(document.activeElement)) {
-        closeDropdowns()
-      }
-    }, 10)
   }
 }
 
@@ -531,16 +205,11 @@ const handleClickOutside = (event: MouseEvent) => {
   const navLinks = document.querySelector('.nav-links')
   const menuToggle = document.querySelector('.mobile-menu-toggle')
 
-  if (mobileMenuOpen.value &&
-      navLinks &&
-      menuToggle &&
-      !navLinks.contains(target) &&
-      !menuToggle.contains(target)) {
+  if (mobileMenuOpen.value && navLinks && menuToggle && !navLinks.contains(target) && !menuToggle.contains(target)) {
     closeMobileMenu()
   }
 }
 
-// Add click listener for outside clicks on mobile
 if (typeof window !== 'undefined') {
   document.addEventListener('click', handleClickOutside)
 }
@@ -549,11 +218,7 @@ if (typeof window !== 'undefined') {
 <template>
   <nav class="router-nav" @mouseleave="closeDropdowns">
     <!-- Mobile menu backdrop -->
-    <div
-      v-if="mobileMenuOpen"
-      class="mobile-menu-backdrop"
-      @click="closeMobileMenu"
-    ></div>
+    <div v-if="mobileMenuOpen" class="mobile-menu-backdrop" @click="closeMobileMenu"></div>
 
     <div class="nav-container">
       <div class="nav-brand">
@@ -565,12 +230,10 @@ if (typeof window !== 'undefined') {
           title="Click to scroll to top"
         >🌸</span>
         <span class="brand-text">Mold</span>
-        <!-- Font Awesome icon demonstration -->
         <font-awesome-icon :icon="['fas', 'child']" size="lg" class="fa-child-icon" title="Font Awesome - Child Icon" />
         <span class="build-indicator" v-if="buildInfo" :title="`Build #${buildInfo.buildCount} deployed ${timeAgo}`">
           #{{ buildInfo.buildCount }} ({{ timeAgo }})
         </span>
-        <!-- Keyboard shortcuts help button (Ticket #128) -->
         <button
           class="keyboard-help-btn"
           @click="toggleHelp(); showKeyboardHelp = isHelpOpen"
@@ -584,21 +247,20 @@ if (typeof window !== 'undefined') {
         </div>
         <div class="nav-controls">
           <button
-          @click="appStore.toggleSearchModal"
-          class="control-btn search-btn"
-          :class="{ active: appStore.searchModalOpen }"
-          :aria-label="appStore.searchModalOpen ? 'Close search' : 'Open search (Ctrl+K)'"
-          :aria-pressed="appStore.searchModalOpen"
-          title="Search (Ctrl+K)"
-        >
-             🔍
+            @click="appStore.toggleSearchModal"
+            class="control-btn search-btn"
+            :class="{ active: appStore.searchModalOpen }"
+            :aria-label="appStore.searchModalOpen ? 'Close search' : 'Open search (Ctrl+K)'"
+            :aria-pressed="appStore.searchModalOpen"
+            title="Search (Ctrl+K)"
+          >
+            🔍
           </button>
           <button
             @click="appStore.toggleDarkMode"
             class="control-btn"
             :class="{ active: appStore.darkMode }"
             :aria-label="appStore.darkerMode ? 'Switch to light mode' : (appStore.darkMode ? 'Switch to midnight mode' : 'Switch to dark mode')"
-            title=""
           >
             {{ appStore.darkerMode ? '🌑' : (appStore.darkMode ? '🌙' : '☀️') }}
           </button>
@@ -607,8 +269,6 @@ if (typeof window !== 'undefined') {
             class="control-btn"
             :class="{ active: appStore.isAustralian }"
             :aria-label="appStore.isAustralian ? 'Switch to US English' : 'Switch to Australian English'"
-            :aria-pressed="appStore.isAustralian"
-            title=""
           >
             {{ appStore.isAustralian ? '🇦🇺' : '🇺🇸' }}
           </button>
@@ -617,99 +277,23 @@ if (typeof window !== 'undefined') {
             class="control-btn"
             :class="{ active: !appStore.isMuted }"
             :aria-label="appStore.isMuted ? 'Unmute sound' : 'Mute sound'"
-            :aria-pressed="!appStore.isMuted"
-            title=""
           >
             {{ appStore.isMuted ? '🔇' : '🔊' }}
           </button>
-          <button
-            @click="appStore.togglePanel('tachometer')"
-            class="control-btn"
-            :class="{ active: appStore.panels.tachometer }"
-            :aria-label="appStore.panels.tachometer ? 'Hide mold meter' : 'Show mold meter'"
-            :aria-pressed="appStore.panels.tachometer"
-            title=""
-          >
-             🍄
-          </button>
-          <button
-            @click="appStore.togglePanel('rankings')"
-            class="control-btn"
-            :class="{ active: appStore.panels.rankings }"
-            :aria-label="appStore.panels.rankings ? 'Hide rankings' : 'Show rankings'"
-            :aria-pressed="appStore.panels.rankings"
-            title=""
-          >
-             👻
-          </button>
-          <button
-            @click="appStore.togglePanel('cat')"
-            class="control-btn"
-            :class="{ active: appStore.panels.cat }"
-            :aria-label="appStore.panels.cat ? 'Hide cats' : 'Show cats'"
-            :aria-pressed="appStore.panels.cat"
-            title=""
-          >
-             🐱
-          </button>
-          <button
-            @click="appStore.togglePanel('feed')"
-            class="control-btn"
-            :class="{ active: appStore.panels.feed }"
-            :aria-label="appStore.panels.feed ? 'Hide feed' : 'Show feed'"
-            :aria-pressed="appStore.panels.feed"
-            title=""
-          >
-             📰
-          </button>
-          <button
-            @click="appStore.toggleMoldMode"
-            class="control-btn"
-            :class="{ active: appStore.moldMode }"
-            :aria-label="appStore.moldMode ? 'Disable mold mode' : 'Enable mold mode'"
-            :aria-pressed="appStore.moldMode"
-            title=""
-          >
-             🦠
-          </button>
-          <button
-            @click="appStore.togglePanel('digitalGoose')"
-            class="control-btn"
-            :class="{ active: appStore.panels.digitalGoose }"
-            :aria-label="appStore.panels.digitalGoose ? 'Hide goose' : 'Show goose'"
-            :aria-pressed="appStore.panels.digitalGoose"
-            title=""
-          >
-             🦆
-          </button>
-          <button
-            @click="appStore.togglePanel('mining')"
-            class="control-btn"
-            :class="{ active: appStore.panels.mining }"
-            :aria-label="appStore.panels.mining ? 'Hide GPU mining' : 'Show GPU mining'"
-            :aria-pressed="appStore.panels.mining"
-            title=""
-          >
-             ⛏️
-          </button>
-          <button
-            @click="appStore.toggleChaosMode"
-            class="control-btn chaos-btn"
-            :class="{ active: appStore.chaosMode }"
-            :aria-label="appStore.chaosMode ? 'Disable chaos mode' : 'Enable chaos mode'"
-            :aria-pressed="appStore.chaosMode"
-            title=""
-          >
-             🌀
-          </button>
+          <button @click="appStore.togglePanel('tachometer')" class="control-btn" :class="{ active: appStore.panels.tachometer }" title="Toggle mold meter">🍄</button>
+          <button @click="appStore.togglePanel('rankings')" class="control-btn" :class="{ active: appStore.panels.rankings }" title="Toggle rankings">👻</button>
+          <button @click="appStore.togglePanel('cat')" class="control-btn" :class="{ active: appStore.panels.cat }" title="Toggle cats">🐱</button>
+          <button @click="appStore.togglePanel('feed')" class="control-btn" :class="{ active: appStore.panels.feed }" title="Toggle feed">📰</button>
+          <button @click="appStore.toggleMoldMode" class="control-btn" :class="{ active: appStore.moldMode }" title="Toggle mold mode">🦠</button>
+          <button @click="appStore.togglePanel('digitalGoose')" class="control-btn" :class="{ active: appStore.panels.digitalGoose }" title="Toggle goose">🦆</button>
+          <button @click="appStore.togglePanel('mining')" class="control-btn" :class="{ active: appStore.panels.mining }" title="Toggle GPU mining">⛏️</button>
+          <button @click="appStore.toggleChaosMode" class="control-btn chaos-btn" :class="{ active: appStore.chaosMode }" title="Toggle chaos mode">🌀</button>
         </div>
       </div>
 
       <button class="mobile-menu-toggle" @click="toggleMobileMenu" :aria-label="mobileMenuOpen ? 'Close menu' : 'Open menu'">
         <span class="hamburger-icon" :class="{ open: mobileMenuOpen }">
-          <span></span>
-          <span></span>
-          <span></span>
+          <span></span><span></span><span></span>
         </span>
       </button>
 
@@ -731,7 +315,7 @@ if (typeof window !== 'undefined') {
 
         <!-- Dropdown Menus -->
         <div
-          v-for="(dropdown, index) in dropdowns"
+          v-for="dropdown in dropdowns"
           :key="dropdown.title"
           class="dropdown"
           :class="{ open: isDropdownOpen(dropdown.title) }"
@@ -750,7 +334,7 @@ if (typeof window !== 'undefined') {
             <span class="dropdown-arrow" aria-hidden="true">▼</span>
           </button>
 
-          <div class="dropdown-menu" role="menu" @keydown="handleDropdownMenuKeydown($event, index)">
+          <div class="dropdown-menu" role="menu">
             <RouterLink
               v-for="routeData in dropdown.routes"
               :key="routeData.path"
@@ -807,470 +391,4 @@ if (typeof window !== 'undefined') {
   />
 </template>
 
-<style scoped>
-/* Brand Icon */
-.brand-icon {
-  display: inline-block;
-  transition: transform 0.1s linear;
-  font-size: 1.5rem;
-}
-
-/* Font Awesome Child Icon */
-.fa-child-icon {
-  margin-left: 8px;
-  color: #ff91a4;
-  transition: all 0.2s ease;
-}
-
-.dark .fa-child-icon {
-  color: #ffb6c1;
-}
-
-.fa-child-icon:hover {
-  transform: scale(1.2);
-  color: #ff6b8a;
-}
-
-/* Keyboard Help Button */
-.keyboard-help-btn {
-  background: none;
-  border: none;
-  font-size: 1.2rem;
-  cursor: pointer;
-  padding: 4px 8px;
-  margin-left: 8px;
-  border-radius: 6px;
-  transition: all 0.2s ease;
-  opacity: 0.7;
-}
-
-.keyboard-help-btn:hover {
-  opacity: 1;
-  background: rgba(255, 182, 193, 0.15);
-  transform: scale(1.1);
-}
-
-.dark .keyboard-help-btn:hover {
-  background: rgba(255, 182, 193, 0.1);
-}
-
-/* Dropdown Container */
-.dropdown {
-  position: relative;
-  display: inline-block;
-}
-
-/* Dropdown Button */
-.dropdown-btn {
-  color: #666;
-  text-decoration: none;
-  padding: 8px 16px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-family: 'Quicksand', sans-serif;
-  font-weight: 600;
-  font-size: 15px;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: none;
-  border: none;
-}
-
-.dark .dropdown-btn {
-  color: #aaa;
-}
-
-.dropdown-btn:hover {
-  background: rgba(255, 182, 193, 0.15);
-  color: #ff91a4;
-}
-
-.dark .dropdown-btn:hover {
-  background: rgba(255, 182, 193, 0.1);
-  color: #ffb6c1;
-}
-
-.dropdown-btn.active {
-  color: #ff91a4;
-  background: rgba(255, 182, 193, 0.2);
-}
-
-.dark .dropdown-btn.active {
-  color: #ffb6c1;
-  background: rgba(255, 182, 193, 0.15);
-}
-
-/* Dropdown Arrow */
-.dropdown-arrow {
-  font-size: 10px;
-  transition: transform 0.2s ease;
-  margin-left: 2px;
-}
-
-.dropdown.open .dropdown-arrow {
-  transform: rotate(180deg);
-}
-
-/* Dropdown Menu */
-.dropdown-menu {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  min-width: 200px;
-  background: rgba(255, 255, 255, 0.98);
-  border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-  opacity: 0;
-  visibility: hidden;
-  transform: translateY(-10px);
-  transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  padding: 8px;
-  z-index: 1000;
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 182, 193, 0.2);
-}
-
-.dark .dropdown-menu {
-  background: rgba(40, 44, 52, 0.98);
-  border-color: rgba(255, 182, 193, 0.1);
-}
-
-.dropdown.open .dropdown-menu {
-  opacity: 1;
-  visibility: visible;
-  transform: translateY(0);
-}
-
-/* Dropdown Items */
-.dropdown-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  text-decoration: none;
-  color: #666;
-  font-weight: 500;
-  font-size: 14px;
-  transition: all 0.15s ease;
-  cursor: pointer;
-}
-
-.dark .dropdown-item {
-  color: #aaa;
-}
-
-.dropdown-item:hover {
-  background: rgba(255, 182, 193, 0.15);
-  color: #ff91a4;
-  transform: translateX(4px);
-}
-
-.dark .dropdown-item:hover {
-  background: rgba(255, 182, 193, 0.1);
-  color: #ffb6c1;
-}
-
-.dropdown-item.active {
-  background: rgba(255, 182, 193, 0.2);
-  color: #ff91a4;
-  font-weight: 600;
-}
-
-.dark .dropdown-item.active {
-  background: rgba(255, 182, 193, 0.15);
-  color: #ffb6c1;
-}
-
-.dropdown-item .link-icon {
-  font-size: 16px;
-}
-
-/* Mobile Menu Backdrop */
-.mobile-menu-backdrop {
-  position: fixed;
-  top: 56px;
-  left: 0;
-  width: 100%;
-  height: calc(100vh - 56px);
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 0;
-  animation: fadeIn 0.2s ease;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-/* Mobile Responsive Styles */
-@media (max-width: 768px) {
-  .dropdown {
-    width: 100%;
-    display: block;
-  }
-
-  .dropdown-btn {
-    width: 100%;
-    justify-content: space-between;
-    border-radius: 0;
-    padding: 16px 1.5rem;
-    border-bottom: 1px solid rgba(255, 182, 193, 0.1);
-    position: relative;
-  }
-
-  .dark .dropdown-btn {
-    border-bottom: 1px solid rgba(255, 182, 193, 0.08);
-  }
-
-  .dropdown-menu {
-    position: static;
-    width: 100%;
-    min-width: 100%;
-    opacity: 1;
-    visibility: visible;
-    transform: none;
-    box-shadow: none;
-    border-radius: 0;
-    padding: 0;
-    background: rgba(248, 248, 248, 0.98);
-    display: none;
-    border: none;
-    border-left: 3px solid #ff91a4;
-  }
-
-  .dark .dropdown-menu {
-    background: rgba(30, 30, 30, 0.98);
-    border-left-color: #ffb6c1;
-  }
-
-  .dropdown.open .dropdown-menu {
-    display: block;
-    animation: slideDown 0.2s ease;
-  }
-
-  @keyframes slideDown {
-    from {
-      opacity: 0;
-      transform: translateY(-10px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  .dropdown-item {
-    width: 100%;
-    padding: 12px 1.5rem 12px 2rem;
-    border-bottom: 1px solid rgba(255, 182, 193, 0.05);
-    font-size: 15px;
-  }
-
-  .dropdown-item:last-child {
-    border-bottom: none;
-  }
-
-  .dropdown-item:hover {
-    transform: none;
-    background: rgba(255, 182, 193, 0.15);
-  }
-
-  .dark .dropdown-item:hover {
-    background: rgba(255, 182, 193, 0.1);
-  }
-
-  .dropdown-btn.active::after {
-    display: none;
-  }
-
-  .dropdown-btn.active::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 3px;
-    background: #ff91a4;
-  }
-
-  .dark .dropdown-btn.active::before {
-    background: #ffb6c1;
-  }
-
-  .dropdown-item .link-icon {
-    font-size: 18px;
-  }
-
-  .dropdown-btn.active {
-    border-bottom: 1px solid transparent;
-  }
-
-  .dark .dropdown-btn.active {
-    border-bottom: 1px solid transparent;
-  }
-}
-
-/* Build Indicator (Ticket #56) */
-.build-indicator {
-  font-size: 11px;
-  font-weight: 600;
-  color: #999;
-  margin-left: 8px;
-  padding: 2px 6px;
-  background: rgba(0, 0, 0, 0.05);
-  border-radius: 4px;
-  transition: all 0.2s ease;
-}
-
-.dark .build-indicator {
-  color: #777;
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.build-indicator:hover {
-  color: #666;
-  background: rgba(0, 0, 0, 0.08);
-}
-
-.dark .build-indicator:hover {
-  color: #999;
-  background: rgba(255, 255, 255, 0.15);
-}
-
-/* Chaos Mode Styles (Ticket #88) */
-.chaos-btn.active {
-  animation: chaos-spin 1s linear infinite;
-}
-
-@keyframes chaos-spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-/* Global chaos mode effects */
-body.chaos {
-  animation: chaos-shake 0.5s ease-in-out infinite;
-}
-
-@keyframes chaos-shake {
-  0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-2px) rotate(-1deg); }
-  75% { transform: translateX(2px) rotate(1deg); }
-}
-
-body.chaos .brand-icon {
-  animation: chaos-rainbow 2s linear infinite;
-}
-
-@keyframes chaos-rainbow {
-  0% { filter: hue-rotate(0deg); }
-  100% { filter: hue-rotate(360deg); }
-}
-
-body.chaos .control-btn {
-  animation: chaos-bounce 0.5s ease-in-out infinite alternate;
-}
-
-body.chaos .control-btn:nth-child(odd) {
-  animation-delay: 0.25s;
-}
-
-@keyframes chaos-bounce {
-  0% { transform: translateY(0); }
-  100% { transform: translateY(-3px); }
-}
-
-body.chaos .router-link,
-body.chaos .dropdown-btn {
-  animation: chaos-glow 1.5s ease-in-out infinite alternate;
-}
-
-@keyframes chaos-glow {
-  0% { text-shadow: 0 0 5px var(--chaos-color-1, #ff0000); }
-  100% { text-shadow: 0 0 15px var(--chaos-color-2, #00ff00); }
-}
-
-/* Breadcrumb Navigation (Ticket #126) */
-.breadcrumbs {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
-  border-radius: 10px;
-  padding: 10px 20px;
-  margin: 10px auto 20px;
-  max-width: 1200px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  overflow-x: auto;
-}
-
-.dark .breadcrumbs {
-  background: rgba(40, 44, 52, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.breadcrumb-item {
-  color: #666;
-  text-decoration: none;
-  transition: all 0.2s ease;
-  white-space: nowrap;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-}
-
-.dark .breadcrumb-item {
-  color: #a0aec0;
-}
-
-.breadcrumb-item:hover {
-  color: #ff91a4;
-  text-decoration: none;
-}
-
-.dark .breadcrumb-item:hover {
-  color: #ffb6c1;
-}
-
-.breadcrumb-current {
-  color: #ff91a4;
-  font-weight: 600;
-}
-
-.dark .breadcrumb-current {
-  color: #ffb6c1;
-}
-
-.breadcrumb-separator {
-  color: #cbd5e0;
-  font-size: 12px;
-  margin: 0 4px;
-}
-
-.dark .breadcrumb-separator {
-  color: #4a5568;
-}
-
-/* Responsive breadcrumbs */
-@media (max-width: 768px) {
-  .breadcrumbs {
-    padding: 8px 16px;
-    margin: 8px 16px 16px;
-    font-size: 13px;
-    gap: 6px;
-  }
-
-  .breadcrumb-separator {
-    margin: 0 2px;
-  }
-}
-</style>
+<style scoped src="./Router.css"></style>
