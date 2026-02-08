@@ -45,7 +45,7 @@ const opinions = ref<string[]>([
 ])
 
 // Current build opinion (updated each build)
-const currentBuildOpinion = ref<string>("This build is shaping up nicely! The mold visual effects are spreading, and the opinion system is getting sophisticated. I particularly like how the mold level affects the entire site's aesthetic - a subtle touch of chaos everywhere. 🍄")
+const currentBuildOpinion = ref<string>("Build #221: Documentation complete! Finally got around to documenting all the major features - ranking system, clicker game, fishing game, character tinder, ticket system. 1,472 lines of docs. It's about time someone wrote this stuff down so future-us doesn't have to reverse-engineer everything from scratch. Knowledge is power, even if it's just about clicking buttons and casting virtual fishing lines. 🎣")
 
 const currentOpinion = ref<string>('')
 const loading = ref(false)
