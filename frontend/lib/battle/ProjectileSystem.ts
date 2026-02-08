@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import type { MechEntity } from './MechEntity'
+import { markRaw } from 'vue'
 
 export interface Projectile {
   id: string
@@ -49,7 +50,7 @@ export class ProjectileSystem {
     // Create projectile mesh
     const geometry = this.getProjectileGeometry(weaponType)
     const material = this.getProjectileMaterial(weaponType, mech.isPlayer)
-    const mesh = new THREE.Mesh(geometry, material)
+    const mesh = markRaw(new THREE.Mesh(geometry, material))
     mesh.position.copy(spawnPosition)
     this.scene.add(mesh)
 

@@ -4,6 +4,7 @@ import { ProjectileSystem } from './ProjectileSystem'
 import { CameraController } from './CameraController'
 import { PhysicsSystem } from './PhysicsSystem'
 import { InputManager, type InputState } from './InputManager'
+import { markRaw } from 'vue'
 
 export interface BattleSceneConfig {
   canvas: HTMLCanvasElement
@@ -41,14 +42,14 @@ export class BattleScene {
     this.onDamageDealt = config.onDamageDealt
 
     // Initialize Three.js scene
-    this.scene = new THREE.Scene()
+    this.scene = markRaw(new THREE.Scene())
     this.scene.background = new THREE.Color(0x1a1a2e)
 
     // Initialize renderer
-    this.renderer = new THREE.WebGLRenderer({
+    this.renderer = markRaw(new THREE.WebGLRenderer({
       canvas: config.canvas,
       antialias: true
-    })
+    }))
     this.renderer.setSize(window.innerWidth, window.innerHeight)
     this.renderer.setPixelRatio(window.devicePixelRatio)
     this.renderer.shadowMap.enabled = true

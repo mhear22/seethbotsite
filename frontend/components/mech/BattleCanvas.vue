@@ -3,7 +3,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, markRaw } from 'vue'
 import { BattleScene } from '../../lib/battle/BattleScene'
 import type { MechEntity } from '../../lib/battle/MechEntity'
 
@@ -24,7 +24,7 @@ let battleScene: BattleScene | null = null
 onMounted(() => {
   if (!canvasRef.value) return
 
-  battleScene = new BattleScene({
+  battleScene = markRaw(new BattleScene({
     canvas: canvasRef.value,
     playerMech: props.playerMech,
     enemyMech: props.enemyMech,
@@ -34,7 +34,7 @@ onMounted(() => {
     onDamageDealt: (amount) => {
       emit('damage-dealt', amount)
     }
-  })
+  }))
 
   battleScene.start()
 

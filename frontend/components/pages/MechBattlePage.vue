@@ -67,10 +67,10 @@
       />
 
       <BattleHUD
-        :player-health="battle.playerHealth.value"
-        :player-max-health="battle.playerMaxHealth.value"
-        :enemy-health="battle.enemyHealth.value"
-        :enemy-max-health="battle.enemyMaxHealth.value"
+        :player-health="battle.playerHealth"
+        :player-max-health="battle.playerMaxHealth"
+        :enemy-health="battle.enemyHealth"
+        :enemy-max-health="battle.enemyMaxHealth"
         :enemy-name="enemyName"
         :jump-fuel="battle.battleState.value.player?.jumpFuel ?? 0"
         :has-jump-jets="hasJumpJets"

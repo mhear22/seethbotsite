@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import type { MechLoadout } from '../../composables/useMechBuilder'
+import { markRaw } from 'vue'
 
 export interface CombatStats {
   maxHealth: number
@@ -51,7 +52,7 @@ export class MechEntity {
     this.rotation = new THREE.Euler(0, 0, 0)
     this.velocity = new THREE.Vector3(0, 0, 0)
 
-    this.mesh = this.createMeshGroup()
+    this.mesh = markRaw(this.createMeshGroup())
   }
 
   private createMeshGroup(): THREE.Group {

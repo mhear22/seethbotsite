@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import type { MechEntity } from './MechEntity'
+import { markRaw } from 'vue'
 
 export class CameraController {
   camera: THREE.PerspectiveCamera
@@ -16,12 +17,12 @@ export class CameraController {
 
   constructor(target: MechEntity) {
     this.target = target
-    this.camera = new THREE.PerspectiveCamera(
+    this.camera = markRaw(new THREE.PerspectiveCamera(
       75, // FOV
       window.innerWidth / window.innerHeight,
       0.1, // Near
       1000 // Far
-    )
+    ))
 
     // Initial offset: behind and above the mech
     this.offset = new THREE.Vector3(0, 6, -10)
