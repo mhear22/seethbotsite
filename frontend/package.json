@@ -5,9 +5,10 @@
   "description": "Vue.js + TypeScript + Vite interactive website",
   "scripts": {
     "dev": "vite",
-    "build": "npm run generate:types || true && vite build",
+    "build": "npm run generate:images && npm run generate:types || true && vite build",
     "preview": "vite preview",
     "generate:types": "openapi-typescript ../backend/dist/openapi.json -o ./src/types/openapi.ts",
+    "generate:images": "node scripts/generate-image-sizes.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
@@ -30,6 +31,7 @@
     "@vue/test-utils": "^2.4.0",
     "@vue/tsconfig": "^0.5.0",
     "jsdom": "^25.0.0",
+    "sharp": "^0.33.5",
     "typescript": "^5.7.2",
     "vite": "^5.0.0",
     "vite-plugin-imagemin": "^0.6.1",
