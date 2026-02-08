@@ -71,3 +71,18 @@ This native module needs to be compatible with your Node.js version.
 
 ## Static Files
 Serves all files from parent directory (Vue.js app including components, styles, etc.)
+
+## Project Structure
+
+```
+backend/
+├── src/              # TypeScript source files
+│   ├── controllers/  # API route handlers
+│   ├── middleware/   # Express middleware
+│   ├── services/     # Business logic layer
+│   └── utils/        # Utility functions
+├── public/           # Static assets
+├── scripts/          # Build and utility scripts
+├── tests/            # Test files
+└── dist/             # Compiled JavaScript output (generated)
+```
