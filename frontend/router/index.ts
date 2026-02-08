@@ -36,6 +36,7 @@ import SolarPanelPage from '../components/pages/SolarPanelPage.vue'
 import BatteryCalculatorPage from '../components/pages/BatteryCalculatorPage.vue'
 import MechBuilderPage from '../components/pages/MechBuilderPage.vue'
 import MechBattlePage from '../components/pages/MechBattlePage.vue'
+import SearchPage from '../components/pages/SearchPage.vue'
 
 const routes = [
   {
@@ -222,6 +223,11 @@ const routes = [
     path: '/mech-battle',
     name: 'mech-battle',
     component: MechBattlePage
+  },
+  {
+    path: '/search',
+    name: 'search',
+    component: SearchPage
   }
 ]
 

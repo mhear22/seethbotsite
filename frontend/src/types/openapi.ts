@@ -741,6 +741,69 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refresh access token
+         * @description Get a new JWT token using an existing valid token. Useful for extending sessions without re-login.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description Current valid JWT token */
+                        token: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Token refreshed successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            user?: {
+                                id?: number;
+                                email?: string;
+                                display_name?: string;
+                                created_at?: string;
+                                updated_at?: string;
+                            };
+                            /** @description New JWT authentication token */
+                            token?: string;
+                        };
+                    };
+                };
+                /** @description Invalid or expired token */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/me": {
         parameters: {
             query?: never;
@@ -4494,6 +4557,301 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search across all content
+         * @description Search for movies, shop items, quotes, and advice
+         */
+        get: {
+            parameters: {
+                query: {
+                    /**
+                     * @description Search query
+                     * @example matrix
+                     */
+                    q: string;
+                    /**
+                     * @description Comma-separated list of types to search (movie,shop_item,quote,advice)
+                     * @example movie,shop_item
+                     */
+                    types?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Search results */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            query?: string;
+                            results?: {
+                                /** @enum {string} */
+                                type?: "movie" | "shop_item" | "quote" | "advice";
+                                id?: string;
+                                title?: string;
+                                description?: string;
+                                relevance?: number;
+                                metadata?: Record<string, never>;
+                            }[];
+                            count?: number;
+                            /** Format: date-time */
+                            timestamp?: string;
+                        };
+                    };
+                };
+                /** @description Bad request (missing query) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error?: string;
+                        };
+                    };
+                };
+                /** @description Server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error?: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/search/movies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search movies only
+         * @description Search for movies by title, genre, or notes
+         */
+        get: {
+            parameters: {
+                query: {
+                    /**
+                     * @description Search query
+                     * @example matrix
+                     */
+                    q: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Movie search results */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            query?: string;
+                            results?: components["schemas"]["Movie"][];
+                            count?: number;
+                            /** Format: date-time */
+                            timestamp?: string;
+                        };
+                    };
+                };
+                /** @description Bad request (missing query) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/search/shop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search shop items only
+         * @description Search for shop items by name, description, or category
+         */
+        get: {
+            parameters: {
+                query: {
+                    /**
+                     * @description Search query
+                     * @example boost
+                     */
+                    q: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Shop item search results */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            query?: string;
+                            results?: {
+                                id?: string;
+                                name?: string;
+                                description?: string;
+                                cost?: number;
+                                icon?: string;
+                                category?: string;
+                            }[];
+                            count?: number;
+                            /** Format: date-time */
+                            timestamp?: string;
+                        };
+                    };
+                };
+                /** @description Bad request (missing query) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/search/quotes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search quotes only
+         * @description Search for Northernlion quotes and advice
+         */
+        get: {
+            parameters: {
+                query: {
+                    /**
+                     * @description Search query
+                     * @example chaos
+                     */
+                    q: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Quote search results */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            query?: string;
+                            results?: {
+                                /** @enum {string} */
+                                type?: "quote" | "advice";
+                                id?: string;
+                                description?: string;
+                                relevance?: number;
+                                metadata?: Record<string, never>;
+                            }[];
+                            count?: number;
+                            /** Format: date-time */
+                            timestamp?: string;
+                        };
+                    };
+                };
+                /** @description Bad request (missing query) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/shop/items": {
         parameters: {
             query?: never;
@@ -5799,6 +6157,70 @@ export interface paths {
                             sampleSize?: number;
                             /** @description Average completion time in hours (null if insufficient data) */
                             averageCompletionTimeHours?: number;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tickets/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get ticketing statistics
+         * @description Returns ticket statistics including total count, status breakdown, and date ranges
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Statistics retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example 42 */
+                            totalTickets?: number;
+                            byStatus?: {
+                                pending?: number;
+                                "needs-info"?: number;
+                                completed?: number;
+                                declined?: number;
+                            };
+                            oldestTicket?: {
+                                id?: number;
+                                title?: string;
+                                created_at?: string;
+                            };
+                            newestTicket?: {
+                                id?: number;
+                                title?: string;
+                                created_at?: string;
+                            };
+                            dates?: {
+                                oldestCreated?: string;
+                                newestCreated?: string;
+                                oldestCompleted?: string;
+                                newestCompleted?: string;
+                            };
                         };
                     };
                 };
