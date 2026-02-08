@@ -5,6 +5,9 @@
   box-sizing: border-box;
 }
 
+/* Import accessibility styles (Ticket #148) */
+@import './styles/accessibility.css';
+
 body {
   font-family: 'Quicksand', sans-serif;
   background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
