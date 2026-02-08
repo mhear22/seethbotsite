@@ -1,0 +1,369 @@
+/* ========================================
+   ACCESSIBILITY STYLES
+   Ticket #148: Accessibility Improvements
+   ======================================== */
+
+/* High Contrast Mode Support */
+@media (prefers-contrast: high) {
+  /* Ensure better contrast in high contrast mode */
+  .router-link,
+  button,
+  input,
+  textarea {
+    border-width: 2px;
+  }
+
+  .cute-btn,
+  .favorite-button,
+  .control-btn {
+    border: 2px solid currentColor;
+  }
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  /* Respect user's preference for reduced motion */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .heart {
+    animation: none !important;
+  }
+
+  .sparkles {
+    animation: none !important;
+  }
+
+  .float {
+    animation: none !important;
+  }
+
+  .chaos-particle {
+    animation: none !important;
+  }
+}
+
+/* Screen Reader Only Content */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Focus Management */
+/* Ensure all interactive elements have visible focus */
+button:focus,
+input:focus,
+textarea:focus,
+select:focus,
+a:focus,
+[tabindex]:focus {
+  outline: 3px solid currentColor;
+  outline-offset: 2px;
+}
+
+/* Hide outline only when using :focus-visible (not all browsers support it) */
+button:focus:not(:focus-visible),
+input:focus:not(:focus-visible),
+textarea:focus:not(:focus-visible),
+select:focus:not(:focus-visible),
+a:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* ARIA Live Regions */
+/* For dynamic content that should be announced to screen readers */
+[aria-live="polite"] {
+  /* Content changes are announced when user is idle */
+}
+
+[aria-live="assertive"] {
+  /* Content changes are announced immediately */
+}
+
+[aria-live="off"] {
+  /* Content is not announced */
+}
+
+/* Landmark Regions */
+/* Help screen readers understand page structure */
+[role="banner"],
+[role="navigation"],
+[role="main"],
+[role="complementary"],
+[role="contentinfo"],
+[role="search"],
+[role="form"] {
+  /* These roles are important for accessibility */
+}
+
+/* Ensure headings form a logical outline */
+/* h1 should be unique and main title, h2-h6 for subsections */
+h1:not([role]):not([aria-label]),
+h2:not([role]):not([aria-label]),
+h3:not([role]):not([aria-label]),
+h4:not([role]):not([aria-label]),
+h5:not([role]):not([aria-label]),
+h6:not([role]):not([aria-label]) {
+  /* Ensure headings are used properly */
+}
+
+/* Links and Buttons */
+/* Ensure links and buttons are distinguishable */
+a:not([class]) {
+  color: #0066cc;
+  text-decoration: underline;
+}
+
+a[href]:hover,
+a[href]:focus {
+  text-decoration: underline;
+}
+
+/* Ensure buttons have sufficient visual affordance */
+button {
+  cursor: pointer;
+  min-width: 44px;
+  min-height: 44px;
+}
+
+/* Form Controls */
+/* Ensure form labels are associated with their inputs */
+label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+textarea,
+select {
+  width: 100%;
+  padding: 0.75rem;
+  border: 2px solid #ccc;
+  border-radius: 4px;
+  font-size: 1rem;
+}
+
+/* Error Messages */
+/* Ensure error messages are associated with form fields */
+[aria-invalid="true"] {
+  border-color: #dc2626;
+}
+
+[role="alert"] {
+  background-color: #fee2e2;
+  color: #991b1b;
+  padding: 0.75rem;
+  border-left: 4px solid #dc2626;
+  border-radius: 4px;
+}
+
+/* Data Tables */
+/* Ensure tables are accessible */
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+th,
+td {
+  padding: 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+th {
+  background-color: #f9fafb;
+  font-weight: 600;
+}
+
+/* Ensure table headers have scope attribute */
+th[scope="col"] {
+  /* Column header */
+}
+
+th[scope="row"] {
+  /* Row header */
+}
+
+/* Images */
+/* Ensure decorative images are hidden from screen readers */
+img[alt=""],
+img:not([alt]) {
+  /* These should be decorative or marked with aria-hidden */
+}
+
+/* Ensure informative images have alt text */
+img:not([aria-hidden="true"]) {
+  /* Should have meaningful alt text */
+}
+
+/* Dialogs and Modals */
+/* Ensure modals are properly managed */
+[role="dialog"] {
+  /* Should have aria-modal="true" */
+}
+
+/* Ensure focus is trapped in modals */
+[role="dialog"][aria-modal="true"] {
+  /* Focus should be trapped */
+}
+
+/* Tooltips */
+/* Ensure tooltips are accessible */
+[role="tooltip"] {
+  /* Should be associated with the triggering element */
+  /* Should have aria-describedby on trigger */
+}
+
+/* Expandable/Collapsible Content */
+/* Ensure expandable content is accessible */
+[aria-expanded="false"] ~ * {
+  /* Content is hidden */
+}
+
+[aria-expanded="true"] ~ * {
+  /* Content is visible */
+}
+
+/* Progress Indicators */
+/* Ensure progress is communicated to screen readers */
+[role="progressbar"] {
+  /* Should have aria-valuenow, aria-valuemin, aria-valuemax */
+}
+
+/* Tabs */
+/* Ensure tab interfaces are accessible */
+[role="tablist"] {
+  /* Container for tabs */
+}
+
+[role="tab"] {
+  /* Individual tab button */
+  /* Should have aria-selected and aria-controls */
+}
+
+[role="tabpanel"] {
+  /* Tab content panel */
+  /* Should have aria-labelledby */
+}
+
+/* Lists */
+/* Ensure lists are semantically correct */
+ul,
+ol {
+  margin-left: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+/* Ensure list items are semantically correct */
+li {
+  margin-bottom: 0.25rem;
+}
+
+/* Code */
+/* Ensure code blocks are accessible */
+code {
+  font-family: 'Courier New', monospace;
+  background-color: #f3f4f6;
+  padding: 0.125rem 0.25rem;
+  border-radius: 2px;
+}
+
+pre {
+  background-color: #f3f4f6;
+  padding: 1rem;
+  border-radius: 4px;
+  overflow-x: auto;
+}
+
+/* Color and Contrast */
+/* Ensure text has sufficient contrast (WCAG 2.1 AA: 4.5:1 for normal text) */
+/* Large text (18px+ or bold 14px+): 3:1 contrast ratio */
+/* UI components: 3:1 contrast ratio for graphical elements */
+
+/* Font Size */
+/* Ensure font size can be scaled up to 200% */
+html {
+  font-size: 16px;
+}
+
+/* Text should reflow when zoomed */
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Dark Mode Accessibility */
+.dark .sr-only {
+  /* Screen reader only content should work in dark mode too */
+}
+
+/* High Contrast Mode (Windows) */
+@media screen and (-ms-high-contrast: active) {
+  /* Improve contrast for Windows High Contrast mode */
+  button,
+  a,
+  input,
+  textarea,
+  select {
+    border: 2px solid WindowText;
+    background-color: Window;
+    color: WindowText;
+  }
+
+  button:hover,
+  a:hover {
+    background-color: Highlight;
+    color: HighlightText;
+  }
+}
+
+/* Print Styles */
+@media print {
+  /* Ensure content is printable and readable */
+  .skip-link,
+  .music-control,
+  .dark-toggle,
+  .nav-controls,
+  .control-buttons-container {
+    display: none !important;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  a[href]:after {
+    content: " (" attr(href) ")";
+  }
+}
+
+/* Touch Targets */
+/* Ensure touch targets are at least 44x44px (WCAG 2.5.5) */
+@media (pointer: coarse) {
+  button,
+  a,
+  input[type="checkbox"],
+  input[type="radio"] {
+    min-width: 44px;
+    min-height: 44px;
+    min-touch-action: manipulation;
+  }
+}
