@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { getDB } from './tickets-db';
+import { getDB, safeJsonParse } from './tickets-db';
 
 /**
  * Overall ticket statistics

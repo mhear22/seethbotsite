@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { getDB } from './tickets-db';
+import { getDB, safeJsonParse } from './tickets-db';
 import { TicketWithComputed, ticketsService } from './tickets.service';
 
 /**
@@ -171,9 +171,7 @@ export class TicketsFilterService {
 
     // Add computed fields to each ticket
     return tickets.map((ticket: any) => {
-      const dependencies = ticket.dependencies
-        ? JSON.parse(ticket.dependencies)
-        : [];
+      const dependencies = safeJsonParse<number[]>(ticket.dependencies, []);
 
       return {
         ...ticket,
@@ -244,9 +242,7 @@ export class TicketsFilterService {
 
     // Add computed fields to each ticket
     const ticketsWithComputed = tickets.map((ticket: any) => {
-      const dependencies = ticket.dependencies
-        ? JSON.parse(ticket.dependencies)
-        : [];
+      const dependencies = safeJsonParse<number[]>(ticket.dependencies, []);
 
       return {
         ...ticket,

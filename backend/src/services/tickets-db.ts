@@ -172,6 +172,23 @@ export function parseDependencies(description: string | null): number[] {
 }
 
 /**
+ * Safely parse JSON string
+ * Returns the parsed value if valid, or null if invalid
+ */
+export function safeJsonParse<T>(jsonString: string | null, defaultValue: T): T {
+  if (!jsonString) {
+    return defaultValue;
+  }
+
+  try {
+    return JSON.parse(jsonString) as T;
+  } catch (error) {
+    console.error('Failed to parse JSON:', error);
+    return defaultValue;
+  }
+}
+
+/**
  * Check if a ticket is blocked based on its dependencies
  * A ticket is blocked if any of its dependencies are not completed
  */
