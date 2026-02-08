@@ -15,7 +15,9 @@ import Router from './Router.vue'
 import SearchModal from '../ui/SearchModal.vue'
 import MobileFAB from '../ui/MobileFAB.vue'
 import SkipLink from '../ui/SkipLink.vue'
+import KeyboardShortcutsHelp from '../ui/KeyboardShortcutsHelp.vue'
 import { useAppStore } from '../../../stores/useAppStore'
+import { useKeyboardShortcuts } from '../../../composables/useKeyboardShortcuts'
 
 export interface RankingItem {
   name: string
@@ -46,6 +48,9 @@ const appStore = useAppStore()
 // Router
 const router = useRouter()
 const route = useRoute()
+
+// Keyboard shortcuts
+const { shortcuts, isHelpOpen, toggleHelp, registerShortcut } = useKeyboardShortcuts()
 
 // Modal items for left dock (Tachometer)
 const leftModals = computed<ModalItem[]>(() => [
@@ -98,8 +103,117 @@ const handleGlobalKeydown = (e: KeyboardEvent) => {
   }
 }
 
+// Register all keyboard shortcuts
+const registerAllShortcuts = () => {
+  // Navigation shortcuts
+  registerShortcut({
+    key: 'h',
+    description: 'Go to Home',
+    action: () => router.push('/')
+  })
+
+  registerShortcut({
+    key: 'a',
+    description: 'Go to About',
+    action: () => router.push('/about')
+  })
+
+  registerShortcut({
+    key: 's',
+    description: 'Go to Settings',
+    action: () => router.push('/settings')
+  })
+
+  registerShortcut({
+    key: 'p',
+    description: 'Go to Shop',
+    action: () => router.push('/shop')
+  })
+
+  // Panel toggles
+  registerShortcut({
+    key: 'g',
+    description: 'Toggle Digital Goose',
+    action: () => appStore.togglePanel('digitalGoose')
+  })
+
+  registerShortcut({
+    key: 'r',
+    description: 'Toggle Rankings',
+    action: () => {
+      // Only allow on home page
+      if (route.path === '/') {
+        appStore.togglePanel('rankings')
+      }
+    }
+  })
+
+  registerShortcut({
+    key: 'c',
+    description: 'Toggle Cat Panel',
+    action: () => {
+      // Only allow on home page
+      if (route.path === '/') {
+        appStore.togglePanel('cat')
+      }
+    }
+  })
+
+  registerShortcut({
+    key: 'f',
+    description: 'Toggle Feed',
+    action: () => appStore.togglePanel('feed')
+  })
+
+  // Actions
+  registerShortcut({
+    key: '/',
+    description: 'Open Search',
+    action: () => appStore.toggleSearchModal()
+  })
+
+  registerShortcut({
+    key: 'n',
+    description: 'Create New Ticket',
+    action: () => router.push('/tickets')
+  })
+
+  // Help
+  registerShortcut({
+    key: '?',
+    description: 'Show Keyboard Shortcuts Help',
+    action: () => toggleHelp()
+  })
+
+  // Esc - Close modals/panels (handled by browser default, but we can add specific handling if needed)
+  registerShortcut({
+    key: 'Escape',
+    description: 'Close Modals / Panels',
+    action: () => {
+      if (isHelpOpen.value) {
+        toggleHelp()
+      } else if (appStore.searchModalOpen) {
+        appStore.toggleSearchModal()
+      } else if (appStore.mikaModalOpen) {
+        appStore.closeMikaModal()
+      } else if (appStore.panels.feed) {
+        appStore.togglePanel('feed')
+      } else if (appStore.panels.activeUsers) {
+        appStore.togglePanel('activeUsers')
+      } else if (route.path === '/' && appStore.panels.rankings) {
+        appStore.togglePanel('rankings')
+      } else if (route.path === '/' && appStore.panels.cat) {
+        appStore.togglePanel('cat')
+      } else if (appStore.panels.digitalGoose) {
+        appStore.togglePanel('digitalGoose')
+      }
+    }
+  })
+}
+
 onMounted(() => {
   document.addEventListener('keydown', handleGlobalKeydown)
+  registerAllShortcuts()
 })
 
 onUnmounted(() => {
@@ -200,6 +314,13 @@ onUnmounted(() => {
     <SearchModal
       :is-open="appStore.searchModalOpen"
       @close="appStore.toggleSearchModal"
+    />
+
+    <!-- Keyboard Shortcuts Help Modal (Ticket #128) -->
+    <KeyboardShortcutsHelp
+      :shortcuts="shortcuts"
+      :is-open="isHelpOpen"
+      @close="toggleHelp"
     />
   </div>
 
