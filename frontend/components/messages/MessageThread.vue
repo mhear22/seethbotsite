@@ -3,6 +3,7 @@ import { ref, onMounted, nextTick, watch, computed } from 'vue'
 import { messagesRepository } from '../../repositories/messages.repository'
 import type { Conversation, MessageWithSender } from '../../repositories/types/messages.types'
 import { messagesRepository as repo } from '../../repositories/messages.repository'
+import { formatDateForMessage, formatTime } from '../../utils/format'
 
 interface Props {
   conversation: Conversation
@@ -130,30 +131,6 @@ const isOwnMessage = (message: MessageWithSender) => {
   return message.sender_id === getCurrentUserId()
 }
 
-// Format timestamp
-const formatTime = (timestamp: string) => {
-  const date = new Date(timestamp)
-  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-}
-
-const formatDate = (timestamp: string) => {
-  const date = new Date(timestamp)
-  const today = new Date()
-
-  if (date.toDateString() === today.toDateString()) {
-    return 'Today'
-  }
-
-  const yesterday = new Date(today)
-  yesterday.setDate(yesterday.getDate() - 1)
-
-  if (date.toDateString() === yesterday.toDateString()) {
-    return 'Yesterday'
-  }
-
-  return date.toLocaleDateString([], { month: 'short', day: 'numeric' })
-}
-
 // Check if date separator is needed
 const needsDateSeparator = (index: number) => {
   if (index === 0) return true
@@ -215,7 +192,7 @@ onMounted(() => {
         <div v-for="(message, index) in messages" :key="message.id">
           <!-- Date separator -->
           <div v-if="needsDateSeparator(index)" class="date-separator">
-            <span>{{ formatDate(message.created_at) }}</span>
+            <span>{{ formatDateForMessage(message.created_at) }}</span>
           </div>
 
           <!-- Editing mode -->

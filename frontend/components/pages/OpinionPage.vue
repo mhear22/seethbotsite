@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { formatDate } from '../../utils/format'
 
 const opinions = ref<string[]>([
   "Goose is chaotic neutral",
@@ -111,7 +112,7 @@ onMounted(() => {
         <div class="build-opinion-card">
           <span class="build-emoji">🍄</span>
           <p class="build-opinion-text">{{ currentBuildOpinion }}</p>
-          <p class="build-date">Updated: {{ new Date().toLocaleDateString() }}</p>
+          <p class="build-date">Updated: {{ formatDate(new Date()) }}</p>
         </div>
       </div>
     </div>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useAppStore } from '../../stores/useAppStore'
+import { formatDate } from '../../utils/format'
 
 interface ShopItem {
   id: number
@@ -191,7 +192,7 @@ const formatPoints = (points: number) => {
             <div class="inventory-icon">{{ item.itemIcon }}</div>
             <div class="inventory-details">
               <div class="inventory-name">{{ item.itemName }}</div>
-              <div class="inventory-date">Purchased {{ new Date(item.purchasedAt).toLocaleDateString() }}</div>
+              <div class="inventory-date">Purchased {{ formatDate(item.purchasedAt) }}</div>
             </div>
           </div>
         </div>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
+import { formatDate } from '../../utils/format'
 
 const currentTime = ref<string>('')
 const currentDate = ref<string>('')
@@ -15,11 +16,7 @@ const updateTime = () => {
     minute: '2-digit',
     hour12: false
   })
-  currentDate.value = now.toLocaleDateString('en-AU', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'short'
-  })
+  currentDate.value = formatDate(now, false, 'short', true)
 }
 
 const accelerate = () => {

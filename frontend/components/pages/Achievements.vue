@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { achievementsRepository } from '../../repositories/achievements.repository'
 import type { AchievementDisplay, AchievementProgress } from '../../repositories/types/achievements.types'
+import { formatDate } from '../../utils/format'
 
 const achievements = ref<AchievementDisplay[]>([])
 const progress = ref<AchievementProgress | null>(null)
@@ -34,15 +35,6 @@ const getProgressColor = (percentage: number): string => {
   if (percentage >= 50) return '#ecc94b' // Yellow
   if (percentage >= 25) return '#ed8936' // Orange
   return '#fc8181' // Red
-}
-
-const formatDate = (dateString: string): string => {
-  const date = new Date(dateString)
-  return date.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric'
-  })
 }
 
 const checkNewAchievements = async () => {

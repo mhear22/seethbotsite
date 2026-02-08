@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { stocksRepository } from '../../repositories/stocks.repository'
 import { useUserId } from '../../composables/useUserId'
 import { usePolling } from '../../composables/usePolling'
+import { formatTime } from '../../utils/format'
 
 interface Stock {
   name: string
@@ -160,10 +161,6 @@ const generateChartData = (history: { timestamp: number; price: number }[]) => {
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(value)
-}
-
-const formatTimestamp = (timestamp: number) => {
-  return new Date(timestamp).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
 }
 
 // Convert Discord custom emoji format to HTML img tag

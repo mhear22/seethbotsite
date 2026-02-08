@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useAuthStore } from '../../stores/useAuthStore'
+import { useAuth } from '../../composables/useAuth'
+import { formatDate } from '../../utils/format'
 
-// Store
-const authStore = useAuthStore()
+// Auth composable
+const auth = useAuth()
 
 // Form mode: 'login' | 'register' | 'profile'
 const mode = ref<'login' | 'register' | 'profile'>('login')
@@ -42,8 +43,8 @@ const setMode = (newMode: 'login' | 'register' | 'profile') => {
   mode.value = newMode
   clearMessages()
   // Pre-fill profile form
-  if (newMode === 'profile' && authStore.user) {
-    profileForm.value.displayName = authStore.user.display_name || ''
+  if (newMode === 'profile' && auth.user.value) {
+    profileForm.value.displayName = auth.user.value.display_name || ''
   }
 }
 
@@ -60,7 +61,7 @@ const handleLogin = async () => {
     return
   }
 
-  const result = await authStore.login(
+  const result = await auth.login(
     loginForm.value.email,
     loginForm.value.password
   )
@@ -92,7 +93,7 @@ const handleRegister = async () => {
     return
   }
 
-  const result = await authStore.register(
+  const result = await auth.register(
     registerForm.value.email,
     registerForm.value.password,
     registerForm.value.displayName
@@ -115,7 +116,7 @@ const handleUpdateProfile = async () => {
     return
   }
 
-  const result = await authStore.updateProfile(profileForm.value.displayName)
+  const result = await auth.updateProfile(profileForm.value.displayName)
 
   if (result.success && result.user) {
     successMessage.value = 'Profile updated successfully!'
@@ -142,7 +143,7 @@ const handleChangePassword = async () => {
     return
   }
 
-  const result = await authStore.changePassword(
+  const result = await auth.changePassword(
     changePasswordForm.value.oldPassword,
     changePasswordForm.value.newPassword
   )
@@ -157,7 +158,7 @@ const handleChangePassword = async () => {
 
 const handleLogout = async () => {
   if (confirm('Are you sure you want to logout?')) {
-    await authStore.logout()
+    await auth.logout()
     successMessage.value = 'Logged out successfully'
     setMode('login')
   }
@@ -168,7 +169,7 @@ const handleDeleteAccount = async () => {
     const password = prompt('Please enter your password to confirm account deletion:')
     if (!password) return
 
-    const result = await authStore.deleteAccount(password)
+    const result = await auth.deleteAccount(password)
     if (result.success) {
       successMessage.value = 'Account deleted successfully'
       setMode('login')
@@ -184,7 +185,7 @@ const handleDeleteAccount = async () => {
     <div class="auth-container">
       <div class="auth-header">
         <h1>🔐 Account</h1>
-        <p v-if="authStore.isAuthenticated">Welcome, {{ authStore.user?.display_name || authStore.user?.email }}!</p>
+        <p v-if="auth.isAuthenticated.value">Welcome, {{ auth.user.value?.display_name || auth.user.value?.email }}!</p>
       </div>
 
       <!-- Messages -->
@@ -196,7 +197,7 @@ const handleDeleteAccount = async () => {
       </div>
 
       <!-- Mode Tabs (only when authenticated) -->
-      <div v-if="authStore.isAuthenticated" class="auth-tabs">
+      <div v-if="auth.isAuthenticated.value" class="auth-tabs">
         <button
           :class="{ active: mode === 'profile' }"
           @click="setMode('profile')"
@@ -221,7 +222,7 @@ const handleDeleteAccount = async () => {
             type="email"
             placeholder="your@email.com"
             @keyup.enter="handleLogin"
-            :disabled="authStore.loading"
+            :disabled="auth.loading.value"
           />
         </div>
 
@@ -232,15 +233,15 @@ const handleDeleteAccount = async () => {
             :type="showPassword ? 'text' : 'password'"
             placeholder="••••••••"
             @keyup.enter="handleLogin"
-            :disabled="authStore.loading"
+            :disabled="auth.loading.value"
           />
           <button class="toggle-password" @click="showPassword = !showPassword">
             {{ showPassword ? '🙈' : '👁️' }}
           </button>
         </div>
 
-        <button class="auth-btn auth-btn-primary" @click="handleLogin" :disabled="authStore.loading">
-          {{ authStore.loading ? 'Signing in...' : 'Sign In' }}
+        <button class="auth-btn auth-btn-primary" @click="handleLogin" :disabled="auth.loading.value">
+          {{ auth.loading.value ? 'Signing in...' : 'Sign In' }}
         </button>
 
         <p class="auth-switch">
@@ -260,7 +261,7 @@ const handleDeleteAccount = async () => {
             type="email"
             placeholder="your@email.com"
             @keyup.enter="handleRegister"
-            :disabled="authStore.loading"
+            :disabled="auth.loading.value"
           />
         </div>
 
@@ -271,7 +272,7 @@ const handleDeleteAccount = async () => {
             type="text"
             placeholder="Your Name"
             @keyup.enter="handleRegister"
-            :disabled="authStore.loading"
+            :disabled="auth.loading.value"
           />
         </div>
 
@@ -281,7 +282,7 @@ const handleDeleteAccount = async () => {
             v-model="registerForm.password"
             :type="showPassword ? 'text' : 'password'"
             placeholder="••••••••"
-            :disabled="authStore.loading"
+            :disabled="auth.loading.value"
           />
         </div>
 
@@ -292,15 +293,15 @@ const handleDeleteAccount = async () => {
             :type="showPassword ? 'text' : 'password'"
             placeholder="••••••••"
             @keyup.enter="handleRegister"
-            :disabled="authStore.loading"
+            :disabled="auth.loading.value"
           />
           <button class="toggle-password" @click="showPassword = !showPassword">
             {{ showPassword ? '🙈' : '👁️' }}
           </button>
         </div>
 
-        <button class="auth-btn auth-btn-primary" @click="handleRegister" :disabled="authStore.loading">
-          {{ authStore.loading ? 'Creating...' : 'Create Account' }}
+        <button class="auth-btn auth-btn-primary" @click="handleRegister" :disabled="auth.loading.value">
+          {{ auth.loading.value ? 'Creating...' : 'Create Account' }}
         </button>
 
         <p class="auth-switch">
@@ -310,13 +311,13 @@ const handleDeleteAccount = async () => {
       </div>
 
       <!-- Profile Form -->
-      <div v-if="mode === 'profile' && authStore.isAuthenticated" class="auth-form">
+      <div v-if="mode === 'profile' && auth.isAuthenticated.value" class="auth-form">
         <h2>Profile Settings</h2>
 
         <div class="form-group">
           <label>Email</label>
           <input
-            :value="authStore.user?.email"
+            :value="auth.user.value?.email"
             type="email"
             disabled
             class="disabled-input"
@@ -329,12 +330,12 @@ const handleDeleteAccount = async () => {
             v-model="profileForm.displayName"
             type="text"
             @keyup.enter="handleUpdateProfile"
-            :disabled="authStore.loading"
+            :disabled="auth.loading.value"
           />
         </div>
 
-        <button class="auth-btn auth-btn-primary" @click="handleUpdateProfile" :disabled="authStore.loading">
-          {{ authStore.loading ? 'Updating...' : 'Update Profile' }}
+        <button class="auth-btn auth-btn-primary" @click="handleUpdateProfile" :disabled="auth.loading.value">
+          {{ auth.loading.value ? 'Updating...' : 'Update Profile' }}
         </button>
 
         <hr class="auth-divider" />
@@ -347,7 +348,7 @@ const handleDeleteAccount = async () => {
             v-model="changePasswordForm.oldPassword"
             :type="showPassword ? 'text' : 'password'"
             placeholder="••••••••"
-            :disabled="authStore.loading"
+            :disabled="auth.loading.value"
           />
         </div>
 
@@ -357,7 +358,7 @@ const handleDeleteAccount = async () => {
             v-model="changePasswordForm.newPassword"
             :type="showPassword ? 'text' : 'password'"
             placeholder="••••••••"
-            :disabled="authStore.loading"
+            :disabled="auth.loading.value"
           />
         </div>
 
@@ -368,25 +369,25 @@ const handleDeleteAccount = async () => {
             :type="showPassword ? 'text' : 'password'"
             placeholder="••••••••"
             @keyup.enter="handleChangePassword"
-            :disabled="authStore.loading"
+            :disabled="auth.loading.value"
           />
           <button class="toggle-password" @click="showPassword = !showPassword">
             {{ showPassword ? '🙈' : '👁️' }}
           </button>
         </div>
 
-        <button class="auth-btn auth-btn-secondary" @click="handleChangePassword" :disabled="authStore.loading">
-          {{ authStore.loading ? 'Changing...' : 'Change Password' }}
+        <button class="auth-btn auth-btn-secondary" @click="handleChangePassword" :disabled="auth.loading.value">
+          {{ auth.loading.value ? 'Changing...' : 'Change Password' }}
         </button>
 
         <hr class="auth-divider" />
 
-        <button class="auth-btn auth-btn-danger" @click="handleDeleteAccount" :disabled="authStore.loading">
+        <button class="auth-btn auth-btn-danger" @click="handleDeleteAccount" :disabled="auth.loading.value">
           🗑️ Delete Account
         </button>
 
         <p class="auth-info">
-          Account created: {{ new Date(authStore.user?.created_at || '').toLocaleDateString() }}
+          Account created: {{ formatDate(auth.user.value?.created_at || '') }}
         </p>
       </div>
     </div>
@@ -595,110 +596,52 @@ const handleDeleteAccount = async () => {
 }
 
 .auth-btn-danger:hover:not(:disabled) {
-  background: #e53e3e;
+  background: #c53030;
+}
+
+.auth-divider {
+  border: none;
+  border-top: 2px solid #e2e8f0;
+  margin: 24px 0;
 }
 
 .auth-switch {
   text-align: center;
-  margin: 16px 0 0;
-  font-size: 14px;
+  margin-top: 16px;
   color: #718096;
+  font-size: 14px;
 }
 
 .auth-switch a {
   color: #4299e1;
   cursor: pointer;
   font-weight: 600;
-  text-decoration: underline;
+  text-decoration: none;
 }
 
 .auth-switch a:hover {
-  color: #3182ce;
+  text-decoration: underline;
 }
 
 .auth-info {
   text-align: center;
+  margin-top: 20px;
+  color: #718096;
   font-size: 13px;
-  color: #a0aec0;
-  margin: 20px 0 0 0;
 }
 
-.auth-divider {
-  border: none;
-  border-top: 1px solid #e2e8f0;
-  margin: 30px 0;
-}
+/* Responsive */
+@media (max-width: 640px) {
+  .auth-page {
+    padding: 80px 16px 20px;
+  }
 
-/* Dark mode */
-.dark .auth-header h1 {
-  color: #e2e8f0;
-}
+  .auth-header h1 {
+    font-size: 2rem;
+  }
 
-.dark .auth-header p {
-  color: #a0aec0;
-}
-
-.dark .auth-form {
-  background: #2d3748;
-  border-color: #4a5568;
-}
-
-.dark .auth-form h2,
-.dark .auth-form h3 {
-  color: #e2e8f0;
-}
-
-.dark .form-group label {
-  color: #cbd5e0;
-}
-
-.dark .form-group input {
-  background: #1a202c;
-  border-color: #4a5568;
-  color: #e2e8f0;
-}
-
-.dark .form-group input:focus {
-  border-color: #4299e1;
-  box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.2);
-}
-
-.dark .form-group input:disabled,
-.dark .disabled-input {
-  background: #2d3748;
-  color: #718096;
-}
-
-.dark .toggle-password:hover {
-  background: #2d3748;
-}
-
-.dark .auth-tabs button {
-  background: #2d3748;
-  border-color: #4a5568;
-  color: #cbd5e0;
-}
-
-.dark .auth-tabs button:hover {
-  border-color: #4299e1;
-  color: #4299e1;
-}
-
-.dark .auth-tabs button.active {
-  background: #4299e1;
-  border-color: #4299e1;
-  color: white;
-}
-
-.dark .auth-switch {
-  color: #a0aec0;
-}
-
-.dark .auth-info {
-  color: #718096;
-}
-
-.dark .auth-divider {
-  border-top-color: #4a5568;
+  .auth-form {
+    padding: 20px;
+  }
 }
 </style>

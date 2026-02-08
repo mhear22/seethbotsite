@@ -4,6 +4,7 @@ import Modal from '../shared/ui/Modal.vue'
 import TicketForm from '../shared/ui/TicketForm.vue'
 import { useFavorites } from '../../composables/useFavorites'
 import { useTicketsStore } from '../../stores/useTicketsStore'
+import { formatDate } from '../../utils/format'
 import { useAuthStore } from '../../stores/useAuthStore'
 import type { Ticket, TicketStats } from '../../stores/useTicketsStore'
 
@@ -354,10 +355,6 @@ const saveEdit = async () => {
   }
 }
 
-const formatDate = (dateString: string) => {
-  return ticketsStore.formatDate(dateString)
-}
-
 // Toggle ignore mode
 const toggleIgnoreMode = async () => {
   const newValue = !ignoreMode.value
@@ -654,7 +651,7 @@ onUnmounted(() => {
         <!-- Last Collection Display -->
         <div v-if="ticketsStore.lastCollection" class="last-collection">
           <span class="collection-icon">🕐</span>
-          <span class="collection-text">Last collected: {{ formatDate(ticketsStore.lastCollection) }}</span>
+          <span class="collection-text">Last collected: {{ formatDate(ticketsStore.lastCollection, true) }}</span>
         </div>
 
         <!-- Ignore Mode Toggle -->
@@ -723,7 +720,7 @@ onUnmounted(() => {
                 <span class="ticket-id">#{{ ticketsStore.ticketStats.oldestTicket.id }}</span>
                 <span class="ticket-title">{{ ticketsStore.ticketStats.oldestTicket.title }}</span>
               </div>
-              <span class="ticket-date">{{ formatDate(ticketsStore.ticketStats.oldestTicket.created_at) }}</span>
+              <span class="ticket-date">{{ formatDate(ticketsStore.ticketStats.oldestTicket.created_at, true) }}</span>
             </div>
           </div>
 
@@ -736,7 +733,7 @@ onUnmounted(() => {
                 <span class="ticket-id">#{{ ticketsStore.ticketStats.newestTicket.id }}</span>
                 <span class="ticket-title">{{ ticketsStore.ticketStats.newestTicket.title }}</span>
               </div>
-              <span class="ticket-date">{{ formatDate(ticketsStore.ticketStats.newestTicket.created_at) }}</span>
+              <span class="ticket-date">{{ formatDate(ticketsStore.ticketStats.newestTicket.created_at, true) }}</span>
             </div>
           </div>
 
@@ -748,15 +745,15 @@ onUnmounted(() => {
               <div class="date-range">
                 <div class="date-row">
                   <span class="date-label">Created:</span>
-                  <span class="date-value">{{ formatDate(ticketsStore.ticketStats.dates.oldestCreated) }}</span>
+                  <span class="date-value">{{ formatDate(ticketsStore.ticketStats.dates.oldestCreated, true) }}</span>
                   <span class="date-separator">→</span>
-                  <span class="date-value">{{ formatDate(ticketsStore.ticketStats.dates.newestCreated) }}</span>
+                  <span class="date-value">{{ formatDate(ticketsStore.ticketStats.dates.newestCreated, true) }}</span>
                 </div>
                 <div v-if="ticketsStore.ticketStats.dates.oldestCompleted" class="date-row completed-date">
                   <span class="date-label">Completed:</span>
-                  <span class="date-value">{{ formatDate(ticketsStore.ticketStats.dates.oldestCompleted) }}</span>
+                  <span class="date-value">{{ formatDate(ticketsStore.ticketStats.dates.oldestCompleted, true) }}</span>
                   <span class="date-separator">→</span>
-                  <span class="date-value">{{ formatDate(ticketsStore.ticketStats.dates.newestCompleted) }}</span>
+                  <span class="date-value">{{ formatDate(ticketsStore.ticketStats.dates.newestCompleted, true) }}</span>
                 </div>
               </div>
             </div>
@@ -939,7 +936,7 @@ onUnmounted(() => {
           </div>
 
           <div class="ticket-meta">
-            <span class="ticket-date">Created: {{ formatDate(ticket.created_at) }}</span>
+            <span class="ticket-date">Created: {{ formatDate(ticket.created_at, true) }}</span>
             <div class="ticket-actions">
               <button
                 v-if="ticket.status === 'pending'"

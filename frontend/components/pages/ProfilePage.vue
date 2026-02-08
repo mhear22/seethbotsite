@@ -2,6 +2,7 @@
 import { ref, reactive, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuth } from '../../composables/useAuth'
+import { formatDate } from '../../utils/format'
 
 const route = useRoute()
 const auth = reactive(useAuth())
@@ -208,16 +209,6 @@ const getInitials = (name: string) => {
     .slice(0, 2)
 }
 
-// Format date
-const formatDate = (dateStr: string) => {
-  if (!dateStr) return 'Unknown'
-  return new Date(dateStr).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  })
-}
-
 onMounted(() => {
   loadOtherProfile()
 })
@@ -240,7 +231,7 @@ onMounted(() => {
         <div class="profile-info">
           <h1 class="profile-name">{{ displayDisplayName(auth.user) }}</h1>
           <p class="profile-email">{{ auth.user?.email }}</p>
-          <p class="profile-member-since">Member since {{ formatDate(auth.user?.created_at || '') }}</p>
+          <p class="profile-member-since">Member since {{ formatDate(auth.user?.created_at || '', false, 'long') }}</p>
         </div>
         <button
           v-if="!isEditing && auth.isAuthenticated"
@@ -351,7 +342,7 @@ onMounted(() => {
         </div>
         <div class="profile-info">
           <h1 class="profile-name">{{ displayDisplayName(otherUserProfile) }}</h1>
-          <p class="profile-member-since">Member since {{ formatDate(otherUserProfile.created_at || '') }}</p>
+          <p class="profile-member-since">Member since {{ formatDate(otherUserProfile.created_at || '', false, 'long') }}</p>
         </div>
       </div>
 
