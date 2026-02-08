@@ -6,15 +6,6 @@ import './styles.css'
 import './theme-base.css'
 import { useAuthStore } from './stores/useAuthStore'
 
-// Accessibility testing with axe-core (Ticket #148)
-if (import.meta.env.DEV) {
-  import('@axe-core/vue').then(({ default: axe }) => {
-    console.log('[Accessibility] Axe DevTools enabled')
-  }).catch((error) => {
-    console.warn('[Accessibility] Failed to load axe-core:', error)
-  })
-}
-
 // Font Awesome integration
 import { library } from '@fortawesome/fontawesome-svg-core'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
