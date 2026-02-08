@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { onMounted, watch } from 'vue'
+import { onMounted, watch, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import MainApp from './components/shared/core/MainApp.vue'
 import { useAppStore } from './stores/useAppStore'
 import { useAuthStore } from './stores/useAuthStore'
 import { useTheme } from './composables/useTheme'
+import { useAuth } from './composables/useAuth'
+import { useSync } from './composables/useSync'
 
 // Stores
 const appStore = useAppStore()
@@ -15,6 +17,10 @@ const route = useRoute()
 
 // Initialize theme
 const { applyTheme } = useTheme()
+
+// Sync
+const { isAuthenticated } = useAuth()
+const { initSync, cleanupSync } = useSync()
 
 // Sync route path with store currentRoute
 watch(() => route.path, (newPath) => {
@@ -62,6 +68,27 @@ onMounted(() => {
   if (authStore.isInitialized) {
     console.log('[Auth] Already initialized, validating token...')
     authStore.validateToken()
+  }
+
+  // Initialize account sync (Ticket #177) - only if authenticated
+  if (isAuthenticated.value) {
+    initSync()
+  }
+
+  // Watch authentication state to initialize/cleanup sync
+  watch(isAuthenticated, (newValue) => {
+    if (newValue) {
+      initSync()
+    } else {
+      cleanupSync()
+    }
+  })
+})
+
+// Cleanup sync on unmount
+onUnmounted(() => {
+  if (isAuthenticated.value) {
+    cleanupSync()
   }
 })
 </script>

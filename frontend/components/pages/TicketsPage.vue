@@ -2,6 +2,7 @@
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import Modal from '../shared/ui/Modal.vue'
 import TicketForm from '../shared/ui/TicketForm.vue'
+import TicketFilters from '../shared/ui/TicketFilters.vue'
 import { useFavorites } from '../../composables/useFavorites'
 import { useTicketsStore } from '../../stores/useTicketsStore'
 import { formatDate } from '../../utils/format'
@@ -26,9 +27,29 @@ const filterPriority = ref('')
 const filterTag = ref('')
 const filterCategory = ref('')
 
+// Combined filters object for TicketFilters component
+const filters = computed({
+  get: () => ({
+    searchQuery: searchQuery.value,
+    filterStatus: filterStatus.value,
+    filterType: filterType.value,
+    filterPriority: filterPriority.value,
+    filterTag: filterTag.value,
+    filterCategory: filterCategory.value
+  }),
+  set: (value) => {
+    searchQuery.value = value.searchQuery
+    filterStatus.value = value.filterStatus
+    filterType.value = value.filterType
+    filterPriority.value = value.filterPriority
+    filterTag.value = value.filterTag
+    filterCategory.value = value.filterCategory
+  }
+})
+
 // Search state
 const searchQuery = ref('')
-const searchInputRef = ref<HTMLInputElement | null>(null)
+const ticketFiltersRef = ref<InstanceType<typeof TicketFilters> | null>(null)
 
 // Favorites composable
 const { toggleFavorite, isFavorite } = useFavorites()
@@ -610,7 +631,7 @@ onMounted(async () => {
     // '/' to focus search
     if (e.key === '/' && !e.ctrlKey && !e.metaKey) {
       e.preventDefault()
-      searchInputRef.value?.focus()
+      ticketFiltersRef.value?.searchInputRef?.focus()
     }
   }
 
@@ -629,7 +650,7 @@ onUnmounted(() => {
     }
     if (e.key === '/' && !e.ctrlKey && !e.metaKey) {
       e.preventDefault()
-      searchInputRef.value?.focus()
+      ticketFiltersRef.value?.searchInputRef?.focus()
     }
   }
   window.removeEventListener('keydown', handleKeyDown)
@@ -783,92 +804,7 @@ onUnmounted(() => {
       </button>
 
       <!-- Filter Chips (buttons instead of dropdown per ticket #151) -->
-      <div class="filter-section">
-        <div class="search-box">
-          <input
-            ref="searchInputRef"
-            v-model="searchQuery"
-            type="text"
-            placeholder="🔍 Search tickets... (press / to focus)"
-            class="search-input"
-          />
-          <button
-            v-if="searchQuery"
-            @click="searchQuery = ''"
-            class="search-clear"
-            title="Clear search"
-          >
-            ✕
-          </button>
-        </div>
-        <div class="filter-group-title">Status</div>
-        <div class="filter-chips">
-          <button
-            v-for="option in statusOptions"
-            :key="option.value"
-            @click="filterStatus = option.value"
-            :class="['filter-chip', { active: filterStatus === option.value }]"
-          >
-            {{ option.label }}
-          </button>
-        </div>
-        <div class="filter-group-title">Type</div>
-        <div class="filter-chips">
-          <button
-            v-for="option in typeOptions"
-            :key="option.value"
-            @click="filterType = filterType === option.value ? '' : option.value"
-            :class="['filter-chip', { active: filterType === option.value }]"
-          >
-            {{ option.label }}
-          </button>
-        </div>
-        <div class="filter-group-title">Priority</div>
-        <div class="filter-chips">
-          <button
-            v-for="option in priorityOptions"
-            :key="option.value"
-            @click="filterPriority = filterPriority === option.value ? '' : option.value"
-            :class="['filter-chip', { active: filterPriority === option.value }]"
-          >
-            {{ option.label }}
-          </button>
-        </div>
-        <div class="filter-group-title">Tags</div>
-        <div class="filter-chips">
-          <input
-            v-model="filterTag"
-            type="text"
-            placeholder="🏷️ Filter by tag..."
-            class="filter-input"
-          />
-          <button
-            v-if="filterTag"
-            @click="filterTag = ''"
-            class="filter-clear"
-            title="Clear tag filter"
-          >
-            ✕
-          </button>
-        </div>
-        <div class="filter-group-title">Category</div>
-        <div class="filter-chips">
-          <input
-            v-model="filterCategory"
-            type="text"
-            placeholder="📁 Filter by category..."
-            class="filter-input"
-          />
-          <button
-            v-if="filterCategory"
-            @click="filterCategory = ''"
-            class="filter-clear"
-            title="Clear category filter"
-          >
-            ✕
-          </button>
-        </div>
-      </div>
+      <TicketFilters ref="ticketFiltersRef" v-model="filters" />
 
       <!-- Filtered Tickets List -->
       <div  class="tickets-list">
@@ -1540,78 +1476,6 @@ onUnmounted(() => {
   color: #e2e8f0;
 }
 
-.filter-section {
-  background: rgba(255, 255, 255, 0.95);
-  padding: 20px;
-  border-radius: 12px;
-  margin-bottom: 20px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
-  border: 1px solid #e2e8f0;
-}
-
-.dark .filter-section {
-  background: rgba(40, 44, 52, 0.95);
-  border-color: #4a5568;
-}
-
-.filter-group {
-  margin-bottom: 16px;
-}
-
-.filter-group:last-child {
-  margin-bottom: 0;
-}
-
-.filter-label {
-  display: inline-block;
-  font-size: 14px;
-  font-weight: 600;
-  color: #4a5568;
-  margin-right: 12px;
-}
-
-.filter-dropdown {
-  padding: 8px 12px;
-  border: 2px solid #e2e8f0;
-  background: white;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 500;
-  color: #4a5568;
-  cursor: pointer;
-  transition: all 0.2s;
-  min-width: 150px;
-}
-
-.filter-dropdown:hover {
-  border-color: #4299e1;
-}
-
-.filter-dropdown:focus {
-  outline: none;
-  border-color: #4299e1;
-  box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
-}
-
-.dark .filter-dropdown {
-  background: #2d3748;
-  border-color: #4a5568;
-  color: #e2e8f0;
-}
-
-.dark .filter-dropdown:hover {
-  border-color: #4299e1;
-}
-
-.dark .filter-dropdown:focus {
-  border-color: #4299e1;
-  box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.2);
-}
-
-.dark .filter-label {
-  color: #cbd5e0;
-}
-
 .new-ticket-btn {
   width: 100%;
   padding: 14px 20px;
@@ -2043,11 +1907,6 @@ onUnmounted(() => {
   color: #a0aec0;
 }
 
-.dark .filter-section {
-  background: #2d3748;
-  border-color: #4a5568;
-}
-
 .dark .ticket-card {
   background: #2d3748;
   border-color: #4a5568;
@@ -2114,99 +1973,6 @@ onUnmounted(() => {
 
 .dark .collection-text {
   color: #90cdf4;
-}
-
-/* Search box styles */
-.search-box {
-  position: relative;
-  margin-bottom: 16px;
-}
-
-.search-input {
-  width: 100%;
-  padding: 10px 40px 10px 16px;
-  border: 2px solid #e2e8f0;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 500;
-  transition: all 0.2s;
-  background: white;
-  color: #4a5568;
-}
-
-.search-input:focus {
-  outline: none;
-  border-color: #4299e1;
-  box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
-}
-
-.search-input::placeholder {
-  color: #a0aec0;
-}
-
-.search-clear {
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  background: #48bb78;
-  border: none;
-  border-radius: 50%;
-  width: 24px;
-  height: 24px;
-  font-size: 16px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
-  color: white;
-}
-
-.search-clear:hover {
-  background: #38a169;
-  transform: translateY(-50%) scale(1.1);
-}
-
-.dark .search-input {
-  background: #2d3748;
-  border-color: #4a5568;
-  color: #e2e8f0;
-  font-weight: 500;
-}
-
-.dark .search-input:focus {
-  border-color: #4299e1;
-  box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.2);
-}
-
-.dark .search-input::placeholder {
-  color: #718096;
-}
-
-.dark .search-clear {
-  background: #38a169;
-  color: white;
-}
-
-.dark .search-clear:hover {
-  background: #48bb78;
-}
-
-/* Filter group title styles */
-.filter-group-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: #718096;
-  margin: 16px 0 8px 0;
-}
-
-.filter-group-title:first-of-type {
-  margin-top: 0;
-}
-
-.dark .filter-group-title {
-  color: #a0aec0;
 }
 
 /* Dark mode kanban styles */
@@ -2512,59 +2278,6 @@ onUnmounted(() => {
   font-size: 12px;
   font-weight: 500;
   border: 1px solid #d6bcfa;
-}
-
-/* Filter Input Styles */
-.filter-input {
-  flex: 1;
-  padding: 6px 10px;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 500;
-  color: #4a5568;
-  background: white;
-  min-width: 150px;
-}
-
-.filter-input:focus {
-  outline: none;
-  border-color: #4299e1;
-  box-shadow: 0 0 0 2px rgba(66, 153, 225, 0.1);
-}
-
-.filter-clear {
-  padding: 4px 8px;
-  background: #cbd5e0;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.filter-clear:hover {
-  background: #a0aec0;
-}
-
-.dark .filter-input {
-  background: #2d3748;
-  border-color: #4a5568;
-  color: #e2e8f0;
-}
-
-.dark .filter-input:focus {
-  border-color: #4299e1;
-  box-shadow: 0 0 0 2px rgba(66, 153, 225, 0.2);
-}
-
-.dark .filter-clear {
-  background: #4a5568;
-}
-
-.dark .filter-clear:hover {
-  background: #718096;
 }
 
 .dark .tag-chip {
