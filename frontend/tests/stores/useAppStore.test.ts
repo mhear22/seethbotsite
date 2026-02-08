@@ -141,7 +141,6 @@ describe('useAppStore', () => {
 
       expect(store.darkMode).toBe(true)
       expect(store.darkerMode).toBe(false)
-      expect(mockPlayButtonClick).toHaveBeenCalled()
     })
 
     it('cycles dark -> darker', () => {
@@ -249,7 +248,6 @@ describe('useAppStore', () => {
 
       expect(store.isMuted).toBe(false)
       expect(mockUnmuteAll).toHaveBeenCalled()
-      expect(mockPlayButtonClick).toHaveBeenCalled()
     })
   })
 

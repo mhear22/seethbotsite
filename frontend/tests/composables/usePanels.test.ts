@@ -50,6 +50,7 @@ describe('usePanels', () => {
         tachometer: true,
         coolnessPanel: true,
         mining: false,
+        activeUsers: true,
       })
     })
 
@@ -133,6 +134,8 @@ describe('usePanels', () => {
 
       const { panels, openPanel } = usePanels()
 
+      // On mobile, rankings defaults to false, so open it first
+      openPanel('rankings')
       expect(panels.value.rankings).toBe(true)
 
       // Opening cat should close rankings

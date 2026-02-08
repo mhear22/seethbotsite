@@ -195,6 +195,6 @@ describe('Modal', () => {
     })
 
     const closeButton = document.body.querySelector('.modal-close-btn')
-    expect(closeButton?.getAttribute('aria-label')).toBe('Close')
+    expect(closeButton?.getAttribute('aria-label')).toBe('Close modal')
   })
 })

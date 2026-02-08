@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, shallowRef, onMounted, onUnmounted } from 'vue'
 import * as THREE from 'three'
 import { statsRepository } from '../../repositories/stats.repository'
 
@@ -7,9 +7,9 @@ const container = ref<HTMLElement | null>(null)
 const gameActive = ref(false)
 const score = ref(0)
 const caughtFish = ref<string[]>([])
-const scene = ref<THREE.Scene | null>(null)
-const camera = ref<THREE.PerspectiveCamera | null>(null)
-const renderer = ref<THREE.WebGLRenderer | null>(null)
+const scene = shallowRef<THREE.Scene | null>(null)
+const camera = shallowRef<THREE.PerspectiveCamera | null>(null)
+const renderer = shallowRef<THREE.WebGLRenderer | null>(null)
 let animationId: number | null = null
 
 // User ID for tracking
@@ -68,8 +68,18 @@ const updateHighScore = async () => {
 
 let hook: THREE.Mesh | null = null
 let fishingLine: THREE.Line | null = null
-let fishes: THREE.Mesh[] = []
+let fishes: THREE.Group[] = []
 let fishVelocities: { x: number; z: number }[] = []
+let fishTimeouts: number[] = []
+
+interface FishUserData {
+  color: number
+  name: string
+  points: number
+  size: number
+  rare?: boolean
+  id: number
+}
 
 const fishTypes = [
   { color: 0xff6b6b, name: 'Red Snapper', points: 10, size: 1 },
@@ -149,7 +159,7 @@ const createFishingLine = () => {
   // Fishing line (visual only)
   const lineGeometry = new THREE.BufferGeometry().setFromPoints([
     new THREE.Vector3(0, 5, 0),
-    hook.position
+    new THREE.Vector3(0, 2, 0)
   ])
   const lineMaterial = new THREE.LineBasicMaterial({ color: 0x333333, linewidth: 2 })
   fishingLine = new THREE.Line(lineGeometry, lineMaterial)
@@ -213,7 +223,8 @@ const createFish = () => {
   fishGroup.rotation.y = Math.random() * Math.PI * 2
 
   // Store fish type as userData
-  fishGroup.userData = { ...fishType, id: fishes.length }
+  const userData: FishUserData = { ...fishType, id: fishes.length }
+  fishGroup.userData = userData
 
   scene.value.add(fishGroup)
   fishes.push(fishGroup)
@@ -224,9 +235,9 @@ const createFish = () => {
 }
 
 const animate = () => {
-  animationId = requestAnimationFrame(animate)
-
   if (!scene.value || !camera.value || !renderer.value || !hook) return
+
+  animationId = requestAnimationFrame(animate)
 
   // Animate fishes
   fishes.forEach((fish, index) => {
@@ -242,19 +253,21 @@ const animate = () => {
   })
 
   // Update fishing line
-  if (fishingLine) {
-    const positions = (fishingLine.geometry as THREE.BufferGeometry).attributes.position.array as Float32Array
-    positions[3] = hook.position.x
-    positions[4] = hook.position.y
-    positions[5] = hook.position.z
-    (fishingLine.geometry as THREE.BufferGeometry).attributes.position.needsUpdate = true
+  if (fishingLine && hook && hook.position) {
+    const hookPos = hook.position
+    const posAttr = fishingLine.geometry.getAttribute('position') as THREE.BufferAttribute
+    const positions = posAttr.array as Float32Array
+    positions[3] = hookPos.x
+    positions[4] = hookPos.y
+    positions[5] = hookPos.z
+    posAttr.needsUpdate = true
   }
 
   renderer.value.render(scene.value, camera.value)
 }
 
 const castLine = () => {
-  if (!hook || !gameActive.value) return
+  if (!hook) return
 
   gameActive.value = true
 
@@ -264,24 +277,34 @@ const castLine = () => {
   let progress = 0
 
   const dropHook = () => {
+    if (!hook) return
+
     progress += 0.05
     hook.position.y = startY - (startY - targetY) * progress
 
     // Check for fish collision (dynamic based on fish size)
     const caughtIndex = fishes.findIndex(fish => {
-      const distance = hook.position.distanceTo(fish.position)
-      const catchRadius = 0.6 + (fish.userData.size * 0.3)
+      if (!hook || !fish || !fish.position) return false
+
+      // Manual distance calculation to avoid THREE.js type issues
+      const dx = hook.position.x - fish.position.x
+      const dy = hook.position.y - fish.position.y
+      const dz = hook.position.z - fish.position.z
+      const distance = Math.sqrt(dx * dx + dy * dy + dz * dz)
+      const fishData = fish.userData as FishUserData
+      const catchRadius = 0.6 + (fishData.size * 0.3)
       return distance < catchRadius
     })
 
     if (caughtIndex !== -1) {
       // Caught a fish!
       const caughtFishItem = fishes[caughtIndex]
-      score.value += caughtFishItem.userData.points
-      caughtFish.value.push(caughtFishItem.userData.name)
+      const fishData = caughtFishItem.userData as FishUserData
+      score.value += fishData.points
+      caughtFish.value.push(fishData.name)
 
       // Record the fish caught stat
-      recordFishCaught(caughtFishItem.userData.name, caughtFishItem.userData.points)
+      recordFishCaught(fishData.name, fishData.points)
 
       // Update high score
       updateHighScore()
@@ -291,8 +314,16 @@ const castLine = () => {
       fishes.splice(caughtIndex, 1)
       fishVelocities.splice(caughtIndex, 1)
 
-      // Create new fish after delay
-      setTimeout(() => createFish(), 2000)
+      // Create new fish after delay - track timeout for cleanup
+      const timeoutId = window.setTimeout(() => {
+        if (scene.value) {
+          createFish()
+        }
+        // Remove this timeout ID from tracking
+        const idx = fishTimeouts.indexOf(timeoutId)
+        if (idx > -1) fishTimeouts.splice(idx, 1)
+      }, 2000)
+      fishTimeouts.push(timeoutId)
 
       // Reel in
       reelIn(startY)
@@ -317,6 +348,8 @@ const reelIn = (targetY: number) => {
   const startY = hook.position.y
 
   const pullUp = () => {
+    if (!hook) return
+
     progress += 0.08
     hook.position.y = startY + (targetY - startY) * progress
 
@@ -353,11 +386,43 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  // Cancel animation frame
   if (animationId !== null) {
     cancelAnimationFrame(animationId)
+    animationId = null
   }
+
+  // Clear all pending fish creation timeouts
+  fishTimeouts.forEach(timeoutId => clearTimeout(timeoutId))
+  fishTimeouts = []
+
+  // Cleanup event listeners
   window.removeEventListener('resize', onWindowResize)
+
+  // Dispose Three.js resources to prevent memory leaks
+  if (scene.value) {
+    scene.value.traverse((object) => {
+      if (object instanceof THREE.Mesh) {
+        object.geometry?.dispose()
+        if (object.material) {
+          if (Array.isArray(object.material)) {
+            object.material.forEach(material => material.dispose())
+          } else {
+            object.material.dispose()
+          }
+        }
+      }
+    })
+  }
+
+  // Dispose renderer
   renderer.value?.dispose()
+
+  // Clear references
+  hook = null
+  fishingLine = null
+  fishes = []
+  fishVelocities = []
 
   // Update final high score before unmount
   updateHighScore()

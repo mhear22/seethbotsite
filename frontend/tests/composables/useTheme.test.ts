@@ -253,8 +253,8 @@ describe('useTheme', () => {
   })
 
   describe('presets', () => {
-    it('should have 8 presets', () => {
-      expect(THEME_PRESETS).toHaveLength(8)
+    it('should have 10 presets', () => {
+      expect(THEME_PRESETS).toHaveLength(10)
     })
 
     it('should include expected preset ids', () => {
