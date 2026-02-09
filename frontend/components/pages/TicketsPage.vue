@@ -3,6 +3,7 @@ import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import Modal from '../shared/ui/Modal.vue'
 import TicketForm from '../shared/ui/TicketForm.vue'
 import TicketFilters from '../shared/ui/TicketFilters.vue'
+import TicketDetailsModal from '../shared/tickets/TicketDetailsModal.vue'
 import { useFavorites } from '../../composables/useFavorites'
 import { useTicketsStore } from '../../stores/useTicketsStore'
 import { formatDate } from '../../utils/format'
@@ -100,6 +101,10 @@ const editForm = ref({
 
 // Local error state for form validation
 const formError = ref<string | null>(null)
+
+// Ticket details modal state
+const showDetailsModal = ref(false)
+const viewingTicket = ref<Ticket | null>(null)
 
 // Status colors
 const statusColors = {
@@ -227,6 +232,19 @@ const toggleTicketDescription = (ticketId: number, e: Event) => {
   }
   // Force reactivity by creating a new Set
   expandedTicketIds.value = new Set(expandedTicketIds.value)
+}
+
+// Open ticket details modal
+const openTicketDetails = (ticket: Ticket, e: Event) => {
+  e.stopPropagation()
+  viewingTicket.value = ticket
+  showDetailsModal.value = true
+}
+
+// Close ticket details modal
+const closeTicketDetails = () => {
+  showDetailsModal.value = false
+  viewingTicket.value = null
 }
 
 const isTicketDescriptionExpanded = (ticketId: number): boolean => {
@@ -875,6 +893,14 @@ onUnmounted(() => {
             <span class="ticket-date">Created: {{ formatDate(ticket.created_at, true) }}</span>
             <div class="ticket-actions">
               <button
+                @click="openTicketDetails(ticket, $event)"
+                class="view-details-btn"
+                :disabled="loading"
+                title="View full ticket details"
+              >
+                👁️ View Details
+              </button>
+              <button
                 v-if="ticket.status === 'pending'"
                 @click="startEdit(ticket)"
                 class="edit-ticket-btn"
@@ -996,6 +1022,13 @@ onUnmounted(() => {
         </div>
       </div>
     </Modal>
+
+    <!-- Ticket Details Modal -->
+    <TicketDetailsModal
+      :is-open="showDetailsModal"
+      :ticket="viewingTicket"
+      @close="closeTicketDetails"
+    />
   </div>
 </template>
 
@@ -1829,7 +1862,8 @@ onUnmounted(() => {
 
 .edit-ticket-btn,
 .close-ticket-btn,
-.delete-ticket-btn {
+.delete-ticket-btn,
+.view-details-btn {
   padding: 6px 14px;
   color: white;
   border: none;
@@ -1867,9 +1901,19 @@ onUnmounted(() => {
   transform: translateY(-1px);
 }
 
+.view-details-btn {
+  background: #4299e1;
+}
+
+.view-details-btn:hover:not(:disabled) {
+  background: #3182ce;
+  transform: translateY(-1px);
+}
+
 .edit-ticket-btn:disabled,
 .close-ticket-btn:disabled,
-.delete-ticket-btn:disabled {
+.delete-ticket-btn:disabled,
+.view-details-btn:disabled {
   background: #cbd5e0;
   cursor: not-allowed;
   transform: none;
