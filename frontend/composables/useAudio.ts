@@ -2,13 +2,13 @@ import { ref } from 'vue'
 
 // Sound file mappings
 const SOUND_FILES = {
-  click: '/button-sound.mp3',
-  success: '/button-sound.mp3',
-  error: '/fart-with-reverb.mp3',
-  panelOpen: '/button-sound.mp3',
-  honk: '/goose-honk.mp3',
-  pointsEarned: '/button-sound.mp3',
-  notification: '/button-sound.mp3'
+  click: '/sounds/click.mp3',
+  success: '/sounds/success.mp3',
+  error: '/sounds/error.mp3',
+  panelOpen: '/sounds/panel.mp3',
+  honk: '/sounds/honk.mp3',
+  pointsEarned: '/sounds/points.mp3',
+  notification: '/sounds/notification.mp3'
 } as const
 
 // Sound configuration for variety

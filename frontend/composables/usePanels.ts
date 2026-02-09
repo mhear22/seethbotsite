@@ -1,4 +1,5 @@
 import { ref, watch } from 'vue'
+import { useAudio } from './useAudio'
 
 export interface PanelState {
   rankings: boolean
@@ -98,6 +99,8 @@ export function usePanels(initialState?: Partial<PanelState>) {
     return window.innerWidth <= 768
   }
 
+  const { playPanelOpen } = useAudio()
+
   const togglePanel = (panelName: keyof PanelState) => {
     const isCurrentlyOpen = panels.value[panelName]
 
@@ -111,6 +114,11 @@ export function usePanels(initialState?: Partial<PanelState>) {
     }
 
     panels.value[panelName] = !isCurrentlyOpen
+
+    // Play sound when panel is opened
+    if (!isCurrentlyOpen) {
+      playPanelOpen()
+    }
   }
 
   const openPanel = (panelName: keyof PanelState) => {
@@ -124,10 +132,16 @@ export function usePanels(initialState?: Partial<PanelState>) {
     }
 
     panels.value[panelName] = true
+
+    // Play sound when panel is opened
+    playPanelOpen()
   }
 
   const closePanel = (panelName: keyof PanelState) => {
     panels.value[panelName] = false
+
+    // Play sound when panel is closed
+    playPanelOpen()
   }
 
   return {

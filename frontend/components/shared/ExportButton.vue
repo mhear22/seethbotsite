@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { exportRepository } from '../../repositories/export.repository'
+import { useAudio } from '@/composables/useAudio'
 
 interface Props {
   type: 'rankings' | 'stats' | 'clicks' | 'history' | 'leaderboard'
@@ -29,8 +30,10 @@ const emit = defineEmits<{
 
 const showMenu = ref(false)
 const isExporting = ref(false)
+const { playClick, playSuccess, playError } = useAudio()
 
 const handleExport = async (format: 'json' | 'csv') => {
+  playClick()
   showMenu.value = false
   isExporting.value = true
   emit('exportStart')
@@ -85,9 +88,11 @@ const handleExport = async (format: 'json' | 'csv') => {
     }
 
     emit('exportComplete')
+    playSuccess()
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Export failed'
     emit('exportError', errorMessage)
+    playError()
   } finally {
     isExporting.value = false
   }

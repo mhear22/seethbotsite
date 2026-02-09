@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import { achievementsRepository } from '../../repositories/achievements.repository'
 import type { AchievementDisplay, AchievementProgress } from '../../repositories/types/achievements.types'
 import { formatDate } from '../../utils/format'
+import { useAudio } from '@/composables/useAudio'
 
 const achievements = ref<AchievementDisplay[]>([])
 const progress = ref<AchievementProgress | null>(null)
@@ -37,6 +38,8 @@ const getProgressColor = (percentage: number): string => {
   return '#fc8181' // Red
 }
 
+const { playClick, playSuccess } = useAudio()
+
 const checkNewAchievements = async () => {
   try {
     checkingForNew.value = true
@@ -46,6 +49,8 @@ const checkNewAchievements = async () => {
 
     if (result.newUnlocks.length > 0) {
       newUnlocksMessage.value = `🎉 Unlocked ${result.newUnlocks.length} new achievement(s)!`
+      // Play success sound for achievements
+      playSuccess()
       // Reload to show new achievements
       await loadAchievements()
     } else {
