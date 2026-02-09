@@ -1214,6 +1214,430 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/avatar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update user avatar
+         * @description Updates the authenticated user's avatar URL. Requires JWT token.
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        avatarUrl?: string | null;
+                    };
+                };
+            };
+            responses: {
+                /** @description Avatar updated successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/auth/banner": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update user banner
+         * @description Updates the authenticated user's banner URL. Requires JWT token.
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        bannerUrl?: string | null;
+                    };
+                };
+            };
+            responses: {
+                /** @description Banner updated successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/auth/bio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update user bio
+         * @description Updates the authenticated user's bio. Requires JWT token.
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        bio?: string | null;
+                    };
+                };
+            };
+            responses: {
+                /** @description Bio updated successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/auth/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update user status
+         * @description Updates the authenticated user's status message. Requires JWT token.
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        status?: string | null;
+                    };
+                };
+            };
+            responses: {
+                /** @description Status updated successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/auth/privacy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update user privacy settings
+         * @description Updates the authenticated user's privacy settings. Requires JWT token.
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        showEmail?: boolean;
+                        showJoinedDate?: boolean;
+                    };
+                };
+            };
+            responses: {
+                /** @description Privacy settings updated successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/profile/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get user profile by ID
+         * @description Returns public profile information for a user.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Profile retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description User not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/theme": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get user's theme preferences
+         * @description Returns the authenticated user's theme preferences. Requires JWT token.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Theme preferences retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            success?: boolean;
+                            preferences?: {
+                                preset?: string;
+                                customColors?: {
+                                    primary?: string;
+                                    background?: string;
+                                    text?: string;
+                                    accent?: string;
+                                    cardBackground?: string;
+                                };
+                                options?: {
+                                    darkMode?: boolean;
+                                    highContrast?: boolean;
+                                    reduceMotion?: boolean;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        /**
+         * Update user's theme preferences
+         * @description Updates the authenticated user's theme preferences. Requires JWT token.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description Theme preset name (e.g., "dark", "light") */
+                        preset: string;
+                        customColors: {
+                            /** @description Hex color code (#RRGGBB) */
+                            primary: string;
+                            /** @description Hex color code (#RRGGBB) */
+                            background: string;
+                            /** @description Hex color code (#RRGGBB) */
+                            text: string;
+                            /** @description Hex color code (#RRGGBB) */
+                            accent: string;
+                            /** @description Hex color code (#RRGGBB) */
+                            cardBackground: string;
+                        };
+                        options: {
+                            darkMode: boolean;
+                            highContrast: boolean;
+                            reduceMotion: boolean;
+                        };
+                    };
+                };
+            };
+            responses: {
+                /** @description Theme preferences updated successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            success?: boolean;
+                            preferences?: Record<string, never>;
+                        };
+                    };
+                };
+                /** @description Invalid theme preferences */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/birdsounds/random": {
         parameters: {
             query?: never;
@@ -4557,6 +4981,347 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/reactions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add or toggle a reaction
+         * @description Adds a reaction if it doesn't exist, removes it if it does (toggle behavior)
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /**
+                         * @description Type of target to react to
+                         * @example message
+                         * @enum {string}
+                         */
+                        targetType: "message" | "post" | "comment";
+                        /**
+                         * @description ID of the target
+                         * @example 123
+                         */
+                        targetId: number;
+                        /**
+                         * @description Emoji reaction
+                         * @example 👍
+                         */
+                        emoji: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Reaction toggled successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            success?: boolean;
+                            /** @description true if reaction was added, false if removed */
+                            added?: boolean;
+                            /** @description true if reaction was removed, false if added */
+                            removed?: boolean;
+                        };
+                    };
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/reactions/force": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Force add a reaction
+         * @description Adds a reaction without toggling. Returns null if reaction already exists.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /**
+                         * @example message
+                         * @enum {string}
+                         */
+                        targetType: "message" | "post" | "comment";
+                        /** @example 123 */
+                        targetId: number;
+                        /** @example 👍 */
+                        emoji: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Reaction added successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/reactions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove a reaction by ID
+         * @description Removes a reaction using its ID
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Reaction ID */
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Reaction removed successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Reaction not found or doesn't belong to user */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/reactions/{targetType}/{targetId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get reactions for a target
+         * @description Returns all reactions for a specific target, aggregated by emoji
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description If true, returns individual reactions instead of aggregated counts */
+                    detailed?: boolean;
+                };
+                header?: never;
+                path: {
+                    /** @description Type of target */
+                    targetType: "message" | "post" | "comment";
+                    /** @description ID of the target */
+                    targetId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Reactions retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            reactions?: {
+                                emoji?: string;
+                                count?: number;
+                                user_ids?: number[];
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/reactions/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Check if current user has reacted to a target
+         * @description Returns true if the authenticated user has reacted with the specified emoji
+         */
+        get: {
+            parameters: {
+                query: {
+                    targetType: "message" | "post" | "comment";
+                    targetId: number;
+                    emoji: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Check completed */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            has_reacted?: boolean;
+                        };
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/reactions/user": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get all reactions by the current user
+         * @description Returns all reactions made by the authenticated user
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Reactions retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/search": {
         parameters: {
             query?: never;
@@ -5780,6 +6545,276 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/sync/upload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload local changes to server
+         * @description Uploads local data changes from a device to the server for synchronization.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description Unique identifier for the device */
+                        deviceId: string;
+                        /** @description Human-readable device name */
+                        deviceName?: string;
+                        /** @description Device type (mobile, desktop, tablet, etc.) */
+                        deviceType?: string;
+                        /** @description Platform (iOS, Android, Windows, macOS, etc.) */
+                        platform?: string;
+                        /** @description Sync data containing tickets, settings, etc. */
+                        data?: Record<string, never>;
+                        /**
+                         * @description Strategy for resolving conflicts
+                         * @default last-write-wins
+                         * @enum {string}
+                         */
+                        conflictResolution?: "last-write-wins" | "user-prompted" | "merge";
+                    };
+                };
+            };
+            responses: {
+                /** @description Upload successful */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            success?: boolean;
+                            conflicts_found?: number;
+                            conflicts_resolved?: number;
+                            items_synced?: number;
+                            sync_log_id?: number;
+                        };
+                    };
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sync/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download latest server state
+         * @description Downloads the latest server data for synchronization.
+         */
+        get: {
+            parameters: {
+                query: {
+                    /** @description Unique identifier for the device */
+                    deviceId: string;
+                    /** @description Only return data changed since this timestamp (optional) */
+                    since?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Download successful */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            success?: boolean;
+                            data?: {
+                                tickets?: unknown[];
+                                settings?: unknown[];
+                                version?: number;
+                                timestamp?: string;
+                            };
+                        };
+                    };
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sync/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get sync status and conflicts
+         * @description Returns the current sync status for the user's account.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Status retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            success?: boolean;
+                            status?: {
+                                last_sync_time?: string | null;
+                                total_devices?: number;
+                                recent_syncs?: unknown[];
+                                conflicts_pending?: number;
+                            };
+                        };
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sync/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resolve sync conflicts
+         * @description Manually resolve conflicts found during sync.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        conflicts: {
+                            /** @description Conflict ID (e.g., "ticket-123") */
+                            id: string;
+                            /**
+                             * @description Which version to keep
+                             * @enum {string}
+                             */
+                            resolution: "local" | "remote";
+                        }[];
+                    };
+                };
+            };
+            responses: {
+                /** @description Conflicts resolved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            success?: boolean;
+                            resolved_count?: number;
+                        };
+                    };
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/tickets/settings/ignore-mode": {
         parameters: {
             query?: never;
@@ -6500,6 +7535,85 @@ export interface paths {
                             }[];
                         };
                     };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tickets/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search tickets by term
+         * @description Search tickets by a search term that matches title or description. Supports optional filtering by status, type, priority, tag, and category.
+         */
+        get: {
+            parameters: {
+                query: {
+                    /** @description Search term to match in title or description */
+                    q: string;
+                    /** @description Filter by status */
+                    status?: "all" | "pending" | "needs-info" | "completed" | "declined";
+                    /** @description Filter by type */
+                    type?: "all" | "feature" | "bug" | "feedback";
+                    /** @description Filter by priority */
+                    priority?: "all" | "high" | "medium" | "low";
+                    /** @description Filter by tag */
+                    tag?: string;
+                    /** @description Filter by category */
+                    category?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Search results retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            tickets?: {
+                                id?: number;
+                                title?: string;
+                                description?: string;
+                                status?: string;
+                                type?: string;
+                                priority?: string;
+                                created_at?: string;
+                                updated_at?: string;
+                            }[];
+                            /** @description The search term used */
+                            query?: string;
+                        };
+                    };
+                };
+                /** @description Bad request - missing search term */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
                 };
             };
         };
