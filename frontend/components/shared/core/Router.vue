@@ -280,14 +280,14 @@ if (typeof window !== 'undefined') {
           >
             {{ appStore.isMuted ? '🔇' : '🔊' }}
           </button>
-          <button @click="appStore.togglePanel('tachometer')" class="control-btn" :class="{ active: appStore.panels.tachometer }" title="Toggle mold meter">🍄</button>
-          <button @click="appStore.togglePanel('rankings')" class="control-btn" :class="{ active: appStore.panels.rankings }" title="Toggle rankings">👻</button>
-          <button @click="appStore.togglePanel('cat')" class="control-btn" :class="{ active: appStore.panels.cat }" title="Toggle cats">🐱</button>
-          <button @click="appStore.togglePanel('feed')" class="control-btn" :class="{ active: appStore.panels.feed }" title="Toggle feed">📰</button>
-          <button @click="appStore.toggleMoldMode" class="control-btn" :class="{ active: appStore.moldMode }" title="Toggle mold mode">🦠</button>
-          <button @click="appStore.togglePanel('digitalGoose')" class="control-btn" :class="{ active: appStore.panels.digitalGoose }" title="Toggle goose">🦆</button>
-          <button @click="appStore.togglePanel('mining')" class="control-btn" :class="{ active: appStore.panels.mining }" title="Toggle GPU mining">⛏️</button>
-          <button @click="appStore.toggleChaosMode" class="control-btn chaos-btn" :class="{ active: appStore.chaosMode }" title="Toggle chaos mode">🌀</button>
+          <button @click="appStore.togglePanel('tachometer')" class="control-btn" :class="{ active: appStore.panels.tachometer }" :aria-label="appStore.panels.tachometer ? 'Hide mold meter' : 'Show mold meter'" :aria-pressed="appStore.panels.tachometer" title="Toggle mold meter">🍄</button>
+          <button @click="appStore.togglePanel('rankings')" class="control-btn" :class="{ active: appStore.panels.rankings }" :aria-label="appStore.panels.rankings ? 'Hide rankings' : 'Show rankings'" :aria-pressed="appStore.panels.rankings" title="Toggle rankings">👻</button>
+          <button @click="appStore.togglePanel('cat')" class="control-btn" :class="{ active: appStore.panels.cat }" :aria-label="appStore.panels.cat ? 'Hide cat panel' : 'Show cat panel'" :aria-pressed="appStore.panels.cat" title="Toggle cats">🐱</button>
+          <button @click="appStore.togglePanel('feed')" class="control-btn" :class="{ active: appStore.panels.feed }" :aria-label="appStore.panels.feed ? 'Hide feed' : 'Show feed'" :aria-pressed="appStore.panels.feed" title="Toggle feed">📰</button>
+          <button @click="appStore.toggleMoldMode" class="control-btn" :class="{ active: appStore.moldMode }" :aria-label="appStore.moldMode ? 'Disable mold mode' : 'Enable mold mode'" :aria-pressed="appStore.moldMode" title="Toggle mold mode">🦠</button>
+          <button @click="appStore.togglePanel('digitalGoose')" class="control-btn" :class="{ active: appStore.panels.digitalGoose }" :aria-label="appStore.panels.digitalGoose ? 'Hide goose' : 'Show goose'" :aria-pressed="appStore.panels.digitalGoose" title="Toggle goose">🦆</button>
+          <button @click="appStore.togglePanel('mining')" class="control-btn" :class="{ active: appStore.panels.mining }" :aria-label="appStore.panels.mining ? 'Hide GPU mining' : 'Show GPU mining'" :aria-pressed="appStore.panels.mining" title="Toggle GPU mining">⛏️</button>
+          <button @click="appStore.toggleChaosMode" class="control-btn chaos-btn" :class="{ active: appStore.chaosMode }" :aria-label="appStore.chaosMode ? 'Disable chaos mode' : 'Enable chaos mode'" :aria-pressed="appStore.chaosMode" title="Toggle chaos mode">🌀</button>
         </div>
       </div>
 
