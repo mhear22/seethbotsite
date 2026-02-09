@@ -25,29 +25,66 @@ const SOUND_CONFIG = {
 // Local storage keys
 const STORAGE_KEYS = {
   VOLUME: 'audioVolume',
-  MUTED: 'audioMuted'
+  MUTED: 'audioMuted',
+  CATEGORY_CLICK: 'audioCategoryClick',
+  CATEGORY_NOTIFICATION: 'audioCategoryNotification',
+  CATEGORY_ACHIEVEMENT: 'audioCategoryAchievement',
+  CATEGORY_UI: 'audioCategoryUI',
+  CATEGORY_GOOSE: 'audioCategoryGoose'
 }
+
+// Sound category type
+type SoundCategory = 'click' | 'notification' | 'achievement' | 'ui' | 'goose'
 
 // Load preferences from localStorage
 const loadPreferences = () => {
   try {
     const volume = localStorage.getItem(STORAGE_KEYS.VOLUME)
     const muted = localStorage.getItem(STORAGE_KEYS.MUTED)
+    const click = localStorage.getItem(STORAGE_KEYS.CATEGORY_CLICK)
+    const notification = localStorage.getItem(STORAGE_KEYS.CATEGORY_NOTIFICATION)
+    const achievement = localStorage.getItem(STORAGE_KEYS.CATEGORY_ACHIEVEMENT)
+    const ui = localStorage.getItem(STORAGE_KEYS.CATEGORY_UI)
+    const goose = localStorage.getItem(STORAGE_KEYS.CATEGORY_GOOSE)
     return {
       volume: volume ? parseInt(volume, 10) : 50,
-      muted: muted === 'true'
+      muted: muted === 'true',
+      categoryToggles: {
+        click: click !== 'false',
+        notification: notification !== 'false',
+        achievement: achievement !== 'false',
+        ui: ui !== 'false',
+        goose: goose !== 'false'
+      }
     }
   } catch {
     // Fallback if localStorage is not available
-    return { volume: 50, muted: false }
+    return {
+      volume: 50,
+      muted: false,
+      categoryToggles: {
+        click: true,
+        notification: true,
+        achievement: true,
+        ui: true,
+        goose: true
+      }
+    }
   }
 }
 
 // Save preferences to localStorage
-const savePreferences = (volume: number, muted: boolean) => {
+const savePreferences = (volume: number, muted: boolean, categoryToggles?: Record<SoundCategory, boolean>) => {
   try {
     localStorage.setItem(STORAGE_KEYS.VOLUME, volume.toString())
     localStorage.setItem(STORAGE_KEYS.MUTED, muted.toString())
+    if (categoryToggles) {
+      localStorage.setItem(STORAGE_KEYS.CATEGORY_CLICK, categoryToggles.click.toString())
+      localStorage.setItem(STORAGE_KEYS.CATEGORY_NOTIFICATION, categoryToggles.notification.toString())
+      localStorage.setItem(STORAGE_KEYS.CATEGORY_ACHIEVEMENT, categoryToggles.achievement.toString())
+      localStorage.setItem(STORAGE_KEYS.CATEGORY_UI, categoryToggles.ui.toString())
+      localStorage.setItem(STORAGE_KEYS.CATEGORY_GOOSE, categoryToggles.goose.toString())
+    }
   } catch {
     // Silently fail if localStorage is not available
   }
@@ -76,13 +113,23 @@ const muted = ref<boolean>(false)
 const audioElements = new Map<string, HTMLAudioElement>()
 let isInitialized = false
 
+// Category toggles state
+const categoryToggles = ref<Record<SoundCategory, boolean>>({
+  click: true,
+  notification: true,
+  achievement: true,
+  ui: true,
+  goose: true
+})
+
 // Initialize audio manager
 const initialize = () => {
   if (isInitialized) return
-  
+
   const preferences = loadPreferences()
   volume.value = preferences.volume
   muted.value = preferences.muted
+  categoryToggles.value = preferences.categoryToggles
   preloadSounds()
   isInitialized = true
 }
@@ -108,9 +155,26 @@ const getAudioElement = (soundName: keyof typeof SOUND_FILES): HTMLAudioElement 
   return audio
 }
 
+// Sound category mappings
+const SOUND_CATEGORIES: Record<keyof typeof SOUND_FILES, SoundCategory> = {
+  click: 'click',
+  success: 'achievement',
+  error: 'notification',
+  panelOpen: 'ui',
+  honk: 'goose',
+  pointsEarned: 'achievement',
+  notification: 'notification'
+}
+
 // Play a sound by name
 const playSound = (soundName: keyof typeof SOUND_FILES, options?: { volume?: number; rate?: number }) => {
   if (muted.value) return
+
+  // Check if the sound category is enabled
+  const category = SOUND_CATEGORIES[soundName]
+  if (category && !categoryToggles.value[category]) {
+    return
+  }
 
   const config = SOUND_CONFIG[soundName]
   const audio = getAudioElement(soundName)
@@ -141,20 +205,37 @@ const playSound = (soundName: keyof typeof SOUND_FILES, options?: { volume?: num
 const setVolume = (newVolume: number) => {
   const clampedVolume = Math.max(0, Math.min(100, newVolume))
   volume.value = clampedVolume
-  savePreferences(clampedVolume, muted.value)
+  savePreferences(clampedVolume, muted.value, categoryToggles.value)
 }
 
 // Toggle mute state
 const toggleMute = () => {
   muted.value = !muted.value
-  savePreferences(volume.value, muted.value)
-  
+  savePreferences(volume.value, muted.value, categoryToggles.value)
+
   // Pause all currently playing sounds if muting
   if (muted.value) {
     audioElements.forEach(audio => {
       audio.pause()
     })
   }
+}
+
+// Mute all sounds
+const muteAll = () => {
+  muted.value = true
+  savePreferences(volume.value, muted.value, categoryToggles.value)
+
+  // Pause all currently playing sounds
+  audioElements.forEach(audio => {
+    audio.pause()
+  })
+}
+
+// Unmute all sounds
+const unmuteAll = () => {
+  muted.value = false
+  savePreferences(volume.value, muted.value, categoryToggles.value)
 }
 
 // Sound effect functions
@@ -186,6 +267,23 @@ const playNotification = () => {
   playSound('notification', { rate: SOUND_CONFIG.notification.rate })
 }
 
+// Preview functions for sound categories
+const previewClickSound = () => {
+  playClick()
+}
+
+const previewNotificationSound = () => {
+  playNotification()
+}
+
+const previewAchievementSound = () => {
+  playSuccess()
+}
+
+const previewUISound = () => {
+  playPanelOpen()
+}
+
 // Audio manager composable
 export const useAudio = () => {
   // Initialize on first use
@@ -195,12 +293,15 @@ export const useAudio = () => {
     // State
     volume,
     muted,
-    
+    categoryToggles,
+
     // Core functions
     playSound,
     setVolume,
     toggleMute,
-    
+    muteAll,
+    unmuteAll,
+
     // Sound effect functions
     playClick,
     playSuccess,
@@ -208,7 +309,13 @@ export const useAudio = () => {
     playPanelOpen,
     playHonk,
     playPointsEarned,
-    playNotification
+    playNotification,
+
+    // Preview functions
+    previewClickSound,
+    previewNotificationSound,
+    previewAchievementSound,
+    previewUISound
   }
 }
 
