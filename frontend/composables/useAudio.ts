@@ -1,139 +1,224 @@
 import { ref } from 'vue'
 
-export function useAudio() {
-  const muted = ref(false)
+// Sound file mappings
+const SOUND_FILES = {
+  click: '/button-sound.mp3',
+  success: '/button-sound.mp3',
+  error: '/fart-with-reverb.mp3',
+  panelOpen: '/button-sound.mp3',
+  honk: '/goose-honk.mp3',
+  pointsEarned: '/button-sound.mp3',
+  notification: '/button-sound.mp3'
+} as const
 
-  const playSound = (elementId: string, options?: { volume?: number; startTime?: number; rate?: number }) => {
-    if (muted.value) return
+// Sound configuration for variety
+const SOUND_CONFIG = {
+  click: { volume: 0.5, rate: 1.0 + (Math.random() * 0.1 - 0.05) },
+  success: { volume: 0.5, rate: 1.2 },
+  error: { volume: 0.5, startTime: 0.5, rate: 1.0 },
+  panelOpen: { volume: 0.5, rate: 0.8 },
+  honk: { volume: 0.5, rate: 1.0 },
+  pointsEarned: { volume: 0.5, rate: 1.3 },
+  notification: { volume: 0.5, rate: 1.1 }
+} as const
 
-    const audio = document.getElementById(elementId) as HTMLAudioElement
-    if (!audio) return
+// Local storage keys
+const STORAGE_KEYS = {
+  VOLUME: 'audioVolume',
+  MUTED: 'audioMuted'
+}
 
-    // Pause and reset the audio to start fresh
+// Load preferences from localStorage
+const loadPreferences = () => {
+  try {
+    const volume = localStorage.getItem(STORAGE_KEYS.VOLUME)
+    const muted = localStorage.getItem(STORAGE_KEYS.MUTED)
+    return {
+      volume: volume ? parseInt(volume, 10) : 50,
+      muted: muted === 'true'
+    }
+  } catch {
+    // Fallback if localStorage is not available
+    return { volume: 50, muted: false }
+  }
+}
+
+// Save preferences to localStorage
+const savePreferences = (volume: number, muted: boolean) => {
+  try {
+    localStorage.setItem(STORAGE_KEYS.VOLUME, volume.toString())
+    localStorage.setItem(STORAGE_KEYS.MUTED, muted.toString())
+  } catch {
+    // Silently fail if localStorage is not available
+  }
+}
+
+// Preload audio files
+const preloadSounds = () => {
+  Object.values(SOUND_FILES).forEach(src => {
+    // Find the sound name from the source
+    const soundName = Object.entries(SOUND_FILES).find(([_, soundSrc]) => soundSrc === src)?.[0]
+    
+    // Create and store audio element if not already cached
+    if (soundName && !audioElements.has(soundName)) {
+      const audio = new Audio(src)
+      audio.preload = 'auto'
+      audioElements.set(soundName, audio)
+      // Force load the audio file
+      audio.load()
+    }
+  })
+}
+
+// Reactive state - use refs to make it reactive
+const volume = ref<number>(50)
+const muted = ref<boolean>(false)
+const audioElements = new Map<string, HTMLAudioElement>()
+let isInitialized = false
+
+// Initialize audio manager
+const initialize = () => {
+  if (isInitialized) return
+  
+  const preferences = loadPreferences()
+  volume.value = preferences.volume
+  muted.value = preferences.muted
+  preloadSounds()
+  isInitialized = true
+}
+
+// Get or create audio element for a sound
+const getAudioElement = (soundName: keyof typeof SOUND_FILES): HTMLAudioElement | null => {
+  const src = SOUND_FILES[soundName]
+  if (!src) return null
+
+  // Check if we already have an audio element for this sound
+  if (audioElements.has(soundName)) {
+    const audio = audioElements.get(soundName)!
+    // Reset audio to start fresh
     audio.pause()
-    audio.currentTime = options?.startTime ?? 0
+    audio.currentTime = 0
+    return audio
+  }
 
-    // Ensure audio doesn't loop (fix for button sound looping issue)
-    audio.loop = false
+  // Create new audio element
+  const audio = new Audio(src)
+  audio.preload = 'auto'
+  audioElements.set(soundName, audio)
+  return audio
+}
 
-    // Set volume (clamp between 0 and 1) - default to 0.5 (50%) as per ticket #172
-    audio.volume = Math.min(Math.max(options?.volume ?? 0.5, 0), 1.0)
+// Play a sound by name
+const playSound = (soundName: keyof typeof SOUND_FILES, options?: { volume?: number; rate?: number }) => {
+  if (muted.value) return
 
-    // Set playback rate for variety (if supported)
-    if (options?.rate && audio.playbackRate !== undefined) {
-      audio.playbackRate = Math.max(0.5, Math.min(2.0, options.rate))
-    }
+  const config = SOUND_CONFIG[soundName]
+  const audio = getAudioElement(soundName)
+  if (!audio) return
 
-    audio.play().catch(err => {
-      console.log('Audio play failed (user may not have interacted yet):', err)
+  // Set volume (0-1, from the current volume preference or override)
+  const volumeValue = options?.volume ?? (volume.value / 100)
+  audio.volume = Math.max(0, Math.min(1, volumeValue))
+
+  // Set playback rate
+  const rate = options?.rate ?? config.rate
+  if (audio.playbackRate !== undefined) {
+    audio.playbackRate = Math.max(0.5, Math.min(2.0, rate))
+  }
+
+  // Set start time if specified
+  if (config.startTime !== undefined) {
+    audio.currentTime = config.startTime
+  }
+
+  // Play the sound
+  audio.play().catch(err => {
+    console.log('Audio play failed (user may not have interacted yet):', err)
+  })
+}
+
+// Set volume (0-100)
+const setVolume = (newVolume: number) => {
+  const clampedVolume = Math.max(0, Math.min(100, newVolume))
+  volume.value = clampedVolume
+  savePreferences(clampedVolume, muted.value)
+}
+
+// Toggle mute state
+const toggleMute = () => {
+  muted.value = !muted.value
+  savePreferences(volume.value, muted.value)
+  
+  // Pause all currently playing sounds if muting
+  if (muted.value) {
+    audioElements.forEach(audio => {
+      audio.pause()
     })
   }
+}
 
-  const playFart = async (volume?: number, forceSimple: boolean = false) => {
-    if (muted.value) return
+// Sound effect functions
+const playClick = () => {
+  playSound('click', { rate: SOUND_CONFIG.click.rate })
+}
 
-    // Try to use enhanced fart audio processing if available
-    try {
-      const { useFartAudio } = await import('./useFartAudio')
-      const { playFart: playFartEnhanced } = useFartAudio()
-      await playFartEnhanced(volume, forceSimple)
-    } catch (error) {
-      console.log('Enhanced fart audio not available, using simple playback')
-      playSound('fartSound', { volume: volume })
-    }
-  }
+const playSuccess = () => {
+  playSound('success', { rate: SOUND_CONFIG.success.rate })
+}
 
-  const toggleMusic = (playing: boolean) => {
-    const music = document.getElementById('newMusic') as HTMLAudioElement
-    if (!music) return
+const playError = () => {
+  playSound('error', { rate: SOUND_CONFIG.error.rate })
+}
 
-    if (playing && !muted.value) {
-      // Set music to 50% volume (ticket #172)
-      music.volume = 0.5
-      music.play().catch(err => console.log('Music play failed:', err))
-    } else {
-      music.pause()
-    }
-  }
+const playPanelOpen = () => {
+  playSound('panelOpen', { rate: SOUND_CONFIG.panelOpen.rate })
+}
 
-  const muteAll = () => {
-    muted.value = true
-    // Pause all audio elements
-    const audioIds = ['newMusic', 'fartSound', 'buttonSound', 'gooseHonk']
-    audioIds.forEach(id => {
-      const el = document.getElementById(id) as HTMLAudioElement
-      if (el) el.pause()
-    })
-  }
+const playHonk = () => {
+  playSound('honk', { rate: SOUND_CONFIG.honk.rate })
+}
 
-  const unmuteAll = () => {
-    muted.value = false
-  }
+const playPointsEarned = () => {
+  playSound('pointsEarned', { rate: SOUND_CONFIG.pointsEarned.rate })
+}
 
-  // Sound effect for button clicks - 50% volume (ticket #172)
-  const playButtonClick = () => {
-    playSound('buttonSound', { volume: 0.5, rate: 1.0 + (Math.random() * 0.1 - 0.05) })
-  }
+const playNotification = () => {
+  playSound('notification', { rate: SOUND_CONFIG.notification.rate })
+}
 
-  // Sound effect for achievements/milestones - 50% volume (ticket #172)
-  const playAchievement = () => {
-    playSound('buttonSound', { volume: 0.5, startTime: 0, rate: 1.2 })
-  }
-
-  // Sound effect for successful actions (purchases, unlocks) - 50% volume (ticket #172)
-  const playSuccess = () => {
-    playSound('buttonSound', { volume: 0.5, rate: 1.3 })
-  }
-
-  // Sound effect for error/failure - 50% volume (ticket #172)
-  const playError = () => {
-    playSound('fartSound', { volume: 0.5, startTime: 0.5 })
-  }
-
-  // Sound effect for goose interaction - 50% volume (ticket #172)
-  const playGooseHonk = () => {
-    playSound('gooseHonk', { volume: 0.5 })
-  }
-
-  // Sound effect for game interactions (clicking, fishing, etc.) - 50% volume (ticket #172)
-  const playGameAction = () => {
-    // Fixed at 50% volume as per ticket #172
-    playSound('buttonSound', { volume: 0.5, rate: 0.9 + Math.random() * 0.2 })
-  }
-
-  // Sound effect for panel opening/closing - 50% volume (ticket #172)
-  const playPanelToggle = () => {
-    playSound('buttonSound', { volume: 0.5, rate: 0.8 })
-  }
-
-  // Sound effect for level up - 50% volume (ticket #172)
-  const playLevelUp = () => {
-    playSound('buttonSound', { volume: 0.5, rate: 1.5 })
-    // Play twice for emphasis
-    setTimeout(() => {
-      playSound('buttonSound', { volume: 0.5, rate: 1.7 })
-    }, 100)
-  }
-
-  // Sound effect for purchase - 50% volume (ticket #172)
-  const playPurchase = () => {
-    playSound('buttonSound', { volume: 0.5, rate: 1.1 })
-  }
+// Audio manager composable
+export const useAudio = () => {
+  // Initialize on first use
+  initialize()
 
   return {
+    // State
+    volume,
+    muted,
+    
+    // Core functions
     playSound,
-    playFart,
-    playButtonClick,
-    playAchievement,
+    setVolume,
+    toggleMute,
+    
+    // Sound effect functions
+    playClick,
     playSuccess,
     playError,
-    playGooseHonk,
-    playGameAction,
-    playPanelToggle,
-    playLevelUp,
-    playPurchase,
-    toggleMusic,
-    muteAll,
-    unmuteAll
+    playPanelOpen,
+    playHonk,
+    playPointsEarned,
+    playNotification
   }
+}
+
+// Export types for type safety
+export type SoundName = keyof typeof SOUND_FILES
+
+// Export for testing
+export const _resetAudioManager = () => {
+  isInitialized = false
+  audioElements.clear()
+  volume.value = 50
+  muted.value = false
 }
