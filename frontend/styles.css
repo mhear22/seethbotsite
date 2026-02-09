@@ -3097,3 +3097,317 @@ body.darker .mika-modal-box {
     font-size: 24px;
   }
 }
+
+/* ========================================
+   HIGH CONTRAST MODE
+   Ticket #148: Accessibility - High Contrast Mode
+   ======================================== */
+
+body.high-contrast {
+  --color-primary: #000080;
+  --color-text: #000000;
+  --color-accent: #000080;
+  --color-card-bg: #ffffff;
+}
+
+body.high-contrast,
+body.high-contrast.dark,
+body.high-contrast.darker {
+  background: #ffffff !important;
+  color: #000000 !important;
+}
+
+body.high-contrast * {
+  background-image: none !important;
+  background: #ffffff !important;
+  color: #000000 !important;
+  border-color: #000000 !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
+body.high-contrast a,
+body.high-contrast .router-link,
+body.high-contrast button,
+body.high-contrast .control-btn,
+body.high-contrast .cute-btn,
+body.high-contrast .detect-btn,
+body.high-contrast .turn-me-btn,
+body.high-contrast .girl-back-btn,
+body.high-contrast .reset-btn {
+  background: #000000 !important;
+  color: #ffffff !important;
+  border: 2px solid #ffffff !important;
+}
+
+body.high-contrast a:hover,
+body.high-contrast .router-link:hover,
+body.high-contrast button:hover,
+body.high-contrast .control-btn:hover,
+body.high-contrast .cute-btn:hover,
+body.high-contrast .detect-btn:hover,
+body.high-contrast .turn-me-btn:hover,
+body.high-contrast .girl-back-btn:hover,
+body.high-contrast .reset-btn:hover {
+  background: #ffffff !important;
+  color: #000000 !important;
+  border-color: #000000 !important;
+}
+
+body.high-contrast h1,
+body.high-contrast h2,
+body.high-contrast h3,
+body.high-contrast h4,
+body.high-contrast h5,
+body.high-contrast h6 {
+  background: none !important;
+  -webkit-text-fill-color: #000000 !important;
+  color: #000000 !important;
+  background-clip: unset !important;
+}
+
+body.high-contrast .router-link.active {
+  background: #000000 !important;
+  color: #ffffff !important;
+}
+
+body.high-contrast .router-link.active::after {
+  background: #ffffff !important;
+}
+
+body.high-contrast input,
+body.high-contrast textarea,
+body.high-contrast select {
+  background: #ffffff !important;
+  color: #000000 !important;
+  border: 3px solid #000000 !important;
+}
+
+body.high-contrast :focus-visible {
+  outline: 4px solid #000000 !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 6px #ffffff, 0 0 0 8px #000000 !important;
+  border-radius: 2px !important;
+}
+
+body.high-contrast .skip-link {
+  background: #000000 !important;
+  color: #ffffff !important;
+  border: 2px solid #ffffff !important;
+}
+
+body.high-contrast .rankings-panel,
+body.high-contrast .cat-panel,
+body.high-contrast .feed-panel,
+body.high-contrast .container,
+body.high-contrast .modal-container,
+body.high-contrast .mika-modal-box,
+body.high-contrast .confirmation-box {
+  background: #ffffff !important;
+  border: 3px solid #000000 !important;
+  box-shadow: none !important;
+}
+
+body.high-contrast .feed-header,
+body.high-contrast .settings-heading {
+  background: #000000 !important;
+  color: #ffffff !important;
+}
+
+body.high-contrast .gender-result {
+  border: 3px solid #000000 !important;
+  background: #ffffff !important;
+}
+
+body.high-contrast .gender-result.result-female,
+body.high-contrast .gender-result.result-male,
+body.high-contrast .gender-result.result-unisex,
+body.high-contrast .gender-result.result-couple,
+body.high-contrast .gender-result.result-unknown,
+body.high-contrast .gender-result.result-error {
+  background: #ffffff !important;
+  color: #000000 !important;
+}
+
+body.high-contrast .rank-item,
+body.high-contrast .full-rank-item {
+  background: #ffffff !important;
+  border: 2px solid #000000 !important;
+}
+
+body.high-contrast .rank-score {
+  color: #000000 !important;
+}
+
+/* High contrast for decorative elements - make them borders instead of backgrounds */
+body.high-contrast .rank-avatar,
+body.high-contrast .control-btn.active::after,
+body.high-contrast .toggle-thumb {
+  background: #ffffff !important;
+  border: 2px solid #000000 !important;
+}
+
+body.high-contrast .toggle-slider.on {
+  background: #000000 !important;
+}
+
+body.high-contrast .toggle-slider.on .toggle-thumb {
+  background: #ffffff !important;
+}
+
+/* Images - maintain border but remove decorative backgrounds */
+body.high-contrast img,
+body.high-contrast .cat-image {
+  border: 3px solid #000000 !important;
+  background: #ffffff !important;
+}
+
+/* High contrast focus states for specific components */
+body.high-contrast .control-btn.active,
+body.high-contrast .font-size-btn.active,
+body.high-contrast .router-link.active {
+  background: #000000 !important;
+  color: #ffffff !important;
+  border: 3px solid #ffffff !important;
+}
+
+/* High contrast for progress indicators */
+body.high-contrast .rank-score.updated {
+  animation: none !important;
+  text-decoration: underline;
+  text-decoration-style: wavy;
+  text-decoration-thickness: 3px;
+}
+
+/* High contrast for status indicators */
+body.high-contrast .trend-up {
+  color: #000000 !important;
+}
+
+body.high-contrast .trend-down {
+  color: #000000 !important;
+}
+
+/* High contrast for links */
+body.high-contrast a[href] {
+  text-decoration: underline !important;
+  text-decoration-thickness: 2px !important;
+}
+
+body.high-contrast a[href]:hover {
+  background: #000000 !important;
+  color: #ffffff !important;
+}
+
+/* High contrast for tables and lists */
+body.high-contrast .results-list,
+body.high-contrast .search-results,
+body.high-contrast .rankings-list,
+body.high-contrast .full-rankings-list {
+  background: #ffffff !important;
+  border: 2px solid #000000 !important;
+}
+
+body.high-contrast .result-item,
+body.high-contrast .rank-item {
+  border-bottom: 2px solid #000000 !important;
+}
+
+body.high-contrast .result-item.active,
+body.high-contrast .rank-item.current-user {
+  background: #000000 !important;
+  color: #ffffff !important;
+}
+
+/* High contrast for badges and indicators */
+body.high-contrast .build-indicator,
+body.high-contrast .result-subtitle {
+  color: #000000 !important;
+  font-weight: bold !important;
+}
+
+/* High contrast for dropdowns */
+body.high-contrast .dropdown-menu {
+  background: #ffffff !important;
+  border: 3px solid #000000 !important;
+  box-shadow: none !important;
+}
+
+body.high-contrast .dropdown-item,
+body.high-contrast .dropdown-btn {
+  background: #ffffff !important;
+  color: #000000 !important;
+  border: none !important;
+}
+
+body.high-contrast .dropdown-item:hover,
+body.high-contrast .dropdown-item.active {
+  background: #000000 !important;
+  color: #ffffff !important;
+}
+
+/* High contrast for tooltips */
+body.high-contrast .tooltip {
+  background: #000000 !important;
+  color: #ffffff !important;
+  border: 2px solid #ffffff !important;
+}
+
+/* High contrast for code blocks */
+body.high-contrast code,
+body.high-contrast pre {
+  background: #f0f0f0 !important;
+  color: #000000 !important;
+  border: 2px solid #000000 !important;
+}
+
+/* High contrast for form controls */
+body.high-contrast .checkbox,
+body.high-contrast .radio {
+  border: 3px solid #000000 !important;
+  background: #ffffff !important;
+}
+
+body.high-contrast .checkbox:checked,
+body.high-contrast .radio:checked {
+  background: #000000 !important;
+  border-color: #000000 !important;
+}
+
+/* High contrast for alerts and notifications */
+body.high-contrast .alert,
+body.high-contrast .notification,
+body.high-contrast .toast {
+  background: #000000 !important;
+  color: #ffffff !important;
+  border: 3px solid #ffffff !important;
+}
+
+/* High contrast for disabled states */
+body.high-contrast button:disabled,
+body.high-contrast input:disabled,
+body.high-contrast select:disabled,
+body.high-contrast textarea:disabled {
+  opacity: 0.7 !important;
+  background: #e0e0e0 !important;
+  color: #666666 !important;
+  border: 2px solid #999999 !important;
+}
+
+/* High contrast for responsive design adjustments */
+@media (max-width: 768px) {
+  body.high-contrast .nav-links,
+  body.high-contrast .mobile-bottom-nav {
+    background: #ffffff !important;
+    border-top: 3px solid #000000 !important;
+  }
+
+  body.high-contrast .mobile-nav-item {
+    color: #000000 !important;
+  }
+
+  body.high-contrast .mobile-nav-item.active {
+    background: #000000 !important;
+    color: #ffffff !important;
+  }
+}
