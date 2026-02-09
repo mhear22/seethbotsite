@@ -28,9 +28,23 @@ export class MechEntity {
   isJumping: boolean = false
   jumpFuel: number
   isPlayer: boolean
+  isDestroyed: boolean = false
+
+  // Destruction animation - random velocities per mesh child
+  private destroyVelocities: THREE.Vector3[] = []
+  private destroyRotations: THREE.Vector3[] = []
+
+  // Dash state
+  isDashing: boolean = false
+  dashTimer: number = 0
+  dashCooldown: number = 0
+  readonly DASH_DURATION = 0.15
+  readonly DASH_COOLDOWN = 2.0
 
   // AI state
-  aiState: 'idle' | 'chase' | 'strafe' | 'shoot' = 'idle'
+  aiState: 'idle' | 'chase' | 'strafe' | 'shoot' | 'flank' | 'retreat' | 'aggressive' = 'idle'
+  aiStrafeDir: number = 1
+  aiStrafeDirTimer: number = 0
   lastShotTime: number = 0
 
   constructor(
@@ -142,6 +156,45 @@ export class MechEntity {
         }, 100)
       }
     })
+  }
+
+  playDestroyAnimation(deltaTime: number) {
+    const children = this.mesh.children
+    // Initialize random velocities on first call
+    if (this.destroyVelocities.length === 0) {
+      for (let i = 0; i < children.length; i++) {
+        this.destroyVelocities.push(new THREE.Vector3(
+          (Math.random() - 0.5) * 8,
+          2 + Math.random() * 6,
+          (Math.random() - 0.5) * 8,
+        ))
+        this.destroyRotations.push(new THREE.Vector3(
+          (Math.random() - 0.5) * 5,
+          (Math.random() - 0.5) * 5,
+          (Math.random() - 0.5) * 5,
+        ))
+      }
+    }
+
+    for (let i = 0; i < children.length; i++) {
+      const child = children[i]
+      const vel = this.destroyVelocities[i]
+      const rot = this.destroyRotations[i]
+      if (!vel || !rot) continue
+
+      // Apply gravity to velocity
+      vel.y -= 12 * deltaTime
+
+      // Move part
+      child.position.x += vel.x * deltaTime
+      child.position.y += vel.y * deltaTime
+      child.position.z += vel.z * deltaTime
+
+      // Spin part
+      child.rotation.x += rot.x * deltaTime
+      child.rotation.y += rot.y * deltaTime
+      child.rotation.z += rot.z * deltaTime
+    }
   }
 
   getForwardDirection(): THREE.Vector3 {

@@ -68,6 +68,7 @@
         @battle-end="handleBattleEnd"
         @damage-dealt="handleDamageDealt"
         @time-update="handleTimeUpdate"
+        @hud-update="handleHudUpdate"
       />
 
       <BattleHUD
@@ -78,6 +79,10 @@
         :enemy-name="enemyName"
         :jump-fuel="battle.battleState.value.player?.jumpFuel ?? 0"
         :has-jump-jets="hasJumpJets"
+        :dash-cooldown="hudData.dashCooldown"
+        :dash-max-cooldown="hudData.dashMaxCooldown"
+        :enemy-radar-x="hudData.enemyRadarX"
+        :enemy-radar-y="hudData.enemyRadarY"
       />
     </div>
 
@@ -136,7 +141,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed, watch, onUnmounted } from 'vue'
+import { ref, reactive, onMounted, computed, watch, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMechBuilder } from '../../composables/useMechBuilder'
 import { useMechBattle } from '../../composables/useMechBattle'
@@ -154,6 +159,12 @@ const keyboardShortcuts = useKeyboardShortcuts()
 const battlePhase = computed(() => battle.battleState.value.phase)
 const battleTime = ref(0)
 const isSettingsOpen = ref(false)
+const hudData = reactive({
+  dashCooldown: 0,
+  dashMaxCooldown: 2,
+  enemyRadarX: 0,
+  enemyRadarY: 0,
+})
 
 const playerStats = computed(() => {
   if (!battle.battleState.value.player) {
@@ -229,6 +240,18 @@ function handleDamageDealt(amount: number) {
 
 function handleTimeUpdate(time: number) {
   battleTime.value = time
+}
+
+function handleHudUpdate(data: {
+  dashCooldown: number
+  dashMaxCooldown: number
+  enemyRadarX: number
+  enemyRadarY: number
+}) {
+  hudData.dashCooldown = data.dashCooldown
+  hudData.dashMaxCooldown = data.dashMaxCooldown
+  hudData.enemyRadarX = data.enemyRadarX
+  hudData.enemyRadarY = data.enemyRadarY
 }
 
 function returnToBuilder() {

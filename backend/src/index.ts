@@ -7,12 +7,6 @@ import { swaggerSpec } from './swagger';
 import { logAuthAttempt } from './auth';
 import { rateLimiter, securityHeaders } from './middleware';
 
-// Test ticket #166 - Demonstrating ticket workflow implementation
-// This comment marks the successful completion of test ticket #166
-
-// Test ticket #167 - Test ticket with no description
-// This comment marks the successful completion of test ticket #167
-
 // Import controllers
 import healthController from './controllers/health.controller';
 import rankingsController from './controllers/rankings.controller';
@@ -57,7 +51,7 @@ const SERVE_ROOT = process.env.SERVE_ROOT || path.join(__dirname, '..', 'webdist
 // Middleware
 app.use(cors());
 app.use(compression());
-app.use(express.json());
+app.use(express.json({ limit: '100kb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(securityHeaders);
 
@@ -152,10 +146,6 @@ app.get('*', (req: Request, res: Response) => {
   res.setHeader('Expires', '0');
   res.sendFile(path.join(SERVE_ROOT, 'index.html'));
 });
-
-// Test ticket #168 - Updated Title
-// This comment marks the successful completion of test ticket #168
-// Improved error handling with development mode details
 
 // Error handling
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {

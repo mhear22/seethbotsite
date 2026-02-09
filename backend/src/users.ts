@@ -241,8 +241,11 @@ export function validateTokenAndGetUser(token: string): { user: User; session: S
       return null;
     }
 
-    // Update last used time
-    db.prepare('UPDATE sessions SET last_used_at = CURRENT_TIMESTAMP WHERE id = ?').run(session.id);
+    // Only update last_used_at if 5+ minutes have passed
+    const lastUsed = new Date(session.last_used_at).getTime();
+    if (Date.now() - lastUsed > 5 * 60 * 1000) {
+      db.prepare('UPDATE sessions SET last_used_at = CURRENT_TIMESTAMP WHERE id = ?').run(session.id);
+    }
 
     // Get user
     const user = db.prepare('SELECT id, email, display_name, avatar_url, banner_url, bio, status, show_email, show_joined_date, created_at, updated_at FROM users WHERE id = ? AND is_deleted = 0').get(session.user_id) as User;
@@ -370,54 +373,13 @@ export function cleanupExpiredSessions(): number {
   return result.changes;
 }
 
-/**
- * Update user display name
- */
-export function updateUserDisplayName(userId: number, displayName: string): User {
-  const db = getUsersDB();
-  db.prepare('UPDATE users SET display_name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND is_deleted = 0').run(displayName, userId);
-  const user = db.prepare('SELECT id, email, display_name, avatar_url, banner_url, bio, status, show_email, show_joined_date, created_at, updated_at FROM users WHERE id = ? AND is_deleted = 0').get(userId) as User;
-  return user;
-}
+const UPDATABLE_USER_FIELDS = ['display_name', 'avatar_url', 'banner_url', 'bio', 'status'] as const;
+type UpdatableUserField = typeof UPDATABLE_USER_FIELDS[number];
 
-/**
- * Update user avatar
- */
-export function updateUserAvatar(userId: number, avatarUrl: string | null): User {
+export function updateUserField(userId: number, field: UpdatableUserField, value: string | null): User {
   const db = getUsersDB();
-  db.prepare('UPDATE users SET avatar_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND is_deleted = 0').run(avatarUrl, userId);
-  const user = db.prepare('SELECT id, email, display_name, avatar_url, banner_url, bio, status, show_email, show_joined_date, created_at, updated_at FROM users WHERE id = ? AND is_deleted = 0').get(userId) as User;
-  return user;
-}
-
-/**
- * Update user banner
- */
-export function updateUserBanner(userId: number, bannerUrl: string | null): User {
-  const db = getUsersDB();
-  db.prepare('UPDATE users SET banner_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND is_deleted = 0').run(bannerUrl, userId);
-  const user = db.prepare('SELECT id, email, display_name, avatar_url, banner_url, bio, status, show_email, show_joined_date, created_at, updated_at FROM users WHERE id = ? AND is_deleted = 0').get(userId) as User;
-  return user;
-}
-
-/**
- * Update user bio
- */
-export function updateUserBio(userId: number, bio: string | null): User {
-  const db = getUsersDB();
-  db.prepare('UPDATE users SET bio = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND is_deleted = 0').run(bio, userId);
-  const user = db.prepare('SELECT id, email, display_name, avatar_url, banner_url, bio, status, show_email, show_joined_date, created_at, updated_at FROM users WHERE id = ? AND is_deleted = 0').get(userId) as User;
-  return user;
-}
-
-/**
- * Update user status
- */
-export function updateUserStatus(userId: number, status: string | null): User {
-  const db = getUsersDB();
-  db.prepare('UPDATE users SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND is_deleted = 0').run(status, userId);
-  const user = db.prepare('SELECT id, email, display_name, avatar_url, banner_url, bio, status, show_email, show_joined_date, created_at, updated_at FROM users WHERE id = ? AND is_deleted = 0').get(userId) as User;
-  return user;
+  db.prepare(`UPDATE users SET ${field} = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND is_deleted = 0`).run(value, userId);
+  return db.prepare('SELECT id, email, display_name, avatar_url, banner_url, bio, status, show_email, show_joined_date, created_at, updated_at FROM users WHERE id = ? AND is_deleted = 0').get(userId) as User;
 }
 
 /**

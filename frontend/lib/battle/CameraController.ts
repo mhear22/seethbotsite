@@ -5,7 +5,6 @@ import { markRaw } from 'vue'
 export class CameraController {
   camera: THREE.PerspectiveCamera
   target: MechEntity
-  offset: THREE.Vector3
   mouseRotation: { x: number; y: number } = { x: 0, y: 0 }
 
   // Camera settings
@@ -16,6 +15,17 @@ export class CameraController {
   private currentDistance = 10
   public sensitivityMultiplier = 1.0
 
+  // Over-the-shoulder offset (applied after orbit calculation)
+  private readonly SHOULDER_RIGHT = 2.5
+  private readonly SHOULDER_UP = 3.0
+
+  // Smoothing rate (units per second, frame-rate independent)
+  private readonly SMOOTH_SPEED = 12
+
+  // Screen shake
+  private shakeIntensity = 0
+  private readonly SHAKE_DECAY = 8 // How fast shake fades
+
   constructor(target: MechEntity) {
     this.target = target
     this.camera = markRaw(new THREE.PerspectiveCamera(
@@ -24,9 +34,6 @@ export class CameraController {
       0.1, // Near
       1000 // Far
     ))
-
-    // Initial offset: behind and above the mech
-    this.offset = new THREE.Vector3(0, 6, -10)
   }
 
   update(deltaTime: number, mouseX: number, mouseY: number) {
@@ -42,43 +49,50 @@ export class CameraController {
       Math.min(this.MAX_PITCH, this.mouseRotation.y)
     )
 
-    // Over-the-shoulder offset (right shoulder)
-    const shoulderOffsetRight = 6.0 // Lateral offset to the right
-    const shoulderOffsetUp = 3.0 // Height offset above shoulder
-
-    // Calculate base camera offset (behind the mech)
+    const yaw = this.mouseRotation.x
+    const pitch = this.mouseRotation.y
     const distance = this.currentDistance
-    const behindOffset = distance * Math.cos(this.mouseRotation.y)
-    const heightFromPitch = distance * Math.sin(this.mouseRotation.y)
 
-    // Target position (mech center, slightly elevated)
-    const targetPosition = this.target.position.clone()
-    targetPosition.y += 3 // Look at point higher on the mech
-
-    // Calculate camera position with rotation
-    const cameraOffset = new THREE.Vector3(
-      shoulderOffsetRight, // Right shoulder offset
-      4 + shoulderOffsetUp + heightFromPitch, // Height with pitch adjustment
-      -behindOffset // Behind the mech
+    // Camera's forward direction from yaw/pitch (where the player is aiming)
+    const aimDir = new THREE.Vector3(
+      Math.sin(yaw) * Math.cos(pitch),
+      Math.sin(pitch),
+      Math.cos(yaw) * Math.cos(pitch)
     )
 
-    // Rotate offset based on mech rotation (yaw)
-    cameraOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.mouseRotation.x)
+    // Camera right direction (must match THREE.js Euler Y rotation convention)
+    const rightDir = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw))
 
-    // Calculate desired camera position
-    const desiredPosition = this.target.position.clone().add(cameraOffset)
+    // Anchor point: mech center, slightly elevated
+    const anchor = this.target.position.clone()
+    anchor.y += 3
 
-    // Smooth follow with lerp
-    this.camera.position.lerp(desiredPosition, 0.15)
+    // Position camera behind the aim direction + shoulder offset
+    const desiredPosition = anchor.clone()
+      .sub(aimDir.clone().multiplyScalar(distance))
+      .add(rightDir.clone().multiplyScalar(this.SHOULDER_RIGHT))
+    desiredPosition.y += this.SHOULDER_UP
 
-    // Look at target (over the shoulder view point)
-    const lookAtPoint = targetPosition.clone()
-    lookAtPoint.x -= shoulderOffsetRight * 0.3 * Math.cos(this.mouseRotation.x) // Slight offset from center
-    lookAtPoint.z -= shoulderOffsetRight * 0.3 * Math.sin(this.mouseRotation.x)
-    this.camera.lookAt(lookAtPoint)
+    // Direct camera positioning — no lag on mouse input
+    this.camera.position.copy(desiredPosition)
+
+    // Apply screen shake offset
+    if (this.shakeIntensity > 0.001) {
+      this.camera.position.x += (Math.random() - 0.5) * 2 * this.shakeIntensity
+      this.camera.position.y += (Math.random() - 0.5) * 2 * this.shakeIntensity
+      this.shakeIntensity *= Math.max(0, 1 - this.SHAKE_DECAY * deltaTime)
+    }
+
+    // Look along the aim direction (at a far point), NOT at the mech
+    const lookTarget = this.camera.position.clone().add(aimDir)
+    this.camera.lookAt(lookTarget)
 
     // Update mech rotation based on camera (player faces camera direction)
     this.target.rotation.y = this.mouseRotation.x
+  }
+
+  triggerShake(intensity: number) {
+    this.shakeIntensity = Math.max(this.shakeIntensity, intensity)
   }
 
   handleResize(width: number, height: number) {

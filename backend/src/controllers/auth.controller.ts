@@ -7,36 +7,19 @@ import {
   getUserSessions,
   deleteSession,
   deleteAllSessions,
-  updateUserDisplayName,
-  updateUserAvatar,
-  updateUserBanner,
-  updateUserBio,
-  updateUserStatus,
+  updateUserField,
   updateUserPrivacy,
   getUserById,
   changeUserPassword,
   deleteUserAccount,
-  cleanupExpiredSessions,
   refreshToken,
   getUserThemePreferences,
   updateUserThemePreferences
 } from '../users';
 import { extractApiKey } from '../auth';
+import { requireAuth } from '../middleware/auth';
 
 const router = Router();
-
-/**
- * Helper to extract user from JWT token
- */
-function getUserFromToken(req: Request): { user: any; session: any } | null {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
-  }
-
-  const token = authHeader.substring(7);
-  return validateTokenAndGetUser(token);
-}
 
 /**
  * @openapi
@@ -322,15 +305,9 @@ router.post('/auth/refresh', (req: Request, res: Response) => {
  *       401:
  *         description: Not authenticated
  */
-router.get('/auth/me', (req: Request, res: Response) => {
+router.get('/auth/me', requireAuth, (req: Request, res: Response) => {
   try {
-    const result = getUserFromToken(req);
-
-    if (!result) {
-      return res.status(401).json({ error: 'Not authenticated' });
-    }
-
-    res.json(result);
+    res.json({ user: req.user, session: req.session });
   } catch (error) {
     console.error('Error getting user info:', error);
     res.status(500).json({ error: 'Failed to get user info' });
@@ -350,14 +327,9 @@ router.get('/auth/me', (req: Request, res: Response) => {
  *       401:
  *         description: Not authenticated
  */
-router.post('/auth/logout', (req: Request, res: Response) => {
+router.post('/auth/logout', requireAuth, (req: Request, res: Response) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Not authenticated' });
-    }
-
-    const token = authHeader.substring(7);
+    const token = req.headers.authorization!.substring(7);
     const success = logoutUser(token);
 
     if (success) {
@@ -404,15 +376,9 @@ router.post('/auth/logout', (req: Request, res: Response) => {
  *       401:
  *         description: Not authenticated
  */
-router.get('/auth/sessions', (req: Request, res: Response) => {
+router.get('/auth/sessions', requireAuth, (req: Request, res: Response) => {
   try {
-    const result = getUserFromToken(req);
-
-    if (!result) {
-      return res.status(401).json({ error: 'Not authenticated' });
-    }
-
-    const sessions = getUserSessions(result.user.id);
+    const sessions = getUserSessions(req.user!.id);
     res.json({ sessions });
   } catch (error) {
     console.error('Error getting sessions:', error);
@@ -441,20 +407,14 @@ router.get('/auth/sessions', (req: Request, res: Response) => {
  *       404:
  *         description: Session not found
  */
-router.delete('/auth/sessions/:id', (req: Request, res: Response) => {
+router.delete('/auth/sessions/:id', requireAuth, (req: Request, res: Response) => {
   try {
-    const result = getUserFromToken(req);
-
-    if (!result) {
-      return res.status(401).json({ error: 'Not authenticated' });
-    }
-
     const sessionId = parseInt(req.params.id);
     if (isNaN(sessionId)) {
       return res.status(400).json({ error: 'Invalid session ID' });
     }
 
-    const success = deleteSession(sessionId, result.user.id);
+    const success = deleteSession(sessionId, req.user!.id);
 
     if (success) {
       res.json({ message: 'Session deleted successfully' });
@@ -480,15 +440,9 @@ router.delete('/auth/sessions/:id', (req: Request, res: Response) => {
  *       401:
  *         description: Not authenticated
  */
-router.delete('/auth/sessions/all', (req: Request, res: Response) => {
+router.delete('/auth/sessions/all', requireAuth, (req: Request, res: Response) => {
   try {
-    const result = getUserFromToken(req);
-
-    if (!result) {
-      return res.status(401).json({ error: 'Not authenticated' });
-    }
-
-    const count = deleteAllSessions(result.user.id);
+    const count = deleteAllSessions(req.user!.id);
     res.json({ message: 'Logged out from all devices', count });
   } catch (error) {
     console.error('Error deleting all sessions:', error);
@@ -518,21 +472,15 @@ router.delete('/auth/sessions/all', (req: Request, res: Response) => {
  *       401:
  *         description: Not authenticated
  */
-router.patch('/auth/profile', (req: Request, res: Response) => {
+router.patch('/auth/profile', requireAuth, (req: Request, res: Response) => {
   try {
-    const result = getUserFromToken(req);
-
-    if (!result) {
-      return res.status(401).json({ error: 'Not authenticated' });
-    }
-
     const { displayName } = req.body;
 
     if (!displayName || typeof displayName !== 'string') {
       return res.status(400).json({ error: 'Display name is required' });
     }
 
-    const user = updateUserDisplayName(result.user.id, displayName);
+    const user = updateUserField(req.user!.id, 'display_name', displayName);
     res.json({ success: true, user });
   } catch (error) {
     console.error('Error updating profile:', error);
@@ -568,14 +516,8 @@ router.patch('/auth/profile', (req: Request, res: Response) => {
  *       401:
  *         description: Not authenticated or invalid old password
  */
-router.patch('/auth/password', async (req: Request, res: Response) => {
+router.patch('/auth/password', requireAuth, async (req: Request, res: Response) => {
   try {
-    const result = getUserFromToken(req);
-
-    if (!result) {
-      return res.status(401).json({ error: 'Not authenticated' });
-    }
-
     const { oldPassword, newPassword } = req.body;
 
     if (!oldPassword || !newPassword) {
@@ -586,7 +528,7 @@ router.patch('/auth/password', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'New password must be at least 8 characters' });
     }
 
-    await changeUserPassword(result.user.id, oldPassword, newPassword);
+    await changeUserPassword(req.user!.id, oldPassword, newPassword);
     res.json({ success: true, message: 'Password changed successfully. Please login again on all devices.' });
   } catch (error: any) {
     if (error.message === 'Invalid current password') {
@@ -621,21 +563,15 @@ router.patch('/auth/password', async (req: Request, res: Response) => {
  *       401:
  *         description: Not authenticated or invalid password
  */
-router.delete('/auth/account', async (req: Request, res: Response) => {
+router.delete('/auth/account', requireAuth, async (req: Request, res: Response) => {
   try {
-    const result = getUserFromToken(req);
-
-    if (!result) {
-      return res.status(401).json({ error: 'Not authenticated' });
-    }
-
     const { password } = req.body;
 
     if (!password) {
       return res.status(400).json({ error: 'Password is required' });
     }
 
-    await deleteUserAccount(result.user.id, password);
+    await deleteUserAccount(req.user!.id, password);
     res.json({ message: 'Account deleted successfully' });
   } catch (error: any) {
     if (error.message === 'Invalid password') {
@@ -669,17 +605,11 @@ router.delete('/auth/account', async (req: Request, res: Response) => {
  *       401:
  *         description: Not authenticated
  */
-router.patch('/auth/avatar', (req: Request, res: Response) => {
+router.patch('/auth/avatar', requireAuth, (req: Request, res: Response) => {
   try {
-    const result = getUserFromToken(req);
-
-    if (!result) {
-      return res.status(401).json({ error: 'Not authenticated' });
-    }
-
     const { avatarUrl } = req.body;
 
-    const user = updateUserAvatar(result.user.id, avatarUrl || null);
+    const user = updateUserField(req.user!.id, 'avatar_url', avatarUrl || null);
     res.json({ success: true, user });
   } catch (error) {
     console.error('Error updating avatar:', error);
@@ -710,17 +640,11 @@ router.patch('/auth/avatar', (req: Request, res: Response) => {
  *       401:
  *         description: Not authenticated
  */
-router.patch('/auth/banner', (req: Request, res: Response) => {
+router.patch('/auth/banner', requireAuth, (req: Request, res: Response) => {
   try {
-    const result = getUserFromToken(req);
-
-    if (!result) {
-      return res.status(401).json({ error: 'Not authenticated' });
-    }
-
     const { bannerUrl } = req.body;
 
-    const user = updateUserBanner(result.user.id, bannerUrl || null);
+    const user = updateUserField(req.user!.id, 'banner_url', bannerUrl || null);
     res.json({ success: true, user });
   } catch (error) {
     console.error('Error updating banner:', error);
@@ -752,17 +676,11 @@ router.patch('/auth/banner', (req: Request, res: Response) => {
  *       401:
  *         description: Not authenticated
  */
-router.patch('/auth/bio', (req: Request, res: Response) => {
+router.patch('/auth/bio', requireAuth, (req: Request, res: Response) => {
   try {
-    const result = getUserFromToken(req);
-
-    if (!result) {
-      return res.status(401).json({ error: 'Not authenticated' });
-    }
-
     const { bio } = req.body;
 
-    const user = updateUserBio(result.user.id, bio || null);
+    const user = updateUserField(req.user!.id, 'bio', bio || null);
     res.json({ success: true, user });
   } catch (error) {
     console.error('Error updating bio:', error);
@@ -794,17 +712,11 @@ router.patch('/auth/bio', (req: Request, res: Response) => {
  *       401:
  *         description: Not authenticated
  */
-router.patch('/auth/status', (req: Request, res: Response) => {
+router.patch('/auth/status', requireAuth, (req: Request, res: Response) => {
   try {
-    const result = getUserFromToken(req);
-
-    if (!result) {
-      return res.status(401).json({ error: 'Not authenticated' });
-    }
-
     const { status } = req.body;
 
-    const user = updateUserStatus(result.user.id, status || null);
+    const user = updateUserField(req.user!.id, 'status', status || null);
     res.json({ success: true, user });
   } catch (error) {
     console.error('Error updating status:', error);
@@ -836,18 +748,12 @@ router.patch('/auth/status', (req: Request, res: Response) => {
  *       401:
  *         description: Not authenticated
  */
-router.patch('/auth/privacy', (req: Request, res: Response) => {
+router.patch('/auth/privacy', requireAuth, (req: Request, res: Response) => {
   try {
-    const result = getUserFromToken(req);
-
-    if (!result) {
-      return res.status(401).json({ error: 'Not authenticated' });
-    }
-
     const { showEmail, showJoinedDate } = req.body;
 
     const user = updateUserPrivacy(
-      result.user.id,
+      req.user!.id,
       typeof showEmail === 'boolean' ? showEmail : true,
       typeof showJoinedDate === 'boolean' ? showJoinedDate : true
     );
@@ -951,15 +857,9 @@ router.get('/profile/:id', (req: Request, res: Response) => {
  *       401:
  *         description: Not authenticated
  */
-router.get('/auth/theme', (req: Request, res: Response) => {
+router.get('/auth/theme', requireAuth, (req: Request, res: Response) => {
   try {
-    const result = getUserFromToken(req);
-
-    if (!result) {
-      return res.status(401).json({ error: 'Not authenticated' });
-    }
-
-    const preferences = getUserThemePreferences(result.user.id);
+    const preferences = getUserThemePreferences(req.user!.id);
     res.json({ success: true, preferences });
   } catch (error) {
     console.error('Error getting theme preferences:', error);
@@ -1031,21 +931,15 @@ router.get('/auth/theme', (req: Request, res: Response) => {
  *       401:
  *         description: Not authenticated
  */
-router.put('/auth/theme', (req: Request, res: Response) => {
+router.put('/auth/theme', requireAuth, (req: Request, res: Response) => {
   try {
-    const result = getUserFromToken(req);
-
-    if (!result) {
-      return res.status(401).json({ error: 'Not authenticated' });
-    }
-
     const { preferences } = req.body;
 
     if (!preferences) {
       return res.status(400).json({ error: 'Theme preferences are required' });
     }
 
-    const updatedPreferences = updateUserThemePreferences(result.user.id, preferences);
+    const updatedPreferences = updateUserThemePreferences(req.user!.id, preferences);
     res.json({ success: true, preferences: updatedPreferences });
   } catch (error: any) {
     if (error.message === 'Invalid theme preferences') {

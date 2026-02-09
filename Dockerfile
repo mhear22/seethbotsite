@@ -1,16 +1,15 @@
 # Multi-stage build for full-stack application
-# Force rebuild: goose-honk support
 
-# Shared build base with dependencies
+# Shared build base with native compilation tools
 FROM node:20-alpine3.19 AS builder-base
 RUN apk add --no-cache python3 make g++
 
-# Stage 1: Build backend (TypeScript) - MUST BE FIRST to generate OpenAPI spec
+# Stage 1: Build backend (TypeScript) - generates OpenAPI spec for frontend
 FROM builder-base AS backend-builder
 
 WORKDIR /app/backend
 
-# Copy backend package files
+# Copy backend package files (cached unless package*.json changes)
 COPY backend/package*.json ./
 
 # Install with cache mount
@@ -41,27 +40,14 @@ RUN --mount=type=cache,target=/root/.npm \
 # Copy backend OpenAPI spec for type generation
 COPY --from=backend-builder /app/backend/dist/openapi.json ../backend/dist/openapi.json
 
-# Copy frontend config files first (less frequently changed)
-COPY frontend/vite.config.ts frontend/tsconfig.json frontend/tsconfig.node.json frontend/index.html ./
-COPY frontend/*.css frontend/*.mp3 frontend/*.html ./
+# Copy all frontend source in one layer (relies on .dockerignore to exclude node_modules/dist)
+COPY frontend/ ./
 
-# Copy frontend source code (more frequently changed)
-COPY frontend/main.ts frontend/App.vue ./
-COPY frontend/components ./components/
-COPY frontend/repositories ./repositories/
-COPY frontend/config ./config/
-COPY frontend/router ./router/
-COPY frontend/utils ./utils/
-COPY frontend/composables ./composables/
-COPY frontend/stores ./stores/
-COPY frontend/lib ./lib/
-COPY frontend/public ./public/
-
-# Build frontend (generates types from backend OpenAPI spec)
+# Build frontend
 RUN npm run build
 
-# Stage 3: Production dependencies
-FROM node:20-alpine3.19 AS prod-deps
+# Stage 3: Production dependencies (needs native build tools for bcrypt)
+FROM builder-base AS prod-deps
 
 WORKDIR /app/backend
 
@@ -71,12 +57,12 @@ COPY backend/package*.json ./
 RUN --mount=type=cache,target=/root/.npm \
     npm ci --omit=dev
 
-# Stage 4: Production image
+# Stage 4: Production image (minimal)
 FROM node:20-alpine3.19
 
 WORKDIR /app/backend
 
-# Copy production dependencies (smaller than full node_modules)
+# Copy production dependencies
 COPY --from=prod-deps /app/backend/node_modules ./node_modules
 COPY --from=prod-deps /app/backend/package.json ./package.json
 
@@ -97,12 +83,9 @@ ENV GIT_HASH=${GIT_HASH}
 ENV GIT_BRANCH=${GIT_BRANCH}
 ENV PORT=3000
 
-# Expose port
 EXPOSE 3000
 
-# Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD node -e "require('http').get('http://localhost:3000/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
-# Start server
 CMD ["node", "dist/index.js"]

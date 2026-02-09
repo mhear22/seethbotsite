@@ -17,6 +17,12 @@ const emit = defineEmits<{
   (e: 'battle-end', result: 'victory' | 'defeat'): void
   (e: 'damage-dealt', amount: number): void
   (e: 'time-update', time: number): void
+  (e: 'hud-update', data: {
+    dashCooldown: number
+    dashMaxCooldown: number
+    enemyRadarX: number
+    enemyRadarY: number
+  }): void
 }>()
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
@@ -42,12 +48,36 @@ onMounted(() => {
 
   battleScene.start()
 
-  // Emit time updates periodically
+  // Emit time + HUD updates periodically
   const timeInterval = setInterval(() => {
     if (battleScene) {
       emit('time-update', battleScene.getBattleTime())
+
+      // Compute radar-relative enemy position rotated by player yaw
+      const playerPos = battleScene.getPlayerPosition()
+      const enemyPos = battleScene.getEnemyPosition()
+      const yaw = battleScene.getPlayerYaw()
+
+      const dx = enemyPos.x - playerPos.x
+      const dz = enemyPos.z - playerPos.z
+      // Normalize to arena scale (50 units -> -1..1)
+      const nx = dx / 25
+      const nz = dz / 25
+
+      // Rotate by negative player yaw so "up" on radar = player forward
+      const cosY = Math.cos(-yaw)
+      const sinY = Math.sin(-yaw)
+      const radarX = nx * cosY - nz * sinY
+      const radarY = -(nx * sinY + nz * cosY) // Negate so forward = up in CSS
+
+      emit('hud-update', {
+        dashCooldown: battleScene.getPlayerDashCooldown(),
+        dashMaxCooldown: battleScene.getPlayerDashMaxCooldown(),
+        enemyRadarX: radarX,
+        enemyRadarY: radarY,
+      })
     }
-  }, 100)
+  }, 50) // 20fps for HUD
 
   // Cleanup interval on unmount
   onUnmounted(() => {

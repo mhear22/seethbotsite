@@ -4,6 +4,8 @@ import { ProjectileSystem } from './ProjectileSystem'
 import { CameraController } from './CameraController'
 import { PhysicsSystem } from './PhysicsSystem'
 import { InputManager, type InputState } from './InputManager'
+import { ParticleSystem } from './ParticleSystem'
+import { EnemyAI } from './EnemyAI'
 import { markRaw } from 'vue'
 
 export interface BattleSceneConfig {
@@ -23,6 +25,8 @@ export class BattleScene {
   private inputManager: InputManager
   private physicsSystem: PhysicsSystem
   private projectileSystem: ProjectileSystem
+  private particleSystem!: ParticleSystem
+  private enemyAI!: EnemyAI
 
   playerMech: MechEntity
   enemyMech: MechEntity
@@ -37,6 +41,11 @@ export class BattleScene {
   private lastPlayerShot: number = 0
   private readonly PLAYER_FIRE_RATE = 0.25 // Shots per second
 
+  // Battle ending animation
+  private battleEnding: boolean = false
+  private battleEndTimer: number = 0
+  private battleEndResult: 'victory' | 'defeat' = 'victory'
+
   constructor(config: BattleSceneConfig) {
     this.playerMech = config.playerMech
     this.enemyMech = config.enemyMech
@@ -45,7 +54,6 @@ export class BattleScene {
 
     // Initialize Three.js scene
     this.scene = markRaw(new THREE.Scene())
-    this.scene.background = new THREE.Color(0x1a1a2e)
 
     // Initialize renderer
     this.renderer = markRaw(new THREE.WebGLRenderer({
@@ -60,7 +68,9 @@ export class BattleScene {
     this.inputManager = new InputManager(config.canvas)
     this.physicsSystem = new PhysicsSystem()
     this.projectileSystem = new ProjectileSystem(this.scene)
+    this.particleSystem = new ParticleSystem(this.scene)
     this.camera = new CameraController(this.playerMech)
+    this.enemyAI = new EnemyAI()
 
     // Apply settings
     if (config.mouseSensitivity !== undefined) {
@@ -71,12 +81,76 @@ export class BattleScene {
     }
 
     // Setup scene
+    this.setupSky()
     this.setupLighting()
     this.setupArena()
     this.addMechsToScene()
 
     // Handle window resize
     window.addEventListener('resize', () => this.handleResize())
+  }
+
+  private setupSky() {
+    const skyGeometry = new THREE.SphereGeometry(400, 32, 16)
+    const skyMaterial = new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      uniforms: {},
+      vertexShader: `
+        varying vec3 vWorldPosition;
+        void main() {
+          vec4 worldPos = modelMatrix * vec4(position, 1.0);
+          vWorldPosition = worldPos.xyz;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        varying vec3 vWorldPosition;
+
+        // Simple hash for star placement
+        float hash(vec2 p) {
+          return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+        }
+
+        void main() {
+          vec3 dir = normalize(vWorldPosition);
+          float elevation = dir.y; // -1 (bottom) to 1 (top)
+
+          // Zenith color (dark sky)
+          vec3 zenith = vec3(0.039, 0.039, 0.102); // #0a0a1a
+
+          // Horizon glow: magenta -> cyan gradient
+          vec3 magenta = vec3(1.0, 0.0, 1.0);  // #ff00ff
+          vec3 cyan = vec3(0.0, 1.0, 1.0);      // #00ffff
+
+          // Horizon band: strongest at elevation ~0, fading by |elevation| > 0.15
+          float horizonBand = smoothstep(0.2, 0.0, abs(elevation));
+          // Blend magenta to cyan across the horizontal angle
+          float angle = atan(dir.x, dir.z) * 0.5 + 0.5;
+          vec3 horizonColor = mix(magenta, cyan, angle);
+
+          // Base sky: interpolate zenith down to darker near bottom
+          vec3 skyColor = mix(zenith * 0.5, zenith, smoothstep(-0.3, 0.3, elevation));
+
+          // Add horizon glow
+          skyColor = mix(skyColor, horizonColor, horizonBand * 0.6);
+
+          // Procedural stars in upper hemisphere
+          if (elevation > 0.05) {
+            vec2 starUV = dir.xz / (elevation + 0.001) * 20.0;
+            float starVal = hash(floor(starUV));
+            float starBright = step(0.985, starVal);
+            // Twinkle based on slightly shifted UV
+            float twinkle = hash(floor(starUV) + vec2(0.5));
+            starBright *= (0.6 + 0.4 * twinkle);
+            skyColor += vec3(starBright) * smoothstep(0.05, 0.3, elevation);
+          }
+
+          gl_FragColor = vec4(skyColor, 1.0);
+        }
+      `
+    })
+    const sky = new THREE.Mesh(skyGeometry, skyMaterial)
+    this.scene.add(sky)
   }
 
   private setupLighting() {
@@ -167,10 +241,34 @@ export class BattleScene {
   }
 
   private update(deltaTime: number) {
+    // Update particles every frame (even during battle ending)
+    this.particleSystem.update(deltaTime)
+
+    // If battle is ending, play destruction animation then stop
+    if (this.battleEnding) {
+      this.battleEndTimer -= deltaTime
+      const defeated = this.battleEndResult === 'victory' ? this.enemyMech : this.playerMech
+      defeated.playDestroyAnimation(deltaTime)
+
+      // Still update camera during ending
+      const input = this.inputManager.getInputState()
+      this.camera.update(deltaTime, input.mouseX, input.mouseY)
+      this.inputManager.resetMouseMovement()
+
+      if (this.battleEndTimer <= 0) {
+        this.onBattleEnd(this.battleEndResult)
+        this.stop()
+      }
+      return
+    }
+
     const input = this.inputManager.getInputState()
 
     // Update player mech
-    this.physicsSystem.updateMovement(this.playerMech, input, deltaTime)
+    this.physicsSystem.updateDash(this.playerMech, input, deltaTime)
+    if (!this.playerMech.isDashing) {
+      this.physicsSystem.updateMovement(this.playerMech, input, deltaTime)
+    }
     this.physicsSystem.updateJumpJets(this.playerMech, input, deltaTime)
     this.playerMech.update(deltaTime)
 
@@ -181,8 +279,8 @@ export class BattleScene {
       this.lastPlayerShot = this.battleTime
     }
 
-    // Update enemy AI
-    const shouldEnemyFire = this.physicsSystem.updateEnemyAI(
+    // Update enemy AI (new dedicated class)
+    const shouldEnemyFire = this.enemyAI.update(
       this.enemyMech,
       this.playerMech,
       deltaTime
@@ -206,22 +304,32 @@ export class BattleScene {
     for (const hit of hits) {
       const defeated = hit.target.takeDamage(hit.projectile.damage)
 
+      // Spawn hit particles at impact point
+      this.particleSystem.spawnHitEffect(
+        hit.projectile.position.clone(),
+        hit.projectile.type
+      )
+
       // Track damage dealt by player
       if (hit.target === this.enemyMech) {
         this.onDamageDealt(hit.projectile.damage)
       }
 
+      // Screen shake when player takes damage
+      if (hit.target === this.playerMech) {
+        this.camera.triggerShake(0.4)
+      }
+
       this.projectileSystem.removeProjectile(hit.projectile)
 
-      // Check for battle end
+      // Check for battle end — start destruction animation instead of immediate stop
       if (defeated) {
-        if (hit.target === this.playerMech) {
-          this.onBattleEnd('defeat')
-          this.stop()
-        } else {
-          this.onBattleEnd('victory')
-          this.stop()
-        }
+        this.particleSystem.spawnExplosion(hit.target.position.clone())
+        this.camera.triggerShake(1.0)
+        hit.target.isDestroyed = true
+        this.battleEnding = true
+        this.battleEndTimer = 2.0
+        this.battleEndResult = hit.target === this.playerMech ? 'defeat' : 'victory'
       }
     }
 
@@ -245,6 +353,7 @@ export class BattleScene {
     this.stop()
     this.inputManager.cleanup()
     this.projectileSystem.cleanup()
+    this.particleSystem.cleanup()
     this.playerMech.cleanup()
     this.enemyMech.cleanup()
 
@@ -263,5 +372,25 @@ export class BattleScene {
 
   getBattleTime(): number {
     return this.battleTime
+  }
+
+  getPlayerPosition(): THREE.Vector3 {
+    return this.playerMech.position
+  }
+
+  getEnemyPosition(): THREE.Vector3 {
+    return this.enemyMech.position
+  }
+
+  getPlayerYaw(): number {
+    return this.playerMech.rotation.y
+  }
+
+  getPlayerDashCooldown(): number {
+    return this.playerMech.dashCooldown
+  }
+
+  getPlayerDashMaxCooldown(): number {
+    return this.playerMech.DASH_COOLDOWN
   }
 }

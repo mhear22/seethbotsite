@@ -6,6 +6,7 @@ export interface InputState {
   right: boolean
   jump: boolean
   shoot: boolean
+  dash: boolean
   mouseX: number
   mouseY: number
 }
@@ -72,6 +73,7 @@ export class InputManager {
       right: this.keys.get('KeyD') || false,
       jump: this.keys.get('Space') || false,
       shoot: this.mouseButtons.get(0) || false, // Left mouse button
+      dash: this.keys.get('ShiftLeft') || this.keys.get('ShiftRight') || false,
       mouseX: this.mouseMovement.x,
       mouseY: this.mouseMovement.y
     }

@@ -28,10 +28,10 @@ export class PhysicsSystem {
       mech.velocity.add(forward.clone().multiplyScalar(-baseSpeed))
     }
     if (input.left) {
-      mech.velocity.add(right.clone().multiplyScalar(-baseSpeed))
+      mech.velocity.add(right.clone().multiplyScalar(baseSpeed))
     }
     if (input.right) {
-      mech.velocity.add(right.clone().multiplyScalar(baseSpeed))
+      mech.velocity.add(right.clone().multiplyScalar(-baseSpeed))
     }
 
     // Apply velocity to position with deltaTime
@@ -43,6 +43,45 @@ export class PhysicsSystem {
     // Clamp to arena bounds
     mech.position.x = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, mech.position.x))
     mech.position.z = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, mech.position.z))
+  }
+
+  updateDash(mech: MechEntity, input: InputState, deltaTime: number) {
+    // Tick cooldown
+    if (mech.dashCooldown > 0) {
+      mech.dashCooldown -= deltaTime
+    }
+
+    // Currently dashing — count down timer
+    if (mech.isDashing) {
+      mech.dashTimer -= deltaTime
+      if (mech.dashTimer <= 0) {
+        mech.isDashing = false
+      }
+      return // Skip normal movement during dash
+    }
+
+    // Initiate dash
+    if (input.dash && mech.dashCooldown <= 0) {
+      // Determine dash direction from input, or forward by default
+      const forward = new THREE.Vector3(0, 0, 1).applyEuler(mech.rotation)
+      const right = new THREE.Vector3(1, 0, 0).applyEuler(mech.rotation)
+      const dashDir = new THREE.Vector3()
+
+      if (input.forward) dashDir.add(forward)
+      if (input.backward) dashDir.sub(forward)
+      if (input.left) dashDir.sub(right)
+      if (input.right) dashDir.add(right)
+
+      if (dashDir.lengthSq() < 0.01) {
+        dashDir.copy(forward) // Default: dash forward
+      }
+      dashDir.normalize()
+
+      mech.velocity.copy(dashDir.multiplyScalar(30))
+      mech.isDashing = true
+      mech.dashTimer = mech.DASH_DURATION
+      mech.dashCooldown = mech.DASH_COOLDOWN
+    }
   }
 
   updateJumpJets(mech: MechEntity, input: InputState, deltaTime: number) {
