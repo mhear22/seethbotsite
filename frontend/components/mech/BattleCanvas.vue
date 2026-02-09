@@ -6,6 +6,7 @@
 import { ref, onMounted, onUnmounted, markRaw } from 'vue'
 import { BattleScene } from '../../lib/battle/BattleScene'
 import type { MechEntity } from '../../lib/battle/MechEntity'
+import { useGameSettings } from '../../composables/useGameSettings'
 
 const props = defineProps<{
   playerMech: MechEntity
@@ -20,6 +21,7 @@ const emit = defineEmits<{
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 let battleScene: BattleScene | null = null
+const gameSettings = useGameSettings()
 
 onMounted(() => {
   if (!canvasRef.value) return
@@ -33,7 +35,9 @@ onMounted(() => {
     },
     onDamageDealt: (amount) => {
       emit('damage-dealt', amount)
-    }
+    },
+    mouseSensitivity: gameSettings.settings.value.mouseSensitivity,
+    movementSpeed: gameSettings.settings.value.movementSpeed,
   }))
 
   battleScene.start()

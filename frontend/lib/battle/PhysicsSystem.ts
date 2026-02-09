@@ -6,9 +6,11 @@ const ARENA_SIZE = 50
 const ARENA_HALF = ARENA_SIZE / 2
 
 export class PhysicsSystem {
+  public speedMultiplier = 1.0
+
   updateMovement(mech: MechEntity, input: InputState, deltaTime: number) {
     // Calculate base speed from stats
-    const baseSpeed = 8 * (Math.max(10, mech.stats.speed) / 100)
+    const baseSpeed = 8 * this.speedMultiplier * (Math.max(10, mech.stats.speed) / 100)
 
     // Get movement directions relative to camera view
     const forward = new THREE.Vector3(0, 0, 1)
@@ -18,25 +20,25 @@ export class PhysicsSystem {
     forward.applyEuler(mech.rotation)
     right.applyEuler(mech.rotation)
 
-    // WASD movement
+    // WASD movement - add acceleration to velocity
     if (input.forward) {
-      mech.velocity.add(forward.clone().multiplyScalar(baseSpeed * deltaTime))
+      mech.velocity.add(forward.clone().multiplyScalar(baseSpeed))
     }
     if (input.backward) {
-      mech.velocity.add(forward.clone().multiplyScalar(-baseSpeed * deltaTime))
+      mech.velocity.add(forward.clone().multiplyScalar(-baseSpeed))
     }
     if (input.left) {
-      mech.velocity.add(right.clone().multiplyScalar(-baseSpeed * deltaTime))
+      mech.velocity.add(right.clone().multiplyScalar(-baseSpeed))
     }
     if (input.right) {
-      mech.velocity.add(right.clone().multiplyScalar(baseSpeed * deltaTime))
+      mech.velocity.add(right.clone().multiplyScalar(baseSpeed))
     }
 
-    // Apply velocity to position
+    // Apply velocity to position with deltaTime
     mech.position.add(mech.velocity.clone().multiplyScalar(deltaTime))
 
-    // Apply friction (ground)
-    mech.velocity.multiplyScalar(0.85)
+    // Apply friction (ground) - tighter control
+    mech.velocity.multiplyScalar(0.75)
 
     // Clamp to arena bounds
     mech.position.x = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, mech.position.x))

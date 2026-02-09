@@ -14,6 +14,7 @@ export class CameraController {
   private readonly MIN_PITCH = -Math.PI / 6 // -30 degrees
   private readonly MAX_PITCH = Math.PI / 3 // 60 degrees
   private currentDistance = 10
+  public sensitivityMultiplier = 1.0
 
   constructor(target: MechEntity) {
     this.target = target
@@ -30,7 +31,8 @@ export class CameraController {
 
   update(deltaTime: number, mouseX: number, mouseY: number) {
     // Apply mouse rotation
-    const sensitivity = 0.002
+    const baseSensitivity = 0.002
+    const sensitivity = baseSensitivity * this.sensitivityMultiplier
     this.mouseRotation.x -= mouseX * sensitivity // Horizontal (yaw)
     this.mouseRotation.y -= mouseY * sensitivity // Vertical (pitch)
 
@@ -40,26 +42,40 @@ export class CameraController {
       Math.min(this.MAX_PITCH, this.mouseRotation.y)
     )
 
-    // Calculate camera position based on mouse rotation
-    const horizontalOffset = this.currentDistance * Math.sin(this.mouseRotation.x)
-    const verticalOffset = this.currentDistance * Math.sin(this.mouseRotation.y) + 6
-    const depthOffset = this.currentDistance * Math.cos(this.mouseRotation.x)
+    // Over-the-shoulder offset (right shoulder)
+    const shoulderOffsetRight = 6.0 // Lateral offset to the right
+    const shoulderOffsetUp = 3.0 // Height offset above shoulder
 
-    // Target position (slightly above mech center)
+    // Calculate base camera offset (behind the mech)
+    const distance = this.currentDistance
+    const behindOffset = distance * Math.cos(this.mouseRotation.y)
+    const heightFromPitch = distance * Math.sin(this.mouseRotation.y)
+
+    // Target position (mech center, slightly elevated)
     const targetPosition = this.target.position.clone()
-    targetPosition.y += 2
+    targetPosition.y += 3 // Look at point higher on the mech
+
+    // Calculate camera position with rotation
+    const cameraOffset = new THREE.Vector3(
+      shoulderOffsetRight, // Right shoulder offset
+      4 + shoulderOffsetUp + heightFromPitch, // Height with pitch adjustment
+      -behindOffset // Behind the mech
+    )
+
+    // Rotate offset based on mech rotation (yaw)
+    cameraOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.mouseRotation.x)
 
     // Calculate desired camera position
-    const desiredPosition = targetPosition.clone()
-    desiredPosition.x -= horizontalOffset
-    desiredPosition.y += verticalOffset
-    desiredPosition.z -= depthOffset
+    const desiredPosition = this.target.position.clone().add(cameraOffset)
 
     // Smooth follow with lerp
     this.camera.position.lerp(desiredPosition, 0.15)
 
-    // Look at target
-    this.camera.lookAt(targetPosition)
+    // Look at target (over the shoulder view point)
+    const lookAtPoint = targetPosition.clone()
+    lookAtPoint.x -= shoulderOffsetRight * 0.3 * Math.cos(this.mouseRotation.x) // Slight offset from center
+    lookAtPoint.z -= shoulderOffsetRight * 0.3 * Math.sin(this.mouseRotation.x)
+    this.camera.lookAt(lookAtPoint)
 
     // Update mech rotation based on camera (player faces camera direction)
     this.target.rotation.y = this.mouseRotation.x

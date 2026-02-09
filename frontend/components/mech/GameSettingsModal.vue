@@ -1,0 +1,247 @@
+<template>
+  <div v-if="isOpen" class="modal-overlay" @click.self="close">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Game Settings</h2>
+        <button @click="close" class="close-btn">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Mouse Sensitivity -->
+        <div class="setting-group">
+          <label class="setting-label">
+            Mouse Sensitivity
+            <span class="setting-value">{{ settings.mouseSensitivity.toFixed(1) }}x</span>
+          </label>
+          <input
+            type="range"
+            min="0.5"
+            max="10.0"
+            step="0.5"
+            v-model.number="settings.mouseSensitivity"
+            class="slider"
+          />
+          <div class="slider-labels">
+            <span>0.5x</span>
+            <span>10x</span>
+          </div>
+        </div>
+
+        <!-- Description -->
+        <div class="settings-info">
+          <p>Adjust controls to your preference. Settings are saved automatically.</p>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button @click="resetToDefaults" class="reset-btn">Reset to Defaults</button>
+        <button @click="close" class="confirm-btn">Done</button>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { useGameSettings } from '../../composables/useGameSettings'
+
+const props = defineProps<{
+  isOpen: boolean
+}>()
+
+const emit = defineEmits<{
+  (e: 'close'): void
+}>()
+
+const gameSettings = useGameSettings()
+const { settings, resetToDefaults } = gameSettings
+
+function close() {
+  emit('close')
+}
+</script>
+
+<style scoped>
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+
+.modal-content {
+  background: linear-gradient(135deg, #1e293b, #0f172a);
+  border: 2px solid rgba(59, 130, 246, 0.3);
+  border-radius: 16px;
+  width: 90%;
+  max-width: 500px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px 28px;
+  border-bottom: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.modal-header h2 {
+  color: #fff;
+  font-size: 1.8rem;
+  margin: 0;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  color: #9ca3af;
+  font-size: 2rem;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s;
+}
+
+.close-btn:hover {
+  color: #fff;
+}
+
+.modal-body {
+  padding: 28px;
+}
+
+.setting-group {
+  margin-bottom: 32px;
+}
+
+.setting-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #e5e7eb;
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.setting-value {
+  color: #3b82f6;
+  font-size: 1rem;
+  font-weight: bold;
+}
+
+.slider {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(59, 130, 246, 0.2);
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #3b82f6;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.slider::-webkit-slider-thumb:hover {
+  background: #60a5fa;
+  transform: scale(1.1);
+}
+
+.slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #3b82f6;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s;
+}
+
+.slider::-moz-range-thumb:hover {
+  background: #60a5fa;
+  transform: scale(1.1);
+}
+
+.slider-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 0.85rem;
+  color: #9ca3af;
+}
+
+.settings-info {
+  margin-top: 24px;
+  padding: 16px;
+  background: rgba(59, 130, 246, 0.1);
+  border-radius: 8px;
+  border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.settings-info p {
+  color: #9ca3af;
+  font-size: 0.9rem;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.modal-footer {
+  display: flex;
+  gap: 12px;
+  padding: 20px 28px;
+  border-top: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.reset-btn,
+.confirm-btn {
+  flex: 1;
+  padding: 12px 24px;
+  font-size: 1rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.reset-btn {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border: 2px solid rgba(239, 68, 68, 0.3);
+}
+
+.reset-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+.confirm-btn {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: #fff;
+}
+
+.confirm-btn:hover {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.4);
+}
+</style>

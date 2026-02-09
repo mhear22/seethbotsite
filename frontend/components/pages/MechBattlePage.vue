@@ -1,5 +1,8 @@
 <template>
   <div class="mech-battle-page">
+    <!-- Settings Modal -->
+    <GameSettingsModal :is-open="isSettingsOpen" @close="isSettingsOpen = false" />
+
     <!-- Loading State -->
     <div v-if="battlePhase === 'loading'" class="screen loading-screen">
       <div class="screen-content">
@@ -51,6 +54,7 @@
 
         <div class="button-group">
           <button @click="startBattle" class="start-btn">Launch Battle</button>
+          <button @click="isSettingsOpen = true" class="settings-btn">Settings</button>
           <button @click="returnToBuilder" class="back-btn">Return to Builder</button>
         </div>
       </div>
@@ -139,6 +143,7 @@ import { useMechBattle } from '../../composables/useMechBattle'
 import { useKeyboardShortcuts } from '../../composables/useKeyboardShortcuts'
 import BattleCanvas from '../mech/BattleCanvas.vue'
 import BattleHUD from '../mech/BattleHUD.vue'
+import GameSettingsModal from '../mech/GameSettingsModal.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -148,6 +153,7 @@ const keyboardShortcuts = useKeyboardShortcuts()
 
 const battlePhase = computed(() => battle.battleState.value.phase)
 const battleTime = ref(0)
+const isSettingsOpen = ref(false)
 
 const playerStats = computed(() => {
   if (!battle.battleState.value.player) {
@@ -190,18 +196,22 @@ onMounted(() => {
   // Generate enemy mech (Phase 1: tutorial difficulty)
   battle.generateEnemy('tutorial')
 
-  // Disable keyboard shortcuts during active battle
+  // Watch battle phase and disable shortcuts during active battle
   watch(battlePhase, (phase) => {
+    console.log('[MechBattle] Phase changed to:', phase, '| Shortcuts enabled:', keyboardShortcuts.enabled.value)
     if (phase === 'active') {
+      console.log('[MechBattle] 🔒 DISABLING keyboard shortcuts for active battle')
       keyboardShortcuts.disable()
     } else {
+      console.log('[MechBattle] 🔓 ENABLING keyboard shortcuts')
       keyboardShortcuts.enable()
     }
-  })
+  }, { immediate: true })
 })
 
 // Re-enable shortcuts when leaving page
 onUnmounted(() => {
+  console.log('[MechBattle] Component unmounted, re-enabling keyboard shortcuts')
   keyboardShortcuts.enable()
 })
 
@@ -347,7 +357,8 @@ function returnToBuilder() {
 
 .start-btn,
 .back-btn,
-.return-btn {
+.return-btn,
+.settings-btn {
   padding: 15px 40px;
   font-size: 1.2rem;
   font-weight: bold;
@@ -365,6 +376,16 @@ function returnToBuilder() {
 .start-btn:hover {
   background: linear-gradient(135deg, #d97706, #b45309);
   box-shadow: 0 0 20px rgba(245, 158, 11, 0.5);
+}
+
+.settings-btn {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: #fff;
+}
+
+.settings-btn:hover {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
 }
 
 .back-btn,
@@ -487,7 +508,8 @@ function returnToBuilder() {
 
   .start-btn,
   .back-btn,
-  .return-btn {
+  .return-btn,
+  .settings-btn {
     width: 100%;
   }
 }

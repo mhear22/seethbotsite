@@ -16,10 +16,13 @@ export interface Shortcut {
   action: () => void
 }
 
+// Shared state (singleton pattern)
+const shortcuts = ref<Shortcut[]>([])
+const isHelpOpen = ref(false)
+const enabled = ref(true)
+let isListenerSetup = false
+
 export function useKeyboardShortcuts() {
-  const shortcuts = ref<Shortcut[]>([])
-  const isHelpOpen = ref(false)
-  const enabled = ref(true)
 
   // Helper to format keyboard shortcuts for display
   const formatShortcut = (shortcut: Shortcut): string => {
@@ -114,15 +117,15 @@ export function useKeyboardShortcuts() {
     return categories
   })
 
-  // Setup event listeners
+  // Setup event listeners (only once)
   onMounted(() => {
-    window.addEventListener('keydown', handleKeyDown)
+    if (!isListenerSetup) {
+      window.addEventListener('keydown', handleKeyDown)
+      isListenerSetup = true
+    }
   })
 
-  // Cleanup event listeners
-  onUnmounted(() => {
-    window.removeEventListener('keydown', handleKeyDown)
-  })
+  // Note: We don't remove the listener on unmount since this is a global singleton
 
   return {
     shortcuts,

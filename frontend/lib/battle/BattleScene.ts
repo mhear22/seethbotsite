@@ -12,6 +12,8 @@ export interface BattleSceneConfig {
   enemyMech: MechEntity
   onBattleEnd: (result: 'victory' | 'defeat') => void
   onDamageDealt: (amount: number) => void
+  mouseSensitivity?: number
+  movementSpeed?: number
 }
 
 export class BattleScene {
@@ -59,6 +61,14 @@ export class BattleScene {
     this.physicsSystem = new PhysicsSystem()
     this.projectileSystem = new ProjectileSystem(this.scene)
     this.camera = new CameraController(this.playerMech)
+
+    // Apply settings
+    if (config.mouseSensitivity !== undefined) {
+      this.camera.sensitivityMultiplier = config.mouseSensitivity
+    }
+    if (config.movementSpeed !== undefined) {
+      this.physicsSystem.speedMultiplier = config.movementSpeed
+    }
 
     // Setup scene
     this.setupLighting()
