@@ -146,7 +146,16 @@ export function useTheme() {
 
   // Load theme settings from localStorage
   const savedSettings = localStorage.getItem('themeSettings')
-  const initialSettings: ThemeSettings = savedSettings ? JSON.parse(savedSettings) : {
+  const initialSettings: ThemeSettings = savedSettings ? {
+    ...{
+      currentPreset: 'light',
+      customColors: DEFAULT_CUSTOM_COLORS,
+      options: DEFAULT_OPTIONS,
+      customCSS: '',
+      useCustomColors: false
+    },
+    ...JSON.parse(savedSettings)
+  } : {
     currentPreset: 'light',
     customColors: DEFAULT_CUSTOM_COLORS,
     options: DEFAULT_OPTIONS,
@@ -423,10 +432,17 @@ export function useTheme() {
   // Import theme
   const importTheme = (themeJson: string) => {
     try {
-      const imported = JSON.parse(themeJson) as ThemeSettings
+      const imported = JSON.parse(themeJson) as Partial<ThemeSettings>
       // Validate the imported theme
       if (imported.customColors && typeof imported.customColors === 'object') {
-        settings.value = imported
+        // Merge with current settings to preserve options if not provided
+        settings.value = {
+          currentPreset: imported.currentPreset || settings.value.currentPreset,
+          customColors: imported.customColors,
+          options: imported.options || settings.value.options,
+          customCSS: imported.customCSS || '',
+          useCustomColors: imported.useCustomColors ?? settings.value.useCustomColors
+        }
         saveSettings()
         applyTheme()
         return true
