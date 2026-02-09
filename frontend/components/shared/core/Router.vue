@@ -75,6 +75,7 @@ const dropdowns = ref<DropdownData[]>([
     title: 'Tools',
     icon: '🛠️',
     routes: [
+      { title: 'Search', icon: '🔍', path: '/search' },
       { title: 'Clocks', icon: '🌍', path: '/clocks' },
       { title: 'Countdowns', icon: '⏰', path: '/countdowns' },
       { title: 'Favorites', icon: '⭐', path: '/favorites' },
