@@ -222,16 +222,34 @@ function createBlackHole() {
       varying vec3 vNormal;
       varying vec3 vViewPosition;
       varying vec2 vUv;
+      varying vec3 vWorldPosition;
 
       void main() {
         vNormal = normalize(normalMatrix * normal);
         vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
         vViewPosition = -mvPosition.xyz;
         vUv = uv;
+        vWorldPosition = position;
 
-        // Slight distortion of space
-        float distortion = 1.0 + 0.1 * sin(vUv.y * 10.0);
-        vec3 distortedPosition = position * distortion;
+        // Enhanced gravitational distortion - space warping near the black hole
+        float distFromCenter = length(position.xy);
+        float gravitationalDistortion = 1.0 / (1.0 + distFromCenter * 0.05);
+
+        // Radial stretching effect (spaghettification)
+        float radialStretch = 1.0 + 0.3 * gravitationalDistortion;
+
+        // Tangential compression (space gets squeezed)
+        float tangentialCompression = 1.0 - 0.15 * gravitationalDistortion;
+
+        // Complex wave distortion pattern
+        float wave1 = sin(vUv.y * 20.0 + time) * 0.1 * gravitationalDistortion;
+        float wave2 = cos(vUv.x * 15.0 + time * 1.5) * 0.08 * gravitationalDistortion;
+
+        vec3 distortedPosition = position * radialStretch;
+        distortedPosition.x *= tangentialCompression;
+        distortedPosition.y *= tangentialCompression;
+        distortedPosition.x += wave1;
+        distortedPosition.y += wave2;
 
         gl_Position = projectionMatrix * modelViewMatrix * vec4(distortedPosition, 1.0);
       }
@@ -242,33 +260,104 @@ function createBlackHole() {
       varying vec3 vNormal;
       varying vec3 vViewPosition;
       varying vec2 vUv;
+      varying vec3 vWorldPosition;
 
       void main() {
         vec3 viewDir = normalize(viewVector);
         float rim = 1.0 - max(0.0, dot(viewDir, vNormal));
 
-        // Accretion disk effect
-        float disk = smoothstep(0.3, 0.7, abs(vUv.y - 0.5));
-        vec3 diskColor = mix(vec3(1.0, 0.3, 0.0), vec3(0.5, 0.0, 0.0), disk);
-
-        // Event horizon (black center)
+        // Distance from center for various effects
         float distFromCenter = distance(vUv, vec2(0.5));
-        float eventHorizon = smoothstep(0.2, 0.25, distFromCenter);
 
-        // Lensing effect at the edges
-        float lensing = rim * 2.0;
-        vec3 lensingColor = vec3(0.1, 0.0, 0.2) * lensing;
+        // Event horizon - deeper black center
+        float eventHorizonCore = smoothstep(0.15, 0.22, distFromCenter);
+        float eventHorizonGlow = smoothstep(0.22, 0.35, distFromCenter);
 
-        // Animated accretion disk
-        float anim = sin(time * 2.0 + vUv.x * 10.0) * 0.5 + 0.5;
-        vec3 animatedColor = vec3(anim * 0.5, anim * 0.2, 0.0);
+        // Enhanced accretion disk with multiple bands
+        float diskInner = smoothstep(0.25, 0.30, abs(vUv.y - 0.5));
+        float diskMid = smoothstep(0.30, 0.45, abs(vUv.y - 0.5));
+        float diskOuter = smoothstep(0.45, 0.55, abs(vUv.y - 0.5));
 
-        vec3 finalColor = mix(vec3(0.0), diskColor * animatedColor, eventHorizon);
+        // Hot accretion disk colors (orange/red/white hot plasma)
+        vec3 diskColorInner = vec3(1.0, 0.9, 0.7); // White hot
+        vec3 diskColorMid = vec3(1.0, 0.5, 0.1);   // Orange
+        vec3 diskColorOuter = vec3(0.8, 0.2, 0.05); // Red
+
+        // Animated swirling patterns in the accretion disk
+        float swirl1 = sin(time * 3.0 + vUv.x * 15.0) * 0.5 + 0.5;
+        float swirl2 = cos(time * 2.5 - vUv.y * 12.0) * 0.5 + 0.5;
+        float swirl3 = sin(time * 4.0 + vUv.x * 8.0 + vUv.y * 8.0) * 0.5 + 0.5;
+
+        // Combine swirl patterns
+        vec3 animatedDiskColor = vec3(0.0);
+        animatedDiskColor += diskColorInner * diskInner * swirl1;
+        animatedDiskColor += diskColorMid * diskMid * swirl2;
+        animatedDiskColor += diskColorOuter * diskOuter * swirl3;
+
+        // Enhanced gravitational lensing effect
+        float lensingIntensity = rim * 3.5;
+
+        // Blue shift at the edges (light getting pulled in)
+        vec3 lensingBlue = vec3(0.0, 0.3, 0.8) * lensingIntensity * 0.8;
+
+        // Red shift on the opposite side (light escaping)
+        vec3 lensingRed = vec3(0.8, 0.1, 0.0) * lensingIntensity * 0.4;
+
+        // Combine lensing based on viewing angle
+        float blueShift = smoothstep(0.5, 1.0, vUv.x);
+        vec3 lensingColor = mix(lensingRed, lensingBlue, blueShift);
+
+        // Einstein ring effect - bright ring around the event horizon
+        float einsteinRing = smoothstep(0.30, 0.32, distFromCenter) * (1.0 - smoothstep(0.32, 0.35, distFromCenter));
+        vec3 ringColor = vec3(1.0, 0.95, 0.9) * einsteinRing * 2.0;
+
+        // Photon sphere - extremely bright ring
+        float photonSphere = smoothstep(0.28, 0.29, distFromCenter) * (1.0 - smoothstep(0.29, 0.30, distFromCenter));
+        vec3 photonColor = vec3(1.0, 1.0, 0.95) * photonSphere * 3.0;
+
+        // Time dilation effect - colors shift over time near the event horizon
+        float timeDilation = (1.0 - eventHorizonCore) * 0.5;
+        vec3 timeShift = vec3(
+          sin(time * 2.0 + vUv.x * 10.0),
+          cos(time * 1.8 + vUv.y * 8.0),
+          sin(time * 2.2 + vUv.x * 6.0 + vUv.y * 6.0)
+        ) * timeDilation * 0.2;
+
+        // Wrap-around lensing - stars visible "behind" the black hole
+        float wrapAround = smoothstep(0.2, 0.4, distFromCenter) * (1.0 - smoothstep(0.4, 0.5, distFromCenter));
+        vec3 wrapColor = vec3(0.6, 0.4, 0.8) * wrapAround * 1.5;
+
+        // Outer corona glow
+        float corona = rim * rim * 2.0;
+        vec3 coronaColor = vec3(0.3, 0.15, 0.6) * corona;
+
+        // Combine all effects
+        vec3 finalColor = vec3(0.0);
+
+        // Black event horizon core
+        finalColor = mix(vec3(0.0, 0.0, 0.0), finalColor, eventHorizonCore);
+
+        // Add glowing edge to event horizon
+        finalColor += animatedDiskColor * eventHorizonGlow;
+
+        // Add Einstein ring and photon sphere
+        finalColor += ringColor;
+        finalColor += photonColor;
+
+        // Add gravitational lensing
         finalColor += lensingColor;
 
-        // Outer glow
-        float glow = rim * 0.5;
-        finalColor += vec3(0.2, 0.1, 0.4) * glow;
+        // Add wrap-around effect
+        finalColor += wrapColor;
+
+        // Add time dilation color shift
+        finalColor += timeShift;
+
+        // Add outer corona
+        finalColor += coronaColor;
+
+        // Ensure we don't go above 1.0 in any channel too much
+        finalColor = clamp(finalColor, 0.0, 1.5);
 
         gl_FragColor = vec4(finalColor, 1.0);
       }
@@ -281,17 +370,39 @@ function createBlackHole() {
   blackHole.position.set(0, 0, -60) // Position in the background
   scene?.add(blackHole)
 
-  // Add accretion disk
-  const diskGeometry = new THREE.RingGeometry(10, 16, 64)
-  const diskMaterial = new THREE.MeshBasicMaterial({
+  // Add enhanced accretion disk with multiple layers
+  const diskGeometry1 = new THREE.RingGeometry(9, 14, 128)
+  const diskMaterial1 = new THREE.MeshBasicMaterial({
+    color: 0xffaa00,
+    side: THREE.DoubleSide,
+    transparent: true,
+    opacity: 0.8
+  })
+  const accretionDisk1 = markRaw(new THREE.Mesh(diskGeometry1, diskMaterial1))
+  accretionDisk1.rotation.x = Math.PI / 2.3
+  blackHole.add(accretionDisk1)
+
+  const diskGeometry2 = new THREE.RingGeometry(13, 18, 128)
+  const diskMaterial2 = new THREE.MeshBasicMaterial({
     color: 0xff4400,
     side: THREE.DoubleSide,
     transparent: true,
-    opacity: 0.6
+    opacity: 0.7
   })
-  const accretionDisk = markRaw(new THREE.Mesh(diskGeometry, diskMaterial))
-  accretionDisk.rotation.x = Math.PI / 2
-  blackHole.add(accretionDisk)
+  const accretionDisk2 = markRaw(new THREE.Mesh(diskGeometry2, diskMaterial2))
+  accretionDisk2.rotation.x = Math.PI / 2.5
+  blackHole.add(accretionDisk2)
+
+  const diskGeometry3 = new THREE.RingGeometry(17, 22, 128)
+  const diskMaterial3 = new THREE.MeshBasicMaterial({
+    color: 0xaa2200,
+    side: THREE.DoubleSide,
+    transparent: true,
+    opacity: 0.5
+  })
+  const accretionDisk3 = markRaw(new THREE.Mesh(diskGeometry3, diskMaterial3))
+  accretionDisk3.rotation.x = Math.PI / 2.7
+  blackHole.add(accretionDisk3)
 }
 
 function createStars() {
