@@ -11,6 +11,7 @@ BUILD_COUNT=$(git rev-list --count HEAD 2>/dev/null || echo "1")
 # Check if file exists
 if [ ! -f "$BUILD_INFO_FILE" ]; then
   echo "⚠️  build-info.json not found, creating new one"
+  echo {} > "$BUILD_INFO_FILE"
 fi
 
 # Get git info

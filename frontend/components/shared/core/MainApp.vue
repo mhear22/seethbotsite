@@ -360,7 +360,7 @@ onUnmounted(() => {
     <source src="/button-sound.mp3" type="audio/mpeg">
   </audio>
   <audio id="gooseHonk">
-    <source src="/goose-honk.mp3" type="audio/mpeg">
+    <source src="/honk-sound.mp3" type="audio/mpeg">
   </audio>
 </template>
 

@@ -139,7 +139,6 @@
 │   │
 │   ├── public/             # Static assets (copied to dist)
 │   │   ├── fart-with-reverb.mp3
-│   │   ├── goose-honk.mp3
 │   │   └── honk-sound.mp3
 │   │
 │   └── dist/               # Frontend build output (production)
