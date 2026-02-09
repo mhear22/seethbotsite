@@ -37,8 +37,8 @@ const syncFrequencyOptions = [
 
 // Conflict resolution options
 const conflictResolutionOptions = [
-  { value: 'lww', label: 'Last Write Wins', description: 'Always use the most recent change' },
-  { value: 'ask', label: 'Ask Me', description: 'Prompt to resolve each conflict' },
+  { value: 'last-write-wins', label: 'Last Write Wins', description: 'Always use the most recent change' },
+  { value: 'user-prompted', label: 'Ask Me', description: 'Prompt to resolve each conflict' },
   { value: 'merge', label: 'Auto Merge', description: 'Attempt to merge changes automatically' }
 ]
 
@@ -82,7 +82,7 @@ const updateSyncFrequency = async (frequency: number) => {
 /**
  * Update conflict resolution preference
  */
-const updateConflictResolution = (resolution: 'lww' | 'ask' | 'merge') => {
+const updateConflictResolution = (resolution: 'last-write-wins' | 'user-prompted' | 'merge') => {
   updateSettings({ conflictResolution: resolution })
   showSavedMessage()
 }
@@ -257,7 +257,7 @@ onUnmounted(() => {
         </label>
         <select
           :value="settings.conflictResolution"
-          @change="updateConflictResolution($event.target.value as 'lww' | 'ask' | 'merge')"
+          @change="updateConflictResolution($event.target.value as 'last-write-wins' | 'user-prompted' | 'merge')"
           class="select-input"
         >
           <option
@@ -310,7 +310,7 @@ onUnmounted(() => {
                 <span v-if="device.isCurrentDevice" class="current-badge">(This device)</span>
               </div>
               <div class="device-last-seen">
-                Last seen: {{ formatTimestamp(device.lastSeenAt) }}
+                Last seen: {{ formatTimestamp(device.last_sync) }}
               </div>
             </div>
           </div>
@@ -334,10 +334,10 @@ onUnmounted(() => {
           </div>
           <div class="conflict-details">
             <div class="conflict-side">
-              <strong>Local:</strong> {{ JSON.stringify(conflict.localValue).substring(0, 50) }}...
+              <strong>Local:</strong> {{ JSON.stringify(conflict.local_version).substring(0, 50) }}...
             </div>
             <div class="conflict-side">
-              <strong>Remote:</strong> {{ JSON.stringify(conflict.remoteValue).substring(0, 50) }}...
+              <strong>Remote:</strong> {{ JSON.stringify(conflict.remote_version).substring(0, 50) }}...
             </div>
           </div>
           <div class="conflict-actions">
