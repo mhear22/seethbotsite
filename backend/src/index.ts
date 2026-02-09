@@ -37,9 +37,11 @@ import searchController from './controllers/search.controller';
 import reactionsController from './controllers/reactions.controller';
 import profilesController from './controllers/profiles.controller';
 import favoritesController from './controllers/favorites.controller';
+import themesController from './controllers/themes.controller';
 import { setupWebSocketServer } from './controllers/presence.controller';
 import { initProfilesDB } from './services/profile.service';
 import { initFavoritesDB } from './services/favorites.service';
+import { initThemeDB } from './services/theme.service';
 import { createServer } from 'http';
 
 const app: Express = express();
@@ -124,6 +126,7 @@ app.use('/api/search', searchController);
 app.use('/api/reactions', reactionsController);
 app.use('/api/profiles', profilesController);
 app.use('/api/favorites', favoritesController);
+app.use('/api/themes', themesController);
 
 // Serve raw OpenAPI JSON spec for type generation
 app.get('/api/openapi.json', (req: Request, res: Response) => {
@@ -174,6 +177,11 @@ initProfilesDB().catch((err) => {
 // Initialize favorites database
 initFavoritesDB().catch((err) => {
   console.error('Failed to initialize favorites database:', err);
+});
+
+// Initialize theme database
+initThemeDB().catch((err) => {
+  console.error('Failed to initialize theme database:', err);
 });
 
 server.listen(PORT, () => {
