@@ -20,7 +20,7 @@ describe('useTheme', () => {
     it('should initialize with default settings when no localStorage', () => {
       const { settings } = useTheme()
 
-      expect(settings.value.currentPreset).toBe('default')
+      expect(settings.value.currentPreset).toBe('light')
       expect(settings.value.customCSS).toBe('')
       expect(settings.value.useCustomColors).toBe(false)
       expect(settings.value.customColors).toEqual({
@@ -61,16 +61,16 @@ describe('useTheme', () => {
   describe('currentColors', () => {
     it('should return preset colors by default', () => {
       const { currentColors } = useTheme()
-      const defaultPreset = THEME_PRESETS.find(p => p.id === 'default')!
+      const lightPreset = THEME_PRESETS.find(p => p.id === 'light')!
 
-      expect(currentColors.value.primary).toBe(defaultPreset.colors.primary)
-      expect(currentColors.value.secondary).toBe(defaultPreset.colors.secondary)
-      expect(currentColors.value.accent).toBe(defaultPreset.colors.accent)
+      expect(currentColors.value.primary).toBe(lightPreset.colors.primary)
+      expect(currentColors.value.secondary).toBe(lightPreset.colors.secondary)
+      expect(currentColors.value.accent).toBe(lightPreset.colors.accent)
     })
 
     it('should return custom colors when useCustomColors is true', () => {
       const saved = {
-        currentPreset: 'default',
+        currentPreset: 'light',
         customColors: {
           primary: '#aaaaaa',
           secondary: '#bbbbbb',
@@ -105,7 +105,7 @@ describe('useTheme', () => {
 
     it('should set useCustomColors to false', () => {
       const saved = {
-        currentPreset: 'default',
+        currentPreset: 'light',
         customColors: {
           primary: '#aaaaaa',
           secondary: '#bbbbbb',
@@ -123,10 +123,10 @@ describe('useTheme', () => {
 
       expect(settings.value.useCustomColors).toBe(true)
 
-      setPreset('lavender')
+      setPreset('forest')
 
       expect(settings.value.useCustomColors).toBe(false)
-      expect(settings.value.currentPreset).toBe('lavender')
+      expect(settings.value.currentPreset).toBe('forest')
     })
   })
 
@@ -195,9 +195,9 @@ describe('useTheme', () => {
       updateCustomCSS('.test { color: red; }')
       expect(settings.value.customCSS).toBe('.test { color: red; }')
 
-      resetToPreset('mint')
+      resetToPreset('forest')
 
-      expect(settings.value.currentPreset).toBe('mint')
+      expect(settings.value.currentPreset).toBe('forest')
       expect(settings.value.customCSS).toBe('')
       expect(settings.value.useCustomColors).toBe(false)
     })
@@ -253,20 +253,18 @@ describe('useTheme', () => {
   })
 
   describe('presets', () => {
-    it('should have 10 presets', () => {
-      expect(THEME_PRESETS).toHaveLength(10)
+    it('should have 6 presets', () => {
+      expect(THEME_PRESETS).toHaveLength(6)
     })
 
     it('should include expected preset ids', () => {
       const ids = THEME_PRESETS.map(p => p.id)
-      expect(ids).toContain('default')
-      expect(ids).toContain('ocean')
-      expect(ids).toContain('lavender')
-      expect(ids).toContain('mint')
-      expect(ids).toContain('sunset')
-      expect(ids).toContain('neon')
-      expect(ids).toContain('midnight')
+      expect(ids).toContain('light')
+      expect(ids).toContain('dark')
       expect(ids).toContain('forest')
+      expect(ids).toContain('ocean')
+      expect(ids).toContain('sunset')
+      expect(ids).toContain('cyberpunk')
     })
   })
 })

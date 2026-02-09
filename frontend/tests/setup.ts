@@ -2,7 +2,13 @@
  * Test setup for Vitest
  */
 
-import { vi } from 'vitest'
+import { vi, beforeEach } from 'vitest'
+import { createPinia, setActivePinia } from 'pinia'
+
+// Initialize Pinia for all tests
+beforeEach(() => {
+  setActivePinia(createPinia())
+})
 
 // Mock window.matchMedia
 Object.defineProperty(window, 'matchMedia', {
