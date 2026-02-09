@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { onMounted, watch, onUnmounted } from 'vue'
+import { onMounted, watch, onUnmounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import MainApp from './components/shared/core/MainApp.vue'
+import KeyboardShortcutsHelp from './components/modals/KeyboardShortcutsHelp.vue'
 import { useAppStore } from './stores/useAppStore'
 import { useAuthStore } from './stores/useAuthStore'
 import { useTheme } from './composables/useTheme'
 import { useAuth } from './composables/useAuth'
 import { useSync } from './composables/useSync'
+import { useKeyboardShortcuts, type Shortcut } from './composables/useKeyboardShortcuts'
 
 // Stores
 const appStore = useAppStore()
@@ -14,6 +16,10 @@ const authStore = useAuthStore()
 
 // Router
 const route = useRoute()
+
+// Keyboard shortcuts
+const keyboardShortcuts = useKeyboardShortcuts()
+const showKeyboardHelp = ref(false)
 
 // Initialize theme (applies automatically via useTheme onMounted)
 useTheme()
@@ -83,6 +89,154 @@ onMounted(() => {
       cleanupSync()
     }
   })
+
+  // Initialize keyboard shortcuts (Ticket #128)
+  const shortcuts: Shortcut[] = [
+    // Search / Command palette
+    {
+      key: 'k',
+      ctrl: true,
+      meta: true, // Cmd on Mac
+      description: 'Open search / command palette',
+      category: 'modals',
+      action: () => {
+        appStore.toggleSearchModal()
+      }
+    },
+    // Show keyboard shortcuts help
+    {
+      key: '/',
+      ctrl: true,
+      meta: true, // Cmd on Mac
+      description: 'Show keyboard shortcuts help',
+      category: 'modals',
+      action: () => {
+        showKeyboardHelp.value = true
+      }
+    },
+    // Toggle favorites panel
+    {
+      key: 'f',
+      ctrl: true,
+      meta: true, // Cmd on Mac
+      description: 'Toggle favorites panel',
+      category: 'panels',
+      action: () => {
+        appStore.togglePanel('favorites')
+      }
+    },
+    // Toggle rankings panel
+    {
+      key: 'r',
+      ctrl: true,
+      meta: true, // Cmd on Mac
+      description: 'Toggle rankings panel',
+      category: 'panels',
+      action: () => {
+        appStore.togglePanel('rankings')
+      }
+    },
+    // Escape: Close modals and panels
+    {
+      key: 'Escape',
+      description: 'Close modals / panels',
+      category: 'modals',
+      action: () => {
+        // Close help modal if open
+        if (showKeyboardHelp.value) {
+          showKeyboardHelp.value = false
+          return
+        }
+        // Close search modal
+        if (appStore.searchModalOpen) {
+          appStore.toggleSearchModal()
+          return
+        }
+        // Close confirmation modal
+        if (appStore.confirmationOpen) {
+          appStore.closeConfirmation()
+          return
+        }
+        // Close Mika modal
+        if (appStore.mikaModalOpen) {
+          appStore.closeMikaModal()
+          return
+        }
+      }
+    },
+    // Arrow navigation
+    {
+      key: 'ArrowLeft',
+      description: 'Navigate to previous item',
+      category: 'navigation',
+      action: () => {
+        // Emit event for components to handle
+        window.dispatchEvent(new CustomEvent('keyboard-navigate', { detail: { direction: 'left' } }))
+      }
+    },
+    {
+      key: 'ArrowRight',
+      description: 'Navigate to next item',
+      category: 'navigation',
+      action: () => {
+        window.dispatchEvent(new CustomEvent('keyboard-navigate', { detail: { direction: 'right' } }))
+      }
+    },
+    {
+      key: 'ArrowUp',
+      description: 'Navigate up',
+      category: 'navigation',
+      action: () => {
+        window.dispatchEvent(new CustomEvent('keyboard-navigate', { detail: { direction: 'up' } }))
+      }
+    },
+    {
+      key: 'ArrowDown',
+      description: 'Navigate down',
+      category: 'navigation',
+      action: () => {
+        window.dispatchEvent(new CustomEvent('keyboard-navigate', { detail: { direction: 'down' } }))
+      }
+    },
+    // Toggle theme
+    {
+      key: 'd',
+      ctrl: true,
+      meta: true, // Cmd on Mac
+      description: 'Toggle dark/darker mode',
+      category: 'actions',
+      action: () => {
+        appStore.toggleDarkMode()
+      }
+    },
+    // Toggle music
+    {
+      key: 'm',
+      ctrl: true,
+      meta: true, // Cmd on Mac
+      description: 'Toggle music',
+      category: 'actions',
+      action: () => {
+        appStore.toggleMusic()
+      }
+    },
+    // Next quote
+    {
+      key: 'n',
+      ctrl: true,
+      meta: true, // Cmd on Mac
+      description: 'Next quote',
+      category: 'actions',
+      action: () => {
+        appStore.nextQuote()
+      }
+    }
+  ]
+
+  // Register all shortcuts
+  shortcuts.forEach(shortcut => {
+    keyboardShortcuts.registerShortcut(shortcut)
+  })
 })
 
 // Cleanup sync on unmount
@@ -95,6 +249,7 @@ onUnmounted(() => {
 
 <template>
   <MainApp />
+  <KeyboardShortcutsHelp :is-open="showKeyboardHelp" @close="showKeyboardHelp = false" />
 </template>
 
 <style>
