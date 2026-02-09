@@ -169,6 +169,9 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
 // Start server
 const server = createServer(app);
 
+// Setup WebSocket server for user presence BEFORE server starts listening
+setupWebSocketServer(server);
+
 // Initialize profiles database
 initProfilesDB().catch((err) => {
   console.error('Failed to initialize profiles database:', err);
@@ -190,9 +193,7 @@ server.listen(PORT, () => {
   console.log(`✨ Ready to serve the Vue.js app!`);
   console.log(`🔒 Security: API key authentication enabled for destructive endpoints`);
   console.log(`⚡ Rate limiting: 100 requests per minute per IP`);
+  console.log(`🔗 WebSocket server listening on /ws`);
 });
-
-// Setup WebSocket server for user presence
-setupWebSocketServer(server);
 
 export default app;
