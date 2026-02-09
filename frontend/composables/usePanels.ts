@@ -9,6 +9,7 @@ export interface PanelState {
   coolnessPanel: boolean
   mining: boolean
   activeUsers: boolean
+  favorites: boolean
 }
 
 // Detect if on mobile device
@@ -26,7 +27,8 @@ const DEFAULT_PANELS: PanelState = {
   tachometer: true,
   coolnessPanel: true,
   mining: false,
-  activeUsers: true // Active Users panel open by default
+  activeUsers: true, // Active Users panel open by default
+  favorites: true // Favorites panel open by default
 }
 
 // Mobile-friendly defaults: hide feed, mold meter, and active users on mobile
@@ -38,7 +40,8 @@ const MOBILE_DEFAULT_PANELS: PanelState = {
   tachometer: false,
   coolnessPanel: false,
   mining: false,
-  activeUsers: false
+  activeUsers: false,
+  favorites: false
 }
 
 // Mobile-exclusive panels that should not overlap

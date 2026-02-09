@@ -3,6 +3,7 @@ import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import RankingsPanel from '../../panels/RankingsPanel.vue'
 import CatPanel from '../../panels/CatPanel.vue'
+import FavoritesPanel from '../../panels/FavoritesPanel.vue'
 import FeedContent from '../ui/FeedContent.vue'
 import TachometerContent from '../../panels/TachometerContent.vue'
 import ModalContainer from '../modals/ModalContainer.vue'
@@ -166,6 +167,16 @@ const registerAllShortcuts = () => {
     action: () => appStore.togglePanel('feed')
   })
 
+  registerShortcut({
+    key: 'v',
+    description: 'Toggle Favorites',
+    action: () => {
+      if (appStore.isAuthenticated) {
+        appStore.togglePanel('favorites')
+      }
+    }
+  })
+
   // Actions
   registerShortcut({
     key: '/',
@@ -207,6 +218,8 @@ const registerAllShortcuts = () => {
         appStore.togglePanel('cat')
       } else if (appStore.panels.digitalGoose) {
         appStore.togglePanel('digitalGoose')
+      } else if (appStore.panels.favorites) {
+        appStore.togglePanel('favorites')
       }
     }
   })
@@ -238,6 +251,14 @@ onUnmounted(() => {
 
     <!-- Digital Goose (Independent - not in modal container per ticket requirements) -->
     <DigitalGoose v-if="appStore.panels.digitalGoose" />
+
+    <!-- Favorites Panel (Ticket #127) -->
+    <FavoritesPanel
+      v-if="appStore.panels.favorites && appStore.isAuthenticated"
+      :is-open="appStore.panels.favorites"
+      @toggle="appStore.togglePanel('favorites')"
+      class="floating-panel favorites-panel"
+    />
 
     <!-- Left Dock - Tachometer (Mold Meter with Fart button) -->
     <ModalContainer
