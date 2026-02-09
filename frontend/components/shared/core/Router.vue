@@ -51,6 +51,7 @@ const dropdowns = ref<DropdownData[]>([
       { title: 'Phrenology', icon: '🧠', path: '/gender' },
       { title: 'Cats', icon: '🐱', path: '/cats' },
       { title: 'Keanu', icon: '🥋', path: '/keanu' },
+      { title: 'Orbital Mechanics', icon: '🌌', path: '/orbital' },
       { title: 'Mech Builder', icon: '🤖', path: '/mech-builder' },
       { title: 'Mech Battle', icon: '⚔️', path: '/mech-battle' },
       { title: 'Stock Market', icon: '📈', path: '/stocks' },
