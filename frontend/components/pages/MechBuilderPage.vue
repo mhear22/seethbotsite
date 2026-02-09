@@ -21,9 +21,9 @@
         :class="{
           active: currentStep === index,
           completed: isStepCompleted(index),
-          available: index <= currentStep
+          available: true
         }"
-        @click="index <= currentStep && goToStep(index)"
+        @click="goToStep(index)"
       >
         <div class="step-number">{{ index + 1 }}</div>
         <div class="step-label">{{ step.label }}</div>
@@ -41,40 +41,87 @@
         </h2>
         <p class="step-description">The core is the heart of your mech, providing power and equipment slots.</p>
 
-        <div class="parts-grid">
-          <div
-            v-for="core in CORE_PRESETS"
-            :key="core.id"
-            class="part-card"
-            :class="{
-              selected: loadout.core?.id === core.id,
-              [`rarity-${core.rarity}`]: true
-            }"
-            @click="selectPart(core, 'core')"
-          >
-            <div class="part-header">
+        <div class="split-layout">
+          <div class="parts-list">
+            <div
+              v-for="core in CORE_PRESETS"
+              :key="core.id"
+              class="part-list-item"
+              :class="{
+                selected: loadout.core?.id === core.id,
+                [`rarity-${core.rarity}`]: true
+              }"
+              @click="selectPart(core, 'core')"
+            >
               <MechIcons :icon="core.icon" :size="48" />
-              <div class="part-rarity">{{ core.rarity }}</div>
-            </div>
-            <div class="part-name">{{ core.name }}</div>
-            <div class="part-manufacturer">{{ core.manufacturer }}</div>
-            <div class="part-description">{{ core.description }}</div>
-            <div class="part-stats">
-              <div class="stat-row">
-                <MechIcons icon="energy" :size="16" />
-                <span>{{ core.powerOutput }} Power</span>
-              </div>
-              <div class="stat-row">
-                <span>📦 {{ core.slots }} Slots</span>
+              <div class="part-list-info">
+                <div class="part-name">{{ core.name }}</div>
+                <div class="part-manufacturer">{{ core.manufacturer }}</div>
               </div>
             </div>
-            <div class="part-pros-cons">
-              <div class="pros">
-                <div v-for="pro in core.pros" :key="pro" class="pro-item">✓ {{ pro }}</div>
+          </div>
+
+          <div class="part-details">
+            <div v-if="loadout.core" class="details-card">
+              <div class="details-header">
+                <MechIcons :icon="loadout.core.icon" :size="64" />
+                <div>
+                  <h3>{{ loadout.core.name }}</h3>
+                  <div class="part-rarity">{{ loadout.core.rarity }}</div>
+                  <div class="part-manufacturer">{{ loadout.core.manufacturer }}</div>
+                </div>
               </div>
-              <div class="cons">
-                <div v-for="con in core.cons" :key="con" class="con-item">✗ {{ con }}</div>
+              <p class="part-description">{{ loadout.core.description }}</p>
+              <div class="part-stats-detail">
+                <div class="stat-row">
+                  <MechIcons icon="energy" :size="16" />
+                  <span>{{ loadout.core.powerOutput }} Power</span>
+                </div>
+                <div class="stat-row">
+                  <span>📦 {{ loadout.core.slots }} Slots</span>
+                </div>
               </div>
+              <div class="part-pros-cons">
+                <div class="pros">
+                  <div v-for="pro in loadout.core.pros" :key="pro" class="pro-item">✓ {{ pro }}</div>
+                </div>
+                <div class="cons">
+                  <div v-for="con in loadout.core.cons" :key="con" class="con-item">✗ {{ con }}</div>
+                </div>
+              </div>
+
+              <div class="modified-stats">
+                <h4>Modified Stats</h4>
+                <div class="stats-preview">
+                  <div class="stat-item">
+                    <MechIcons icon="health" :size="20" />
+                    <span>{{ totalStats.health }}</span>
+                  </div>
+                  <div class="stat-item">
+                    <MechIcons icon="armor" :size="20" />
+                    <span>{{ totalStats.armor }}</span>
+                  </div>
+                  <div class="stat-item">
+                    <MechIcons icon="speed" :size="20" />
+                    <span>{{ totalStats.speed }}</span>
+                  </div>
+                  <div class="stat-item">
+                    <MechIcons icon="energy" :size="20" />
+                    <span :class="{ negative: totalStats.energy < 0 }">{{ totalStats.energy }}</span>
+                  </div>
+                  <div class="stat-item">
+                    <MechIcons icon="firepower" :size="20" />
+                    <span>{{ totalStats.firepower }}</span>
+                  </div>
+                  <div class="stat-item">
+                    <MechIcons icon="accuracy" :size="20" />
+                    <span>{{ totalStats.accuracy }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div v-else class="no-selection">
+              <p>Select a core from the list</p>
             </div>
           </div>
         </div>
@@ -88,41 +135,88 @@
         </h2>
         <p class="step-description">Legs determine mobility, stability, and terrain handling.</p>
 
-        <div class="parts-grid">
-          <div
-            v-for="legs in LEGS_PRESETS"
-            :key="legs.id"
-            class="part-card"
-            :class="{
-              selected: loadout.legs?.id === legs.id,
-              [`rarity-${legs.rarity}`]: true
-            }"
-            @click="selectPart(legs, 'legs')"
-          >
-            <div class="part-header">
+        <div class="split-layout">
+          <div class="parts-list">
+            <div
+              v-for="legs in LEGS_PRESETS"
+              :key="legs.id"
+              class="part-list-item"
+              :class="{
+                selected: loadout.legs?.id === legs.id,
+                [`rarity-${legs.rarity}`]: true
+              }"
+              @click="selectPart(legs, 'legs')"
+            >
               <MechIcons :icon="legs.icon" :size="48" />
-              <div class="part-rarity">{{ legs.rarity }}</div>
-            </div>
-            <div class="part-name">{{ legs.name }}</div>
-            <div class="part-manufacturer">{{ legs.manufacturer }}</div>
-            <div class="part-description">{{ legs.description }}</div>
-            <div class="part-stats">
-              <div class="stat-row">
-                <MechIcons icon="speed" :size="16" />
-                <span>Speed {{ legs.stats.speed > 0 ? '+' : '' }}{{ legs.stats.speed }}</span>
-              </div>
-              <div class="stat-row">
-                <MechIcons icon="armor" :size="16" />
-                <span>Armor +{{ legs.stats.armor }}</span>
+              <div class="part-list-info">
+                <div class="part-name">{{ legs.name }}</div>
+                <div class="part-manufacturer">{{ legs.manufacturer }}</div>
               </div>
             </div>
-            <div class="part-pros-cons">
-              <div class="pros">
-                <div v-for="pro in legs.pros" :key="pro" class="pro-item">✓ {{ pro }}</div>
+          </div>
+
+          <div class="part-details">
+            <div v-if="loadout.legs" class="details-card">
+              <div class="details-header">
+                <MechIcons :icon="loadout.legs.icon" :size="64" />
+                <div>
+                  <h3>{{ loadout.legs.name }}</h3>
+                  <div class="part-rarity">{{ loadout.legs.rarity }}</div>
+                  <div class="part-manufacturer">{{ loadout.legs.manufacturer }}</div>
+                </div>
               </div>
-              <div class="cons">
-                <div v-for="con in legs.cons" :key="con" class="con-item">✗ {{ con }}</div>
+              <p class="part-description">{{ loadout.legs.description }}</p>
+              <div class="part-stats-detail">
+                <div class="stat-row">
+                  <MechIcons icon="speed" :size="16" />
+                  <span>Speed {{ loadout.legs.stats.speed > 0 ? '+' : '' }}{{ loadout.legs.stats.speed }}</span>
+                </div>
+                <div class="stat-row">
+                  <MechIcons icon="armor" :size="16" />
+                  <span>Armor +{{ loadout.legs.stats.armor }}</span>
+                </div>
               </div>
+              <div class="part-pros-cons">
+                <div class="pros">
+                  <div v-for="pro in loadout.legs.pros" :key="pro" class="pro-item">✓ {{ pro }}</div>
+                </div>
+                <div class="cons">
+                  <div v-for="con in loadout.legs.cons" :key="con" class="con-item">✗ {{ con }}</div>
+                </div>
+              </div>
+
+              <div class="modified-stats">
+                <h4>Modified Stats</h4>
+                <div class="stats-preview">
+                  <div class="stat-item">
+                    <MechIcons icon="health" :size="20" />
+                    <span>{{ totalStats.health }}</span>
+                  </div>
+                  <div class="stat-item">
+                    <MechIcons icon="armor" :size="20" />
+                    <span>{{ totalStats.armor }}</span>
+                  </div>
+                  <div class="stat-item">
+                    <MechIcons icon="speed" :size="20" />
+                    <span>{{ totalStats.speed }}</span>
+                  </div>
+                  <div class="stat-item">
+                    <MechIcons icon="energy" :size="20" />
+                    <span :class="{ negative: totalStats.energy < 0 }">{{ totalStats.energy }}</span>
+                  </div>
+                  <div class="stat-item">
+                    <MechIcons icon="firepower" :size="20" />
+                    <span>{{ totalStats.firepower }}</span>
+                  </div>
+                  <div class="stat-item">
+                    <MechIcons icon="accuracy" :size="20" />
+                    <span>{{ totalStats.accuracy }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div v-else class="no-selection">
+              <p>Select legs from the list</p>
             </div>
           </div>
         </div>
@@ -136,40 +230,87 @@
         </h2>
         <p class="step-description">The head contains sensors and targeting systems for accuracy.</p>
 
-        <div class="parts-grid">
-          <div
-            v-for="head in HEAD_PRESETS"
-            :key="head.id"
-            class="part-card"
-            :class="{
-              selected: loadout.head?.id === head.id,
-              [`rarity-${head.rarity}`]: true
-            }"
-            @click="selectPart(head, 'head')"
-          >
-            <div class="part-header">
+        <div class="split-layout">
+          <div class="parts-list">
+            <div
+              v-for="head in HEAD_PRESETS"
+              :key="head.id"
+              class="part-list-item"
+              :class="{
+                selected: loadout.head?.id === head.id,
+                [`rarity-${head.rarity}`]: true
+              }"
+              @click="selectPart(head, 'head')"
+            >
               <MechIcons :icon="head.icon" :size="48" />
-              <div class="part-rarity">{{ head.rarity }}</div>
-            </div>
-            <div class="part-name">{{ head.name }}</div>
-            <div class="part-manufacturer">{{ head.manufacturer }}</div>
-            <div class="part-description">{{ head.description }}</div>
-            <div class="part-stats">
-              <div class="stat-row">
-                <MechIcons icon="accuracy" :size="16" />
-                <span>+{{ head.targetingBonus }} Targeting</span>
-              </div>
-              <div class="stat-row">
-                <span>📡 {{ head.sensorRange }}m Range</span>
+              <div class="part-list-info">
+                <div class="part-name">{{ head.name }}</div>
+                <div class="part-manufacturer">{{ head.manufacturer }}</div>
               </div>
             </div>
-            <div class="part-pros-cons">
-              <div class="pros">
-                <div v-for="pro in head.pros" :key="pro" class="pro-item">✓ {{ pro }}</div>
+          </div>
+
+          <div class="part-details">
+            <div v-if="loadout.head" class="details-card">
+              <div class="details-header">
+                <MechIcons :icon="loadout.head.icon" :size="64" />
+                <div>
+                  <h3>{{ loadout.head.name }}</h3>
+                  <div class="part-rarity">{{ loadout.head.rarity }}</div>
+                  <div class="part-manufacturer">{{ loadout.head.manufacturer }}</div>
+                </div>
               </div>
-              <div class="cons">
-                <div v-for="con in head.cons" :key="con" class="con-item">✗ {{ con }}</div>
+              <p class="part-description">{{ loadout.head.description }}</p>
+              <div class="part-stats-detail">
+                <div class="stat-row">
+                  <MechIcons icon="accuracy" :size="16" />
+                  <span>+{{ loadout.head.targetingBonus }} Targeting</span>
+                </div>
+                <div class="stat-row">
+                  <span>📡 {{ loadout.head.sensorRange }}m Range</span>
+                </div>
               </div>
+              <div class="part-pros-cons">
+                <div class="pros">
+                  <div v-for="pro in loadout.head.pros" :key="pro" class="pro-item">✓ {{ pro }}</div>
+                </div>
+                <div class="cons">
+                  <div v-for="con in loadout.head.cons" :key="con" class="con-item">✗ {{ con }}</div>
+                </div>
+              </div>
+
+              <div class="modified-stats">
+                <h4>Modified Stats</h4>
+                <div class="stats-preview">
+                  <div class="stat-item">
+                    <MechIcons icon="health" :size="20" />
+                    <span>{{ totalStats.health }}</span>
+                  </div>
+                  <div class="stat-item">
+                    <MechIcons icon="armor" :size="20" />
+                    <span>{{ totalStats.armor }}</span>
+                  </div>
+                  <div class="stat-item">
+                    <MechIcons icon="speed" :size="20" />
+                    <span>{{ totalStats.speed }}</span>
+                  </div>
+                  <div class="stat-item">
+                    <MechIcons icon="energy" :size="20" />
+                    <span :class="{ negative: totalStats.energy < 0 }">{{ totalStats.energy }}</span>
+                  </div>
+                  <div class="stat-item">
+                    <MechIcons icon="firepower" :size="20" />
+                    <span>{{ totalStats.firepower }}</span>
+                  </div>
+                  <div class="stat-item">
+                    <MechIcons icon="accuracy" :size="20" />
+                    <span>{{ totalStats.accuracy }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div v-else class="no-selection">
+              <p>Select a head from the list</p>
             </div>
           </div>
         </div>
@@ -183,64 +324,110 @@
         </h2>
         <p class="step-description">Choose weapons for left and right arms. Mix and match for asymmetric loadouts.</p>
 
-        <div class="arm-selection-container">
-          <div class="arm-slot">
-            <h3>Left Arm</h3>
-            <div v-if="loadout.leftArm" class="selected-arm">
-              <MechIcons :icon="loadout.leftArm.icon" :size="32" />
-              <div>{{ loadout.leftArm.name }}</div>
-              <button @click.stop="removePart('leftArm')" class="remove-btn">Remove</button>
-            </div>
-            <div v-else class="empty-slot">Click a weapon below</div>
-          </div>
-
-          <div class="arm-slot">
-            <h3>Right Arm</h3>
-            <div v-if="loadout.rightArm" class="selected-arm">
-              <MechIcons :icon="loadout.rightArm.icon" :size="32" />
-              <div>{{ loadout.rightArm.name }}</div>
-              <button @click.stop="removePart('rightArm')" class="remove-btn">Remove</button>
-            </div>
-            <div v-else class="empty-slot">Click a weapon below</div>
-          </div>
-        </div>
-
-        <div class="parts-grid">
-          <div
-            v-for="arm in ARM_PRESETS"
-            :key="arm.id"
-            class="part-card"
-            :class="{
-              selected: loadout.leftArm?.id === arm.id || loadout.rightArm?.id === arm.id,
-              [`rarity-${arm.rarity}`]: true,
-              'in-synergy': isPartInSynergy(arm.id)
-            }"
-            @click="selectArmSlot(arm)"
-          >
-            <div class="part-header">
+        <div class="split-layout">
+          <div class="parts-list">
+            <div
+              v-for="arm in ARM_PRESETS"
+              :key="arm.id"
+              class="part-list-item"
+              :class="{
+                selected: loadout.leftArm?.id === arm.id || loadout.rightArm?.id === arm.id,
+                [`rarity-${arm.rarity}`]: true,
+                'in-synergy': isPartInSynergy(arm.id)
+              }"
+              @click="selectArmSlot(arm)"
+            >
               <MechIcons :icon="arm.icon" :size="48" />
-              <div class="part-rarity">{{ arm.rarity }}</div>
-            </div>
-            <div class="part-name">{{ arm.name }}</div>
-            <div class="part-manufacturer">{{ arm.manufacturer }}</div>
-            <div class="part-description">{{ arm.description }}</div>
-            <div class="part-stats">
-              <div class="stat-row">
-                <MechIcons icon="firepower" :size="16" />
-                <span>{{ arm.stats.firepower }} Firepower</span>
-              </div>
-              <div class="stat-row">
-                <MechIcons icon="accuracy" :size="16" />
-                <span>{{ arm.stats.accuracy }} Accuracy</span>
+              <div class="part-list-info">
+                <div class="part-name">{{ arm.name }}</div>
+                <div class="part-manufacturer">{{ arm.manufacturer }}</div>
               </div>
             </div>
-            <div class="part-pros-cons">
-              <div class="pros">
-                <div v-for="pro in arm.pros" :key="pro" class="pro-item">✓ {{ pro }}</div>
+          </div>
+
+          <div class="part-details">
+            <div class="arm-slots-display">
+              <div class="arm-slot-mini">
+                <h4>Left Arm</h4>
+                <div v-if="loadout.leftArm" class="selected-arm-mini">
+                  <MechIcons :icon="loadout.leftArm.icon" :size="24" />
+                  <span>{{ loadout.leftArm.name }}</span>
+                  <button @click.stop="removePart('leftArm')" class="remove-btn-mini">✕</button>
+                </div>
+                <div v-else class="empty-slot-mini">Empty</div>
               </div>
-              <div class="cons">
-                <div v-for="con in arm.cons" :key="con" class="con-item">✗ {{ con }}</div>
+              <div class="arm-slot-mini">
+                <h4>Right Arm</h4>
+                <div v-if="loadout.rightArm" class="selected-arm-mini">
+                  <MechIcons :icon="loadout.rightArm.icon" :size="24" />
+                  <span>{{ loadout.rightArm.name }}</span>
+                  <button @click.stop="removePart('rightArm')" class="remove-btn-mini">✕</button>
+                </div>
+                <div v-else class="empty-slot-mini">Empty</div>
               </div>
+            </div>
+
+            <div v-if="selectedArmForPreview" class="details-card">
+              <div class="details-header">
+                <MechIcons :icon="selectedArmForPreview.icon" :size="64" />
+                <div>
+                  <h3>{{ selectedArmForPreview.name }}</h3>
+                  <div class="part-rarity">{{ selectedArmForPreview.rarity }}</div>
+                  <div class="part-manufacturer">{{ selectedArmForPreview.manufacturer }}</div>
+                </div>
+              </div>
+              <p class="part-description">{{ selectedArmForPreview.description }}</p>
+              <div class="part-stats-detail">
+                <div class="stat-row">
+                  <MechIcons icon="firepower" :size="16" />
+                  <span>{{ selectedArmForPreview.stats.firepower }} Firepower</span>
+                </div>
+                <div class="stat-row">
+                  <MechIcons icon="accuracy" :size="16" />
+                  <span>{{ selectedArmForPreview.stats.accuracy }} Accuracy</span>
+                </div>
+              </div>
+              <div class="part-pros-cons">
+                <div class="pros">
+                  <div v-for="pro in selectedArmForPreview.pros" :key="pro" class="pro-item">✓ {{ pro }}</div>
+                </div>
+                <div class="cons">
+                  <div v-for="con in selectedArmForPreview.cons" :key="con" class="con-item">✗ {{ con }}</div>
+                </div>
+              </div>
+
+              <div class="modified-stats">
+                <h4>Modified Stats</h4>
+                <div class="stats-preview">
+                  <div class="stat-item">
+                    <MechIcons icon="health" :size="20" />
+                    <span>{{ totalStats.health }}</span>
+                  </div>
+                  <div class="stat-item">
+                    <MechIcons icon="armor" :size="20" />
+                    <span>{{ totalStats.armor }}</span>
+                  </div>
+                  <div class="stat-item">
+                    <MechIcons icon="speed" :size="20" />
+                    <span>{{ totalStats.speed }}</span>
+                  </div>
+                  <div class="stat-item">
+                    <MechIcons icon="energy" :size="20" />
+                    <span :class="{ negative: totalStats.energy < 0 }">{{ totalStats.energy }}</span>
+                  </div>
+                  <div class="stat-item">
+                    <MechIcons icon="firepower" :size="20" />
+                    <span>{{ totalStats.firepower }}</span>
+                  </div>
+                  <div class="stat-item">
+                    <MechIcons icon="accuracy" :size="20" />
+                    <span>{{ totalStats.accuracy }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div v-else class="no-selection">
+              <p>Select a weapon from the list</p>
             </div>
           </div>
         </div>
@@ -254,46 +441,93 @@
         </h2>
         <p class="step-description">Add special equipment for tactical advantages.</p>
 
-        <div class="parts-grid">
-          <div
-            class="part-card skip-card"
-            :class="{ selected: !loadout.rack }"
-            @click="removePart('rack')"
-          >
-            <div class="part-header">
+        <div class="split-layout">
+          <div class="parts-list">
+            <div
+              class="part-list-item"
+              :class="{ selected: !loadout.rack }"
+              @click="removePart('rack')"
+            >
               <div class="skip-icon">✕</div>
+              <div class="part-list-info">
+                <div class="part-name">No Equipment</div>
+                <div class="part-manufacturer">Skip</div>
+              </div>
             </div>
-            <div class="part-name">No Equipment</div>
-            <div class="part-description">Skip this slot and proceed with no rack equipment.</div>
+
+            <div
+              v-for="rack in RACK_PRESETS"
+              :key="rack.id"
+              class="part-list-item"
+              :class="{
+                selected: loadout.rack?.id === rack.id,
+                [`rarity-${rack.rarity}`]: true
+              }"
+              @click="selectPart(rack, 'rack')"
+            >
+              <MechIcons :icon="rack.icon" :size="48" />
+              <div class="part-list-info">
+                <div class="part-name">{{ rack.name }}</div>
+                <div class="part-manufacturer">{{ rack.manufacturer }}</div>
+              </div>
+            </div>
           </div>
 
-          <div
-            v-for="rack in RACK_PRESETS"
-            :key="rack.id"
-            class="part-card"
-            :class="{
-              selected: loadout.rack?.id === rack.id,
-              [`rarity-${rack.rarity}`]: true
-            }"
-            @click="selectPart(rack, 'rack')"
-          >
-            <div class="part-header">
-              <MechIcons :icon="rack.icon" :size="48" />
-              <div class="part-rarity">{{ rack.rarity }}</div>
-            </div>
-            <div class="part-name">{{ rack.name }}</div>
-            <div class="part-manufacturer">{{ rack.manufacturer }}</div>
-            <div class="part-description">{{ rack.description }}</div>
-            <div class="special-ability">
-              <strong>Ability:</strong> {{ rack.specialAbility }}
-            </div>
-            <div class="part-pros-cons">
-              <div class="pros">
-                <div v-for="pro in rack.pros" :key="pro" class="pro-item">✓ {{ pro }}</div>
+          <div class="part-details">
+            <div v-if="loadout.rack" class="details-card">
+              <div class="details-header">
+                <MechIcons :icon="loadout.rack.icon" :size="64" />
+                <div>
+                  <h3>{{ loadout.rack.name }}</h3>
+                  <div class="part-rarity">{{ loadout.rack.rarity }}</div>
+                  <div class="part-manufacturer">{{ loadout.rack.manufacturer }}</div>
+                </div>
               </div>
-              <div class="cons">
-                <div v-for="con in rack.cons" :key="con" class="con-item">✗ {{ con }}</div>
+              <p class="part-description">{{ loadout.rack.description }}</p>
+              <div class="special-ability">
+                <strong>Ability:</strong> {{ loadout.rack.specialAbility }}
               </div>
+              <div class="part-pros-cons">
+                <div class="pros">
+                  <div v-for="pro in loadout.rack.pros" :key="pro" class="pro-item">✓ {{ pro }}</div>
+                </div>
+                <div class="cons">
+                  <div v-for="con in loadout.rack.cons" :key="con" class="con-item">✗ {{ con }}</div>
+                </div>
+              </div>
+
+              <div class="modified-stats">
+                <h4>Modified Stats</h4>
+                <div class="stats-preview">
+                  <div class="stat-item">
+                    <MechIcons icon="health" :size="20" />
+                    <span>{{ totalStats.health }}</span>
+                  </div>
+                  <div class="stat-item">
+                    <MechIcons icon="armor" :size="20" />
+                    <span>{{ totalStats.armor }}</span>
+                  </div>
+                  <div class="stat-item">
+                    <MechIcons icon="speed" :size="20" />
+                    <span>{{ totalStats.speed }}</span>
+                  </div>
+                  <div class="stat-item">
+                    <MechIcons icon="energy" :size="20" />
+                    <span :class="{ negative: totalStats.energy < 0 }">{{ totalStats.energy }}</span>
+                  </div>
+                  <div class="stat-item">
+                    <MechIcons icon="firepower" :size="20" />
+                    <span>{{ totalStats.firepower }}</span>
+                  </div>
+                  <div class="stat-item">
+                    <MechIcons icon="accuracy" :size="20" />
+                    <span>{{ totalStats.accuracy }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div v-else class="no-selection">
+              <p>No equipment selected (optional)</p>
             </div>
           </div>
         </div>
@@ -543,6 +777,10 @@ const canProceed = computed(() => {
 })
 
 const canShare = computed(() => isComplete.value && warnings.value.length === 0)
+
+const selectedArmForPreview = computed(() => {
+  return loadout.value.leftArm || loadout.value.rightArm || null
+})
 
 // Methods
 function isStepCompleted(stepIndex: number): boolean {
@@ -803,6 +1041,242 @@ onMounted(() => {
   max-width: 700px;
   margin-left: auto;
   margin-right: auto;
+}
+
+.split-layout {
+  display: grid;
+  grid-template-columns: 350px 1fr;
+  gap: 2rem;
+  margin-bottom: 2rem;
+  max-height: 70vh;
+}
+
+.parts-list {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding-right: 0.5rem;
+}
+
+.part-list-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: linear-gradient(135deg, rgba(30, 30, 50, 0.9), rgba(20, 20, 40, 0.9));
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.part-list-item:hover {
+  border-color: rgba(255, 255, 255, 0.3);
+  transform: translateX(4px);
+}
+
+.part-list-item.selected {
+  border-color: #60a5fa;
+  background: linear-gradient(135deg, rgba(96, 165, 250, 0.2), rgba(30, 30, 50, 0.9));
+}
+
+.part-list-item.in-synergy {
+  animation: synergy-pulse 2s infinite;
+}
+
+.part-list-item.rarity-common {
+  color: #9ca3af;
+}
+
+.part-list-item.rarity-uncommon {
+  color: #10b981;
+}
+
+.part-list-item.rarity-rare {
+  color: #60a5fa;
+}
+
+.part-list-item.rarity-legendary {
+  color: #f59e0b;
+}
+
+.part-list-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.part-list-info .part-name {
+  font-size: 1rem;
+  font-weight: bold;
+  color: white;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.part-list-info .part-manufacturer {
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+
+.part-details {
+  overflow-y: auto;
+  padding-left: 0.5rem;
+}
+
+.details-card {
+  background: linear-gradient(135deg, rgba(30, 30, 50, 0.9), rgba(20, 20, 40, 0.9));
+  border: 2px solid rgba(96, 165, 250, 0.3);
+  border-radius: 12px;
+  padding: 1.5rem;
+}
+
+.details-header {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+.details-header h3 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: white;
+}
+
+.no-selection {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 300px;
+  color: #6b7280;
+  font-style: italic;
+  font-size: 1.1rem;
+}
+
+.part-stats-detail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+}
+
+.modified-stats {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 2px solid rgba(96, 165, 250, 0.3);
+}
+
+.modified-stats h4 {
+  margin: 0 0 1rem 0;
+  color: #10b981;
+  font-size: 1.1rem;
+  text-align: center;
+}
+
+.stats-preview {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+}
+
+.stats-preview .stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.75rem;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+}
+
+.stats-preview .stat-item span {
+  font-size: 1.25rem;
+  font-weight: bold;
+  color: #10b981;
+}
+
+.stats-preview .stat-item span.negative {
+  color: #ef4444;
+}
+
+.arm-slots-display {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.arm-slot-mini {
+  flex: 1;
+  background: rgba(30, 30, 50, 0.5);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 0.75rem;
+}
+
+.arm-slot-mini h4 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.9rem;
+  color: #60a5fa;
+  text-align: center;
+}
+
+.selected-arm-mini {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  background: rgba(96, 165, 250, 0.2);
+  border: 1px solid #60a5fa;
+  border-radius: 6px;
+}
+
+.selected-arm-mini span {
+  flex: 1;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.remove-btn-mini {
+  background: #ef4444;
+  color: white;
+  border: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.remove-btn-mini:hover {
+  background: #dc2626;
+}
+
+.empty-slot-mini {
+  padding: 0.5rem;
+  text-align: center;
+  color: #6b7280;
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+.skip-icon {
+  font-size: 3rem;
+  color: #6b7280;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .parts-grid {
@@ -1459,6 +1933,27 @@ onMounted(() => {
 }
 
 @media (max-width: 768px) {
+  .split-layout {
+    grid-template-columns: 1fr;
+    max-height: none;
+  }
+
+  .parts-list {
+    max-height: 300px;
+  }
+
+  .part-details {
+    max-height: none;
+  }
+
+  .stats-preview {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .arm-slots-display {
+    flex-direction: column;
+  }
+
   .parts-grid {
     grid-template-columns: 1fr;
   }

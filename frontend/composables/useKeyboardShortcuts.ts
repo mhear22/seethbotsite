@@ -19,6 +19,7 @@ export interface Shortcut {
 export function useKeyboardShortcuts() {
   const shortcuts = ref<Shortcut[]>([])
   const isHelpOpen = ref(false)
+  const enabled = ref(true)
 
   // Helper to format keyboard shortcuts for display
   const formatShortcut = (shortcut: Shortcut): string => {
@@ -29,6 +30,16 @@ export function useKeyboardShortcuts() {
     if (shortcut.alt) parts.push('Alt')
     parts.push(shortcut.key.toUpperCase())
     return parts.join(' + ')
+  }
+
+  // Enable shortcuts
+  const enable = () => {
+    enabled.value = true
+  }
+
+  // Disable shortcuts
+  const disable = () => {
+    enabled.value = false
   }
 
   // Register a keyboard shortcut
@@ -53,6 +64,11 @@ export function useKeyboardShortcuts() {
 
   // Handle keyboard events
   const handleKeyDown = (event: KeyboardEvent) => {
+    // Skip if shortcuts are disabled
+    if (!enabled.value) {
+      return
+    }
+
     // Don't trigger shortcuts when typing in input fields
     const target = event.target as HTMLElement
     if (target.tagName === 'INPUT' ||
@@ -112,9 +128,12 @@ export function useKeyboardShortcuts() {
     shortcuts,
     shortcutsByCategory,
     isHelpOpen,
+    enabled,
     toggleHelp,
     registerShortcut,
     unregisterShortcut,
-    formatShortcut
+    formatShortcut,
+    enable,
+    disable
   }
 }

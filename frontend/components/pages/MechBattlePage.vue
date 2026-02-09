@@ -132,10 +132,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMechBuilder } from '../../composables/useMechBuilder'
 import { useMechBattle } from '../../composables/useMechBattle'
+import { useKeyboardShortcuts } from '../../composables/useKeyboardShortcuts'
 import BattleCanvas from '../mech/BattleCanvas.vue'
 import BattleHUD from '../mech/BattleHUD.vue'
 
@@ -143,6 +144,7 @@ const route = useRoute()
 const router = useRouter()
 const builder = useMechBuilder()
 const battle = useMechBattle()
+const keyboardShortcuts = useKeyboardShortcuts()
 
 const battlePhase = computed(() => battle.battleState.value.phase)
 const battleTime = ref(0)
@@ -187,6 +189,20 @@ onMounted(() => {
 
   // Generate enemy mech (Phase 1: tutorial difficulty)
   battle.generateEnemy('tutorial')
+
+  // Disable keyboard shortcuts during active battle
+  watch(battlePhase, (phase) => {
+    if (phase === 'active') {
+      keyboardShortcuts.disable()
+    } else {
+      keyboardShortcuts.enable()
+    }
+  })
+})
+
+// Re-enable shortcuts when leaving page
+onUnmounted(() => {
+  keyboardShortcuts.enable()
 })
 
 function startBattle() {
