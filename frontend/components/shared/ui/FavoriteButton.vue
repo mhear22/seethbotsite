@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useFavoritesStore } from '../../../stores/useFavoritesStore'
+import { useAudio } from '@/composables/useAudio'
 
 const props = defineProps<{
   itemType: 'page' | 'panel' | 'feature'
@@ -14,6 +15,7 @@ const emit = defineEmits<{
 }>()
 
 const favoritesStore = useFavoritesStore()
+const { playClick, playSuccess } = useAudio()
 const isProcessing = ref(false)
 
 const isFavorited = () => favoritesStore.isFavorited(props.itemType, props.itemId)
@@ -31,6 +33,11 @@ const toggleFavorite = async () => {
 
   if (success) {
     emit('toggle', !wasFavorited)
+    // Play success sound when favoriting
+    playSuccess()
+  } else {
+    // Play click sound even on failure for feedback
+    playClick()
   }
 
   isProcessing.value = false

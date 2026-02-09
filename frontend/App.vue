@@ -10,6 +10,7 @@ import { useAuth } from './composables/useAuth'
 import { useSync } from './composables/useSync'
 import { useKeyboardShortcuts, type Shortcut } from './composables/useKeyboardShortcuts'
 import { useSwipeGestures } from './composables/useSwipeGestures'
+import { useAudio } from './composables/useAudio'
 import SwipeIndicator from './components/shared/SwipeIndicator.vue'
 
 // Stores
@@ -30,6 +31,9 @@ const swipeProgress = ref(0)
 
 // Initialize theme (applies automatically via useTheme onMounted)
 useTheme()
+
+// Initialize audio manager (Ticket #192)
+useAudio()
 
 // Sync
 const { isAuthenticated } = useAuth()
