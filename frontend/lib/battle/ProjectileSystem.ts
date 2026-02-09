@@ -104,11 +104,11 @@ export class ProjectileSystem {
   private getProjectileSpeed(type: string): number {
     switch (type) {
       case 'energy':
-        return 40 // Fast
+        return 80 // Fast
       case 'missile':
-        return 25 // Medium
+        return 50 // Medium
       default: // ballistic
-        return 30 // Fast
+        return 60 // Fast
     }
   }
 

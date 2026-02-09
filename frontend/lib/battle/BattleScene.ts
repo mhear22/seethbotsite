@@ -16,6 +16,24 @@ export interface BattleSceneConfig {
   onDamageDealt: (amount: number) => void
   mouseSensitivity?: number
   movementSpeed?: number
+  invertMouseX?: boolean
+  invertMouseY?: boolean
+  keyBindings?: {
+    forward: string
+    backward: string
+    left: string
+    right: string
+    jump: string
+    dash: string
+  }
+}
+
+export interface Building {
+  mesh: THREE.Mesh
+  position: THREE.Vector3
+  width: number
+  height: number
+  depth: number
 }
 
 export class BattleScene {
@@ -30,6 +48,7 @@ export class BattleScene {
 
   playerMech: MechEntity
   enemyMech: MechEntity
+  private buildings: Building[] = []
 
   private animationId: number | null = null
   private lastTime: number = 0
@@ -65,7 +84,7 @@ export class BattleScene {
     this.renderer.shadowMap.enabled = true
 
     // Initialize systems
-    this.inputManager = new InputManager(config.canvas)
+    this.inputManager = new InputManager(config.canvas, config.keyBindings)
     this.physicsSystem = new PhysicsSystem()
     this.projectileSystem = new ProjectileSystem(this.scene)
     this.particleSystem = new ParticleSystem(this.scene)
@@ -79,6 +98,12 @@ export class BattleScene {
     if (config.movementSpeed !== undefined) {
       this.physicsSystem.speedMultiplier = config.movementSpeed
     }
+    if (config.invertMouseX !== undefined) {
+      this.camera.invertMouseX = config.invertMouseX
+    }
+    if (config.invertMouseY !== undefined) {
+      this.camera.invertMouseY = config.invertMouseY
+    }
 
     // Setup scene
     this.setupSky()
@@ -91,7 +116,7 @@ export class BattleScene {
   }
 
   private setupSky() {
-    const skyGeometry = new THREE.SphereGeometry(400, 32, 16)
+    const skyGeometry = new THREE.SphereGeometry(800, 32, 16)
     const skyMaterial = new THREE.ShaderMaterial({
       side: THREE.BackSide,
       uniforms: {},
@@ -160,12 +185,14 @@ export class BattleScene {
 
     // Directional light (sun)
     const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8)
-    directionalLight.position.set(20, 30, 20)
+    directionalLight.position.set(50, 80, 50)
     directionalLight.castShadow = true
-    directionalLight.shadow.camera.left = -50
-    directionalLight.shadow.camera.right = 50
-    directionalLight.shadow.camera.top = 50
-    directionalLight.shadow.camera.bottom = -50
+    directionalLight.shadow.camera.left = -200
+    directionalLight.shadow.camera.right = 200
+    directionalLight.shadow.camera.top = 200
+    directionalLight.shadow.camera.bottom = -200
+    directionalLight.shadow.mapSize.width = 2048
+    directionalLight.shadow.mapSize.height = 2048
     this.scene.add(directionalLight)
 
     // Hemisphere light for better ambient
@@ -175,7 +202,7 @@ export class BattleScene {
 
   private setupArena() {
     // Floor
-    const floorGeometry = new THREE.PlaneGeometry(50, 50)
+    const floorGeometry = new THREE.PlaneGeometry(300, 300)
     const floorMaterial = new THREE.MeshStandardMaterial({
       color: 0x2d3748,
       roughness: 0.8,
@@ -187,12 +214,12 @@ export class BattleScene {
     this.scene.add(floor)
 
     // Grid helper
-    const gridHelper = new THREE.GridHelper(50, 50, 0x4a5568, 0x374151)
+    const gridHelper = new THREE.GridHelper(300, 150, 0x4a5568, 0x374151)
     gridHelper.position.y = 0.01
     this.scene.add(gridHelper)
 
     // Arena boundaries (visual walls)
-    const wallHeight = 5
+    const wallHeight = 10
     const wallMaterial = new THREE.MeshStandardMaterial({
       color: 0x1e293b,
       transparent: true,
@@ -207,10 +234,86 @@ export class BattleScene {
     }
 
     // Four walls
-    createWall(50, wallHeight, 0.5, 0, -25) // North
-    createWall(50, wallHeight, 0.5, 0, 25)  // South
-    createWall(0.5, wallHeight, 50, -25, 0) // West
-    createWall(0.5, wallHeight, 50, 25, 0)  // East
+    createWall(300, wallHeight, 0.5, 0, -150) // North
+    createWall(300, wallHeight, 0.5, 0, 150)  // South
+    createWall(0.5, wallHeight, 300, -150, 0) // West
+    createWall(0.5, wallHeight, 300, 150, 0)  // East
+
+    // Add buildings as obstacles
+    this.addBuildings()
+  }
+
+  private addBuildings() {
+    const buildingMaterial = new THREE.MeshStandardMaterial({
+      color: 0x3b4252,
+      roughness: 0.9,
+      metalness: 0.1
+    })
+
+    const createBuilding = (width: number, height: number, depth: number, x: number, z: number) => {
+      const geometry = new THREE.BoxGeometry(width, height, depth)
+      const building = new THREE.Mesh(geometry, buildingMaterial)
+      building.position.set(x, height / 2, z)
+      building.castShadow = true
+      building.receiveShadow = true
+      this.scene.add(building)
+
+      // Add accent lines
+      const edgeGeometry = new THREE.EdgesGeometry(geometry)
+      const edgeMaterial = new THREE.LineBasicMaterial({ color: 0x5e81ac })
+      const edges = new THREE.LineSegments(edgeGeometry, edgeMaterial)
+      building.add(edges)
+
+      // Store building data for collision detection
+      this.buildings.push({
+        mesh: building,
+        position: new THREE.Vector3(x, height / 2, z),
+        width,
+        height,
+        depth
+      })
+    }
+
+    // Strategic building placement - scattered throughout arena
+    // Keep center area relatively clear for spawning
+
+    // Cluster 1: Northwest
+    createBuilding(12, 8, 12, -80, -80)
+    createBuilding(8, 12, 8, -65, -95)
+    createBuilding(10, 6, 10, -100, -70)
+
+    // Cluster 2: Northeast
+    createBuilding(15, 10, 15, 75, -85)
+    createBuilding(8, 14, 8, 90, -70)
+    createBuilding(10, 7, 10, 85, -105)
+
+    // Cluster 3: Southwest
+    createBuilding(10, 9, 10, -90, 80)
+    createBuilding(12, 11, 12, -70, 95)
+    createBuilding(8, 6, 8, -105, 90)
+
+    // Cluster 4: Southeast
+    createBuilding(14, 8, 14, 80, 75)
+    createBuilding(9, 13, 9, 95, 90)
+    createBuilding(11, 7, 11, 70, 100)
+
+    // Mid-range buildings (ring around center)
+    createBuilding(8, 10, 8, -50, 0)
+    createBuilding(8, 10, 8, 50, 0)
+    createBuilding(8, 10, 8, 0, -50)
+    createBuilding(8, 10, 8, 0, 50)
+
+    // Corner pillars
+    createBuilding(6, 15, 6, -120, -120)
+    createBuilding(6, 15, 6, 120, -120)
+    createBuilding(6, 15, 6, -120, 120)
+    createBuilding(6, 15, 6, 120, 120)
+
+    // Additional scattered obstacles
+    createBuilding(7, 5, 7, -30, -70)
+    createBuilding(7, 5, 7, 30, 70)
+    createBuilding(7, 5, 7, -70, 30)
+    createBuilding(7, 5, 7, 70, -30)
   }
 
   private addMechsToScene() {
@@ -270,6 +373,7 @@ export class BattleScene {
       this.physicsSystem.updateMovement(this.playerMech, input, deltaTime)
     }
     this.physicsSystem.updateJumpJets(this.playerMech, input, deltaTime)
+    this.checkMechBuildingCollisions(this.playerMech)
     this.playerMech.update(deltaTime)
 
     // Player shooting
@@ -293,10 +397,14 @@ export class BattleScene {
       this.projectileSystem.fireWeapon(this.enemyMech, aimDirection)
     }
 
+    this.checkMechBuildingCollisions(this.enemyMech)
     this.enemyMech.update(deltaTime)
 
     // Update projectiles
     this.projectileSystem.update(deltaTime)
+
+    // Check projectile-building collisions
+    this.checkProjectileBuildingCollisions()
 
     // Check projectile collisions
     const hits = this.projectileSystem.checkCollisions([this.playerMech, this.enemyMech])
@@ -392,5 +500,66 @@ export class BattleScene {
 
   getPlayerDashMaxCooldown(): number {
     return this.playerMech.DASH_COOLDOWN
+  }
+
+  private checkProjectileBuildingCollisions() {
+    const projectiles = this.projectileSystem.getProjectiles()
+
+    for (const projectile of projectiles) {
+      for (const building of this.buildings) {
+        // Check if projectile is within building bounds
+        const dx = Math.abs(projectile.position.x - building.position.x)
+        const dy = Math.abs(projectile.position.y - building.position.y)
+        const dz = Math.abs(projectile.position.z - building.position.z)
+
+        if (dx < building.width / 2 &&
+            dy < building.height / 2 &&
+            dz < building.depth / 2) {
+          // Projectile hit building - spawn impact effect and remove projectile
+          this.particleSystem.spawnHitEffect(
+            projectile.position.clone(),
+            projectile.type
+          )
+          this.projectileSystem.removeProjectile(projectile)
+          break
+        }
+      }
+    }
+  }
+
+  private checkMechBuildingCollisions(mech: MechEntity) {
+    const mechRadius = 2 // Collision radius for mechs
+
+    for (const building of this.buildings) {
+      // Calculate closest point on building to mech
+      const closestX = Math.max(
+        building.position.x - building.width / 2,
+        Math.min(mech.position.x, building.position.x + building.width / 2)
+      )
+      const closestZ = Math.max(
+        building.position.z - building.depth / 2,
+        Math.min(mech.position.z, building.position.z + building.depth / 2)
+      )
+
+      // Calculate distance from mech to closest point
+      const dx = mech.position.x - closestX
+      const dz = mech.position.z - closestZ
+      const distanceSquared = dx * dx + dz * dz
+
+      // If mech is colliding with building, push it out
+      if (distanceSquared < mechRadius * mechRadius) {
+        const distance = Math.sqrt(distanceSquared)
+        if (distance > 0) {
+          // Push mech away from building
+          const pushX = (dx / distance) * (mechRadius - distance)
+          const pushZ = (dz / distance) * (mechRadius - distance)
+          mech.position.x += pushX
+          mech.position.z += pushZ
+        } else {
+          // Mech is exactly at building center, push in arbitrary direction
+          mech.position.x += mechRadius
+        }
+      }
+    }
   }
 }

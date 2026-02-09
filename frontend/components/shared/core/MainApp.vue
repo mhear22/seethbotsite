@@ -88,6 +88,11 @@ const onRouteChange = (routeName: string) => {
   appStore.onRouteChange(routeName)
 }
 
+// Check if we're on a full-screen route (like mech battle)
+const isFullScreenRoute = computed(() => {
+  return route.name === 'mech-battle'
+})
+
 const goToGirlMode = () => {
   console.log('Going to girl mode...')
   appStore.closeConfirmation()
@@ -236,25 +241,25 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="main-app" :class="{ dark: appStore.darkMode, 'centered': appStore.currentRoute === 'home' }">
+  <div class="main-app" :class="{ dark: appStore.darkMode, 'centered': appStore.currentRoute === 'home', 'fullscreen': isFullScreenRoute }">
     <!-- Skip link for keyboard accessibility (Ticket #193) -->
-    <SkipLink />
+    <SkipLink v-if="!isFullScreenRoute" />
 
-    <Router />
+    <Router v-if="!isFullScreenRoute" />
 
     <!-- Breadcrumb Navigation (Ticket #126) -->
-    <Breadcrumb />
+    <Breadcrumb v-if="!isFullScreenRoute" />
 
     <main class="content-wrapper" id="main-content">
       <router-view />
     </main>
 
     <!-- Digital Goose (Independent - not in modal container per ticket requirements) -->
-    <DigitalGoose v-if="appStore.panels.digitalGoose" />
+    <DigitalGoose v-if="appStore.panels.digitalGoose && !isFullScreenRoute" />
 
     <!-- Favorites Panel (Ticket #127) -->
     <FavoritesPanel
-      v-if="appStore.panels.favorites && appStore.isAuthenticated"
+      v-if="appStore.panels.favorites && appStore.isAuthenticated && !isFullScreenRoute"
       :is-open="appStore.panels.favorites"
       @toggle="appStore.togglePanel('favorites')"
       class="floating-panel favorites-panel"
@@ -262,6 +267,7 @@ onUnmounted(() => {
 
     <!-- Left Dock - Tachometer (Mold Meter with Fart button) -->
     <ModalContainer
+      v-if="!isFullScreenRoute"
       :modals="leftModals"
       @toggle="appStore.togglePanel"
     >
@@ -278,6 +284,7 @@ onUnmounted(() => {
 
     <!-- Right Dock - Feed and Active Users -->
     <ModalContainer
+      v-if="!isFullScreenRoute"
       :modals="rightModals"
       @toggle="appStore.togglePanel"
     >
@@ -299,7 +306,7 @@ onUnmounted(() => {
 
     <!-- Floating Panels (Bottom Left - Rankings and Cats) -->
     <RankingsPanel
-      v-if="appStore.panels.rankings && appStore.currentRoute === 'home'"
+      v-if="appStore.panels.rankings && appStore.currentRoute === 'home' && !isFullScreenRoute"
       :rankings="appStore.rankings"
       :current-route="appStore.currentRoute"
       :is-open="appStore.panels.rankings"
@@ -307,7 +314,7 @@ onUnmounted(() => {
       class="floating-panel rankings-panel"
     />
     <CatPanel
-      v-if="appStore.panels.cat && appStore.currentRoute === 'home'"
+      v-if="appStore.panels.cat && appStore.currentRoute === 'home' && !isFullScreenRoute"
       :cat-image="appStore.catImage"
       :loading="appStore.catLoading"
       :is-open="appStore.panels.cat"
@@ -318,31 +325,33 @@ onUnmounted(() => {
 
     <!-- Mining Panel - Shows on stock market route -->
     <MiningPanel
-      v-if="appStore.panels.mining && appStore.currentRoute === 'stocks'"
+      v-if="appStore.panels.mining && appStore.currentRoute === 'stocks' && !isFullScreenRoute"
       class="floating-panel mining-panel"
     />
 
     <!-- Modals -->
     <MikaModal
-      v-if="appStore.mikaModalOpen"
+      v-if="appStore.mikaModalOpen && !isFullScreenRoute"
       :is-open="appStore.mikaModalOpen"
       @close="appStore.closeMikaModal"
     />
 
     <!-- Torch Effect for Darker Mode (Ticket #109) -->
-    <TorchEffect />
+    <TorchEffect v-if="!isFullScreenRoute" />
 
     <!-- Mobile FAB for mode toggles -->
-    <MobileFAB />
+    <MobileFAB v-if="!isFullScreenRoute" />
 
     <!-- Search Modal (Ticket #139) -->
     <SearchModal
+      v-if="!isFullScreenRoute"
       :is-open="appStore.searchModalOpen"
       @close="appStore.toggleSearchModal"
     />
 
     <!-- Keyboard Shortcuts Help Modal (Ticket #128) -->
     <KeyboardShortcutsHelp
+      v-if="!isFullScreenRoute"
       :shortcuts="shortcuts"
       :is-open="isHelpOpen"
       @close="toggleHelp"
@@ -372,6 +381,12 @@ onUnmounted(() => {
   padding-top: 80px;
 }
 
+/* Full-screen mode - remove all padding */
+.main-app.fullscreen {
+  padding-top: 0;
+  min-height: 100vh;
+}
+
 /* Center content on home page */
 .main-app.centered {
   display: flex;
@@ -392,9 +407,32 @@ onUnmounted(() => {
   padding: 0 20px;
 }
 
+/* Full-screen mode - remove content wrapper constraints */
+.main-app.fullscreen .content-wrapper {
+  max-width: 100%;
+  padding: 0;
+  margin: 0;
+}
+
 /* Don't constrain on home page */
 .main-app.centered .content-wrapper {
   max-width: 100%;
   padding: 0;
+}
+
+/* Full-screen routes (mech battle, etc.) - remove all constraints */
+.main-app:has(.mech-battle-page) {
+  padding-top: 0;
+}
+
+.main-app:has(.mech-battle-page) .content-wrapper {
+  max-width: 100%;
+  padding: 0;
+  margin: 0;
+}
+
+/* Hide navbar on full-screen routes */
+.main-app:has(.mech-battle-page) ~ * {
+  display: none;
 }
 </style>

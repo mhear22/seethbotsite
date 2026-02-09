@@ -27,6 +27,114 @@
           </div>
         </div>
 
+        <!-- Movement Speed -->
+        <div class="setting-group">
+          <label class="setting-label">
+            Movement Speed
+            <span class="setting-value">{{ settings.movementSpeed.toFixed(1) }}</span>
+          </label>
+          <input
+            type="range"
+            min="5"
+            max="50"
+            step="2.5"
+            v-model.number="settings.movementSpeed"
+            class="slider"
+          />
+          <div class="slider-labels">
+            <span>Slow</span>
+            <span>Fast</span>
+          </div>
+        </div>
+
+        <!-- Mouse Invert Options -->
+        <div class="setting-group">
+          <label class="setting-label">Mouse Invert</label>
+          <div class="checkbox-group">
+            <label class="checkbox-label">
+              <input type="checkbox" v-model="settings.invertMouseX" />
+              <span>Invert X-Axis (Horizontal)</span>
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" v-model="settings.invertMouseY" />
+              <span>Invert Y-Axis (Vertical)</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Key Bindings -->
+        <div class="setting-group">
+          <label class="setting-label">Key Bindings</label>
+          <div class="keybind-grid">
+            <div class="keybind-item">
+              <span class="keybind-name">Forward</span>
+              <input
+                type="text"
+                :value="getKeyDisplay(settings.keyBindings.forward)"
+                @keydown="captureKey($event, 'forward')"
+                readonly
+                class="keybind-input"
+                placeholder="Press key..."
+              />
+            </div>
+            <div class="keybind-item">
+              <span class="keybind-name">Backward</span>
+              <input
+                type="text"
+                :value="getKeyDisplay(settings.keyBindings.backward)"
+                @keydown="captureKey($event, 'backward')"
+                readonly
+                class="keybind-input"
+                placeholder="Press key..."
+              />
+            </div>
+            <div class="keybind-item">
+              <span class="keybind-name">Left</span>
+              <input
+                type="text"
+                :value="getKeyDisplay(settings.keyBindings.left)"
+                @keydown="captureKey($event, 'left')"
+                readonly
+                class="keybind-input"
+                placeholder="Press key..."
+              />
+            </div>
+            <div class="keybind-item">
+              <span class="keybind-name">Right</span>
+              <input
+                type="text"
+                :value="getKeyDisplay(settings.keyBindings.right)"
+                @keydown="captureKey($event, 'right')"
+                readonly
+                class="keybind-input"
+                placeholder="Press key..."
+              />
+            </div>
+            <div class="keybind-item">
+              <span class="keybind-name">Jump</span>
+              <input
+                type="text"
+                :value="getKeyDisplay(settings.keyBindings.jump)"
+                @keydown="captureKey($event, 'jump')"
+                readonly
+                class="keybind-input"
+                placeholder="Press key..."
+              />
+            </div>
+            <div class="keybind-item">
+              <span class="keybind-name">Dash</span>
+              <input
+                type="text"
+                :value="getKeyDisplay(settings.keyBindings.dash)"
+                @keydown="captureKey($event, 'dash')"
+                readonly
+                class="keybind-input"
+                placeholder="Press key..."
+              />
+            </div>
+          </div>
+        </div>
+
         <!-- Description -->
         <div class="settings-info">
           <p>Adjust controls to your preference. Settings are saved automatically.</p>
@@ -57,6 +165,43 @@ const { settings, resetToDefaults } = gameSettings
 
 function close() {
   emit('close')
+}
+
+// Convert key code to display name
+function getKeyDisplay(keyCode: string): string {
+  const keyMap: Record<string, string> = {
+    'KeyW': 'W',
+    'KeyA': 'A',
+    'KeyS': 'S',
+    'KeyD': 'D',
+    'KeyE': 'E',
+    'KeyQ': 'Q',
+    'KeyR': 'R',
+    'KeyF': 'F',
+    'Space': 'Space',
+    'ShiftLeft': 'Left Shift',
+    'ShiftRight': 'Right Shift',
+    'ControlLeft': 'Left Ctrl',
+    'ControlRight': 'Right Ctrl',
+    'ArrowUp': '↑',
+    'ArrowDown': '↓',
+    'ArrowLeft': '←',
+    'ArrowRight': '→',
+  }
+  return keyMap[keyCode] || keyCode
+}
+
+// Capture key press for binding
+function captureKey(event: KeyboardEvent, action: 'forward' | 'backward' | 'left' | 'right' | 'jump' | 'dash') {
+  event.preventDefault()
+  event.stopPropagation()
+
+  // Don't allow binding Escape or Enter
+  if (event.code === 'Escape' || event.code === 'Enter') {
+    return
+  }
+
+  settings.value.keyBindings[action] = event.code
 }
 </script>
 
@@ -188,6 +333,71 @@ function close() {
   margin-top: 8px;
   font-size: 0.85rem;
   color: #9ca3af;
+}
+
+.checkbox-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #e5e7eb;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  accent-color: #3b82f6;
+}
+
+.keybind-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.keybind-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.keybind-name {
+  color: #9ca3af;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.keybind-input {
+  background: rgba(59, 130, 246, 0.1);
+  border: 2px solid rgba(59, 130, 246, 0.3);
+  border-radius: 6px;
+  padding: 8px 12px;
+  color: #fff;
+  font-size: 0.95rem;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.keybind-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.2);
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.3);
+}
+
+.keybind-input::placeholder {
+  color: #6b7280;
 }
 
 .settings-info {

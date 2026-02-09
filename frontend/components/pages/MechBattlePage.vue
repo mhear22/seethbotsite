@@ -72,10 +72,10 @@
       />
 
       <BattleHUD
-        :player-health="battle.playerHealth"
-        :player-max-health="battle.playerMaxHealth"
-        :enemy-health="battle.enemyHealth"
-        :enemy-max-health="battle.enemyMaxHealth"
+        :player-health="battle.playerHealth.value"
+        :player-max-health="battle.playerMaxHealth.value"
+        :enemy-health="battle.enemyHealth.value"
+        :enemy-max-health="battle.enemyMaxHealth.value"
         :enemy-name="enemyName"
         :jump-fuel="battle.battleState.value.player?.jumpFuel ?? 0"
         :has-jump-jets="hasJumpJets"
@@ -262,11 +262,14 @@ function returnToBuilder() {
 
 <style scoped>
 .mech-battle-page {
+  position: fixed;
+  top: 0;
+  left: 0;
   width: 100vw;
   height: 100vh;
   overflow: hidden;
   background: #000;
-  position: relative;
+  z-index: 1000;
 }
 
 /* Screens */

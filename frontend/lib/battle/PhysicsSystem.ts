@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import type { MechEntity } from './MechEntity'
 import type { InputState } from './InputManager'
 
-const ARENA_SIZE = 50
+const ARENA_SIZE = 300
 const ARENA_HALF = ARENA_SIZE / 2
 
 export class PhysicsSystem {

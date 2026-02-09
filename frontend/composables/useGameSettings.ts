@@ -8,11 +8,31 @@ import { ref, watch } from 'vue'
 export interface GameSettings {
   mouseSensitivity: number
   movementSpeed: number
+  invertMouseX: boolean
+  invertMouseY: boolean
+  keyBindings: {
+    forward: string
+    backward: string
+    left: string
+    right: string
+    jump: string
+    dash: string
+  }
 }
 
 const DEFAULT_SETTINGS: GameSettings = {
-  mouseSensitivity: 3.0, // Multiplier for mouse sensitivity (3.0 = default)
-  movementSpeed: 40.0, // Multiplier for movement speed (fixed at 40.0)
+  mouseSensitivity: 6.0, // Multiplier for mouse sensitivity (6.0 = default, 2x faster)
+  movementSpeed: 10.0, // Multiplier for movement speed (10.0 = default, slower)
+  invertMouseX: false,
+  invertMouseY: false,
+  keyBindings: {
+    forward: 'KeyW',
+    backward: 'KeyS',
+    left: 'KeyA',
+    right: 'KeyD',
+    jump: 'Space',
+    dash: 'ShiftLeft'
+  }
 }
 
 const STORAGE_KEY = 'mech-game-settings'
@@ -26,6 +46,9 @@ function loadSettings(): GameSettings {
       return {
         mouseSensitivity: parsed.mouseSensitivity ?? DEFAULT_SETTINGS.mouseSensitivity,
         movementSpeed: parsed.movementSpeed ?? DEFAULT_SETTINGS.movementSpeed,
+        invertMouseX: parsed.invertMouseX ?? DEFAULT_SETTINGS.invertMouseX,
+        invertMouseY: parsed.invertMouseY ?? DEFAULT_SETTINGS.invertMouseY,
+        keyBindings: parsed.keyBindings ?? DEFAULT_SETTINGS.keyBindings,
       }
     }
   } catch (error) {

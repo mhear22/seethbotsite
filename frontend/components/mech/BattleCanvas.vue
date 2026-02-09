@@ -44,6 +44,9 @@ onMounted(() => {
     },
     mouseSensitivity: gameSettings.settings.value.mouseSensitivity,
     movementSpeed: gameSettings.settings.value.movementSpeed,
+    invertMouseX: gameSettings.settings.value.invertMouseX,
+    invertMouseY: gameSettings.settings.value.invertMouseY,
+    keyBindings: gameSettings.settings.value.keyBindings,
   }))
 
   battleScene.start()

@@ -14,11 +14,35 @@ export interface InputState {
 export class InputManager {
   private keys: Map<string, boolean> = new Map()
   private mouseButtons: Map<number, boolean> = new Map()
-  private mouseMovement = { x: 0, y: 0 }
+  private mouseMovement = { x: 0.0, y: 0.0 }
+  private mouseAccumulator = { x: 0.0, y: 0.0 } // Accumulated raw movement
   private canvas: HTMLCanvasElement
+  private keyBindings: {
+    forward: string
+    backward: string
+    left: string
+    right: string
+    jump: string
+    dash: string
+  }
 
-  constructor(canvas: HTMLCanvasElement) {
+  constructor(canvas: HTMLCanvasElement, keyBindings?: {
+    forward: string
+    backward: string
+    left: string
+    right: string
+    jump: string
+    dash: string
+  }) {
     this.canvas = canvas
+    this.keyBindings = keyBindings ?? {
+      forward: 'KeyW',
+      backward: 'KeyS',
+      left: 'KeyA',
+      right: 'KeyD',
+      jump: 'Space',
+      dash: 'ShiftLeft'
+    }
     this.setupListeners()
   }
 
@@ -51,8 +75,9 @@ export class InputManager {
 
     this.canvas.addEventListener('mousemove', (e) => {
       if (document.pointerLockElement === this.canvas) {
-        this.mouseMovement.x += e.movementX
-        this.mouseMovement.y += e.movementY
+        // Accumulate raw movement values (integers from browser)
+        this.mouseAccumulator.x += e.movementX
+        this.mouseAccumulator.y += e.movementY
       }
     })
 
@@ -66,20 +91,26 @@ export class InputManager {
   }
 
   getInputState(): InputState {
+    // Transfer accumulated movement to current frame
+    this.mouseMovement.x = this.mouseAccumulator.x
+    this.mouseMovement.y = this.mouseAccumulator.y
+
     return {
-      forward: this.keys.get('KeyW') || false,
-      backward: this.keys.get('KeyS') || false,
-      left: this.keys.get('KeyA') || false,
-      right: this.keys.get('KeyD') || false,
-      jump: this.keys.get('Space') || false,
+      forward: this.keys.get(this.keyBindings.forward) || false,
+      backward: this.keys.get(this.keyBindings.backward) || false,
+      left: this.keys.get(this.keyBindings.left) || false,
+      right: this.keys.get(this.keyBindings.right) || false,
+      jump: this.keys.get(this.keyBindings.jump) || false,
       shoot: this.mouseButtons.get(0) || false, // Left mouse button
-      dash: this.keys.get('ShiftLeft') || this.keys.get('ShiftRight') || false,
+      dash: this.keys.get(this.keyBindings.dash) || this.keys.get('ShiftRight') || false,
       mouseX: this.mouseMovement.x,
       mouseY: this.mouseMovement.y
     }
   }
 
   resetMouseMovement() {
+    // Reset the accumulator for next frame
+    this.mouseAccumulator = { x: 0, y: 0 }
     this.mouseMovement = { x: 0, y: 0 }
   }
 
@@ -92,5 +123,6 @@ export class InputManager {
     this.keys.clear()
     this.mouseButtons.clear()
     this.mouseMovement = { x: 0, y: 0 }
+    this.mouseAccumulator = { x: 0, y: 0 }
   }
 }

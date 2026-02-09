@@ -10,17 +10,20 @@ export class CameraController {
   // Camera settings
   private readonly MIN_DISTANCE = 5
   private readonly MAX_DISTANCE = 15
-  private readonly MIN_PITCH = -Math.PI / 6 // -30 degrees
+  private readonly MIN_PITCH = -Math.PI / 3 // -30 degrees
   private readonly MAX_PITCH = Math.PI / 3 // 60 degrees
   private currentDistance = 10
   public sensitivityMultiplier = 1.0
+  public invertMouseX = false
+  public invertMouseY = false
 
   // Over-the-shoulder offset (applied after orbit calculation)
   private readonly SHOULDER_RIGHT = 2.5
   private readonly SHOULDER_UP = 3.0
 
-  // Smoothing rate (units per second, frame-rate independent)
-  private readonly SMOOTH_SPEED = 12
+  // Mouse velocity smoothing - converts discrete integer input into smooth rotation
+  private mouseVelocity = { x: 0, y: 0 }
+  private readonly MOUSE_VELOCITY_DECAY = 16 // How fast velocity decays per second (higher = snappier)
 
   // Screen shake
   private shakeIntensity = 0
@@ -37,13 +40,32 @@ export class CameraController {
   }
 
   update(deltaTime: number, mouseX: number, mouseY: number) {
-    // Apply mouse rotation
     const baseSensitivity = 0.002
     const sensitivity = baseSensitivity * this.sensitivityMultiplier
-    this.mouseRotation.x -= mouseX * sensitivity // Horizontal (yaw)
-    this.mouseRotation.y -= mouseY * sensitivity // Vertical (pitch)
 
-    // Clamp vertical rotation
+    // Apply invert settings
+    const xMultiplier = this.invertMouseX ? -1 : 1
+    const yMultiplier = this.invertMouseY ? -1 : 1
+
+    // Convert raw integer mouse input into velocity impulses
+    // New input adds to velocity, then velocity is applied and decayed each frame
+    this.mouseVelocity.x += mouseX * sensitivity * xMultiplier
+    this.mouseVelocity.y += mouseY * sensitivity * yMultiplier
+
+    // Apply velocity to rotation
+    this.mouseRotation.x += this.mouseVelocity.x
+    this.mouseRotation.y -= this.mouseVelocity.y
+
+    // Decay velocity toward zero (frame-rate independent)
+    const decay = Math.exp(-this.MOUSE_VELOCITY_DECAY * deltaTime)
+    this.mouseVelocity.x *= decay
+    this.mouseVelocity.y *= decay
+
+    // Kill tiny residual velocity to prevent drift
+    if (Math.abs(this.mouseVelocity.x) < 0.0001) this.mouseVelocity.x = 0
+    if (Math.abs(this.mouseVelocity.y) < 0.0001) this.mouseVelocity.y = 0
+
+    // Clamp vertical rotation to prevent looking too far up/down
     this.mouseRotation.y = Math.max(
       this.MIN_PITCH,
       Math.min(this.MAX_PITCH, this.mouseRotation.y)
