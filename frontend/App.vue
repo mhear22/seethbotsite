@@ -37,14 +37,18 @@ watch(() => route.path, (newPath) => {
 // Lifecycle
 onMounted(() => {
   document.body.classList.toggle('dark', appStore.darkMode)
+
+  // Only spawn hearts if not in performance mode (Ticket #perf)
   const spawnHeart = () => {
-    appStore.createHeart()
+    if (!appStore.performanceMode) {
+      appStore.createHeart()
+    }
     setTimeout(spawnHeart, appStore.heartSpawnRate)
   }
   spawnHeart()
 
-  // Initialize mold visual effects (Ticket #32) - only if mold mode is enabled (Ticket #112)
-  if (appStore.moldMode) {
+  // Initialize mold visual effects (Ticket #32) - only if mold mode is enabled (Ticket #112) and not in performance mode
+  if (appStore.moldMode && !appStore.performanceMode) {
     appStore.initMoldCircles()
     appStore.startMoldSpawner()
   }

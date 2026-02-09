@@ -294,6 +294,7 @@ if (typeof window !== 'undefined') {
           <button @click="appStore.toggleMoldMode" class="control-btn" :class="{ active: appStore.moldMode }" title="Toggle mold mode">🦠</button>
           <button @click="appStore.togglePanel('digitalGoose')" class="control-btn" :class="{ active: appStore.panels.digitalGoose }" title="Toggle goose">🦆</button>
           <button @click="appStore.togglePanel('mining')" class="control-btn" :class="{ active: appStore.panels.mining }" title="Toggle GPU mining">⛏️</button>
+          <button @click="appStore.togglePerformanceMode" class="control-btn perf-btn" :class="{ active: appStore.performanceMode }" title="Toggle performance mode (disables animations)">🚀</button>
           <button @click="appStore.toggleChaosMode" class="control-btn chaos-btn" :class="{ active: appStore.chaosMode }" title="Toggle chaos mode">🌀</button>
         </div>
       </div>
