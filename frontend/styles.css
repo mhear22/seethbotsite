@@ -5,6 +5,15 @@
   box-sizing: border-box;
 }
 
+/* Theme CSS Variables (Ticket #184) */
+:root {
+  --color-primary: #ff6b9d;
+  --color-background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+  --color-text: #666666;
+  --color-accent: #ffb6c1;
+  --color-card-bg: rgba(255, 255, 255, 0.95);
+}
+
 body {
   font-family: 'Quicksand', sans-serif;
   background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);

@@ -15,8 +15,8 @@ const authStore = useAuthStore()
 // Router
 const route = useRoute()
 
-// Initialize theme
-const { applyTheme } = useTheme()
+// Initialize theme (applies automatically via useTheme onMounted)
+useTheme()
 
 // Sync
 const { isAuthenticated } = useAuth()

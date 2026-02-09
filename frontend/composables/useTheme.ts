@@ -1,4 +1,6 @@
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
+import { themeRepository } from '../repositories/theme.repository'
+import { useAuth } from './useAuth'
 
 export interface ThemeColors {
   primary: string
@@ -7,6 +9,12 @@ export interface ThemeColors {
   background: string
   text: string
   cardBackground: string
+}
+
+export interface ThemeOptions {
+  darkMode: boolean
+  highContrast: boolean
+  reduceMotion: boolean
 }
 
 export interface ThemePreset {
@@ -20,14 +28,16 @@ export interface ThemePreset {
 export interface ThemeSettings {
   currentPreset: string
   customColors: ThemeColors
+  options: ThemeOptions
   customCSS: string
   useCustomColors: boolean
 }
 
+// Theme presets as specified in the ticket requirements
 export const THEME_PRESETS: ThemePreset[] = [
   {
-    name: 'Default Cute',
-    id: 'default',
+    name: 'Light',
+    id: 'light',
     colors: {
       primary: '#ff6b9d',
       secondary: '#ff8a80',
@@ -36,95 +46,25 @@ export const THEME_PRESETS: ThemePreset[] = [
       text: '#666666',
       cardBackground: 'rgba(255, 255, 255, 0.95)'
     },
-    description: 'The classic cute theme with soft pinks and warm gradients',
-    icon: '💖'
+    description: 'Light and bright theme with warm colors',
+    icon: '☀️'
   },
   {
-    name: 'Ocean Blue',
-    id: 'ocean',
+    name: 'Dark',
+    id: 'dark',
     colors: {
-      primary: '#00a8cc',
-      secondary: '#4facfe',
-      accent: '#64f4c7',
-      background: 'linear-gradient(135deg, #e0f7fa 0%, #b2ebf2 100%)',
-      text: '#37474f',
-      cardBackground: 'rgba(255, 255, 255, 0.95)'
-    },
-    description: 'Fresh ocean vibes with cool blues and teals',
-    icon: '🌊'
-  },
-  {
-    name: 'Lavender Dream',
-    id: 'lavender',
-    colors: {
-      primary: '#9333ea',
-      secondary: '#c084fc',
-      accent: '#e879f9',
-      background: 'linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%)',
-      text: '#581c87',
-      cardBackground: 'rgba(255, 255, 255, 0.95)'
-    },
-    description: 'Mystical purple theme with soft lavender tones',
-    icon: '💜'
-  },
-  {
-    name: 'Mint Fresh',
-    id: 'mint',
-    colors: {
-      primary: '#10b981',
-      secondary: '#34d399',
-      accent: '#6ee7b7',
-      background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
-      text: '#064e3b',
-      cardBackground: 'rgba(255, 255, 255, 0.95)'
-    },
-    description: 'Refreshing mint greens for a clean look',
-    icon: '🌿'
-  },
-  {
-    name: 'Sunset Glow',
-    id: 'sunset',
-    colors: {
-      primary: '#f59e0b',
-      secondary: '#fb923c',
+      primary: '#ec4899',
+      secondary: '#f97316',
       accent: '#fbbf24',
-      background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
-      text: '#78350f',
-      cardBackground: 'rgba(255, 255, 255, 0.95)'
-    },
-    description: 'Warm sunset colors in oranges and ambers',
-    icon: '🌅'
-  },
-  {
-    name: 'Cyber Neon',
-    id: 'neon',
-    colors: {
-      primary: '#ff00ff',
-      secondary: '#00ffff',
-      accent: '#ffff00',
       background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
-      text: '#00ffcc',
-      cardBackground: 'rgba(26, 26, 46, 0.95)'
-    },
-    description: 'Vibrant neon colors for a futuristic cyberpunk look',
-    icon: '🤖'
-  },
-  {
-    name: 'Midnight Gold',
-    id: 'midnight',
-    colors: {
-      primary: '#ffd700',
-      secondary: '#ffb700',
-      accent: '#ffed4e',
-      background: 'linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 100%)',
       text: '#e5e5e5',
       cardBackground: 'rgba(26, 26, 46, 0.95)'
     },
-    description: 'Elegant dark theme with gold accents',
-    icon: '✨'
+    description: 'Dark theme with rich colors',
+    icon: '🌙'
   },
   {
-    name: 'Forest Serenity',
+    name: 'Forest',
     id: 'forest',
     colors: {
       primary: '#2d6a4f',
@@ -138,32 +78,46 @@ export const THEME_PRESETS: ThemePreset[] = [
     icon: '🌲'
   },
   {
-    name: 'Sky Blue',
-    id: 'skyblue',
+    name: 'Ocean',
+    id: 'ocean',
     colors: {
-      primary: '#0ea5e9',
-      secondary: '#38bdf8',
-      accent: '#7dd3fc',
-      background: 'linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%)',
-      text: '#0c4a6e',
+      primary: '#00a8cc',
+      secondary: '#4facfe',
+      accent: '#64f4c7',
+      background: 'linear-gradient(135deg, #e0f7fa 0%, #b2ebf2 100%)',
+      text: '#37474f',
       cardBackground: 'rgba(255, 255, 255, 0.95)'
     },
-    description: 'Bright sky blues for a fresh, airy feel',
-    icon: '☁️'
+    description: 'Fresh ocean vibes with cool blues and teals',
+    icon: '🌊'
   },
   {
-    name: 'OLED Black',
-    id: 'oled',
+    name: 'Sunset',
+    id: 'sunset',
     colors: {
-      primary: '#ff6b9d',
-      secondary: '#ff8a80',
-      accent: '#ffb6c1',
-      background: '#000000',
-      text: '#e5e5e5',
-      cardBackground: 'rgba(20, 20, 20, 0.95)'
+      primary: '#f59e0b',
+      secondary: '#fb923c',
+      accent: '#fbbf24',
+      background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
+      text: '#78350f',
+      cardBackground: 'rgba(255, 255, 255, 0.95)'
     },
-    description: 'True black background for OLED displays - saves battery and maximizes contrast',
-    icon: '⚫'
+    description: 'Warm sunset colors in oranges and ambers',
+    icon: '🌅'
+  },
+  {
+    name: 'Cyberpunk',
+    id: 'cyberpunk',
+    colors: {
+      primary: '#ff00ff',
+      secondary: '#00ffff',
+      accent: '#ffff00',
+      background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+      text: '#00ffcc',
+      cardBackground: 'rgba(26, 26, 46, 0.95)'
+    },
+    description: 'Vibrant neon colors for a futuristic cyberpunk look',
+    icon: '🤖'
   }
 ]
 
@@ -177,20 +131,32 @@ const DEFAULT_CUSTOM_COLORS: ThemeColors = {
   cardBackground: 'rgba(255, 255, 255, 0.95)'
 }
 
+// Default options
+const DEFAULT_OPTIONS: ThemeOptions = {
+  darkMode: false,
+  highContrast: false,
+  reduceMotion: false
+}
+
 // Custom style element ID
 const CUSTOM_STYLE_ID = 'custom-theme-styles'
 
 export function useTheme() {
+  const { isAuthenticated } = useAuth()
+
   // Load theme settings from localStorage
   const savedSettings = localStorage.getItem('themeSettings')
   const initialSettings: ThemeSettings = savedSettings ? JSON.parse(savedSettings) : {
-    currentPreset: 'default',
+    currentPreset: 'light',
     customColors: DEFAULT_CUSTOM_COLORS,
+    options: DEFAULT_OPTIONS,
     customCSS: '',
     useCustomColors: false
   }
 
   const settings = ref<ThemeSettings>(initialSettings)
+  const isLoading = ref(false)
+  const error = ref<string | null>(null)
 
   // Current colors based on settings
   const currentColors = computed<ThemeColors>(() => {
@@ -210,7 +176,14 @@ export function useTheme() {
   const applyThemeColors = (colors: ThemeColors) => {
     const root = document.documentElement
 
-    // Set CSS custom properties (variables)
+    // Set CSS custom properties (variables) as required by the ticket
+    root.style.setProperty('--color-primary', colors.primary)
+    root.style.setProperty('--color-background', colors.background)
+    root.style.setProperty('--color-text', colors.text)
+    root.style.setProperty('--color-accent', colors.accent)
+    root.style.setProperty('--color-card-bg', colors.cardBackground)
+
+    // Also set legacy theme variables for compatibility
     root.style.setProperty('--theme-primary', colors.primary)
     root.style.setProperty('--theme-secondary', colors.secondary)
     root.style.setProperty('--theme-accent', colors.accent)
@@ -223,6 +196,24 @@ export function useTheme() {
 
     // Update text colors
     document.body.style.color = colors.text
+
+    // Apply high contrast if enabled
+    if (settings.value.options.highContrast) {
+      root.style.setProperty('--color-text', '#000000')
+      document.body.style.color = '#000000'
+    }
+  }
+
+  // Apply motion preferences
+  const applyMotionPreferences = () => {
+    const body = document.body
+    if (settings.value.options.reduceMotion) {
+      body.classList.add('reduce-motion')
+      body.style.setProperty('--animation-duration', '0s')
+    } else {
+      body.classList.remove('reduce-motion')
+      body.style.removeProperty('--animation-duration')
+    }
   }
 
   // Apply custom CSS
@@ -249,6 +240,7 @@ export function useTheme() {
   // Apply complete theme
   const applyTheme = () => {
     applyThemeColors(currentColors.value)
+    applyMotionPreferences()
 
     if (settings.value.customCSS) {
       applyCustomCSS(settings.value.customCSS)
@@ -257,28 +249,147 @@ export function useTheme() {
     }
   }
 
+  // Load theme from backend
+  const loadThemeFromBackend = async () => {
+    if (!isAuthenticated.value) {
+      return
+    }
+
+    try {
+      isLoading.value = true
+      error.value = null
+      const preferences = await themeRepository.getThemePreferences()
+
+      // Map backend preferences to local settings
+      settings.value = {
+        currentPreset: preferences.preset,
+        customColors: {
+          primary: preferences.customColors.primary,
+          secondary: preferences.customColors.primary, // Map primary to secondary
+          accent: preferences.customColors.accent,
+          background: preferences.customColors.background,
+          text: preferences.customColors.text,
+          cardBackground: preferences.customColors.cardBackground
+        },
+        options: {
+          darkMode: preferences.options.darkMode,
+          highContrast: preferences.options.highContrast,
+          reduceMotion: preferences.options.reduceMotion
+        },
+        customCSS: '',
+        useCustomColors: false
+      }
+
+      applyTheme()
+    } catch (err) {
+      console.error('Failed to load theme from backend:', err)
+      error.value = 'Failed to load theme preferences'
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  // Save theme to backend
+  const saveThemeToBackend = async () => {
+    if (!isAuthenticated.value) {
+      return
+    }
+
+    try {
+      isLoading.value = true
+      error.value = null
+
+      const preferences = {
+        preset: settings.value.currentPreset,
+        customColors: {
+          primary: settings.value.customColors.primary,
+          background: settings.value.customColors.background,
+          text: settings.value.customColors.text,
+          accent: settings.value.customColors.accent,
+          cardBackground: settings.value.customColors.cardBackground
+        },
+        options: {
+          darkMode: settings.value.options.darkMode,
+          highContrast: settings.value.options.highContrast,
+          reduceMotion: settings.value.options.reduceMotion
+        }
+      }
+
+      await themeRepository.updateThemePreferences(preferences)
+    } catch (err) {
+      console.error('Failed to save theme to backend:', err)
+      error.value = 'Failed to save theme preferences'
+      throw err
+    } finally {
+      isLoading.value = false
+    }
+  }
+
   // Change preset
-  const setPreset = (presetId: string) => {
+  const setPreset = async (presetId: string) => {
     settings.value.currentPreset = presetId
     settings.value.useCustomColors = false
     saveSettings()
     applyTheme()
+
+    // Save to backend if authenticated
+    if (isAuthenticated.value) {
+      try {
+        await saveThemeToBackend()
+      } catch (err) {
+        console.error('Failed to sync theme to backend:', err)
+      }
+    }
   }
 
   // Update custom color
-  const updateCustomColor = (colorKey: keyof ThemeColors, value: string) => {
+  const updateCustomColor = async (colorKey: keyof ThemeColors, value: string) => {
     settings.value.customColors[colorKey] = value
     settings.value.useCustomColors = true
     saveSettings()
     applyTheme()
+
+    // Save to backend if authenticated
+    if (isAuthenticated.value) {
+      try {
+        await saveThemeToBackend()
+      } catch (err) {
+        console.error('Failed to sync theme to backend:', err)
+      }
+    }
   }
 
   // Set all custom colors at once
-  const setCustomColors = (colors: ThemeColors) => {
+  const setCustomColors = async (colors: ThemeColors) => {
     settings.value.customColors = { ...colors }
     settings.value.useCustomColors = true
     saveSettings()
     applyTheme()
+
+    // Save to backend if authenticated
+    if (isAuthenticated.value) {
+      try {
+        await saveThemeToBackend()
+      } catch (err) {
+        console.error('Failed to sync theme to backend:', err)
+      }
+    }
+  }
+
+  // Update options (darkMode, highContrast, reduceMotion)
+  const updateOption = async (optionKey: keyof ThemeOptions, value: boolean) => {
+    settings.value.options[optionKey] = value
+    saveSettings()
+    applyTheme()
+
+    // Save to backend if authenticated
+    if (isAuthenticated.value) {
+      try {
+        await saveThemeToBackend()
+      } catch (err) {
+        console.error('Failed to sync theme to backend:', err)
+      }
+    }
   }
 
   // Update custom CSS
@@ -332,8 +443,15 @@ export function useTheme() {
     localStorage.setItem('themeSettings', JSON.stringify(settings.value))
   }, { deep: true })
 
-  // Initialize theme on mount
-  applyTheme()
+  // Initialize theme on mount and load from backend if authenticated
+  onMounted(async () => {
+    applyTheme()
+
+    // Load theme from backend if user is authenticated
+    if (isAuthenticated.value) {
+      await loadThemeFromBackend()
+    }
+  })
 
   return {
     // State
@@ -341,16 +459,21 @@ export function useTheme() {
     currentColors,
     currentPreset,
     presets: THEME_PRESETS,
+    isLoading,
+    error,
 
     // Actions
     setPreset,
     updateCustomColor,
     setCustomColors,
+    updateOption,
     updateCustomCSS,
     resetToPreset,
     applyTheme,
     exportTheme,
     importTheme,
+    loadThemeFromBackend,
+    saveThemeToBackend,
 
     // Preset list
     allPresets: THEME_PRESETS
