@@ -28,7 +28,7 @@ export function useKeyboardShortcuts() {
   const formatShortcut = (shortcut: Shortcut): string => {
     const parts: string[] = []
     if (shortcut.ctrl) parts.push('Ctrl')
-    if (shortcut.meta) parts.push('Cmd')
+    if (shortcut.meta) parts.push('⌘')
     if (shortcut.shift) parts.push('Shift')
     if (shortcut.alt) parts.push('Alt')
     parts.push(shortcut.key.toUpperCase())

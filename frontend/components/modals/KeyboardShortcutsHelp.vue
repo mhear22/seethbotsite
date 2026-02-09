@@ -1,9 +1,9 @@
 <template>
-  <div v-if="isOpen" class="modal-overlay" @click="close">
-    <div class="modal-content" @click.stop>
+  <div v-if="isOpen" class="modal-overlay" @click="close" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-content" @click.stop ref="modalRef">
       <div class="modal-header">
-        <h2>⌨️ Keyboard Shortcuts</h2>
-        <button class="close-button" @click="close" aria-label="Close">✕</button>
+        <h2 id="modal-title">⌨️ Keyboard Shortcuts</h2>
+        <button class="close-button" @click="close" aria-label="Close modal">✕</button>
       </div>
       <div class="modal-body">
         <div v-for="(groupShortcuts, category) in shortcutsByCategory" :key="category" class="shortcut-category">
@@ -20,14 +20,14 @@
         </div>
       </div>
       <div class="modal-footer">
-        <button class="close-button footer-button" @click="close">Close</button>
+        <button class="close-button footer-button" @click="close" @keydown.enter="close">Close</button>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch, nextTick, onBeforeUnmount } from 'vue'
 import { useKeyboardShortcuts } from '../../composables/useKeyboardShortcuts'
 
 interface Props {
@@ -44,6 +44,9 @@ const emit = defineEmits<{
 
 const { shortcutsByCategory, formatShortcut } = useKeyboardShortcuts()
 
+const modalRef = ref<HTMLElement | null>(null)
+const previouslyFocusedElement = ref<HTMLElement | null>(null)
+
 const getCategoryTitle = (category: string): string => {
   const titles: Record<string, string> = {
     navigation: '🧭 Navigation',
@@ -57,6 +60,66 @@ const getCategoryTitle = (category: string): string => {
 const close = () => {
   emit('close')
 }
+
+// Handle Escape key to close the modal
+const handleKeyDown = (event: KeyboardEvent) => {
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    close()
+  }
+  // Tab key - trap focus within modal
+  else if (event.key === 'Tab') {
+    if (!modalRef.value) return
+
+    const focusableElements = modalRef.value.querySelectorAll(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    )
+    const firstFocusable = focusableElements[0] as HTMLElement
+    const lastFocusable = focusableElements[focusableElements.length - 1] as HTMLElement
+
+    if (event.shiftKey && document.activeElement === firstFocusable) {
+      event.preventDefault()
+      lastFocusable.focus()
+    } else if (!event.shiftKey && document.activeElement === lastFocusable) {
+      event.preventDefault()
+      firstFocusable.focus()
+    }
+  }
+}
+
+// Watch for modal open/close to manage focus
+watch(() => props.isOpen, (newValue) => {
+  if (newValue) {
+    // Modal is opening
+    nextTick(() => {
+      // Store currently focused element to restore later
+      previouslyFocusedElement.value = document.activeElement as HTMLElement
+
+      // Focus the close button
+      const closeButton = modalRef.value?.querySelector('.modal-header .close-button') as HTMLElement
+      if (closeButton) {
+        closeButton.focus()
+      }
+
+      // Add keyboard event listener
+      document.addEventListener('keydown', handleKeyDown)
+    })
+  } else {
+    // Modal is closing
+    document.removeEventListener('keydown', handleKeyDown)
+
+    // Restore focus to previously focused element
+    if (previouslyFocusedElement.value) {
+      previouslyFocusedElement.value.focus()
+      previouslyFocusedElement.value = null
+    }
+  }
+})
+
+// Clean up event listener on component unmount
+onBeforeUnmount(() => {
+  document.removeEventListener('keydown', handleKeyDown)
+})
 </script>
 
 <style scoped>
@@ -94,6 +157,57 @@ const close = () => {
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
   animation: slideUp 0.3s ease-out;
   border: 1px solid var(--border-color);
+  margin: 20px auto;
+}
+
+@media (max-width: 640px) {
+  .modal-content {
+    width: 95%;
+    max-height: 90vh;
+    margin: 10px auto;
+    border-radius: 8px;
+  }
+
+  .modal-header {
+    padding: 16px;
+  }
+
+  .modal-header h2 {
+    font-size: 1.2rem;
+  }
+
+  .modal-body {
+    padding: 16px;
+  }
+
+  .category-title {
+    font-size: 1rem;
+  }
+
+  .shortcut-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 12px 8px;
+  }
+
+  .shortcut-key {
+    font-size: 0.8rem;
+    padding: 3px 8px;
+  }
+
+  .shortcut-description {
+    font-size: 0.9rem;
+  }
+
+  .modal-footer {
+    padding: 12px 16px;
+  }
+
+  .footer-button {
+    width: 100%;
+    padding: 12px;
+  }
 }
 
 @keyframes slideUp {
@@ -132,9 +246,12 @@ const close = () => {
   transition: all 0.2s;
 }
 
-.close-button:hover {
+.close-button:hover,
+.close-button:focus {
   background: var(--bg-hover);
   color: var(--text-primary);
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
 }
 
 .modal-body {
@@ -215,9 +332,12 @@ const close = () => {
   transition: all 0.2s;
 }
 
-.footer-button:hover {
+.footer-button:hover,
+.footer-button:focus {
   opacity: 0.9;
   transform: translateY(-1px);
+  outline: 2px solid white;
+  outline-offset: 2px;
 }
 
 /* Dark mode support */
