@@ -32,7 +32,9 @@ import archiveController from './controllers/archive.controller';
 import messagesController from './controllers/messages.controller';
 import fartsController from './controllers/farts.controller';
 import analyticsController from './controllers/analytics.controller';
+import profilesController from './controllers/profiles.controller';
 import { setupWebSocketServer } from './controllers/presence.controller';
+import { initProfilesDB } from './services/profile.service';
 import { createServer } from 'http';
 
 const app: Express = express();
@@ -84,6 +86,9 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 // Serve static files from the Vue.js app
 app.use(express.static(SERVE_ROOT));
 
+// Serve avatars from backend/public
+app.use('/avatars', express.static(path.join(__dirname, '..', 'public', 'avatars')));
+
 // Mount API controllers
 app.use('/api', healthController);
 app.use('/api', rankingsController);
@@ -109,6 +114,7 @@ app.use('/api', archiveController);
 app.use('/api/farts', fartsController);
 app.use('/api', messagesController);
 app.use('/api', analyticsController);
+app.use('/api/profiles', profilesController);
 
 // Serve raw OpenAPI JSON spec for type generation
 app.get('/api/openapi.json', (req: Request, res: Response) => {
@@ -140,6 +146,12 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
 
 // Start server
 const server = createServer(app);
+
+// Initialize profiles database
+initProfilesDB().catch((err) => {
+  console.error('Failed to initialize profiles database:', err);
+});
+
 server.listen(PORT, () => {
   console.log(`🌸 Server running on http://localhost:${PORT}`);
   console.log(`📁 Serving static files from: ${SERVE_ROOT}`);
