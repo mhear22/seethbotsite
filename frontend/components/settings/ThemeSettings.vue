@@ -20,11 +20,16 @@ const {
   categoryToggles,
   muteAll,
   unmuteAll,
+  playHonk,
   previewClickSound,
   previewNotificationSound,
   previewAchievementSound,
   previewUISound
 } = useAudio()
+
+const previewHonkSound = () => {
+  playHonk()
+}
 
 // Color picker handlers
 const handleColorChange = async (colorKey: keyof typeof currentColors.value, value: string) => {
@@ -382,6 +387,31 @@ const handleCategoryToggle = (category: keyof typeof categoryToggles.value) => {
             class="preview-btn"
             :disabled="muted || !categoryToggles.ui"
             aria-label="Preview UI sound"
+          >
+            🔊 Preview
+          </button>
+        </div>
+
+        <div class="category-item">
+          <label class="category-label">
+            <input
+              type="checkbox"
+              :checked="categoryToggles.goose"
+              @change="handleCategoryToggle('goose')"
+              class="category-checkbox"
+              aria-label="Toggle goose honk sounds"
+              :disabled="muted"
+            />
+            <span class="category-text">
+              Goose Honk Sounds
+              <span class="category-desc">Fun goose effects</span>
+            </span>
+          </label>
+          <button
+            @click="previewHonkSound"
+            class="preview-btn"
+            :disabled="muted || !categoryToggles.goose"
+            aria-label="Preview goose honk sound"
           >
             🔊 Preview
           </button>
