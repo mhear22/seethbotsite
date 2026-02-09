@@ -23,6 +23,10 @@ interface User {
   status: string | null
   show_email: number
   show_joined_date: number
+  discord_id: string | null
+  discord_username: string | null
+  discord_discriminator: string | null
+  discord_avatar: string | null
   created_at: string
   updated_at: string
 }
@@ -79,6 +83,33 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     initialized = true
+  }
+
+  /**
+   * Fetch current user data from server
+   */
+  const fetchUser = async (): Promise<boolean> => {
+    if (!token.value) return false
+
+    try {
+      const response = await fetch(`${API_BASE}/auth/me`, {
+        headers: {
+          'Authorization': `Bearer ${token.value}`
+        }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        user.value = data.user
+        return true
+      } else {
+        console.error('Failed to fetch user')
+        return false
+      }
+    } catch (error) {
+      console.error('Fetch user error:', error)
+      return false
+    }
   }
 
   /**
@@ -658,6 +689,7 @@ export const useAuthStore = defineStore('auth', () => {
     // Actions
     init,
     validateToken,
+    fetchUser,
     refreshToken,
     register,
     login,

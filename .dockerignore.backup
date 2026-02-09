@@ -1,0 +1,11 @@
+node_modules
+dist
+webdist
+.git
+.env*
+*.log
+coverage
+test
+*.db
+worktrees
+scripts/archive

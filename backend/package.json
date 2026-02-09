@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@types/multer": "^2.0.0",
+    "axios": "^1.13.5",
     "bcrypt": "^6.0.0",
     "better-sqlite3": "^12.6.2",
     "compression": "^1.7.4",
@@ -38,6 +39,7 @@
     "ws": "^8.19.0"
   },
   "devDependencies": {
+    "@types/axios": "^0.9.36",
     "@types/bcrypt": "^6.0.0",
     "@types/better-sqlite3": "^7.6.9",
     "@types/compression": "^1.7.5",

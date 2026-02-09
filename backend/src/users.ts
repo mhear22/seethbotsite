@@ -41,7 +41,11 @@ export function initUsersDB(): Database.Database {
     'status TEXT',
     'show_email BOOLEAN DEFAULT 1',
     'show_joined_date BOOLEAN DEFAULT 1',
-    'theme_preferences TEXT DEFAULT NULL'
+    'theme_preferences TEXT DEFAULT NULL',
+    'discord_id TEXT UNIQUE',
+    'discord_username TEXT',
+    'discord_discriminator TEXT',
+    'discord_avatar TEXT'
   ];
 
   for (const columnDef of columnsToAdd) {
@@ -107,6 +111,10 @@ export interface User {
   status: string | null;
   show_email: number;
   show_joined_date: number;
+  discord_id: string | null;
+  discord_username: string | null;
+  discord_discriminator: string | null;
+  discord_avatar: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -171,7 +179,7 @@ export async function registerUser(
   `);
   const result = stmt.run(email, passwordHash, displayName || null);
 
-  const user = db.prepare('SELECT id, email, display_name, avatar_url, banner_url, bio, status, show_email, show_joined_date, created_at, updated_at FROM users WHERE id = ? AND is_deleted = 0').get(result.lastInsertRowid) as User;
+  const user = db.prepare('SELECT id, email, display_name, avatar_url, banner_url, bio, status, show_email, show_joined_date, discord_id, discord_username, discord_discriminator, discord_avatar, created_at, updated_at FROM users WHERE id = ? AND is_deleted = 0').get(result.lastInsertRowid) as User;
 
   // Create session
   const token = generateJWT(user.id);
@@ -215,6 +223,10 @@ export async function loginUser(
     status: userWithHash.status || null,
     show_email: userWithHash.show_email ?? 1,
     show_joined_date: userWithHash.show_joined_date ?? 1,
+    discord_id: userWithHash.discord_id || null,
+    discord_username: userWithHash.discord_username || null,
+    discord_discriminator: userWithHash.discord_discriminator || null,
+    discord_avatar: userWithHash.discord_avatar || null,
     created_at: userWithHash.created_at,
     updated_at: userWithHash.updated_at
   };
@@ -248,7 +260,7 @@ export function validateTokenAndGetUser(token: string): { user: User; session: S
     }
 
     // Get user
-    const user = db.prepare('SELECT id, email, display_name, avatar_url, banner_url, bio, status, show_email, show_joined_date, created_at, updated_at FROM users WHERE id = ? AND is_deleted = 0').get(session.user_id) as User;
+    const user = db.prepare('SELECT id, email, display_name, avatar_url, banner_url, bio, status, show_email, show_joined_date, discord_id, discord_username, discord_discriminator, discord_avatar, created_at, updated_at FROM users WHERE id = ? AND is_deleted = 0').get(session.user_id) as User;
 
     if (!user) {
       return null;
@@ -397,7 +409,7 @@ export function updateUserPrivacy(userId: number, showEmail: boolean, showJoined
  */
 export function getUserById(userId: number): User | null {
   const db = getUsersDB();
-  const user = db.prepare('SELECT id, email, display_name, avatar_url, banner_url, bio, status, show_email, show_joined_date, created_at, updated_at FROM users WHERE id = ? AND is_deleted = 0').get(userId) as User | undefined;
+  const user = db.prepare('SELECT id, email, display_name, avatar_url, banner_url, bio, status, show_email, show_joined_date, discord_id, discord_username, discord_discriminator, discord_avatar, created_at, updated_at FROM users WHERE id = ? AND is_deleted = 0').get(userId) as User | undefined;
   return user || null;
 }
 
@@ -568,5 +580,78 @@ export function updateUserThemePreferences(userId: number, preferences: ThemePre
 
   // Return updated preferences
   return getUserThemePreferences(userId);
+}
+
+/**
+ * Link Discord account to a user
+ *
+ * @param userId - The user ID to link Discord account to
+ * @param discordUser - Discord user information
+ * @returns Updated user object
+ */
+export function linkDiscordAccount(
+  userId: number,
+  discordUser: {
+    id: string;
+    username: string;
+    discriminator: string;
+    avatar: string | null;
+  }
+): User {
+  const db = getUsersDB();
+
+  // Check if Discord account is already linked to another user
+  const existingUser = db.prepare('SELECT id FROM users WHERE discord_id = ? AND is_deleted = 0').get(discordUser.id);
+  if (existingUser) {
+    throw new Error('This Discord account is already linked to another user');
+  }
+
+  // Link Discord account
+  db.prepare(`
+    UPDATE users SET
+      discord_id = ?,
+      discord_username = ?,
+      discord_discriminator = ?,
+      discord_avatar = ?,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = ? AND is_deleted = 0
+  `).run(discordUser.id, discordUser.username, discordUser.discriminator, discordUser.avatar, userId);
+
+  // Return updated user
+  return getUserById(userId)!;
+}
+
+/**
+ * Unlink Discord account from a user
+ *
+ * @param userId - The user ID to unlink Discord account from
+ * @returns Updated user object
+ */
+export function unlinkDiscordAccount(userId: number): User {
+  const db = getUsersDB();
+
+  db.prepare(`
+    UPDATE users SET
+      discord_id = NULL,
+      discord_username = NULL,
+      discord_discriminator = NULL,
+      discord_avatar = NULL,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = ? AND is_deleted = 0
+  `).run(userId);
+
+  return getUserById(userId)!;
+}
+
+/**
+ * Get user by Discord ID
+ *
+ * @param discordId - Discord user ID
+ * @returns User object if found, null otherwise
+ */
+export function getUserByDiscordId(discordId: string): User | null {
+  const db = getUsersDB();
+  const user = db.prepare('SELECT id, email, display_name, avatar_url, banner_url, bio, status, show_email, show_joined_date, discord_id, discord_username, discord_discriminator, discord_avatar, created_at, updated_at FROM users WHERE discord_id = ? AND is_deleted = 0').get(discordId) as User | undefined;
+  return user || null;
 }
 
