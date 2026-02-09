@@ -52,6 +52,7 @@ export const useAppStore = defineStore('app', () => {
   const confirmationOpen = ref(false)
   const searchModalOpen = ref(false)
   const currentRoute = ref('home')
+  const showBreadcrumb = ref(localStorage.getItem('showBreadcrumb') !== 'false')
 
   const quotes = ref([
     'Stay curious, keep asking questions.',
@@ -611,6 +612,11 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
+  const toggleBreadcrumb = () => {
+    showBreadcrumb.value = !showBreadcrumb.value
+    localStorage.setItem('showBreadcrumb', showBreadcrumb.value.toString())
+  }
+
   // Update mold visual effects based on level (Ticket #74)
   const updateMoldEffects = () => {
     const moldLevel = tachValue.value
@@ -641,6 +647,7 @@ export const useAppStore = defineStore('app', () => {
     confirmationOpen,
     searchModalOpen,
     currentRoute,
+    showBreadcrumb,
     quotes,
     temer3Quotes,
     adviceSlips,
@@ -674,6 +681,7 @@ export const useAppStore = defineStore('app', () => {
     toggleDarkerMode,
     toggleChaosMode,
     toggleMoldMode,
+    toggleBreadcrumb,
     togglePerformanceMode,
     toggleMusic,
     toggleMute,

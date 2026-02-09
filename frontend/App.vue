@@ -140,6 +140,17 @@ onMounted(() => {
         appStore.togglePanel('favorites')
       }
     },
+    // Toggle breadcrumb
+    {
+      key: 'b',
+      ctrl: true,
+      meta: true, // Cmd on Mac
+      description: 'Toggle breadcrumb',
+      category: 'navigation',
+      action: () => {
+        appStore.toggleBreadcrumb()
+      }
+    },
     // Toggle rankings panel
     {
       key: 'r',

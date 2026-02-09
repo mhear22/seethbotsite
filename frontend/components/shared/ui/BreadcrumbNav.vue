@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
+import { useAppStore } from '../../stores/useAppStore'
 
 const route = useRoute()
+const appStore = useAppStore()
 
 interface BreadcrumbItem {
   label: string
@@ -104,7 +106,7 @@ const isLastBreadcrumb = (index: number) => {
 </script>
 
 <template>
-  <nav class="breadcrumb-nav" aria-label="Breadcrumb navigation">
+  <nav v-if="appStore.showBreadcrumb" class="breadcrumb-nav" aria-label="Breadcrumb navigation">
     <ol class="breadcrumb-list">
       <li
         v-for="(item, index) in breadcrumbs"
