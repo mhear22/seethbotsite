@@ -1,7 +1,51 @@
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
+
+// Default sound settings
+const DEFAULT_VOLUME = 50
+const DEFAULT_CATEGORY_TOGGLES = {
+  click: true,
+  notification: true,
+  achievement: true,
+  ui: true
+}
+
+// Load settings from localStorage
+const loadSettings = () => {
+  try {
+    const saved = localStorage.getItem('soundSettings')
+    if (saved) {
+      return JSON.parse(saved)
+    }
+  } catch (error) {
+    console.error('Failed to load sound settings:', error)
+  }
+  return null
+}
+
+// Save settings to localStorage
+const saveSettings = (settings: any) => {
+  try {
+    localStorage.setItem('soundSettings', JSON.stringify(settings))
+  } catch (error) {
+    console.error('Failed to save sound settings:', error)
+  }
+}
 
 export function useAudio() {
-  const muted = ref(false)
+  // Initialize settings from localStorage or defaults
+  const savedSettings = loadSettings()
+  const muted = ref(savedSettings?.muted ?? false)
+  const volume = ref(savedSettings?.volume ?? DEFAULT_VOLUME)
+  const categoryToggles = ref(savedSettings?.categories ?? DEFAULT_CATEGORY_TOGGLES)
+
+  // Watch for changes and save to localStorage
+  watch([muted, volume, categoryToggles], () => {
+    saveSettings({
+      muted: muted.value,
+      volume: volume.value,
+      categories: categoryToggles.value
+    })
+  }, { deep: true })
 
   const playSound = (elementId: string, options?: { volume?: number; startTime?: number; rate?: number }) => {
     if (muted.value) return
@@ -16,8 +60,9 @@ export function useAudio() {
     // Ensure audio doesn't loop (fix for button sound looping issue)
     audio.loop = false
 
-    // Set volume (clamp between 0 and 1) - default to 0.5 (50%) as per ticket #172
-    audio.volume = Math.min(Math.max(options?.volume ?? 0.5, 0), 1.0)
+    // Set volume based on master volume setting (0-100 -> 0-1)
+    const masterVolume = volume.value / 100
+    audio.volume = Math.min(Math.max(options?.volume ?? 0.5, 0), 1.0) * masterVolume
 
     // Set playback rate for variety (if supported)
     if (options?.rate && audio.playbackRate !== undefined) {
@@ -48,8 +93,8 @@ export function useAudio() {
     if (!music) return
 
     if (playing && !muted.value) {
-      // Set music to 50% volume (ticket #172)
-      music.volume = 0.5
+      // Set music based on master volume (0-100 -> 0-1)
+      music.volume = volume.value / 100
       music.play().catch(err => console.log('Music play failed:', err))
     } else {
       music.pause()
@@ -70,44 +115,51 @@ export function useAudio() {
     muted.value = false
   }
 
-  // Sound effect for button clicks - 50% volume (ticket #172)
+  // Sound effect for button clicks - checks click category toggle
   const playButtonClick = () => {
+    if (!categoryToggles.value.click) return
     playSound('buttonSound', { volume: 0.5, rate: 1.0 + (Math.random() * 0.1 - 0.05) })
   }
 
-  // Sound effect for achievements/milestones - 50% volume (ticket #172)
+  // Sound effect for achievements/milestones - checks achievement category toggle
   const playAchievement = () => {
+    if (!categoryToggles.value.achievement) return
     playSound('buttonSound', { volume: 0.5, startTime: 0, rate: 1.2 })
   }
 
-  // Sound effect for successful actions (purchases, unlocks) - 50% volume (ticket #172)
+  // Sound effect for successful actions (purchases, unlocks) - checks notification category toggle
   const playSuccess = () => {
+    if (!categoryToggles.value.notification) return
     playSound('buttonSound', { volume: 0.5, rate: 1.3 })
   }
 
-  // Sound effect for error/failure - 50% volume (ticket #172)
+  // Sound effect for error/failure - checks notification category toggle
   const playError = () => {
+    if (!categoryToggles.value.notification) return
     playSound('fartSound', { volume: 0.5, startTime: 0.5 })
   }
 
-  // Sound effect for goose interaction - 50% volume (ticket #172)
+  // Sound effect for goose interaction - checks click category toggle
   const playGooseHonk = () => {
+    if (!categoryToggles.value.click) return
     playSound('gooseHonk', { volume: 0.5 })
   }
 
-  // Sound effect for game interactions (clicking, fishing, etc.) - 50% volume (ticket #172)
+  // Sound effect for game interactions (clicking, fishing, etc.) - checks click category toggle
   const playGameAction = () => {
-    // Fixed at 50% volume as per ticket #172
+    if (!categoryToggles.value.click) return
     playSound('buttonSound', { volume: 0.5, rate: 0.9 + Math.random() * 0.2 })
   }
 
-  // Sound effect for panel opening/closing - 50% volume (ticket #172)
+  // Sound effect for panel opening/closing - checks UI category toggle
   const playPanelToggle = () => {
+    if (!categoryToggles.value.ui) return
     playSound('buttonSound', { volume: 0.5, rate: 0.8 })
   }
 
-  // Sound effect for level up - 50% volume (ticket #172)
+  // Sound effect for level up - checks achievement category toggle
   const playLevelUp = () => {
+    if (!categoryToggles.value.achievement) return
     playSound('buttonSound', { volume: 0.5, rate: 1.5 })
     // Play twice for emphasis
     setTimeout(() => {
@@ -115,9 +167,27 @@ export function useAudio() {
     }, 100)
   }
 
-  // Sound effect for purchase - 50% volume (ticket #172)
+  // Sound effect for purchase - checks notification category toggle
   const playPurchase = () => {
+    if (!categoryToggles.value.notification) return
     playSound('buttonSound', { volume: 0.5, rate: 1.1 })
+  }
+
+  // Preview functions for testing each category
+  const previewClickSound = () => {
+    playSound('buttonSound', { volume: 0.5, rate: 1.0 })
+  }
+
+  const previewNotificationSound = () => {
+    playSound('buttonSound', { volume: 0.5, rate: 1.3 })
+  }
+
+  const previewAchievementSound = () => {
+    playSound('buttonSound', { volume: 0.5, rate: 1.5 })
+  }
+
+  const previewUISound = () => {
+    playSound('buttonSound', { volume: 0.5, rate: 0.8 })
   }
 
   return {
@@ -134,6 +204,15 @@ export function useAudio() {
     playPurchase,
     toggleMusic,
     muteAll,
-    unmuteAll
+    unmuteAll,
+    // Export settings state
+    muted,
+    volume,
+    categoryToggles,
+    // Preview functions
+    previewClickSound,
+    previewNotificationSound,
+    previewAchievementSound,
+    previewUISound
   }
 }
