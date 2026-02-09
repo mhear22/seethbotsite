@@ -37,6 +37,7 @@ import BatteryCalculatorPage from '../components/pages/BatteryCalculatorPage.vue
 import MechBuilderPage from '../components/pages/MechBuilderPage.vue'
 import MechBattlePage from '../components/pages/MechBattlePage.vue'
 import SearchPage from '../components/pages/SearchPage.vue'
+import OrbitalMechanicsPage from '../components/pages/OrbitalMechanicsPage.vue'
 
 const routes = [
   {
@@ -228,6 +229,11 @@ const routes = [
     path: '/search',
     name: 'search',
     component: SearchPage
+  },
+  {
+    path: '/orbital',
+    name: 'orbital',
+    component: OrbitalMechanicsPage
   }
 ]
 
