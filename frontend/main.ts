@@ -14,16 +14,14 @@ import { faChild, faBaby, faUser } from '@fortawesome/free-solid-svg-icons'
 // Add icons to library
 library.add(faChild, faBaby, faUser)
 
-// Register Service Worker for PWA
+// Unregister any existing Service Workers to prevent caching issues
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
-      .then((registration) => {
-        console.log('[PWA] Service Worker registered:', registration)
+  navigator.serviceWorker.getRegistrations().then((registrations) => {
+    for (const registration of registrations) {
+      registration.unregister().then(() => {
+        console.log('[PWA] Service Worker unregistered')
       })
-      .catch((error) => {
-        console.error('[PWA] Service Worker registration failed:', error)
-      })
+    }
   })
 }
 
