@@ -7,7 +7,29 @@ export default defineConfig({
   ],
   server: {
     port: 3000,
-    host: true
+    host: true,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
+      '/avatars': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
+      '/api-docs': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
+      '/ws': {
+        target: 'ws://localhost:3001',
+        ws: true,
+      },
+      '/presence': {
+        target: 'ws://localhost:3001',
+        ws: true,
+      },
+    },
   },
   build: {
     outDir: 'dist',

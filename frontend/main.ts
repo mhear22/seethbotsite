@@ -43,7 +43,7 @@ app.mount('#app')
 const initAuth = () => {
   try {
     const authStore = useAuthStore()
-    authStore.initAuth()
+    authStore.init()
     console.log('[Auth] Auth store initialized')
   } catch (error) {
     console.error('[Auth] Failed to initialize auth store:', error)

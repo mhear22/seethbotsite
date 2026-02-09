@@ -1,9 +1,10 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { RankingItem } from '../shared/core/MainApp.vue'
 import EmojiRenderer from '../shared/ui/EmojiRenderer.vue'
 import { useAppStore } from '../../stores/useAppStore'
 
-defineProps<{
+const props = defineProps<{
   isOpen?: boolean
   currentRoute?: string
   rankings: RankingItem[]
@@ -14,7 +15,7 @@ const emit = defineEmits<{
 }>()
 
 const appStore = useAppStore()
-const isOnHomeRoute = computed(() => currentRoute === 'home')
+const isOnHomeRoute = computed(() => props.currentRoute === 'home')
 
 const toggle = () => {
   emit('toggle')

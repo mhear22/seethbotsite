@@ -83,9 +83,9 @@ export const useAppStore = defineStore('app', () => {
 
   // Helper function to check if current user is Temer3
   const isTemer3 = computed(() => {
-    if (!auth.user.value) return false
-    const displayName = auth.user.value.display_name || ''
-    const email = auth.user.value.email || ''
+    if (!authStore.user) return false
+    const displayName = authStore.user.display_name || ''
+    const email = authStore.user.email || ''
     return displayName.toLowerCase().includes('temer3') || email.toLowerCase().includes('temer3')
   })
 
