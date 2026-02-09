@@ -8,6 +8,12 @@ import {
   deleteSession,
   deleteAllSessions,
   updateUserDisplayName,
+  updateUserAvatar,
+  updateUserBanner,
+  updateUserBio,
+  updateUserStatus,
+  updateUserPrivacy,
+  getUserById,
   changeUserPassword,
   deleteUserAccount,
   cleanupExpiredSessions,
@@ -635,6 +641,264 @@ router.delete('/auth/account', async (req: Request, res: Response) => {
     }
     console.error('Error deleting account:', error);
     res.status(500).json({ error: 'Failed to delete account' });
+  }
+});
+
+/**
+ * @openapi
+ * /api/auth/avatar:
+ *   patch:
+ *     tags: [Authentication]
+ *     summary: Update user avatar
+ *     description: Updates the authenticated user's avatar URL. Requires JWT token.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               avatarUrl:
+ *                 type: string
+ *                 nullable: true
+ *     responses:
+ *       200:
+ *         description: Avatar updated successfully
+ *       401:
+ *         description: Not authenticated
+ */
+router.patch('/auth/avatar', (req: Request, res: Response) => {
+  try {
+    const result = getUserFromToken(req);
+
+    if (!result) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const { avatarUrl } = req.body;
+
+    const user = updateUserAvatar(result.user.id, avatarUrl || null);
+    res.json({ success: true, user });
+  } catch (error) {
+    console.error('Error updating avatar:', error);
+    res.status(500).json({ error: 'Failed to update avatar' });
+  }
+});
+
+/**
+ * @openapi
+ * /api/auth/banner:
+ *   patch:
+ *     tags: [Authentication]
+ *     summary: Update user banner
+ *     description: Updates the authenticated user's banner URL. Requires JWT token.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               bannerUrl:
+ *                 type: string
+ *                 nullable: true
+ *     responses:
+ *       200:
+ *         description: Banner updated successfully
+ *       401:
+ *         description: Not authenticated
+ */
+router.patch('/auth/banner', (req: Request, res: Response) => {
+  try {
+    const result = getUserFromToken(req);
+
+    if (!result) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const { bannerUrl } = req.body;
+
+    const user = updateUserBanner(result.user.id, bannerUrl || null);
+    res.json({ success: true, user });
+  } catch (error) {
+    console.error('Error updating banner:', error);
+    res.status(500).json({ error: 'Failed to update banner' });
+  }
+});
+
+/**
+ * @openapi
+ * /api/auth/bio:
+ *   patch:
+ *     tags: [Authentication]
+ *     summary: Update user bio
+ *     description: Updates the authenticated user's bio. Requires JWT token.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               bio:
+ *                 type: string
+ *                 nullable: true
+ *                 maxLength: 500
+ *     responses:
+ *       200:
+ *         description: Bio updated successfully
+ *       401:
+ *         description: Not authenticated
+ */
+router.patch('/auth/bio', (req: Request, res: Response) => {
+  try {
+    const result = getUserFromToken(req);
+
+    if (!result) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const { bio } = req.body;
+
+    const user = updateUserBio(result.user.id, bio || null);
+    res.json({ success: true, user });
+  } catch (error) {
+    console.error('Error updating bio:', error);
+    res.status(500).json({ error: 'Failed to update bio' });
+  }
+});
+
+/**
+ * @openapi
+ * /api/auth/status:
+ *   patch:
+ *     tags: [Authentication]
+ *     summary: Update user status
+ *     description: Updates the authenticated user's status message. Requires JWT token.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 nullable: true
+ *                 maxLength: 100
+ *     responses:
+ *       200:
+ *         description: Status updated successfully
+ *       401:
+ *         description: Not authenticated
+ */
+router.patch('/auth/status', (req: Request, res: Response) => {
+  try {
+    const result = getUserFromToken(req);
+
+    if (!result) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const { status } = req.body;
+
+    const user = updateUserStatus(result.user.id, status || null);
+    res.json({ success: true, user });
+  } catch (error) {
+    console.error('Error updating status:', error);
+    res.status(500).json({ error: 'Failed to update status' });
+  }
+});
+
+/**
+ * @openapi
+ * /api/auth/privacy:
+ *   patch:
+ *     tags: [Authentication]
+ *     summary: Update user privacy settings
+ *     description: Updates the authenticated user's privacy settings. Requires JWT token.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               showEmail:
+ *                 type: boolean
+ *               showJoinedDate:
+ *                 type: boolean
+ *     responses:
+ *       200:
+ *         description: Privacy settings updated successfully
+ *       401:
+ *         description: Not authenticated
+ */
+router.patch('/auth/privacy', (req: Request, res: Response) => {
+  try {
+    const result = getUserFromToken(req);
+
+    if (!result) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const { showEmail, showJoinedDate } = req.body;
+
+    const user = updateUserPrivacy(
+      result.user.id,
+      typeof showEmail === 'boolean' ? showEmail : true,
+      typeof showJoinedDate === 'boolean' ? showJoinedDate : true
+    );
+    res.json({ success: true, user });
+  } catch (error) {
+    console.error('Error updating privacy:', error);
+    res.status(500).json({ error: 'Failed to update privacy settings' });
+  }
+});
+
+/**
+ * @openapi
+ * /api/profile/{id}:
+ *   get:
+ *     tags: [Authentication]
+ *     summary: Get user profile by ID
+ *     description: Returns public profile information for a user.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Profile retrieved successfully
+ *       404:
+ *         description: User not found
+ */
+router.get('/profile/:id', (req: Request, res: Response) => {
+  try {
+    const userId = parseInt(req.params.id);
+
+    if (isNaN(userId)) {
+      return res.status(400).json({ error: 'Invalid user ID' });
+    }
+
+    const user = getUserById(userId);
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Return user profile (exclude email if user has privacy settings)
+    const profileUser: any = { ...user };
+    if (!profileUser.show_email) {
+      delete profileUser.email;
+    }
+
+    res.json({ success: true, user: profileUser });
+  } catch (error) {
+    console.error('Error getting profile:', error);
+    res.status(500).json({ error: 'Failed to get profile' });
   }
 });
 

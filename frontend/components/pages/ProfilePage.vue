@@ -3,6 +3,8 @@ import { ref, reactive, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuth } from '../../composables/useAuth'
 import { formatDate } from '../../utils/format'
+import EditProfileModal from '../modals/EditProfileModal.vue'
+import ProfileCard from '../shared/ui/ProfileCard.vue'
 
 const route = useRoute()
 const auth = reactive(useAuth())
@@ -22,16 +24,13 @@ const otherUserProfile = ref<any>(null)
 const loadingOtherProfile = ref(false)
 const otherProfileError = ref('')
 
-// Profile editing
-const isEditing = ref(false)
-const profileForm = ref({
-  displayName: '',
-  avatarUrl: '',
-  bio: ''
-})
+// Profile editing modal
+const isEditModalOpen = ref(false)
 
-const successMessage = ref('')
-const errorMessage = ref('')
+// User stats and achievements
+const userStats = ref<any>(null)
+const userAchievements = ref<any[]>([])
+const loadingStats = ref(false)
 
 // Load other user's profile
 const loadOtherProfile = async () => {
@@ -45,6 +44,7 @@ const loadOtherProfile = async () => {
 
     if (response.ok) {
       otherUserProfile.value = data.user
+      await loadUserStats(otherUserId.value)
     } else {
       otherProfileError.value = data.error || 'Failed to load profile'
     }
@@ -56,136 +56,63 @@ const loadOtherProfile = async () => {
   }
 }
 
-// Start editing profile
-const startEditing = () => {
-  if (auth.user) {
-    profileForm.value = {
-      displayName: auth.user.display_name || '',
-      avatarUrl: (auth.user as any).avatar_url || '',
-      bio: (auth.user as any).bio || ''
-    }
-  }
-  isEditing.value = true
-  clearMessages()
-}
+// Load user stats (coolness points, etc.)
+const loadUserStats = async (userId?: number) => {
+  const targetUserId = userId || auth.user?.id
+  if (!targetUserId) return
 
-// Cancel editing
-const cancelEditing = () => {
-  isEditing.value = false
-  clearMessages()
-}
-
-// Save profile
-const handleSaveProfile = async () => {
-  clearMessages()
-
+  loadingStats.value = true
   try {
-    let hasUpdates = false
-
-    // Update display name if changed
-    if (profileForm.value.displayName !== auth.user?.display_name) {
-      const result = await auth.updateProfile(profileForm.value.displayName)
-      if (!result.success) {
-        errorMessage.value = result.error || 'Failed to update display name'
-        return
-      }
-      hasUpdates = true
-    }
-
-    // Update avatar if changed
-    const currentAvatarUrl = (auth.user as any)?.avatar_url || ''
-    if (profileForm.value.avatarUrl !== currentAvatarUrl) {
-      const result = await updateAvatar(profileForm.value.avatarUrl || null)
-      if (!result.success) {
-        errorMessage.value = result.error || 'Failed to update avatar'
-        return
-      }
-      hasUpdates = true
-    }
-
-    // Update bio if changed
-    const currentBio = (auth.user as any)?.bio || ''
-    if (profileForm.value.bio !== currentBio) {
-      const result = await updateBio(profileForm.value.bio || null)
-      if (!result.success) {
-        errorMessage.value = result.error || 'Failed to update bio'
-        return
-      }
-      hasUpdates = true
-    }
-
-    if (hasUpdates) {
-      successMessage.value = 'Profile updated successfully!'
-      await auth.validateToken() // Refresh user data
-      setTimeout(() => {
-        isEditing.value = false
-        successMessage.value = ''
-      }, 1500)
-    } else {
-      isEditing.value = false
-    }
-  } catch (error) {
-    console.error('Error saving profile:', error)
-    errorMessage.value = 'Failed to save profile'
-  }
-}
-
-// Update avatar
-const updateAvatar = async (avatarUrl: string | null) => {
-  try {
-    const token = localStorage.getItem('auth_token')
-    const response = await fetch('/api/auth/avatar', {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({ avatarUrl })
+    const response = await fetch(`/api/points/status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: targetUserId.toString() })
     })
-
     const data = await response.json()
 
     if (response.ok) {
-      return { success: true }
-    } else {
-      return { success: false, error: data.error || 'Failed to update avatar' }
+      userStats.value = data
     }
   } catch (error) {
-    console.error('Error updating avatar:', error)
-    return { success: false, error: 'Failed to update avatar' }
+    console.error('Failed to load stats:', error)
+  } finally {
+    loadingStats.value = false
   }
 }
 
-// Update bio
-const updateBio = async (bio: string | null) => {
-  try {
-    const token = localStorage.getItem('auth_token')
-    const response = await fetch('/api/auth/bio', {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({ bio })
-    })
+// Load user achievements
+const loadUserAchievements = async () => {
+  const targetUserId = auth.user?.id
+  if (!targetUserId) return
 
+  try {
+    const response = await fetch(`/api/achievements`, {
+      headers: { 'X-User-Id': targetUserId.toString() }
+    })
     const data = await response.json()
 
     if (response.ok) {
-      return { success: true }
-    } else {
-      return { success: false, error: data.error || 'Failed to update bio' }
+      userAchievements.value = data.achievements || []
     }
   } catch (error) {
-    console.error('Error updating bio:', error)
-    return { success: false, error: 'Failed to update bio' }
+    console.error('Failed to load achievements:', error)
   }
 }
 
-// Clear messages
-const clearMessages = () => {
-  successMessage.value = ''
-  errorMessage.value = ''
+// Open edit modal
+const openEditModal = () => {
+  isEditModalOpen.value = true
+}
+
+// Close edit modal
+const closeEditModal = () => {
+  isEditModalOpen.value = false
+}
+
+// Handle profile save
+const handleProfileSave = async () => {
+  await loadUserStats()
+  await loadUserAchievements()
 }
 
 // Display name (with fallback)
@@ -196,6 +123,21 @@ const displayDisplayName = (user: any) => {
 // Avatar URL (with fallback)
 const displayAvatarUrl = (user: any) => {
   return user?.avatar_url || ''
+}
+
+// Banner URL (with fallback)
+const displayBannerUrl = (user: any) => {
+  return user?.banner_url || ''
+}
+
+// Status message
+const displayStatus = (user: any) => {
+  return user?.status || ''
+}
+
+// Bio text
+const displayBio = (user: any) => {
+  return user?.bio || ''
 }
 
 // Get initials for avatar fallback
@@ -209,150 +151,148 @@ const getInitials = (name: string) => {
     .slice(0, 2)
 }
 
-onMounted(() => {
-  loadOtherProfile()
+// Current user for display
+const displayUser = computed(() => {
+  return viewMode.value === 'own' ? auth.user : otherUserProfile.value
+})
+
+onMounted(async () => {
+  if (viewMode.value === 'own') {
+    await loadUserStats()
+    await loadUserAchievements()
+  } else {
+    await loadOtherProfile()
+  }
 })
 </script>
 
 <template>
   <div class="profile-page">
-    <!-- Viewing own profile -->
-    <div v-if="viewMode === 'own'" class="profile-container">
+    <div v-if="loadingOtherProfile" class="loading">
+      Loading profile...
+    </div>
+
+    <div v-else-if="otherProfileError" class="error-message">
+      {{ otherProfileError }}
+    </div>
+
+    <div v-else-if="displayUser" class="profile-container">
+      <!-- Banner -->
+      <div v-if="displayBannerUrl(displayUser)" class="profile-banner">
+        <img :src="displayBannerUrl(displayUser)" alt="Banner" />
+      </div>
+      <div v-else class="profile-banner-placeholder"></div>
+
       <!-- Profile Header -->
       <div class="profile-header">
         <div class="avatar-section">
-          <div v-if="displayAvatarUrl(auth.user)" class="avatar-image">
-            <img :src="displayAvatarUrl(auth.user)" alt="Avatar" />
+          <div v-if="displayAvatarUrl(displayUser)" class="avatar-image">
+            <img :src="displayAvatarUrl(displayUser)" alt="Avatar" />
           </div>
           <div v-else class="avatar-fallback">
-            {{ getInitials(displayDisplayName(auth.user)) }}
+            {{ getInitials(displayDisplayName(displayUser)) }}
           </div>
         </div>
         <div class="profile-info">
-          <h1 class="profile-name">{{ displayDisplayName(auth.user) }}</h1>
-          <p class="profile-email">{{ auth.user?.email }}</p>
-          <p class="profile-member-since">Member since {{ formatDate(auth.user?.created_at || '', false, 'long') }}</p>
+          <h1 class="profile-name">{{ displayDisplayName(displayUser) }}</h1>
+          <p v-if="displayStatus(displayUser)" class="profile-status">
+            {{ displayStatus(displayUser) }}
+          </p>
+          <p v-if="(displayUser as any)?.show_email !== false" class="profile-email">
+            {{ displayUser.email }}
+          </p>
+          <p v-if="(displayUser as any)?.show_joined_date !== false" class="profile-member-since">
+            Member since {{ formatDate(displayUser.created_at || '', false, 'long') }}
+          </p>
         </div>
         <button
-          v-if="!isEditing && auth.isAuthenticated"
+          v-if="viewMode === 'own' && auth.isAuthenticated"
           class="edit-profile-btn"
-          @click="startEditing"
+          @click="openEditModal"
         >
           ✏️ Edit Profile
         </button>
+      </div>
+
+      <!-- Stats Section (Coolness Points) -->
+      <div v-if="userStats && viewMode === 'own'" class="profile-section">
+        <h2 class="section-title">Stats</h2>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon">⭐</div>
+            <div class="stat-info">
+              <div class="stat-value">{{ userStats.score || 0 }}</div>
+              <div class="stat-label">Coolness Points</div>
+            </div>
+          </div>
+          <div v-if="userStats.baseScore !== undefined" class="stat-card">
+            <div class="stat-icon">📊</div>
+            <div class="stat-info">
+              <div class="stat-value">{{ userStats.baseScore || 0 }}</div>
+              <div class="stat-label">Base Score</div>
+            </div>
+          </div>
+          <div v-if="userStats.lastInteraction" class="stat-card">
+            <div class="stat-icon">⏱️</div>
+            <div class="stat-info">
+              <div class="stat-value">
+                {{ formatDate(userStats.lastInteraction, false, 'relative') }}
+              </div>
+              <div class="stat-label">Last Interaction</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Achievements Section -->
+      <div v-if="userAchievements.length > 0 && viewMode === 'own'" class="profile-section">
+        <h2 class="section-title">Achievements</h2>
+        <div class="achievements-grid">
+          <div
+            v-for="achievement in userAchievements"
+            :key="achievement.id"
+            class="achievement-card"
+            :title="achievement.description"
+          >
+            <div class="achievement-icon">{{ achievement.icon || '🏆' }}</div>
+            <div class="achievement-info">
+              <div class="achievement-name">{{ achievement.name }}</div>
+              <div v-if="achievement.unlockedAt" class="achievement-date">
+                {{ formatDate(achievement.unlockedAt, false, 'relative') }}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Bio Section -->
       <div class="profile-section">
         <h2 class="section-title">About</h2>
         <div class="bio-content">
-          <p v-if="(auth.user as any)?.bio" class="bio-text">
-            {{ (auth.user as any).bio }}
+          <p v-if="displayBio(displayUser)" class="bio-text">
+            {{ displayBio(displayUser) }}
           </p>
           <p v-else class="bio-empty">
-            No bio yet. Click "Edit Profile" to add one!
+            No bio yet.
+            <span v-if="viewMode === 'own'">Click "Edit Profile" to add one!</span>
           </p>
         </div>
       </div>
 
-      <!-- Edit Form -->
-      <div v-if="isEditing" class="profile-edit-form">
-        <h2 class="section-title">Edit Profile</h2>
-
-        <!-- Success/Error Messages -->
-        <div v-if="successMessage" class="success-message">
-          {{ successMessage }}
-        </div>
-        <div v-if="errorMessage" class="error-message">
-          {{ errorMessage }}
-        </div>
-
-        <div class="form-group">
-          <label>Display Name</label>
-          <input
-            v-model="profileForm.displayName"
-            type="text"
-            placeholder="Your display name"
-            class="form-input"
-          />
-        </div>
-
-        <div class="form-group">
-          <label>Avatar URL</label>
-          <input
-            v-model="profileForm.avatarUrl"
-            type="url"
-            placeholder="https://example.com/avatar.jpg"
-            class="form-input"
-          />
-          <p class="form-help">
-            Enter a URL to your profile image. Leave empty to use initials.
-          </p>
-        </div>
-
-        <div class="form-group">
-          <label>Bio</label>
-          <textarea
-            v-model="profileForm.bio"
-            placeholder="Tell us about yourself..."
-            class="form-textarea"
-            maxlength="500"
-            rows="4"
-          ></textarea>
-          <p class="form-help">
-            {{ profileForm.bio.length }}/500 characters
-          </p>
-        </div>
-
-        <div class="form-actions">
-          <button
-            class="btn btn-secondary"
-            @click="cancelEditing"
-          >
-            Cancel
-          </button>
-          <button
-            class="btn btn-primary"
-            @click="handleSaveProfile"
-          >
-            Save Changes
-          </button>
-        </div>
+      <!-- Profile Card Preview (for testing) -->
+      <div v-if="viewMode === 'own'" class="profile-section">
+        <h2 class="section-title">Profile Card Preview</h2>
+        <ProfileCard :user="auth.user" />
       </div>
     </div>
 
-    <!-- Viewing another user's profile -->
-    <div v-else class="profile-container">
-      <div v-if="loadingOtherProfile" class="loading">
-        Loading profile...
-      </div>
-
-      <div v-else-if="otherProfileError" class="error-message">
-        {{ otherProfileError }}
-      </div>
-
-      <div v-else-if="otherUserProfile" class="profile-header">
-        <div class="avatar-section">
-          <div v-if="displayAvatarUrl(otherUserProfile)" class="avatar-image">
-            <img :src="displayAvatarUrl(otherUserProfile)" alt="Avatar" />
-          </div>
-          <div v-else class="avatar-fallback">
-            {{ getInitials(displayDisplayName(otherUserProfile)) }}
-          </div>
-        </div>
-        <div class="profile-info">
-          <h1 class="profile-name">{{ displayDisplayName(otherUserProfile) }}</h1>
-          <p class="profile-member-since">Member since {{ formatDate(otherUserProfile.created_at || '', false, 'long') }}</p>
-        </div>
-      </div>
-
-      <div v-if="otherUserProfile && otherUserProfile.bio" class="profile-section">
-        <h2 class="section-title">About</h2>
-        <div class="bio-content">
-          <p class="bio-text">{{ otherUserProfile.bio }}</p>
-        </div>
-      </div>
-    </div>
+    <!-- Edit Profile Modal -->
+    <EditProfileModal
+      :is-open="isEditModalOpen"
+      :user-data="auth.user"
+      @close="closeEditModal"
+      @save="handleProfileSave"
+    />
   </div>
 </template>
 
@@ -367,11 +307,37 @@ onMounted(() => {
   background: var(--bg-card);
   border-radius: 12px;
   overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
-.profile-header {
+/* Banner */
+.profile-banner {
+  width: 100%;
+  height: 200px;
+  overflow: hidden;
+  background: var(--accent);
+}
+
+.profile-banner img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profile-banner-placeholder {
+  width: 100%;
+  height: 200px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
   display: flex;
   align-items: center;
+  justify-content: center;
+  font-size: 48px;
+}
+
+/* Header */
+.profile-header {
+  display: flex;
+  align-items: flex-start;
   padding: 30px;
   gap: 24px;
   border-bottom: 1px solid var(--border-color);
@@ -380,6 +346,7 @@ onMounted(() => {
 
 .avatar-section {
   flex-shrink: 0;
+  margin-top: -60px;
 }
 
 .avatar-image {
@@ -388,6 +355,8 @@ onMounted(() => {
   border-radius: 50%;
   overflow: hidden;
   background: var(--accent);
+  border: 4px solid var(--bg-card);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .avatar-image img {
@@ -401,6 +370,8 @@ onMounted(() => {
   height: 120px;
   border-radius: 50%;
   background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+  border: 4px solid var(--bg-card);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -412,12 +383,19 @@ onMounted(() => {
 .profile-info {
   flex: 1;
   min-width: 200px;
+  margin-top: 30px;
 }
 
 .profile-name {
   font-size: 28px;
   margin: 0 0 8px 0;
   color: var(--text-primary);
+}
+
+.profile-status {
+  color: var(--text-secondary);
+  margin: 0 0 4px 0;
+  font-style: italic;
 }
 
 .profile-email {
@@ -440,6 +418,7 @@ onMounted(() => {
   cursor: pointer;
   font-weight: 500;
   transition: all 0.2s;
+  margin-top: 20px;
 }
 
 .edit-profile-btn:hover {
@@ -447,9 +426,14 @@ onMounted(() => {
   transform: translateY(-1px);
 }
 
+/* Sections */
 .profile-section {
   padding: 24px 30px;
   border-bottom: 1px solid var(--border-color);
+}
+
+.profile-section:last-child {
+  border-bottom: none;
 }
 
 .section-title {
@@ -458,6 +442,7 @@ onMounted(() => {
   color: var(--text-primary);
 }
 
+/* Bio */
 .bio-content {
   background: var(--bg-secondary);
   border-radius: 8px;
@@ -477,105 +462,96 @@ onMounted(() => {
   font-style: italic;
 }
 
-.profile-edit-form {
-  padding: 24px 30px;
+/* Stats Grid */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
 }
 
-.form-group {
-  margin-bottom: 20px;
-}
-
-.form-group label {
-  display: block;
-  margin-bottom: 8px;
-  color: var(--text-primary);
-  font-weight: 500;
-}
-
-.form-input,
-.form-textarea {
-  width: 100%;
-  padding: 12px;
-  border: 1px solid var(--border-color);
+.stat-card {
+  background: var(--bg-secondary);
   border-radius: 8px;
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  font-size: 15px;
-  transition: border-color 0.2s;
-  box-sizing: border-box;
-}
-
-.form-input:focus,
-.form-textarea:focus {
-  outline: none;
-  border-color: var(--accent);
-}
-
-.form-textarea {
-  resize: vertical;
-  font-family: inherit;
-}
-
-.form-help {
-  font-size: 13px;
-  color: var(--text-tertiary);
-  margin-top: 6px;
-}
-
-.form-actions {
+  padding: 16px;
   display: flex;
+  align-items: center;
   gap: 12px;
-  margin-top: 24px;
 }
 
-.btn {
-  padding: 12px 24px;
-  border-radius: 8px;
-  border: none;
-  font-size: 15px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
+.stat-icon {
+  font-size: 32px;
 }
 
-.btn-primary {
-  background: var(--accent);
-  color: white;
+.stat-info {
+  flex: 1;
 }
 
-.btn-primary:hover {
-  background: var(--accent-hover);
-  transform: translateY(-1px);
-}
-
-.btn-secondary {
-  background: var(--bg-tertiary);
+.stat-value {
+  font-size: 24px;
+  font-weight: bold;
   color: var(--text-primary);
 }
 
-.btn-secondary:hover {
-  background: var(--bg-hover);
+.stat-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-top: 2px;
 }
 
-.success-message {
-  background: #10b981;
-  color: white;
-  padding: 12px;
+/* Achievements Grid */
+.achievements-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 12px;
+}
+
+.achievement-card {
+  background: var(--bg-secondary);
   border-radius: 8px;
-  margin-bottom: 20px;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: transform 0.2s;
+}
+
+.achievement-card:hover {
+  transform: translateY(-2px);
+}
+
+.achievement-icon {
+  font-size: 28px;
+}
+
+.achievement-info {
+  flex: 1;
+}
+
+.achievement-name {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.achievement-date {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-top: 2px;
+}
+
+/* Loading & Errors */
+.loading {
+  text-align: center;
+  padding: 40px;
+  color: var(--text-secondary);
 }
 
 .error-message {
   background: #ef4444;
   color: white;
-  padding: 12px;
+  padding: 16px;
   border-radius: 8px;
-}
-
-.loading {
   text-align: center;
-  padding: 40px;
-  color: var(--text-secondary);
 }
 
 /* Responsive */
@@ -586,15 +562,24 @@ onMounted(() => {
   }
 
   .avatar-section {
-    margin: 0 auto;
+    margin: -60px auto 0;
   }
 
   .profile-info {
     text-align: center;
+    margin-top: 16px;
   }
 
   .edit-profile-btn {
     width: 100%;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .achievements-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>

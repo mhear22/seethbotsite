@@ -20,12 +20,38 @@ export function initUsersDB(): Database.Database {
       email TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
       display_name TEXT,
+      avatar_url TEXT,
+      banner_url TEXT,
+      bio TEXT,
+      status TEXT,
+      show_email BOOLEAN DEFAULT 1,
+      show_joined_date BOOLEAN DEFAULT 1,
+      is_deleted BOOLEAN DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
 
-  // Add is_deleted column if it doesn't exist (for soft deletes)
+  // Add profile columns if they don't exist (for existing databases)
+  const columnsToAdd = [
+    'avatar_url TEXT',
+    'banner_url TEXT',
+    'bio TEXT',
+    'status TEXT',
+    'show_email BOOLEAN DEFAULT 1',
+    'show_joined_date BOOLEAN DEFAULT 1'
+  ];
+
+  for (const columnDef of columnsToAdd) {
+    const columnName = columnDef.split(' ')[0];
+    try {
+      db.exec(`ALTER TABLE users ADD COLUMN ${columnDef}`);
+    } catch (err) {
+      // Column already exists, ignore the error
+    }
+  }
+
+  // Add is_deleted column if it doesn't exist (for soft deletes) - this check is now redundant but kept for safety
   try {
     db.exec(`ALTER TABLE users ADD COLUMN is_deleted BOOLEAN DEFAULT 0`);
   } catch (err) {
@@ -73,6 +99,12 @@ export interface User {
   id: number;
   email: string;
   display_name: string | null;
+  avatar_url: string | null;
+  banner_url: string | null;
+  bio: string | null;
+  status: string | null;
+  show_email: number;
+  show_joined_date: number;
   created_at: string;
   updated_at: string;
 }
@@ -118,7 +150,7 @@ export async function registerUser(
   `);
   const result = stmt.run(email, passwordHash, displayName || null);
 
-  const user = db.prepare('SELECT id, email, display_name, created_at, updated_at FROM users WHERE id = ? AND is_deleted = 0').get(result.lastInsertRowid) as User;
+  const user = db.prepare('SELECT id, email, display_name, avatar_url, banner_url, bio, status, show_email, show_joined_date, created_at, updated_at FROM users WHERE id = ? AND is_deleted = 0').get(result.lastInsertRowid) as User;
 
   // Create session
   const token = generateJWT(user.id);
@@ -156,6 +188,12 @@ export async function loginUser(
     id: userWithHash.id,
     email: userWithHash.email,
     display_name: userWithHash.display_name,
+    avatar_url: userWithHash.avatar_url || null,
+    banner_url: userWithHash.banner_url || null,
+    bio: userWithHash.bio || null,
+    status: userWithHash.status || null,
+    show_email: userWithHash.show_email ?? 1,
+    show_joined_date: userWithHash.show_joined_date ?? 1,
     created_at: userWithHash.created_at,
     updated_at: userWithHash.updated_at
   };
@@ -186,7 +224,7 @@ export function validateTokenAndGetUser(token: string): { user: User; session: S
     db.prepare('UPDATE sessions SET last_used_at = CURRENT_TIMESTAMP WHERE id = ?').run(session.id);
 
     // Get user
-    const user = db.prepare('SELECT id, email, display_name, created_at, updated_at FROM users WHERE id = ? AND is_deleted = 0').get(session.user_id) as User;
+    const user = db.prepare('SELECT id, email, display_name, avatar_url, banner_url, bio, status, show_email, show_joined_date, created_at, updated_at FROM users WHERE id = ? AND is_deleted = 0').get(session.user_id) as User;
 
     if (!user) {
       return null;
@@ -317,8 +355,67 @@ export function cleanupExpiredSessions(): number {
 export function updateUserDisplayName(userId: number, displayName: string): User {
   const db = getUsersDB();
   db.prepare('UPDATE users SET display_name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND is_deleted = 0').run(displayName, userId);
-  const user = db.prepare('SELECT id, email, display_name, created_at, updated_at FROM users WHERE id = ? AND is_deleted = 0').get(userId) as User;
+  const user = db.prepare('SELECT id, email, display_name, avatar_url, banner_url, bio, status, show_email, show_joined_date, created_at, updated_at FROM users WHERE id = ? AND is_deleted = 0').get(userId) as User;
   return user;
+}
+
+/**
+ * Update user avatar
+ */
+export function updateUserAvatar(userId: number, avatarUrl: string | null): User {
+  const db = getUsersDB();
+  db.prepare('UPDATE users SET avatar_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND is_deleted = 0').run(avatarUrl, userId);
+  const user = db.prepare('SELECT id, email, display_name, avatar_url, banner_url, bio, status, show_email, show_joined_date, created_at, updated_at FROM users WHERE id = ? AND is_deleted = 0').get(userId) as User;
+  return user;
+}
+
+/**
+ * Update user banner
+ */
+export function updateUserBanner(userId: number, bannerUrl: string | null): User {
+  const db = getUsersDB();
+  db.prepare('UPDATE users SET banner_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND is_deleted = 0').run(bannerUrl, userId);
+  const user = db.prepare('SELECT id, email, display_name, avatar_url, banner_url, bio, status, show_email, show_joined_date, created_at, updated_at FROM users WHERE id = ? AND is_deleted = 0').get(userId) as User;
+  return user;
+}
+
+/**
+ * Update user bio
+ */
+export function updateUserBio(userId: number, bio: string | null): User {
+  const db = getUsersDB();
+  db.prepare('UPDATE users SET bio = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND is_deleted = 0').run(bio, userId);
+  const user = db.prepare('SELECT id, email, display_name, avatar_url, banner_url, bio, status, show_email, show_joined_date, created_at, updated_at FROM users WHERE id = ? AND is_deleted = 0').get(userId) as User;
+  return user;
+}
+
+/**
+ * Update user status
+ */
+export function updateUserStatus(userId: number, status: string | null): User {
+  const db = getUsersDB();
+  db.prepare('UPDATE users SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND is_deleted = 0').run(status, userId);
+  const user = db.prepare('SELECT id, email, display_name, avatar_url, banner_url, bio, status, show_email, show_joined_date, created_at, updated_at FROM users WHERE id = ? AND is_deleted = 0').get(userId) as User;
+  return user;
+}
+
+/**
+ * Update user privacy settings
+ */
+export function updateUserPrivacy(userId: number, showEmail: boolean, showJoinedDate: boolean): User {
+  const db = getUsersDB();
+  db.prepare('UPDATE users SET show_email = ?, show_joined_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND is_deleted = 0').run(showEmail ? 1 : 0, showJoinedDate ? 1 : 0, userId);
+  const user = db.prepare('SELECT id, email, display_name, avatar_url, banner_url, bio, status, show_email, show_joined_date, created_at, updated_at FROM users WHERE id = ? AND is_deleted = 0').get(userId) as User;
+  return user;
+}
+
+/**
+ * Get user by ID (for viewing other profiles)
+ */
+export function getUserById(userId: number): User | null {
+  const db = getUsersDB();
+  const user = db.prepare('SELECT id, email, display_name, avatar_url, banner_url, bio, status, show_email, show_joined_date, created_at, updated_at FROM users WHERE id = ? AND is_deleted = 0').get(userId) as User | undefined;
+  return user || null;
 }
 
 /**

@@ -17,6 +17,12 @@ interface User {
   id: number
   email: string
   display_name: string | null
+  avatar_url: string | null
+  banner_url: string | null
+  bio: string | null
+  status: string | null
+  show_email: number
+  show_joined_date: number
   created_at: string
   updated_at: string
 }
