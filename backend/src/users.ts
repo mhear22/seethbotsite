@@ -27,6 +27,7 @@ export function initUsersDB(): Database.Database {
       show_email BOOLEAN DEFAULT 1,
       show_joined_date BOOLEAN DEFAULT 1,
       is_deleted BOOLEAN DEFAULT 0,
+      theme_preferences TEXT DEFAULT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
@@ -39,7 +40,8 @@ export function initUsersDB(): Database.Database {
     'bio TEXT',
     'status TEXT',
     'show_email BOOLEAN DEFAULT 1',
-    'show_joined_date BOOLEAN DEFAULT 1'
+    'show_joined_date BOOLEAN DEFAULT 1',
+    'theme_preferences TEXT DEFAULT NULL'
   ];
 
   for (const columnDef of columnsToAdd) {
@@ -121,6 +123,25 @@ export interface Session {
   expires_at: string;
   created_at: string;
   last_used_at: string;
+}
+
+/**
+ * Theme preferences interface
+ */
+export interface ThemePreferences {
+  preset: string;
+  customColors: {
+    primary: string;
+    background: string;
+    text: string;
+    accent: string;
+    cardBackground: string;
+  };
+  options: {
+    darkMode: boolean;
+    highContrast: boolean;
+    reduceMotion: boolean;
+  };
 }
 
 /**
@@ -474,3 +495,116 @@ export async function deleteUserAccount(userId: number, password: string): Promi
   // Still hard-delete sessions (ephemeral security tokens)
   deleteAllSessions(userId);
 }
+
+/**
+ * Validate hex color format
+ */
+function isValidHexColor(color: string): boolean {
+  return /^#[0-9A-Fa-f]{6}$/.test(color);
+}
+
+/**
+ * Validate theme preferences
+ */
+function validateThemePreferences(preferences: ThemePreferences): boolean {
+  // Validate preset
+  if (!preferences.preset || typeof preferences.preset !== 'string') {
+    return false;
+  }
+
+  // Validate custom colors
+  if (!preferences.customColors || typeof preferences.customColors !== 'object') {
+    return false;
+  }
+  const colorKeys = ['primary', 'background', 'text', 'accent', 'cardBackground'];
+  for (const key of colorKeys) {
+    if (!preferences.customColors[key as keyof typeof preferences.customColors] ||
+        typeof preferences.customColors[key as keyof typeof preferences.customColors] !== 'string' ||
+        !isValidHexColor(preferences.customColors[key as keyof typeof preferences.customColors])) {
+      return false;
+    }
+  }
+
+  // Validate options
+  if (!preferences.options || typeof preferences.options !== 'object') {
+    return false;
+  }
+  const optionKeys = ['darkMode', 'highContrast', 'reduceMotion'];
+  for (const key of optionKeys) {
+    if (typeof preferences.options[key as keyof typeof preferences.options] !== 'boolean') {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Get user's theme preferences
+ */
+export function getUserThemePreferences(userId: number): ThemePreferences {
+  const db = getUsersDB();
+  const row = db.prepare('SELECT theme_preferences FROM users WHERE id = ? AND is_deleted = 0').get(userId) as { theme_preferences: string | null } | undefined;
+
+  if (!row || !row.theme_preferences) {
+    // Return default theme preferences
+    return {
+      preset: 'dark',
+      customColors: {
+        primary: '#ec4899',
+        background: '#1a1a2e',
+        text: '#ffffff',
+        accent: '#f97316',
+        cardBackground: '#16213e'
+      },
+      options: {
+        darkMode: true,
+        highContrast: false,
+        reduceMotion: false
+      }
+    };
+  }
+
+  try {
+    return JSON.parse(row.theme_preferences) as ThemePreferences;
+  } catch (error) {
+    // If parsing fails, return default
+    return {
+      preset: 'dark',
+      customColors: {
+        primary: '#ec4899',
+        background: '#1a1a2e',
+        text: '#ffffff',
+        accent: '#f97316',
+        cardBackground: '#16213e'
+      },
+      options: {
+        darkMode: true,
+        highContrast: false,
+        reduceMotion: false
+      }
+    };
+  }
+}
+
+/**
+ * Update user's theme preferences
+ */
+export function updateUserThemePreferences(userId: number, preferences: ThemePreferences): ThemePreferences {
+  const db = getUsersDB();
+
+  // Validate preferences
+  if (!validateThemePreferences(preferences)) {
+    throw new Error('Invalid theme preferences');
+  }
+
+  // Store as JSON string
+  const preferencesJson = JSON.stringify(preferences);
+
+  // Update in database
+  db.prepare('UPDATE users SET theme_preferences = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND is_deleted = 0').run(preferencesJson, userId);
+
+  // Return updated preferences
+  return getUserThemePreferences(userId);
+}
+

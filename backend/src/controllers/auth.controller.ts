@@ -17,7 +17,9 @@ import {
   changeUserPassword,
   deleteUserAccount,
   cleanupExpiredSessions,
-  refreshToken
+  refreshToken,
+  getUserThemePreferences,
+  updateUserThemePreferences
 } from '../users';
 import { extractApiKey } from '../auth';
 
@@ -899,6 +901,158 @@ router.get('/profile/:id', (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error getting profile:', error);
     res.status(500).json({ error: 'Failed to get profile' });
+  }
+});
+
+/**
+ * @openapi
+ * /api/auth/theme:
+ *   get:
+ *     tags: [Authentication]
+ *     summary: Get user's theme preferences
+ *     description: Returns the authenticated user's theme preferences. Requires JWT token.
+ *     responses:
+ *       200:
+ *         description: Theme preferences retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 preferences:
+ *                   type: object
+ *                   properties:
+ *                     preset:
+ *                       type: string
+ *                     customColors:
+ *                       type: object
+ *                       properties:
+ *                         primary:
+ *                           type: string
+ *                         background:
+ *                           type: string
+ *                         text:
+ *                           type: string
+ *                         accent:
+ *                           type: string
+ *                         cardBackground:
+ *                           type: string
+ *                     options:
+ *                       type: object
+ *                       properties:
+ *                         darkMode:
+ *                           type: boolean
+ *                         highContrast:
+ *                           type: boolean
+ *                         reduceMotion:
+ *                           type: boolean
+ *       401:
+ *         description: Not authenticated
+ */
+router.get('/auth/theme', (req: Request, res: Response) => {
+  try {
+    const result = getUserFromToken(req);
+
+    if (!result) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const preferences = getUserThemePreferences(result.user.id);
+    res.json({ success: true, preferences });
+  } catch (error) {
+    console.error('Error getting theme preferences:', error);
+    res.status(500).json({ error: 'Failed to get theme preferences' });
+  }
+});
+
+/**
+ * @openapi
+ * /api/auth/theme:
+ *   put:
+ *     tags: [Authentication]
+ *     summary: Update user's theme preferences
+ *     description: Updates the authenticated user's theme preferences. Requires JWT token.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [preset, customColors, options]
+ *             properties:
+ *               preset:
+ *                 type: string
+ *                 description: Theme preset name (e.g., "dark", "light")
+ *               customColors:
+ *                 type: object
+ *                 required: [primary, background, text, accent, cardBackground]
+ *                 properties:
+ *                   primary:
+ *                     type: string
+ *                     description: Hex color code (#RRGGBB)
+ *                   background:
+ *                     type: string
+ *                     description: Hex color code (#RRGGBB)
+ *                   text:
+ *                     type: string
+ *                     description: Hex color code (#RRGGBB)
+ *                   accent:
+ *                     type: string
+ *                     description: Hex color code (#RRGGBB)
+ *                   cardBackground:
+ *                     type: string
+ *                     description: Hex color code (#RRGGBB)
+ *               options:
+ *                 type: object
+ *                 required: [darkMode, highContrast, reduceMotion]
+ *                 properties:
+ *                   darkMode:
+ *                     type: boolean
+ *                   highContrast:
+ *                     type: boolean
+ *                   reduceMotion:
+ *                     type: boolean
+ *     responses:
+ *       200:
+ *         description: Theme preferences updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 preferences:
+ *                   type: object
+ *       400:
+ *         description: Invalid theme preferences
+ *       401:
+ *         description: Not authenticated
+ */
+router.put('/auth/theme', (req: Request, res: Response) => {
+  try {
+    const result = getUserFromToken(req);
+
+    if (!result) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const { preferences } = req.body;
+
+    if (!preferences) {
+      return res.status(400).json({ error: 'Theme preferences are required' });
+    }
+
+    const updatedPreferences = updateUserThemePreferences(result.user.id, preferences);
+    res.json({ success: true, preferences: updatedPreferences });
+  } catch (error: any) {
+    if (error.message === 'Invalid theme preferences') {
+      return res.status(400).json({ error: error.message });
+    }
+    console.error('Error updating theme preferences:', error);
+    res.status(500).json({ error: 'Failed to update theme preferences' });
   }
 });
 
