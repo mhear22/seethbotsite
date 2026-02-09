@@ -38,6 +38,7 @@ import reactionsController from './controllers/reactions.controller';
 import profilesController from './controllers/profiles.controller';
 import favoritesController from './controllers/favorites.controller';
 import themesController from './controllers/themes.controller';
+import discordController from './controllers/discord.controller';
 import { setupWebSocketServer } from './controllers/presence.controller';
 import { initProfilesDB } from './services/profile.service';
 import { initFavoritesDB } from './services/favorites.service';
@@ -127,6 +128,7 @@ app.use('/api/reactions', reactionsController);
 app.use('/api/profiles', profilesController);
 app.use('/api/favorites', favoritesController);
 app.use('/api/themes', themesController);
+app.use('/api', discordController);
 
 // Serve raw OpenAPI JSON spec for type generation
 app.get('/api/openapi.json', (req: Request, res: Response) => {

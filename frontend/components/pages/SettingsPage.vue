@@ -4,6 +4,7 @@ import { useAppStore } from '../../stores/useAppStore'
 import ThemeSwitcher from '../settings/ThemeSwitcher.vue'
 import ThemeSettings from '../settings/ThemeSettings.vue'
 import SyncSettings from '../settings/SyncSettings.vue'
+import DiscordSettings from '../settings/DiscordSettings.vue'
 
 const appStore = useAppStore()
 
@@ -66,6 +67,10 @@ const resetToDefaults = () => {
 
       <div class="settings-section">
         <SyncSettings />
+      </div>
+
+      <div class="settings-section">
+        <DiscordSettings />
       </div>
 
       <div class="settings-section">

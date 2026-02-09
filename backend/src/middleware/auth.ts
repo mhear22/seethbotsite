@@ -22,6 +22,10 @@ declare global {
         display_name: string | null;
         created_at: string;
         updated_at: string;
+        discord_id: string | null;
+        discord_username: string | null;
+        discord_discriminator: string | null;
+        discord_avatar: string | null;
       };
       session?: {
         id: number;
