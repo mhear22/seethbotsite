@@ -352,6 +352,40 @@ const goBack = () => {
   router.push('/')
 }
 
+// Grant coolness points to selected user
+const grantCoolnessPoints = async () => {
+  if (!selectedTargetUser.value) {
+    alert('Please select a user to grant points to!')
+    return
+  }
+
+  if (count.value < 100) {
+    alert('You need at least 100 points to grant coolness points!')
+    return
+  }
+
+  if (!confirm(`Grant 100 coolness points to ${selectedTargetUser.value}? This will cost 100 idle clicker points.`)) {
+    return
+  }
+
+  try {
+    // Deduct 100 points from idle clicker
+    count.value -= 100
+    saveStats()
+
+    // Grant 100 points to selected user via API
+    await clicksRepository.addPoints(selectedTargetUser.value, 100)
+
+    alert(`✅ Successfully granted 100 coolness points to ${selectedTargetUser.value}!`)
+  } catch (error) {
+    console.error('Error granting coolness points:', error)
+    alert('❌ Failed to grant coolness points. Please try again.')
+    // Refund the points on error
+    count.value += 100
+    saveStats()
+  }
+}
+
 onMounted(async () => {
   // Initialize user ID
   userId.value = getOrCreateUserId()
@@ -528,6 +562,7 @@ onUnmounted(() => {
         <!-- Actions -->
         <div class="actions-section">
           <button class="action-btn back-btn" @click="goBack" aria-label="Return to home page">← Back Home</button>
+          <button class="action-btn grant-btn" @click="grantCoolnessPoints" aria-label="Grant 100 coolness points to selected user">🎁 Grant 100 Coolness Points</button>
           <button class="action-btn reset-btn" @click="resetClicks" aria-label="Reset all progress">🔄 Reset</button>
         </div>
       </div>
@@ -862,6 +897,18 @@ onUnmounted(() => {
 
 .reset-btn:hover {
   background: rgba(255, 82, 82, 0.3);
+}
+
+.grant-btn {
+  background: linear-gradient(135deg, #a8e063 0%, #56ab2f 100%);
+  color: #fff;
+  border: none;
+}
+
+.grant-btn:hover {
+  background: linear-gradient(135deg, #56ab2f 0%, #3d8a1f 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(168, 224, 99, 0.4);
 }
 
 /* Responsive */
