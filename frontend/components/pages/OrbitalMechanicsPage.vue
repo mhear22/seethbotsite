@@ -47,7 +47,12 @@ let cameraAngle = 0
 let cameraRadius = 80
 
 // Black hole distortion effect
-let blackHoleMaterial: THREE.ShaderMaterial | null = null
+let blackHoleMaterial: THREE.Material | null = null
+
+// Gravitational lensing render target
+let lensingTarget: THREE.WebGLRenderTarget | null = null
+let lensingMaterial: THREE.ShaderMaterial | null = null
+let lensingQuad: THREE.Mesh | null = null
 
 onMounted(() => {
   initScene()
@@ -86,6 +91,95 @@ function initScene() {
   renderer.setSize(window.innerWidth, window.innerHeight)
   renderer.setPixelRatio(window.devicePixelRatio)
 
+  // Setup gravitational lensing render target
+  lensingTarget = markRaw(new THREE.WebGLRenderTarget(
+    window.innerWidth,
+    window.innerHeight,
+    {
+      minFilter: THREE.LinearFilter,
+      magFilter: THREE.LinearFilter,
+      format: THREE.RGBAFormat
+    }
+  ))
+
+  // Setup lensing post-processing shader
+  lensingMaterial = markRaw(new THREE.ShaderMaterial({
+    uniforms: {
+      tDiffuse: { value: null },
+      schwarzschildRadius: { value: 3.0 },
+      lensingStrength: { value: 15.0 }
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform sampler2D tDiffuse;
+      uniform float schwarzschildRadius;
+      uniform float lensingStrength;
+
+      varying vec2 vUv;
+
+      void main() {
+        // Black hole position in screen space (normalized to -1 to 1)
+        vec2 bhPos = vec2(0.0, 0.0);
+
+        // Calculate distance from current pixel to black hole center
+        vec2 delta = vUv - bhPos;
+        float dist = length(delta);
+
+        // Gravitational lensing: bend light rays
+        // The bending angle is proportional to 1/r
+        // Einstein ring occurs at a specific radius
+        float einsteinRadius = schwarzschildRadius * 0.03;
+
+        // Calculate lensing distortion
+        float lensingFactor = 0.0;
+        if (dist > einsteinRadius * 0.5) {
+          lensingFactor = lensingStrength * einsteinRadius / dist;
+        } else {
+          lensingFactor = 0.0;
+        }
+
+        // Apply lensing to UV coordinates
+        vec2 distortedUv = vUv - delta * lensingFactor;
+
+        // Create event horizon (black center)
+        float eventHorizon = smoothstep(einsteinRadius * 0.5, einsteinRadius * 0.6, dist);
+        vec3 color = texture2D(tDiffuse, distortedUv).rgb;
+
+        // Apply event horizon blackness
+        color *= eventHorizon;
+
+        // Add Einstein ring glow
+        float einsteinRing = smoothstep(einsteinRadius * 0.95, einsteinRadius, dist) *
+                           (1.0 - smoothstep(einsteinRadius, einsteinRadius * 1.05, dist));
+        vec3 ringColor = vec3(1.0, 0.95, 0.9) * einsteinRing * 0.5;
+        color += ringColor;
+
+        // Add accretion disk glow
+        float diskGlow = smoothstep(einsteinRadius * 0.6, einsteinRadius, dist) *
+                        (1.0 - smoothstep(einsteinRadius * 1.3, einsteinRadius * 1.5, dist));
+        vec3 accretionColor = mix(
+          vec3(0.8, 0.4, 0.0),
+          vec3(1.0, 0.6, 0.1),
+          diskGlow
+        ) * diskGlow * 0.3;
+        color += accretionColor;
+
+        gl_FragColor = vec4(color, 1.0);
+      }
+    `
+  }))
+
+  // Create full-screen quad for post-processing
+  const quadGeometry = new THREE.PlaneGeometry(2, 2)
+  lensingQuad = markRaw(new THREE.Mesh(quadGeometry, lensingMaterial))
+  scene?.add(lensingQuad)
+
   // Ambient light
   const ambientLight = new THREE.AmbientLight(0x333333)
   scene.add(ambientLight)
@@ -98,8 +192,7 @@ function initScene() {
   // Create the sun
   const sunGeometry = new THREE.SphereGeometry(4, 32, 32)
   const sunMaterial = new THREE.MeshBasicMaterial({
-    color: 0xffdd00,
-    emissive: 0xffaa00
+    color: 0xffdd00
   })
   sun = markRaw(new THREE.Mesh(sunGeometry, sunMaterial))
   sun.userData.isGlowing = true
@@ -210,160 +303,12 @@ function createOrbitLines() {
 }
 
 function createBlackHole() {
-  // Create black hole sphere with distortion shader
-  const blackHoleGeometry = new THREE.SphereGeometry(8, 64, 64)
-
-  blackHoleMaterial = markRaw(new THREE.ShaderMaterial({
-    uniforms: {
-      time: { value: 0 },
-      viewVector: { value: new THREE.Vector3() }
-    },
-    vertexShader: `
-      varying vec3 vNormal;
-      varying vec3 vViewPosition;
-      varying vec2 vUv;
-      varying vec3 vWorldPosition;
-
-      void main() {
-        vNormal = normalize(normalMatrix * normal);
-        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-        vViewPosition = -mvPosition.xyz;
-        vUv = uv;
-        vWorldPosition = position;
-
-        // Enhanced gravitational distortion - space warping near the black hole
-        float distFromCenter = length(position.xy);
-        float gravitationalDistortion = 1.0 / (1.0 + distFromCenter * 0.05);
-
-        // Radial stretching effect (spaghettification)
-        float radialStretch = 1.0 + 0.3 * gravitationalDistortion;
-
-        // Tangential compression (space gets squeezed)
-        float tangentialCompression = 1.0 - 0.15 * gravitationalDistortion;
-
-        // Complex wave distortion pattern
-        float wave1 = sin(vUv.y * 20.0 + time) * 0.1 * gravitationalDistortion;
-        float wave2 = cos(vUv.x * 15.0 + time * 1.5) * 0.08 * gravitationalDistortion;
-
-        vec3 distortedPosition = position * radialStretch;
-        distortedPosition.x *= tangentialCompression;
-        distortedPosition.y *= tangentialCompression;
-        distortedPosition.x += wave1;
-        distortedPosition.y += wave2;
-
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(distortedPosition, 1.0);
-      }
-    `,
-    fragmentShader: `
-      uniform float time;
-      uniform vec3 viewVector;
-      varying vec3 vNormal;
-      varying vec3 vViewPosition;
-      varying vec2 vUv;
-      varying vec3 vWorldPosition;
-
-      void main() {
-        vec3 viewDir = normalize(viewVector);
-        float rim = 1.0 - max(0.0, dot(viewDir, vNormal));
-
-        // Distance from center for various effects
-        float distFromCenter = distance(vUv, vec2(0.5));
-
-        // Event horizon - deeper black center
-        float eventHorizonCore = smoothstep(0.15, 0.22, distFromCenter);
-        float eventHorizonGlow = smoothstep(0.22, 0.35, distFromCenter);
-
-        // Enhanced accretion disk with multiple bands
-        float diskInner = smoothstep(0.25, 0.30, abs(vUv.y - 0.5));
-        float diskMid = smoothstep(0.30, 0.45, abs(vUv.y - 0.5));
-        float diskOuter = smoothstep(0.45, 0.55, abs(vUv.y - 0.5));
-
-        // Hot accretion disk colors (orange/red/white hot plasma)
-        vec3 diskColorInner = vec3(1.0, 0.9, 0.7); // White hot
-        vec3 diskColorMid = vec3(1.0, 0.5, 0.1);   // Orange
-        vec3 diskColorOuter = vec3(0.8, 0.2, 0.05); // Red
-
-        // Animated swirling patterns in the accretion disk
-        float swirl1 = sin(time * 3.0 + vUv.x * 15.0) * 0.5 + 0.5;
-        float swirl2 = cos(time * 2.5 - vUv.y * 12.0) * 0.5 + 0.5;
-        float swirl3 = sin(time * 4.0 + vUv.x * 8.0 + vUv.y * 8.0) * 0.5 + 0.5;
-
-        // Combine swirl patterns
-        vec3 animatedDiskColor = vec3(0.0);
-        animatedDiskColor += diskColorInner * diskInner * swirl1;
-        animatedDiskColor += diskColorMid * diskMid * swirl2;
-        animatedDiskColor += diskColorOuter * diskOuter * swirl3;
-
-        // Enhanced gravitational lensing effect
-        float lensingIntensity = rim * 3.5;
-
-        // Blue shift at the edges (light getting pulled in)
-        vec3 lensingBlue = vec3(0.0, 0.3, 0.8) * lensingIntensity * 0.8;
-
-        // Red shift on the opposite side (light escaping)
-        vec3 lensingRed = vec3(0.8, 0.1, 0.0) * lensingIntensity * 0.4;
-
-        // Combine lensing based on viewing angle
-        float blueShift = smoothstep(0.5, 1.0, vUv.x);
-        vec3 lensingColor = mix(lensingRed, lensingBlue, blueShift);
-
-        // Einstein ring effect - bright ring around the event horizon
-        float einsteinRing = smoothstep(0.30, 0.32, distFromCenter) * (1.0 - smoothstep(0.32, 0.35, distFromCenter));
-        vec3 ringColor = vec3(1.0, 0.95, 0.9) * einsteinRing * 2.0;
-
-        // Photon sphere - extremely bright ring
-        float photonSphere = smoothstep(0.28, 0.29, distFromCenter) * (1.0 - smoothstep(0.29, 0.30, distFromCenter));
-        vec3 photonColor = vec3(1.0, 1.0, 0.95) * photonSphere * 3.0;
-
-        // Time dilation effect - colors shift over time near the event horizon
-        float timeDilation = (1.0 - eventHorizonCore) * 0.5;
-        vec3 timeShift = vec3(
-          sin(time * 2.0 + vUv.x * 10.0),
-          cos(time * 1.8 + vUv.y * 8.0),
-          sin(time * 2.2 + vUv.x * 6.0 + vUv.y * 6.0)
-        ) * timeDilation * 0.2;
-
-        // Wrap-around lensing - stars visible "behind" the black hole
-        float wrapAround = smoothstep(0.2, 0.4, distFromCenter) * (1.0 - smoothstep(0.4, 0.5, distFromCenter));
-        vec3 wrapColor = vec3(0.6, 0.4, 0.8) * wrapAround * 1.5;
-
-        // Outer corona glow
-        float corona = rim * rim * 2.0;
-        vec3 coronaColor = vec3(0.3, 0.15, 0.6) * corona;
-
-        // Combine all effects
-        vec3 finalColor = vec3(0.0);
-
-        // Black event horizon core
-        finalColor = mix(vec3(0.0, 0.0, 0.0), finalColor, eventHorizonCore);
-
-        // Add glowing edge to event horizon
-        finalColor += animatedDiskColor * eventHorizonGlow;
-
-        // Add Einstein ring and photon sphere
-        finalColor += ringColor;
-        finalColor += photonColor;
-
-        // Add gravitational lensing
-        finalColor += lensingColor;
-
-        // Add wrap-around effect
-        finalColor += wrapColor;
-
-        // Add time dilation color shift
-        finalColor += timeShift;
-
-        // Add outer corona
-        finalColor += coronaColor;
-
-        // Ensure we don't go above 1.0 in any channel too much
-        finalColor = clamp(finalColor, 0.0, 1.5);
-
-        gl_FragColor = vec4(finalColor, 1.0);
-      }
-    `,
+  // Create black hole sphere (simple black sphere - the lensing is done in post-processing)
+  const blackHoleGeometry = new THREE.SphereGeometry(3, 32, 32)
+  blackHoleMaterial = markRaw(new THREE.MeshBasicMaterial({
+    color: 0x000000,
     transparent: true,
-    side: THREE.DoubleSide
+    opacity: 1.0
   }))
 
   blackHole = markRaw(new THREE.Mesh(blackHoleGeometry, blackHoleMaterial))
@@ -403,6 +348,10 @@ function createBlackHole() {
   const accretionDisk3 = markRaw(new THREE.Mesh(diskGeometry3, diskMaterial3))
   accretionDisk3.rotation.x = Math.PI / 2.7
   blackHole.add(accretionDisk3)
+
+  // Rotate accretion disks at different speeds
+  blackHole.userData.disks = [accretionDisk1, accretionDisk2, accretionDisk3]
+  blackHole.userData.diskSpeeds = [0.003, 0.002, 0.001]
 }
 
 function createStars() {
@@ -468,16 +417,14 @@ function updateCamera() {
 }
 
 function updateBlackHole(time: number) {
-  if (blackHoleMaterial) {
-    blackHoleMaterial.uniforms.time.value = time * 0.001
-    if (camera) {
-      blackHoleMaterial.uniforms.viewVector.value.copy(camera.position)
-    }
-  }
-
   // Slowly rotate the black hole
   if (blackHole) {
     blackHole.rotation.y += 0.001
+
+    // Rotate accretion disks at different speeds
+    blackHole.userData.disks.forEach((disk: THREE.Mesh, index: number) => {
+      disk.rotation.z += blackHole.userData.diskSpeeds[index]
+    })
   }
 }
 
@@ -509,8 +456,27 @@ function animate() {
   // Update black hole shader
   updateBlackHole(time)
 
-  // Render
-  renderer?.render(scene!, camera!)
+  // Gravitational lensing post-processing
+  if (renderer && scene && camera && lensingTarget && lensingQuad && lensingMaterial) {
+    // Remove lensing quad from scene
+    scene.remove(lensingQuad)
+
+    // Render scene to render target
+    renderer.setRenderTarget(lensingTarget)
+    renderer.render(scene, camera)
+
+    // Set back to default framebuffer
+    renderer.setRenderTarget(null)
+
+    // Update lensing material
+    lensingMaterial.uniforms.tDiffuse.value = lensingTarget.texture
+
+    // Render lensing effect
+    scene.add(lensingQuad)
+    renderer.render(scene, camera)
+  } else {
+    renderer?.render(scene!, camera!)
+  }
 }
 
 function handleResize() {
@@ -519,6 +485,11 @@ function handleResize() {
   camera.aspect = window.innerWidth / window.innerHeight
   camera.updateProjectionMatrix()
   renderer.setSize(window.innerWidth, window.innerHeight)
+
+  // Resize lensing render target
+  if (lensingTarget) {
+    lensingTarget.setSize(window.innerWidth, window.innerHeight)
+  }
 }
 
 function cleanup() {
@@ -561,6 +532,23 @@ function cleanup() {
     } else {
       blackHole.material.dispose()
     }
+  }
+
+  if (lensingMaterial) {
+    lensingMaterial.dispose()
+  }
+
+  if (lensingQuad) {
+    lensingQuad.geometry.dispose()
+    if (Array.isArray(lensingQuad.material)) {
+      lensingQuad.material.forEach((m) => m.dispose())
+    } else {
+      lensingQuad.material.dispose()
+    }
+  }
+
+  if (lensingTarget) {
+    lensingTarget.dispose()
   }
 
   if (renderer) {
