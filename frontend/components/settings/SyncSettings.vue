@@ -16,7 +16,9 @@ const {
   handleConflict,
   updateSettings,
   fetchConnectedDevices,
-  clearConflicts
+  clearConflicts,
+  initSync,
+  cleanupSync
 } = useSync()
 
 // Local state
@@ -143,12 +145,15 @@ const refreshDevices = async () => {
 // Lifecycle
 onMounted(() => {
   if (isAuthenticated.value) {
+    // Initialize sync functionality
+    initSync()
     refreshDevices()
   }
 })
 
 onUnmounted(() => {
-  // Cleanup if needed
+  // Cleanup sync when component unmounts
+  cleanupSync()
 })
 </script>
 
