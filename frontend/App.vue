@@ -9,6 +9,8 @@ import { useTheme } from './composables/useTheme'
 import { useAuth } from './composables/useAuth'
 import { useSync } from './composables/useSync'
 import { useKeyboardShortcuts, type Shortcut } from './composables/useKeyboardShortcuts'
+import { useSwipeGestures } from './composables/useSwipeGestures'
+import SwipeIndicator from './components/shared/SwipeIndicator.vue'
 
 // Stores
 const appStore = useAppStore()
@@ -20,6 +22,11 @@ const route = useRoute()
 // Keyboard shortcuts
 const keyboardShortcuts = useKeyboardShortcuts()
 const showKeyboardHelp = ref(false)
+
+// Swipe gestures (Ticket #129)
+const swipeGestures = useSwipeGestures()
+const swipeDirection = ref<string | null>(null)
+const swipeProgress = ref(0)
 
 // Initialize theme (applies automatically via useTheme onMounted)
 useTheme()
@@ -237,19 +244,75 @@ onMounted(() => {
   shortcuts.forEach(shortcut => {
     keyboardShortcuts.registerShortcut(shortcut)
   })
+
+  // Initialize swipe gestures visual feedback (Ticket #129)
+  window.addEventListener('swipe-progress', handleSwipeProgress)
+  window.addEventListener('swipe-detected', handleSwipeDetected)
+  window.addEventListener('swipe-up', handleSwipeUp)
+  window.addEventListener('swipe-down', handleSwipeDown)
 })
+
+// Handle swipe progress for visual feedback
+const handleSwipeProgress = (event: CustomEvent) => {
+  const { deltaX, deltaY } = event.detail
+  const absX = Math.abs(deltaX)
+  const absY = Math.abs(deltaY)
+
+  // Determine direction based on which axis has more movement
+  if (absX > absY) {
+    swipeDirection.value = deltaX > 0 ? 'right' : 'left'
+    swipeProgress.value = Math.min(absX / swipeGestures.sensitivity.value, 1)
+  } else {
+    swipeDirection.value = deltaY > 0 ? 'down' : 'up'
+    swipeProgress.value = Math.min(absY / swipeGestures.sensitivity.value, 1)
+  }
+}
+
+// Handle swipe detected event
+const handleSwipeDetected = (event: CustomEvent) => {
+  const { direction } = event.detail
+  swipeDirection.value = direction
+  swipeProgress.value = 1
+
+  // Clear visual feedback after animation
+  setTimeout(() => {
+    swipeDirection.value = null
+    swipeProgress.value = 0
+  }, 300)
+}
+
+// Handle swipe up event (open panel)
+const handleSwipeUp = (event: CustomEvent) => {
+  // Logic to open next panel can be handled by appStore
+  // This is a placeholder for panel management
+  console.log('Swipe up detected - open panel')
+}
+
+// Handle swipe down event (close panel)
+const handleSwipeDown = (event: CustomEvent) => {
+  // Logic to close current panel can be handled by appStore
+  // This is a placeholder for panel management
+  console.log('Swipe down detected - close panel')
+}
 
 // Cleanup sync on unmount
 onUnmounted(() => {
   if (isAuthenticated.value) {
     cleanupSync()
   }
+
+  // Cleanup swipe gesture event listeners
+  window.removeEventListener('swipe-progress', handleSwipeProgress)
+  window.removeEventListener('swipe-detected', handleSwipeDetected)
+  window.removeEventListener('swipe-up', handleSwipeUp)
+  window.removeEventListener('swipe-down', handleSwipeDown)
 })
 </script>
 
 <template>
   <MainApp />
   <KeyboardShortcutsHelp :is-open="showKeyboardHelp" @close="showKeyboardHelp = false" />
+  <SwipeIndicator v-if="swipeGestures.settings.visualFeedback" :direction="swipeDirection" :progress="swipeProgress" />
 </template>
 
 <style>
