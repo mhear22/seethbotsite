@@ -42,7 +42,7 @@ export async function initFavoritesDB(): Promise<Database.Database> {
   const db = new Database(DB_PATH);
 
   // Read and execute the migration
-  const migrationPath = path.join(__dirname, '..', '..', 'migrations', '002_add_user_favorites.sql');
+  const migrationPath = path.join(__dirname, '..', 'migrations', '002_add_user_favorites.sql');
   try {
     const migrationSQL = await fs.readFile(migrationPath, 'utf-8');
     db.exec(migrationSQL);

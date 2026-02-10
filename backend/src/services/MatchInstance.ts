@@ -12,14 +12,14 @@ import {
   MatchStats,
   PlayerInput,
   MechLoadout
-} from '../../../shared/types/NetworkMessages';
+} from '../shared/types/NetworkMessages';
 import {
   NETWORK,
   ARENA,
   MECH,
   PHYSICS,
   COMBAT
-} from '../../../shared/constants/GameConstants';
+} from '../shared/constants/GameConstants';
 import { MechEntity } from '../game/MechEntity';
 import { ProjectileSystem } from '../game/ProjectileSystem';
 

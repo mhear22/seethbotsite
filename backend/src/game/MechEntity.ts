@@ -2,8 +2,8 @@
  * Server-side mech entity for authoritative state management
  */
 
-import { PlayerState, MechLoadout } from '../../../shared/types/NetworkMessages';
-import { MECH } from '../../../shared/constants/GameConstants';
+import { PlayerState, MechLoadout } from '../shared/types/NetworkMessages';
+import { MECH } from '../shared/constants/GameConstants';
 
 export class MechEntity {
   public playerId: string;

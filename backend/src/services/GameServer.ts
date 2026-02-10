@@ -13,8 +13,8 @@ import {
   MatchFoundMessage,
   ArenaBuilding,
   MechLoadout
-} from '../../../shared/types/NetworkMessages';
-import { ARENA, MATCHMAKING } from '../../../shared/constants/GameConstants';
+} from '../shared/types/NetworkMessages';
+import { ARENA, MATCHMAKING } from '../shared/constants/GameConstants';
 
 interface ConnectedPlayer {
   playerId: string;

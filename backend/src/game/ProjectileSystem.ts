@@ -2,8 +2,8 @@
  * Server-side projectile system with lag compensation
  */
 
-import { ProjectileState } from '../../../shared/types/NetworkMessages';
-import { COMBAT, PHYSICS } from '../../../shared/constants/GameConstants';
+import { ProjectileState } from '../shared/types/NetworkMessages';
+import { COMBAT, PHYSICS } from '../shared/constants/GameConstants';
 import { MechEntity } from './MechEntity';
 
 interface Projectile {

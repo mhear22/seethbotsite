@@ -3,8 +3,8 @@
  * Implements FIFO queue for 1v1 matches
  */
 
-import { MechLoadout } from '../../../shared/types/NetworkMessages';
-import { MATCHMAKING } from '../../../shared/constants/GameConstants';
+import { MechLoadout } from '../shared/types/NetworkMessages';
+import { MATCHMAKING } from '../shared/constants/GameConstants';
 
 export interface QueuedPlayer {
   playerId: string;

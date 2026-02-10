@@ -6,7 +6,7 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { IncomingMessage } from 'http';
 import { gameServer } from '../services/GameServer';
-import { ClientMessage } from '../../../shared/types/NetworkMessages';
+import { ClientMessage } from '../shared/types/NetworkMessages';
 import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
