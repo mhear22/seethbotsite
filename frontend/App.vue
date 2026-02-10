@@ -29,6 +29,10 @@ const swipeGestures = useSwipeGestures()
 const swipeDirection = ref<string | null>(null)
 const swipeProgress = ref(0)
 
+// Memory leak fix: Store interval/timeout IDs for cleanup
+let heartSpawnTimeout: ReturnType<typeof setTimeout> | null = null
+let rankingsInterval: ReturnType<typeof setInterval> | null = null
+
 // Initialize theme (applies automatically via useTheme onMounted)
 useTheme()
 
@@ -49,12 +53,12 @@ watch(() => route.path, (newPath) => {
 onMounted(() => {
   document.body.classList.toggle('dark', appStore.darkMode)
 
-  // Only spawn hearts if not in performance mode (Ticket #perf)
+  // Only spawn hearts if not in performance mode (Ticket #perf) - MEMORY LEAK FIX
   const spawnHeart = () => {
     if (!appStore.performanceMode) {
       appStore.createHeart()
     }
-    setTimeout(spawnHeart, appStore.heartSpawnRate)
+    heartSpawnTimeout = setTimeout(spawnHeart, appStore.heartSpawnRate)
   }
   spawnHeart()
 
@@ -81,8 +85,8 @@ onMounted(() => {
   // Riddle answer for Orlando 🍆
   console.log('🩺 Riddle Answer: The surgeon is his mother.')
 
-  // Refresh rankings every 30 seconds
-  setInterval(appStore.loadRankings, 30000)
+  // Refresh rankings every 30 seconds - MEMORY LEAK FIX
+  rankingsInterval = setInterval(appStore.loadRankings, 30000)
 
   // Check auth state on mount (Ticket #197)
   // This ensures the auth store is properly initialized
@@ -325,6 +329,16 @@ onUnmounted(() => {
   window.removeEventListener('swipe-detected', handleSwipeDetected)
   window.removeEventListener('swipe-up', handleSwipeUp)
   window.removeEventListener('swipe-down', handleSwipeDown)
+
+  // MEMORY LEAK FIX: Clear intervals and timeouts
+  if (heartSpawnTimeout) {
+    clearTimeout(heartSpawnTimeout)
+    heartSpawnTimeout = null
+  }
+  if (rankingsInterval) {
+    clearInterval(rankingsInterval)
+    rankingsInterval = null
+  }
 })
 </script>
 
