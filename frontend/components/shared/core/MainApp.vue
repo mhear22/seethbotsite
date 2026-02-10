@@ -360,16 +360,16 @@ onUnmounted(() => {
 
   <!-- Audio elements -->
   <audio id="newMusic">
-    <source src="/newMusic.mp3" type="audio/mpeg">
+    <source src="/sounds/newMusic.mp3" type="audio/mpeg">
   </audio>
   <audio id="fartSound">
-    <source src="/fart-with-reverb.mp3" type="audio/mpeg">
+    <source src="/sounds/fart-with-reverb.mp3" type="audio/mpeg">
   </audio>
   <audio id="buttonSound">
-    <source src="/button-sound.mp3" type="audio/mpeg">
+    <source src="/sounds/button-sound.mp3" type="audio/mpeg">
   </audio>
   <audio id="gooseHonk">
-    <source src="/honk-sound.mp3" type="audio/mpeg">
+    <source src="/sounds/goose-honk.mp3" type="audio/mpeg">
   </audio>
 </template>
 

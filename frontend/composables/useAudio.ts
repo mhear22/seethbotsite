@@ -1,7 +1,19 @@
 import { ref } from 'vue'
 
 export function useAudio() {
-  const muted = ref(false)
+  // Load sound preferences from localStorage (managed by useTheme)
+  const savedSoundPrefs = localStorage.getItem('soundPreferences')
+  const soundPrefs = savedSoundPrefs ? JSON.parse(savedSoundPrefs) : {
+    soundsEnabled: true,
+    notificationSoundsEnabled: true,
+    musicEnabled: true,
+    soundVolume: 0.5
+  }
+
+  const muted = ref(!soundPrefs.soundsEnabled)
+  const notificationSoundsEnabled = ref(soundPrefs.notificationSoundsEnabled)
+  const musicEnabled = ref(soundPrefs.musicEnabled)
+  const soundVolume = ref(soundPrefs.soundVolume)
 
   const playSound = (elementId: string, options?: { volume?: number; startTime?: number; rate?: number }) => {
     if (muted.value) return
@@ -16,8 +28,9 @@ export function useAudio() {
     // Ensure audio doesn't loop (fix for button sound looping issue)
     audio.loop = false
 
-    // Set volume (clamp between 0 and 1) - default to 0.5 (50%) as per ticket #172
-    audio.volume = Math.min(Math.max(options?.volume ?? 0.5, 0), 1.0)
+    // Set volume - use preference volume if no override provided
+    const volume = options?.volume ?? soundVolume.value
+    audio.volume = Math.min(Math.max(volume, 0), 1.0)
 
     // Set playback rate for variety (if supported)
     if (options?.rate && audio.playbackRate !== undefined) {
@@ -32,14 +45,17 @@ export function useAudio() {
   const playFart = async (volume?: number, forceSimple: boolean = false) => {
     if (muted.value) return
 
+    // Use preference volume if no override provided
+    const vol = volume ?? soundVolume.value
+
     // Try to use enhanced fart audio processing if available
     try {
       const { useFartAudio } = await import('./useFartAudio')
       const { playFart: playFartEnhanced } = useFartAudio()
-      await playFartEnhanced(volume, forceSimple)
+      await playFartEnhanced(vol, forceSimple)
     } catch (error) {
       console.log('Enhanced fart audio not available, using simple playback')
-      playSound('fartSound', { volume: volume })
+      playSound('fartSound', { volume: vol })
     }
   }
 
@@ -47,9 +63,9 @@ export function useAudio() {
     const music = document.getElementById('newMusic') as HTMLAudioElement
     if (!music) return
 
-    if (playing && !muted.value) {
-      // Set music to 50% volume (ticket #172)
-      music.volume = 0.5
+    if (playing && !muted.value && musicEnabled.value) {
+      // Use preference volume
+      music.volume = soundVolume.value
       music.play().catch(err => console.log('Music play failed:', err))
     } else {
       music.pause()
@@ -68,6 +84,31 @@ export function useAudio() {
 
   const unmuteAll = () => {
     muted.value = false
+    // Update preferences in localStorage
+    const currentPrefs = JSON.parse(localStorage.getItem('soundPreferences') || '{}')
+    currentPrefs.soundsEnabled = true
+    localStorage.setItem('soundPreferences', JSON.stringify(currentPrefs))
+  }
+
+  // Update sound preferences
+  const updateSoundPreferences = (prefs: Partial<typeof soundPrefs>) => {
+    if (prefs.soundsEnabled !== undefined) {
+      muted.value = !prefs.soundsEnabled
+    }
+    if (prefs.notificationSoundsEnabled !== undefined) {
+      notificationSoundsEnabled.value = prefs.notificationSoundsEnabled
+    }
+    if (prefs.musicEnabled !== undefined) {
+      musicEnabled.value = prefs.musicEnabled
+    }
+    if (prefs.soundVolume !== undefined) {
+      soundVolume.value = prefs.soundVolume
+    }
+
+    // Update preferences in localStorage
+    const currentPrefs = JSON.parse(localStorage.getItem('soundPreferences') || '{}')
+    const newPrefs = { ...currentPrefs, ...soundPrefs, ...prefs }
+    localStorage.setItem('soundPreferences', JSON.stringify(newPrefs))
   }
 
   // Sound effect for button clicks - 50% volume (ticket #172)
@@ -134,6 +175,11 @@ export function useAudio() {
     playPurchase,
     toggleMusic,
     muteAll,
-    unmuteAll
+    unmuteAll,
+    updateSoundPreferences,
+    soundVolume,
+    muted,
+    musicEnabled,
+    notificationSoundsEnabled
   }
 }

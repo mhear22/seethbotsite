@@ -15,6 +15,10 @@ export interface ThemeOptions {
   darkMode: boolean
   highContrast: boolean
   reduceMotion: boolean
+  soundsEnabled: boolean
+  notificationSoundsEnabled: boolean
+  musicEnabled: boolean
+  soundVolume: number
 }
 
 export interface ThemePreset {
@@ -135,7 +139,11 @@ const DEFAULT_CUSTOM_COLORS: ThemeColors = {
 const DEFAULT_OPTIONS: ThemeOptions = {
   darkMode: false,
   highContrast: false,
-  reduceMotion: false
+  reduceMotion: false,
+  soundsEnabled: true,
+  notificationSoundsEnabled: true,
+  musicEnabled: true,
+  soundVolume: 0.5
 }
 
 // Custom style element ID
@@ -225,6 +233,18 @@ export function useTheme() {
     }
   }
 
+  // Apply sound preferences
+  const applySoundPreferences = () => {
+    // Store sound preferences in localStorage for useAudio composable
+    const soundPrefs = {
+      soundsEnabled: settings.value.options.soundsEnabled,
+      notificationSoundsEnabled: settings.value.options.notificationSoundsEnabled,
+      musicEnabled: settings.value.options.musicEnabled,
+      soundVolume: settings.value.options.soundVolume
+    }
+    localStorage.setItem('soundPreferences', JSON.stringify(soundPrefs))
+  }
+
   // Apply custom CSS
   const applyCustomCSS = (css: string) => {
     let styleEl = document.getElementById(CUSTOM_STYLE_ID) as HTMLStyleElement
@@ -250,6 +270,7 @@ export function useTheme() {
   const applyTheme = () => {
     applyThemeColors(currentColors.value)
     applyMotionPreferences()
+    applySoundPreferences()
 
     if (settings.value.customCSS) {
       applyCustomCSS(settings.value.customCSS)
@@ -283,7 +304,11 @@ export function useTheme() {
         options: {
           darkMode: preferences.options.darkMode,
           highContrast: preferences.options.highContrast,
-          reduceMotion: preferences.options.reduceMotion
+          reduceMotion: preferences.options.reduceMotion,
+          soundsEnabled: preferences.options.soundsEnabled ?? DEFAULT_OPTIONS.soundsEnabled,
+          notificationSoundsEnabled: preferences.options.notificationSoundsEnabled ?? DEFAULT_OPTIONS.notificationSoundsEnabled,
+          musicEnabled: preferences.options.musicEnabled ?? DEFAULT_OPTIONS.musicEnabled,
+          soundVolume: preferences.options.soundVolume ?? DEFAULT_OPTIONS.soundVolume
         },
         customCSS: '',
         useCustomColors: false
@@ -320,7 +345,11 @@ export function useTheme() {
         options: {
           darkMode: settings.value.options.darkMode,
           highContrast: settings.value.options.highContrast,
-          reduceMotion: settings.value.options.reduceMotion
+          reduceMotion: settings.value.options.reduceMotion,
+          soundsEnabled: settings.value.options.soundsEnabled,
+          notificationSoundsEnabled: settings.value.options.notificationSoundsEnabled,
+          musicEnabled: settings.value.options.musicEnabled,
+          soundVolume: settings.value.options.soundVolume
         }
       }
 

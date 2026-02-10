@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useTheme } from '../../composables/useTheme'
+import { useAudio } from '../../composables/useAudio'
 
 const {
   settings,
@@ -13,14 +15,70 @@ const {
   error
 } = useTheme()
 
+const {
+  playButtonClick,
+  playAchievement,
+  playSuccess,
+  playError,
+  playGooseHonk,
+  playGameAction,
+  playPanelToggle,
+  soundVolume,
+  updateSoundPreferences
+} = useAudio()
+
+const isPreviewing = ref(false)
+
 // Color picker handlers
 const handleColorChange = async (colorKey: keyof typeof currentColors.value, value: string) => {
   await updateCustomColor(colorKey, value)
 }
 
 // Option toggle handlers
-const handleOptionToggle = async (optionKey: 'darkMode' | 'highContrast' | 'reduceMotion', value: boolean) => {
+const handleOptionToggle = async (optionKey: 'darkMode' | 'highContrast' | 'reduceMotion' | 'soundsEnabled' | 'notificationSoundsEnabled' | 'musicEnabled', value: boolean) => {
   await updateOption(optionKey, value)
+}
+
+// Sound volume handler
+const handleVolumeChange = async (volume: number) => {
+  await updateOption('soundVolume', volume)
+  updateSoundPreferences({ soundVolume: volume })
+}
+
+// Sound preview handlers
+const previewSound = async (type: string) => {
+  if (isPreviewing.value) return
+
+  isPreviewing.value = true
+  try {
+    switch (type) {
+      case 'click':
+        playButtonClick()
+        break
+      case 'achievement':
+        playAchievement()
+        break
+      case 'success':
+        playSuccess()
+        break
+      case 'error':
+        playError()
+        break
+      case 'goose':
+        playGooseHonk()
+        break
+      case 'game':
+        playGameAction()
+        break
+      case 'panel':
+        playPanelToggle()
+        break
+    }
+  } finally {
+    setTimeout(() => {
+      isPreviewing.value = false
+    }, 500)
+  }
 }
 </script>
 
@@ -208,6 +266,144 @@ const handleOptionToggle = async (optionKey: 'darkMode' | 'highContrast' | 'redu
               <span class="option-desc">Minimize animations for accessibility</span>
             </span>
           </label>
+        </div>
+      </div>
+    </section>
+
+    <!-- Sound Settings -->
+    <section class="settings-section">
+      <h3 class="section-title">🔊 Sound Settings</h3>
+      <p class="section-desc">Configure sound effects and audio preferences</p>
+
+      <div class="options-list">
+        <div class="option-item">
+          <label class="option-label">
+            <input
+              type="checkbox"
+              :checked="settings.options.soundsEnabled"
+              @change="handleOptionToggle('soundsEnabled', ($event.target as HTMLInputElement).checked)"
+              class="option-checkbox"
+              aria-label="Toggle all sounds"
+            />
+            <span class="option-text">
+              Sound Effects
+              <span class="option-desc">Enable click, achievement, and game sounds</span>
+            </span>
+          </label>
+        </div>
+
+        <div class="option-item">
+          <label class="option-label">
+            <input
+              type="checkbox"
+              :checked="settings.options.notificationSoundsEnabled"
+              @change="handleOptionToggle('notificationSoundsEnabled', ($event.target as HTMLInputElement).checked)"
+              class="option-checkbox"
+              aria-label="Toggle notification sounds"
+            />
+            <span class="option-text">
+              Notification Sounds
+              <span class="option-desc">Play sounds for messages and alerts</span>
+            </span>
+          </label>
+        </div>
+
+        <div class="option-item">
+          <label class="option-label">
+            <input
+              type="checkbox"
+              :checked="settings.options.musicEnabled"
+              @change="handleOptionToggle('musicEnabled', ($event.target as HTMLInputElement).checked)"
+              class="option-checkbox"
+              aria-label="Toggle background music"
+            />
+            <span class="option-text">
+              Background Music
+              <span class="option-desc">Enable background music playback</span>
+            </span>
+          </label>
+        </div>
+
+        <div class="volume-control">
+          <label class="volume-label">
+            <span class="volume-text">
+              Master Volume
+              <span class="volume-value">{{ Math.round((settings.options.soundVolume || 0.5) * 100) }}%</span>
+            </span>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              :value="settings.options.soundVolume || 0.5"
+              @input="handleVolumeChange(parseFloat(($event.target as HTMLInputElement).value))"
+              class="volume-slider"
+              aria-label="Adjust master volume"
+            />
+          </label>
+        </div>
+      </div>
+
+      <!-- Sound Preview -->
+      <div class="sound-preview-section">
+        <h4 class="preview-title">Preview Sounds</h4>
+        <div class="preview-buttons">
+          <button
+            @click="previewSound('click')"
+            class="preview-btn"
+            :disabled="isPreviewing || !settings.options.soundsEnabled"
+            aria-label="Preview button click sound"
+          >
+            🔘 Click
+          </button>
+          <button
+            @click="previewSound('achievement')"
+            class="preview-btn"
+            :disabled="isPreviewing || !settings.options.soundsEnabled"
+            aria-label="Preview achievement sound"
+          >
+            🏆 Achievement
+          </button>
+          <button
+            @click="previewSound('success')"
+            class="preview-btn"
+            :disabled="isPreviewing || !settings.options.soundsEnabled"
+            aria-label="Preview success sound"
+          >
+            ✅ Success
+          </button>
+          <button
+            @click="previewSound('error')"
+            class="preview-btn"
+            :disabled="isPreviewing || !settings.options.soundsEnabled"
+            aria-label="Preview error sound"
+          >
+            ❌ Error
+          </button>
+          <button
+            @click="previewSound('goose')"
+            class="preview-btn"
+            :disabled="isPreviewing || !settings.options.soundsEnabled"
+            aria-label="Preview goose honk sound"
+          >
+            🪿 Goose
+          </button>
+          <button
+            @click="previewSound('game')"
+            class="preview-btn"
+            :disabled="isPreviewing || !settings.options.soundsEnabled"
+            aria-label="Preview game action sound"
+          >
+            🎮 Game
+          </button>
+          <button
+            @click="previewSound('panel')"
+            class="preview-btn"
+            :disabled="isPreviewing || !settings.options.soundsEnabled"
+            aria-label="Preview panel toggle sound"
+          >
+            📁 Panel
+          </button>
         </div>
       </div>
     </section>
@@ -477,6 +673,124 @@ const handleOptionToggle = async (optionKey: 'darkMode' | 'highContrast' | 'redu
   font-size: 0.85rem;
   color: var(--color-text, #666);
   font-weight: normal;
+}
+
+/* Volume Control */
+.volume-control {
+  background: var(--color-background, linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%));
+  border-radius: 12px;
+  padding: 1rem;
+}
+
+.volume-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  cursor: pointer;
+}
+
+.volume-text {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 600;
+  color: var(--color-text, #333);
+}
+
+.volume-value {
+  font-family: 'Courier New', monospace;
+  background: var(--color-accent, #ffb6c1);
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.9rem;
+}
+
+.volume-slider {
+  width: 100%;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--color-accent, #ffb6c1);
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+}
+
+.volume-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--color-primary, #ff6b9d);
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s ease;
+}
+
+.volume-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+}
+
+.volume-slider::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--color-primary, #ff6b9d);
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s ease;
+}
+
+.volume-slider::-moz-range-thumb:hover {
+  transform: scale(1.1);
+}
+
+/* Sound Preview */
+.sound-preview-section {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 2px solid var(--color-accent, #ffb6c1);
+}
+
+.preview-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: var(--color-primary, #ff6b9d);
+}
+
+.preview-buttons {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 0.75rem;
+}
+
+.preview-btn {
+  padding: 0.75rem 1rem;
+  border: none;
+  border-radius: 8px;
+  background: var(--color-accent, #ffb6c1);
+  color: var(--color-text, #333);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.9rem;
+}
+
+.preview-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  background: var(--color-primary, #ff6b9d);
+  color: white;
+}
+
+.preview-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.preview-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* Live Preview */
