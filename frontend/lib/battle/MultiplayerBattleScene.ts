@@ -7,8 +7,9 @@ import * as THREE from 'three';
 import { BattleScene, type BattleSceneConfig } from './BattleScene';
 import { NetworkManager } from './NetworkManager';
 import { StateInterpolation } from './StateInterpolation';
+import { ClientPrediction } from './ClientPrediction';
 import { MechEntity } from './MechEntity';
-import { PlayerInput, MechLoadout } from '../../shared/types/NetworkMessages';
+import { PlayerInput, MechLoadout, PlayerState } from '../../shared/types/NetworkMessages';
 import { markRaw } from 'vue';
 
 export interface MultiplayerBattleSceneConfig extends Omit<BattleSceneConfig, 'enemyMech'> {
@@ -24,6 +25,7 @@ export interface MultiplayerBattleSceneConfig extends Omit<BattleSceneConfig, 'e
 export class MultiplayerBattleScene extends BattleScene {
   private networkManager: NetworkManager;
   private stateInterpolation: StateInterpolation;
+  private clientPrediction: ClientPrediction;
   private inputSequence = 0;
   private lastInputSent = 0;
   private readonly MIN_INPUT_INTERVAL = 16; // ~60Hz max
@@ -47,6 +49,20 @@ export class MultiplayerBattleScene extends BattleScene {
     // Initialize network manager
     this.networkManager = markRaw(new NetworkManager());
     this.stateInterpolation = markRaw(new StateInterpolation());
+
+    // Initialize client prediction with player's initial state
+    const initialState: PlayerState = {
+      position: [this.playerMech.position.x, this.playerMech.position.y, this.playerMech.position.z],
+      rotation: [0, this.playerMech.mesh.rotation.y, 0],
+      velocity: [0, 0, 0],
+      health: this.playerMech.health,
+      power: this.playerMech.power,
+      jumpFuel: this.playerMech.jumpFuel,
+      isDashing: this.playerMech.isDashing,
+      isJumping: false,
+      abilityActive: false
+    };
+    this.clientPrediction = markRaw(new ClientPrediction(initialState));
 
     // Setup network event handlers
     this.setupNetworkHandlers();
@@ -118,6 +134,26 @@ export class MultiplayerBattleScene extends BattleScene {
    */
   private handleStateSnapshot(snapshot: any): void {
     if (!snapshot.players) return;
+
+    // Get our player state from server for reconciliation
+    const serverPlayerState = snapshot.players[this.yourPlayerId];
+    if (serverPlayerState) {
+      // Reconcile client prediction with server state
+      this.clientPrediction.reconcile(serverPlayerState, snapshot.lastProcessedSeq);
+
+      // Apply predicted state to player mech
+      const predictedState = this.clientPrediction.getPredictedState();
+      this.playerMech.position.set(
+        predictedState.position[0],
+        predictedState.position[1],
+        predictedState.position[2]
+      );
+      this.playerMech.mesh.rotation.y = predictedState.rotation[1];
+      this.playerMech.health = predictedState.health;
+      this.playerMech.power = predictedState.power;
+      this.playerMech.jumpFuel = predictedState.jumpFuel;
+      this.playerMech.isDashing = predictedState.isDashing;
+    }
 
     // Get opponent state
     const opponentState = snapshot.players[this.opponentId];
@@ -221,6 +257,9 @@ export class MultiplayerBattleScene extends BattleScene {
       }
     };
 
+    // Add input to prediction buffer for reconciliation
+    this.clientPrediction.addInput(this.inputSequence, input);
+
     // Send to server
     this.networkManager.sendInput(this.inputSequence, input);
   }
@@ -232,6 +271,13 @@ export class MultiplayerBattleScene extends BattleScene {
     super.cleanup();
     this.networkManager.disconnect();
     this.stateInterpolation.clear();
+  }
+
+  /**
+   * Get client prediction (for debugging)
+   */
+  getClientPrediction(): ClientPrediction {
+    return this.clientPrediction;
   }
 
   /**
