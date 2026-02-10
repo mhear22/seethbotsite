@@ -42,7 +42,7 @@ export function initUsersDB(): Database.Database {
     'show_email BOOLEAN DEFAULT 1',
     'show_joined_date BOOLEAN DEFAULT 1',
     'theme_preferences TEXT DEFAULT NULL',
-    'discord_id TEXT UNIQUE',
+    'discord_id TEXT',
     'discord_username TEXT',
     'discord_discriminator TEXT',
     'discord_avatar TEXT'
