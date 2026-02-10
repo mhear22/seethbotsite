@@ -3,6 +3,9 @@ import { ref, onMounted } from 'vue'
 import { achievementsRepository } from '../../repositories/achievements.repository'
 import type { AchievementDisplay, AchievementProgress } from '../../repositories/types/achievements.types'
 import { formatDate } from '../../utils/format'
+import { useAudio } from '../../composables/useAudio'
+
+const { playAchievement, playClick } = useAudio()
 
 const achievements = ref<AchievementDisplay[]>([])
 const progress = ref<AchievementProgress | null>(null)
@@ -42,10 +45,13 @@ const checkNewAchievements = async () => {
     checkingForNew.value = true
     newUnlocksMessage.value = null
 
+    playClick()
+
     const result = await achievementsRepository.checkAchievements()
 
     if (result.newUnlocks.length > 0) {
       newUnlocksMessage.value = `🎉 Unlocked ${result.newUnlocks.length} new achievement(s)!`
+      playAchievement()
       // Reload to show new achievements
       await loadAchievements()
     } else {

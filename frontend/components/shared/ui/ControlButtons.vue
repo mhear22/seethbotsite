@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import { useAudio } from '../../composables/useAudio'
+
+const { playButtonClick } = useAudio()
+
 defineProps<{
   darkMode?: boolean
   musicPlaying?: boolean
@@ -17,13 +21,13 @@ defineEmits<{
   <div role="group" aria-label="Control buttons">
     <button
       class="rankings-toggle"
-      @click="$emit('toggle-rankings')"
+      @click="playButtonClick(); $emit('toggle-rankings')"
       aria-label="Toggle rankings panel"
       title="Toggle rankings"
     >👻</button>
     <button
       class="dark-toggle"
-      @click="$emit('toggle-dark')"
+      @click="playButtonClick(); $emit('toggle-dark')"
       :aria-label="darkMode ? 'Switch to light mode' : 'Switch to dark mode'"
       title=""
     >
@@ -31,7 +35,7 @@ defineEmits<{
     </button>
     <button
       class="music-control"
-      @click="$emit('toggle-music')"
+      @click="playButtonClick(); $emit('toggle-music')"
       :aria-label="musicPlaying ? 'Pause music' : 'Play music'"
       :aria-pressed="musicPlaying"
       title=""
@@ -40,13 +44,13 @@ defineEmits<{
     </button>
     <button
       class="feed-toggle"
-      @click="$emit('toggle-feed')"
+      @click="playButtonClick(); $emit('toggle-feed')"
       aria-label="Toggle feeds panel"
       title="Toggle feeds"
     >📰</button>
     <button
       class="mika-btn"
-      @click="$emit('toggle-mika')"
+      @click="playButtonClick(); $emit('toggle-mika')"
       aria-label="Show Mika modal"
     >🌸 Mika</button>
   </div>

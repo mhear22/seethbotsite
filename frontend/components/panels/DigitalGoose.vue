@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { clicksRepository } from '../../repositories/clicks.repository'
+import { useAudio } from '../../composables/useAudio'
 
 const honkCount = ref(0)
 const isLoading = ref(false)
@@ -10,7 +11,7 @@ const currentMessage = ref('Honk!')
 const goosePosition = ref({ x: 0, y: 0 }) // Will be set on mount to centered position
 const gooseElement = ref<HTMLElement | null>(null)
 
-const honkSound = new Audio('/honk-sound.mp3')
+const { playGooseHonk } = useAudio()
 
 const messages = [
   'Honk!',
@@ -130,12 +131,8 @@ const honk = async () => {
     currentMessage.value = messages[Math.floor(Math.random() * messages.length)]
   }
   
-  // Play honk sound (shortened to 0.3s)
-  honkSound.currentTime = 0
-  honkSound.play().catch(e => console.error('Error playing honk sound:', e))
-  setTimeout(() => {
-    honkSound.pause()
-  }, 300)
+  // Play honk sound
+  playGooseHonk()
 
   // Random chaos behavior
   if (Math.random() > 0.8) {
