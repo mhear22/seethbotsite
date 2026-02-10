@@ -30,6 +30,14 @@ export class MechEntity {
   isPlayer: boolean
   isDestroyed: boolean = false
 
+  // Power system
+  currentPower: number = 100
+  maxPower: number = 100
+
+  // Rack ability state
+  rackAbilityCooldown: number = 0
+  rackAbilityActive: boolean = false
+
   // Destruction animation - random velocities per mesh child
   private destroyVelocities: THREE.Vector3[] = []
   private destroyRotations: THREE.Vector3[] = []
@@ -207,6 +215,112 @@ export class MechEntity {
     const direction = new THREE.Vector3(1, 0, 0)
     direction.applyEuler(this.rotation)
     return direction.normalize()
+  }
+
+  // Weight system computed properties
+  get totalWeight(): number {
+    let weight = 0
+    if (this.loadout.leftArm) weight += this.loadout.leftArm.weight
+    if (this.loadout.rightArm) weight += this.loadout.rightArm.weight
+    if (this.loadout.core) weight += this.loadout.core.weight
+    if (this.loadout.legs) weight += this.loadout.legs.weight
+    if (this.loadout.head) weight += this.loadout.head.weight
+    if (this.loadout.rack) weight += this.loadout.rack.weight
+    return weight
+  }
+
+  get weightClass(): 'light' | 'medium' | 'heavy' | 'assault' {
+    const w = this.totalWeight
+    if (w < 60) return 'light'
+    if (w < 90) return 'medium'
+    if (w < 120) return 'heavy'
+    return 'assault'
+  }
+
+  get weightPenalty(): number {
+    // 0.5 to 1.0 multiplier (lighter = higher, faster)
+    return Math.max(0.5, 1.0 - (this.totalWeight / 200))
+  }
+
+  // Power system computed properties
+  get powerCapacity(): number {
+    return this.loadout.legs?.powerCapacity || 100
+  }
+
+  get totalPowerDraw(): number {
+    let draw = 0
+    if (this.loadout.leftArm) draw += this.loadout.leftArm.powerDraw
+    if (this.loadout.rightArm) draw += this.loadout.rightArm.powerDraw
+    return draw
+  }
+
+  updatePower(deltaTime: number) {
+    // Regenerate power from core
+    const regenRate = this.loadout.core?.powerOutput || 10
+    this.currentPower = Math.min(this.powerCapacity, this.currentPower + regenRate * deltaTime)
+    this.maxPower = this.powerCapacity
+  }
+
+  // Targeting system
+  getTargetingBonus(targetDistance: number, isMoving: boolean): number {
+    const head = this.loadout.head
+    if (!head) return 0
+
+    let bonus = head.targetingBonus / 100 // Base bonus (0.0 to 1.0)
+
+    // Head-specific range modifiers
+    switch (head.id) {
+      case 'head-targeting-array':
+        // Excellent at all ranges, no movement penalty
+        if (targetDistance > 50) bonus += 0.2
+        break
+      case 'head-scout-suite':
+        // Best at extreme range, poor close-up
+        if (targetDistance > 70) bonus += 0.3
+        if (targetDistance < 20) bonus -= 0.2
+        break
+      case 'head-reinforced':
+        // Consistent but mediocre
+        bonus *= 0.8
+        break
+      case 'head-standard-optics':
+        // Balanced
+        break
+    }
+
+    // Movement penalty (reduced by advanced targeting)
+    if (isMoving && head.id !== 'head-targeting-array') {
+      bonus -= 0.15
+    }
+
+    return Math.max(-0.3, Math.min(0.3, bonus)) // Clamp to ±30%
+  }
+
+  // Rack ability system
+  useRackAbility(): boolean {
+    if (!this.loadout.rack || this.rackAbilityCooldown > 0) return false
+
+    switch (this.loadout.rack.id) {
+      case 'rack-jump-jets':
+        // Already implemented via jump input
+        return false
+      case 'rack-smoke-launcher':
+        // Trigger smoke cloud
+        this.rackAbilityCooldown = 15
+        return true
+      case 'rack-ammo-feed':
+        // Activate burst fire mode
+        this.rackAbilityActive = true
+        this.rackAbilityCooldown = 20
+        setTimeout(() => { this.rackAbilityActive = false }, 5000)
+        return true
+      case 'rack-repair-drone':
+        // Instant heal
+        this.stats.currentHealth = Math.min(this.stats.maxHealth, this.stats.currentHealth + 50)
+        this.rackAbilityCooldown = 30
+        return true
+    }
+    return false
   }
 
   cleanup() {

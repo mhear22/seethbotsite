@@ -8,7 +8,9 @@ const SOUND_FILES = {
   panelOpen: '/sounds/panel.mp3',
   honk: '/sounds/honk.mp3',
   pointsEarned: '/sounds/points.mp3',
-  notification: '/sounds/notification.mp3'
+  notification: '/sounds/notification.mp3',
+  bulletHit: '/sounds/bullet-hit.mp3',
+  bulletHitMech: '/sounds/bullet-hit-mech.mp3'
 } as const
 
 // Sound configuration for variety
@@ -19,7 +21,9 @@ const SOUND_CONFIG = {
   panelOpen: { volume: 0.5, rate: 0.8 },
   honk: { volume: 0.5, rate: 1.0 },
   pointsEarned: { volume: 0.5, rate: 1.3 },
-  notification: { volume: 0.5, rate: 1.1 }
+  notification: { volume: 0.5, rate: 1.1 },
+  bulletHit: { volume: 0.6, rate: 1.0 + (Math.random() * 0.2 - 0.1) },
+  bulletHitMech: { volume: 0.7, rate: 1.0 + (Math.random() * 0.15 - 0.075) }
 } as const
 
 // Local storage keys
@@ -163,7 +167,9 @@ const SOUND_CATEGORIES: Record<keyof typeof SOUND_FILES, SoundCategory> = {
   panelOpen: 'ui',
   honk: 'goose',
   pointsEarned: 'achievement',
-  notification: 'notification'
+  notification: 'notification',
+  bulletHit: 'ui',
+  bulletHitMech: 'ui'
 }
 
 // Play a sound by name
@@ -267,6 +273,14 @@ const playNotification = () => {
   playSound('notification', { rate: SOUND_CONFIG.notification.rate })
 }
 
+const playBulletHit = () => {
+  playSound('bulletHit', { rate: SOUND_CONFIG.bulletHit.rate })
+}
+
+const playBulletHitMech = () => {
+  playSound('bulletHitMech', { rate: SOUND_CONFIG.bulletHitMech.rate })
+}
+
 // Preview functions for sound categories
 const previewClickSound = () => {
   playClick()
@@ -310,6 +324,8 @@ export const useAudio = () => {
     playHonk,
     playPointsEarned,
     playNotification,
+    playBulletHit,
+    playBulletHitMech,
 
     // Preview functions
     previewClickSound,

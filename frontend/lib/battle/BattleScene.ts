@@ -7,6 +7,7 @@ import { InputManager, type InputState } from './InputManager'
 import { ParticleSystem } from './ParticleSystem'
 import { EnemyAI } from './EnemyAI'
 import { markRaw } from 'vue'
+import { useAudio } from '../../composables/useAudio'
 
 export interface BattleSceneConfig {
   canvas: HTMLCanvasElement
@@ -36,6 +37,14 @@ export interface Building {
   depth: number
 }
 
+export interface TargetingState {
+  isTargeted: boolean
+  screenX: number      // pixels from left edge
+  screenY: number      // pixels from top edge
+  screenWidth: number  // pixels
+  screenHeight: number // pixels
+}
+
 export class BattleScene {
   private scene: THREE.Scene
   private renderer: THREE.WebGLRenderer
@@ -45,10 +54,19 @@ export class BattleScene {
   private projectileSystem: ProjectileSystem
   private particleSystem!: ParticleSystem
   private enemyAI!: EnemyAI
+  private audio: ReturnType<typeof useAudio>
 
   playerMech: MechEntity
   enemyMech: MechEntity
   private buildings: Building[] = []
+
+  private targetingState: TargetingState = {
+    isTargeted: false,
+    screenX: 0,
+    screenY: 0,
+    screenWidth: 0,
+    screenHeight: 0
+  }
 
   private animationId: number | null = null
   private lastTime: number = 0
@@ -56,9 +74,9 @@ export class BattleScene {
   private onBattleEnd: (result: 'victory' | 'defeat') => void
   private onDamageDealt: (amount: number) => void
 
-  // Shooting cooldown
-  private lastPlayerShot: number = 0
-  private readonly PLAYER_FIRE_RATE = 0.25 // Shots per second
+  // Dual weapon cooldowns
+  private lastLeftArmShot: number = 0
+  private lastRightArmShot: number = 0
 
   // Battle ending animation
   private battleEnding: boolean = false
@@ -90,6 +108,7 @@ export class BattleScene {
     this.particleSystem = new ParticleSystem(this.scene)
     this.camera = new CameraController(this.playerMech)
     this.enemyAI = new EnemyAI()
+    this.audio = useAudio()
 
     // Apply settings
     if (config.mouseSensitivity !== undefined) {
@@ -376,11 +395,61 @@ export class BattleScene {
     this.checkMechBuildingCollisions(this.playerMech)
     this.playerMech.update(deltaTime)
 
-    // Player shooting
-    if (input.shoot && this.battleTime - this.lastPlayerShot > this.PLAYER_FIRE_RATE) {
-      const aimDirection = this.playerMech.getForwardDirection()
-      this.projectileSystem.fireWeapon(this.playerMech, aimDirection)
-      this.lastPlayerShot = this.battleTime
+    // Update power regeneration
+    this.playerMech.updatePower(deltaTime)
+
+    // Update rack ability cooldown
+    this.playerMech.rackAbilityCooldown = Math.max(0, this.playerMech.rackAbilityCooldown - deltaTime)
+
+    // Handle rack ability input
+    if (input.useAbility) {
+      this.playerMech.useRackAbility()
+    }
+
+    // Dual weapon firing with separate cooldowns
+    // Auto-aim at locked targets, otherwise use camera direction
+    let aimDirection: THREE.Vector3
+    if (this.targetingState.isTargeted) {
+      // Aim at locked enemy
+      aimDirection = this.enemyMech.position.clone()
+        .sub(this.playerMech.position)
+        .normalize()
+    } else {
+      // Use camera aim direction
+      aimDirection = this.playerMech.getForwardDirection()
+    }
+
+    // Determine fire rate (affected by melee weapons and rack abilities)
+    const leftWeaponType = this.playerMech.loadout.leftArm?.weaponType
+    const rightWeaponType = this.playerMech.loadout.rightArm?.weaponType
+
+    // Check for custom fire rates on weapons, fall back to defaults
+    const leftWeapon = this.playerMech.loadout.leftArm
+    const rightWeapon = this.playerMech.loadout.rightArm
+
+    let leftFireRate = leftWeapon?.fireRate ?? (leftWeaponType === 'melee' ? 1.5 : 0.25)
+    let rightFireRate = rightWeapon?.fireRate ?? (rightWeaponType === 'melee' ? 1.5 : 0.25)
+
+    // Ammo feed rack ability: 2x fire rate
+    if (this.playerMech.rackAbilityActive && this.playerMech.loadout.rack?.id === 'rack-ammo-feed') {
+      leftFireRate *= 0.5
+      rightFireRate *= 0.5
+    }
+
+    // Left arm (right mouse button)
+    if (input.shootLeft && this.battleTime - this.lastLeftArmShot > leftFireRate) {
+      if (this.playerMech.loadout.leftArm) {
+        this.projectileSystem.fireWeapon(this.playerMech, aimDirection, 'left')
+        this.lastLeftArmShot = this.battleTime
+      }
+    }
+
+    // Right arm (left mouse button)
+    if (input.shootRight && this.battleTime - this.lastRightArmShot > rightFireRate) {
+      if (this.playerMech.loadout.rightArm) {
+        this.projectileSystem.fireWeapon(this.playerMech, aimDirection, 'right')
+        this.lastRightArmShot = this.battleTime
+      }
     }
 
     // Update enemy AI (new dedicated class)
@@ -390,11 +459,15 @@ export class BattleScene {
       deltaTime
     )
 
+    // Update enemy power regeneration
+    this.enemyMech.updatePower(deltaTime)
+
     if (shouldEnemyFire) {
-      const aimDirection = this.playerMech.position.clone()
+      const enemyAimDirection = this.playerMech.position.clone()
         .sub(this.enemyMech.position)
         .normalize()
-      this.projectileSystem.fireWeapon(this.enemyMech, aimDirection)
+      // Enemy fires from right arm by default
+      this.projectileSystem.fireWeapon(this.enemyMech, enemyAimDirection, 'right')
     }
 
     this.checkMechBuildingCollisions(this.enemyMech)
@@ -412,11 +485,18 @@ export class BattleScene {
     for (const hit of hits) {
       const defeated = hit.target.takeDamage(hit.projectile.damage)
 
+      // Calculate impact position at the target's center (more visible)
+      const impactPosition = hit.target.position.clone()
+      impactPosition.y += 1.5 // Spawn at torso height for better visibility
+
       // Spawn hit particles at impact point
       this.particleSystem.spawnHitEffect(
-        hit.projectile.position.clone(),
+        impactPosition,
         hit.projectile.type
       )
+
+      // Play hit sound
+      this.audio.playBulletHitMech()
 
       // Track damage dealt by player
       if (hit.target === this.enemyMech) {
@@ -444,6 +524,9 @@ export class BattleScene {
     // Update camera
     this.camera.update(deltaTime, input.mouseX, input.mouseY)
     this.inputManager.resetMouseMovement()
+
+    // Update targeting state
+    this.targetingState = this.calculateTargeting()
   }
 
   private render() {
@@ -502,6 +585,92 @@ export class BattleScene {
     return this.playerMech.DASH_COOLDOWN
   }
 
+  getPlayerPower(): number {
+    return this.playerMech.currentPower
+  }
+
+  getPlayerMaxPower(): number {
+    return this.playerMech.maxPower
+  }
+
+  getPlayerAbilityCooldown(): number {
+    return this.playerMech.rackAbilityCooldown
+  }
+
+  getPlayerAbilityMaxCooldown(): number {
+    // Return the max cooldown for the equipped rack ability
+    const rack = this.playerMech.loadout.rack
+    if (!rack) return 0
+
+    switch (rack.id) {
+      case 'rack-smoke-launcher': return 15
+      case 'rack-ammo-feed': return 20
+      case 'rack-repair-drone': return 30
+      default: return 0
+    }
+  }
+
+  getTargetingState(): TargetingState {
+    return this.targetingState
+  }
+
+  private calculateTargeting(): TargetingState {
+    // Get camera aim direction from yaw/pitch
+    const yaw = this.camera.mouseRotation.x
+    const pitch = this.camera.mouseRotation.y
+    const aimDir = new THREE.Vector3(
+      Math.sin(yaw) * Math.cos(pitch),
+      Math.sin(pitch),
+      Math.cos(yaw) * Math.cos(pitch)
+    ).normalize()
+
+    // Vector from player to enemy
+    const toEnemy = this.enemyMech.position.clone()
+      .sub(this.playerMech.position)
+    const distance = toEnemy.length()
+    toEnemy.normalize()
+
+    // Get targeting cone angle from head part (fallback to 15° if no head)
+    const coneAngleDegrees = this.playerMech.loadout.head?.targetingConeAngle ?? 15
+    const coneAngleRadians = coneAngleDegrees * (Math.PI / 180)
+
+    // Cone-based detection: check angle via dot product
+    const dotProduct = aimDir.dot(toEnemy)
+    const angleThreshold = Math.cos(coneAngleRadians)
+
+    if (dotProduct <= angleThreshold) {
+      return { isTargeted: false, screenX: 0, screenY: 0, screenWidth: 0, screenHeight: 0 }
+    }
+
+    // Project enemy position to screen space (NDC coordinates)
+    const enemyScreenPos = this.enemyMech.position.clone()
+    enemyScreenPos.project(this.camera.camera)
+
+    // Check if enemy is in front of camera (not behind)
+    if (enemyScreenPos.z > 1) {
+      return { isTargeted: false, screenX: 0, screenY: 0, screenWidth: 0, screenHeight: 0 }
+    }
+
+    // Convert NDC (-1 to +1) to screen pixel coordinates
+    const screenX = (enemyScreenPos.x + 1) / 2 * window.innerWidth
+    const screenY = (-enemyScreenPos.y + 1) / 2 * window.innerHeight
+
+    // Calculate box size using perspective projection
+    const mechHeightWorld = 4 // Mech is ~4 units tall
+    const fov = this.camera.camera.fov * (Math.PI / 180) // Convert to radians
+    const screenHeight = (mechHeightWorld / distance) *
+                         (window.innerHeight / (2 * Math.tan(fov / 2)))
+    const screenWidth = screenHeight * 0.6 // Aspect ratio (~width/height of mech)
+
+    return {
+      isTargeted: true,
+      screenX,
+      screenY,
+      screenWidth,
+      screenHeight
+    }
+  }
+
   private checkProjectileBuildingCollisions() {
     const projectiles = this.projectileSystem.getProjectiles()
 
@@ -520,6 +689,8 @@ export class BattleScene {
             projectile.position.clone(),
             projectile.type
           )
+          // Play hit sound for building impacts
+          this.audio.playBulletHit()
           this.projectileSystem.removeProjectile(projectile)
           break
         }

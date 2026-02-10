@@ -25,6 +25,15 @@
       <div class="crosshair-line vertical"></div>
     </div>
 
+    <!-- Targeting Box -->
+    <div v-if="targeting.isTargeted" class="targeting-box" :style="targetingStyle">
+      <div class="targeting-corner tl"></div>
+      <div class="targeting-corner tr"></div>
+      <div class="targeting-corner bl"></div>
+      <div class="targeting-corner br"></div>
+      <div class="targeting-label">ENEMY LOCKED</div>
+    </div>
+
     <!-- Dash Cooldown Indicator -->
     <div class="dash-indicator">
       <div class="dash-label" :class="{ ready: dashReady }">
@@ -35,11 +44,30 @@
       </div>
     </div>
 
+    <!-- Power Bar -->
+    <div class="power-bar">
+      <div class="power-label" :class="{ low: playerPowerPercent < 30 }">POWER</div>
+      <div class="power-bar-container">
+        <div class="power-fill" :style="{ width: playerPowerPercent + '%' }"></div>
+        <div class="power-text">{{ Math.floor(playerPower) }}/{{ playerMaxPower }}</div>
+      </div>
+    </div>
+
     <!-- Jump Fuel Indicator -->
     <div v-if="hasJumpJets" class="jump-fuel">
       <div class="fuel-label">JUMP FUEL</div>
       <div class="fuel-bar-container">
         <div class="fuel-fill" :style="{ width: jumpFuelPercent + '%' }"></div>
+      </div>
+    </div>
+
+    <!-- Ability Cooldown Indicator -->
+    <div v-if="hasRackAbility" class="ability-indicator">
+      <div class="ability-label" :class="{ ready: abilityReady }">
+        {{ abilityReady ? abilityName + ' READY' : abilityName }}
+      </div>
+      <div class="ability-bar-container">
+        <div class="ability-fill" :style="{ width: abilityPercent + '%' }"></div>
       </div>
     </div>
 
@@ -57,9 +85,11 @@
     <div class="controls-hint">
       <div class="control-item">WASD - Move</div>
       <div class="control-item">Mouse - Aim</div>
-      <div class="control-item">LMB - Shoot</div>
+      <div class="control-item">LMB - Right Arm</div>
+      <div class="control-item">RMB - Left Arm</div>
       <div class="control-item">Shift - Dash</div>
       <div v-if="hasJumpJets" class="control-item">Space - Jump</div>
+      <div v-if="hasRackAbility" class="control-item">E - Ability</div>
       <div class="control-item">ESC - Exit</div>
     </div>
   </div>
@@ -74,12 +104,25 @@ const props = defineProps<{
   enemyHealth: number
   enemyMaxHealth: number
   enemyName: string
+  playerPower: number
+  playerMaxPower: number
   jumpFuel: number
   hasJumpJets: boolean
   dashCooldown: number
   dashMaxCooldown: number
+  abilityCooldown: number
+  abilityMaxCooldown: number
+  hasRackAbility: boolean
+  abilityName: string
   enemyRadarX: number
   enemyRadarY: number
+  targeting: {
+    isTargeted: boolean
+    screenX: number
+    screenY: number
+    screenWidth: number
+    screenHeight: number
+  }
 }>()
 
 const playerHealthPercent = computed(() => {
@@ -110,11 +153,32 @@ const radarEnemyStyle = computed(() => {
   }
 })
 
+const targetingStyle = computed(() => {
+  const padding = 10 // Extra space around mech
+  return {
+    left: `${props.targeting.screenX - props.targeting.screenWidth / 2 - padding}px`,
+    top: `${props.targeting.screenY - props.targeting.screenHeight / 2 - padding}px`,
+    width: `${props.targeting.screenWidth + padding * 2}px`,
+    height: `${props.targeting.screenHeight + padding * 2}px`,
+  }
+})
+
 const dashReady = computed(() => props.dashCooldown <= 0)
 
 const dashPercent = computed(() => {
   if (props.dashCooldown <= 0) return 100
   return Math.max(0, Math.min(100, (1 - props.dashCooldown / props.dashMaxCooldown) * 100))
+})
+
+const playerPowerPercent = computed(() => {
+  return Math.max(0, Math.min(100, (props.playerPower / props.playerMaxPower) * 100))
+})
+
+const abilityReady = computed(() => props.abilityCooldown <= 0)
+
+const abilityPercent = computed(() => {
+  if (!props.hasRackAbility || props.abilityCooldown <= 0) return 100
+  return Math.max(0, Math.min(100, (1 - props.abilityCooldown / props.abilityMaxCooldown) * 100))
 })
 </script>
 
@@ -235,6 +299,120 @@ const dashPercent = computed(() => {
   transform: translateX(-50%);
 }
 
+/* Targeting Box */
+.targeting-box {
+  position: absolute;
+  pointer-events: none;
+  transition: all 0.1s ease-out;
+}
+
+.targeting-corner {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border: 2px solid #ef4444;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.6);
+}
+
+.targeting-corner.tl {
+  top: 0;
+  left: 0;
+  border-right: none;
+  border-bottom: none;
+}
+
+.targeting-corner.tr {
+  top: 0;
+  right: 0;
+  border-left: none;
+  border-bottom: none;
+}
+
+.targeting-corner.bl {
+  bottom: 0;
+  left: 0;
+  border-right: none;
+  border-top: none;
+}
+
+.targeting-corner.br {
+  bottom: 0;
+  right: 0;
+  border-left: none;
+  border-top: none;
+}
+
+.targeting-label {
+  position: absolute;
+  top: -25px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #ef4444;
+  font-size: 11px;
+  font-weight: bold;
+  text-shadow: 0 0 8px rgba(239, 68, 68, 0.8);
+  white-space: nowrap;
+  animation: pulse 1s infinite;
+}
+
+/* Power Bar */
+.power-bar {
+  position: absolute;
+  bottom: 160px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 200px;
+}
+
+.power-label {
+  color: #60a5fa;
+  font-size: 12px;
+  font-weight: bold;
+  margin-bottom: 5px;
+  text-align: center;
+  text-shadow: 0 0 10px rgba(96, 165, 250, 0.8);
+  transition: color 0.2s;
+}
+
+.power-label.low {
+  color: #ff4444;
+  text-shadow: 0 0 10px rgba(255, 68, 68, 0.8);
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.power-bar-container {
+  position: relative;
+  width: 100%;
+  height: 20px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 2px solid rgba(96, 165, 250, 0.5);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.power-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #2563eb, #60a5fa);
+  box-shadow: 0 0 10px rgba(37, 99, 235, 0.5);
+  transition: width 0.2s ease;
+}
+
+.power-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #fff;
+  font-size: 11px;
+  font-weight: bold;
+  text-shadow: 0 0 10px rgba(0, 0, 0, 0.9);
+}
+
 /* Jump Fuel */
 .jump-fuel {
   position: absolute;
@@ -269,10 +447,50 @@ const dashPercent = computed(() => {
   transition: width 0.2s ease;
 }
 
+/* Ability Indicator */
+.ability-indicator {
+  position: absolute;
+  bottom: 120px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 160px;
+}
+
+.ability-label {
+  color: #888;
+  font-size: 11px;
+  font-weight: bold;
+  margin-bottom: 4px;
+  text-align: center;
+  text-shadow: 0 0 8px rgba(0, 0, 0, 0.8);
+  transition: color 0.2s;
+}
+
+.ability-label.ready {
+  color: #fbbf24;
+  text-shadow: 0 0 10px rgba(251, 191, 36, 0.6);
+}
+
+.ability-bar-container {
+  width: 100%;
+  height: 8px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.ability-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #f59e0b, #fbbf24);
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.4);
+  transition: width 0.1s linear;
+}
+
 /* Dash Indicator */
 .dash-indicator {
   position: absolute;
-  bottom: 120px;
+  bottom: 20px;
   left: 50%;
   transform: translateX(-50%);
   width: 140px;
