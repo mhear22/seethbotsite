@@ -17,8 +17,11 @@ import {
   NETWORK,
   ARENA,
   MECH,
-  PHYSICS
+  PHYSICS,
+  COMBAT
 } from '../../../shared/constants/GameConstants';
+import { MechEntity } from '../game/MechEntity';
+import { ProjectileSystem } from '../game/ProjectileSystem';
 
 interface PlayerData {
   playerId: string;
@@ -30,6 +33,7 @@ interface PlayerData {
   lastInput: PlayerInput | null;
   connected: boolean;
   stats: MatchStats;
+  mech: MechEntity; // Server-side mech entity
 }
 
 export type MatchState = 'COUNTDOWN' | 'ACTIVE' | 'ENDING' | 'ENDED';
@@ -39,11 +43,12 @@ export class MatchInstance {
   private player1: PlayerData;
   private player2: PlayerData;
   private matchState: MatchState = 'COUNTDOWN';
-  private projectiles: Map<string, ProjectileState> = new Map();
+  private projectileSystem: ProjectileSystem;
   private tickInterval: NodeJS.Timeout | null = null;
   private serverTime: number = Date.now();
   private countdownRemaining: number = 3;
   private onMatchEndCallback: ((matchId: string) => void) | null = null;
+  private eventIdCounter = 0;
 
   constructor(
     matchId: string,
@@ -58,32 +63,39 @@ export class MatchInstance {
   ) {
     this.matchId = matchId;
 
+    // Initialize projectile system
+    this.projectileSystem = new ProjectileSystem();
+
     // Initialize player 1
     const spawn1 = this.generateSpawnPosition(0);
+    const mech1 = new MechEntity(player1Id, player1Name, player1Loadout, spawn1);
     this.player1 = {
       playerId: player1Id,
       playerName: player1Name,
       loadout: player1Loadout,
       socket: player1Socket,
-      state: this.createInitialState(spawn1),
+      state: mech1.state,
       lastInputSeq: 0,
       lastInput: null,
       connected: true,
-      stats: this.createInitialStats()
+      stats: this.createInitialStats(),
+      mech: mech1
     };
 
     // Initialize player 2
     const spawn2 = this.generateSpawnPosition(Math.PI);
+    const mech2 = new MechEntity(player2Id, player2Name, player2Loadout, spawn2);
     this.player2 = {
       playerId: player2Id,
       playerName: player2Name,
       loadout: player2Loadout,
       socket: player2Socket,
-      state: this.createInitialState(spawn2),
+      state: mech2.state,
       lastInputSeq: 0,
       lastInput: null,
       connected: true,
-      stats: this.createInitialStats()
+      stats: this.createInitialStats(),
+      mech: mech2
     };
 
     console.log(`[Match ${matchId}] Created: ${player1Name} vs ${player2Name}`);
@@ -133,13 +145,29 @@ export class MatchInstance {
    */
   private tick(): void {
     this.serverTime = Date.now();
+    const deltaTime = NETWORK.SNAPSHOT_INTERVAL / 1000;
 
     // Update player physics based on last input
     this.updatePlayerPhysics(this.player1);
     this.updatePlayerPhysics(this.player2);
 
-    // Update projectiles (Phase 3)
-    // this.updateProjectiles();
+    // Update cooldowns
+    this.player1.mech.updateCooldowns(deltaTime);
+    this.player2.mech.updateCooldowns(deltaTime);
+
+    // Update projectiles
+    this.projectileSystem.update(deltaTime);
+
+    // Check projectile collisions
+    const hits = this.projectileSystem.checkCollisions([
+      this.player1.mech,
+      this.player2.mech
+    ]);
+
+    // Process hits
+    for (const hit of hits) {
+      this.handleProjectileHit(hit.projectileId, hit.hitMechId, hit.position, hit.damage);
+    }
 
     // Send state snapshot to both players
     this.sendStateSnapshot();
@@ -239,7 +267,7 @@ export class MatchInstance {
         [this.player1.playerId]: this.player1.state,
         [this.player2.playerId]: this.player2.state
       },
-      projectiles: Array.from(this.projectiles.values())
+      projectiles: this.projectileSystem.getProjectileStates()
     };
 
     // Send to player 1 with their last seq
@@ -273,6 +301,15 @@ export class MatchInstance {
     if (seq > player.lastInputSeq) {
       player.lastInputSeq = seq;
       player.lastInput = input;
+    }
+
+    // Handle weapon firing
+    if (input.shootLeft && player.mech.canFireWeapon('left')) {
+      this.handleWeaponFire(player, 'left', input.aimDirection);
+    }
+
+    if (input.shootRight && player.mech.canFireWeapon('right')) {
+      this.handleWeaponFire(player, 'right', input.aimDirection);
     }
   }
 
@@ -441,6 +478,135 @@ export class MatchInstance {
    */
   public hasPlayer(playerId: string): boolean {
     return this.player1.playerId === playerId || this.player2.playerId === playerId;
+  }
+
+  /**
+   * Handle weapon fire
+   */
+  private handleWeaponFire(
+    player: PlayerData,
+    weapon: 'left' | 'right',
+    aimDirection: { x: number; y: number; z: number }
+  ): void {
+    const weaponConfig = weapon === 'left' ? player.loadout.leftWeapon : player.loadout.rightWeapon;
+    if (!weaponConfig) return;
+
+    // Fire weapon (consumes resources and sets cooldown)
+    player.mech.fireWeapon(weapon);
+
+    // Update stats
+    player.stats.shotsFired++;
+
+    // Get muzzle position
+    const muzzlePos = player.mech.getMuzzlePosition(weapon);
+
+    // Spawn projectile
+    const projectileId = this.projectileSystem.spawnProjectile(
+      player.playerId,
+      muzzlePos,
+      [aimDirection.x, aimDirection.y, aimDirection.z],
+      weaponConfig.type,
+      weaponConfig.damage
+    );
+
+    // Broadcast projectile_spawned event
+    const eventId = this.generateEventId();
+    this.broadcast({
+      type: 'event',
+      eventId,
+      eventType: 'projectile_spawned',
+      data: {
+        projectileId,
+        ownerId: player.playerId,
+        position: muzzlePos,
+        weaponType: weaponConfig.type,
+        damage: weaponConfig.damage
+      }
+    });
+  }
+
+  /**
+   * Handle projectile hit
+   */
+  private handleProjectileHit(
+    projectileId: string,
+    hitMechId: string,
+    position: [number, number, number],
+    damage: number
+  ): void {
+    const hitPlayer = this.getPlayer(hitMechId);
+    if (!hitPlayer) return;
+
+    const attacker = hitPlayer === this.player1 ? this.player2 : this.player1;
+
+    // Apply damage
+    const defeated = hitPlayer.mech.takeDamage(damage);
+
+    // Update stats
+    attacker.stats.shotsHit++;
+    attacker.stats.damageDealt += damage;
+    hitPlayer.stats.damageReceived += damage;
+
+    // Broadcast damage event
+    const damageEventId = this.generateEventId();
+    this.broadcast({
+      type: 'event',
+      eventId: damageEventId,
+      eventType: 'damage',
+      data: {
+        targetId: hitMechId,
+        attackerId: attacker.playerId,
+        damage,
+        newHealth: hitPlayer.state.health
+      }
+    });
+
+    // Broadcast projectile hit event
+    const hitEventId = this.generateEventId();
+    this.broadcast({
+      type: 'event',
+      eventId: hitEventId,
+      eventType: 'projectile_hit',
+      data: {
+        projectileId,
+        hitPlayerId: hitMechId,
+        position,
+        normal: [0, 1, 0] // Simplified
+      }
+    });
+
+    // Check if mech was destroyed
+    if (defeated) {
+      this.handleMechDestroyed(hitPlayer, attacker);
+    }
+  }
+
+  /**
+   * Handle mech destroyed
+   */
+  private handleMechDestroyed(defeated: PlayerData, victor: PlayerData): void {
+    // Broadcast mech_destroyed event
+    const eventId = this.generateEventId();
+    this.broadcast({
+      type: 'event',
+      eventId,
+      eventType: 'mech_destroyed',
+      data: {
+        playerId: defeated.playerId,
+        killerId: victor.playerId,
+        position: defeated.state.position
+      }
+    });
+
+    // End match
+    this.endMatch(victor.playerId, 'health_depleted');
+  }
+
+  /**
+   * Generate unique event ID
+   */
+  private generateEventId(): string {
+    return `evt_${this.matchId}_${this.eventIdCounter++}`;
   }
 
   /**

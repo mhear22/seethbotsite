@@ -114,6 +114,10 @@ export class MultiplayerBattleScene extends BattleScene {
     this.networkManager.on('server_error', (data) => {
       console.error('[MultiplayerBattleScene] Server error:', data);
     });
+
+    this.networkManager.on('game_event', (data) => {
+      this.handleGameEvent(data);
+    });
   }
 
   /**
@@ -199,6 +203,107 @@ export class MultiplayerBattleScene extends BattleScene {
   private handleOpponentDisconnect(): void {
     // You win by default
     (this as any).triggerBattleEnd('victory');
+  }
+
+  /**
+   * Handle game events from server
+   */
+  private handleGameEvent(event: any): void {
+    if (!event || !event.eventType) return;
+
+    switch (event.eventType) {
+      case 'projectile_spawned':
+        this.handleProjectileSpawned(event.data);
+        break;
+
+      case 'projectile_hit':
+        this.handleProjectileHit(event.data);
+        break;
+
+      case 'damage':
+        this.handleDamage(event.data);
+        break;
+
+      case 'mech_destroyed':
+        this.handleMechDestroyed(event.data);
+        break;
+
+      case 'weapon_fire':
+        // Optional: play weapon fire sound/animation
+        break;
+
+      default:
+        console.warn('[MultiplayerBattleScene] Unknown event type:', event.eventType);
+    }
+
+    // Send acknowledgment for critical events
+    if (event.eventId) {
+      this.networkManager.sendAck(event.eventId);
+    }
+  }
+
+  /**
+   * Handle projectile spawned event
+   */
+  private handleProjectileSpawned(data: any): void {
+    // Access projectile system from parent class
+    const projectileSystem = (this as any).projectileSystem;
+    if (!projectileSystem) return;
+
+    // Determine which mech fired (for visual projectile spawning)
+    const shooter = data.ownerId === this.yourPlayerId ? this.playerMech : this.enemyMech;
+
+    // Create visual projectile
+    // The projectile system will handle the visual representation
+    // Server is authoritative for hit detection
+    console.log('[MultiplayerBattleScene] Projectile spawned:', data.projectileId);
+  }
+
+  /**
+   * Handle projectile hit event
+   */
+  private handleProjectileHit(data: any): void {
+    const particleSystem = (this as any).particleSystem;
+    const audio = (this as any).audio;
+
+    if (!particleSystem || !audio) return;
+
+    // Spawn impact effects at hit position
+    const impactPos = new THREE.Vector3(
+      data.position[0],
+      data.position[1],
+      data.position[2]
+    );
+
+    particleSystem.spawnHitEffect(impactPos, 'ballistic');
+    audio.playBulletHitMech();
+
+    console.log('[MultiplayerBattleScene] Projectile hit:', data);
+  }
+
+  /**
+   * Handle damage event
+   */
+  private handleDamage(data: any): void {
+    const targetMech = data.targetId === this.yourPlayerId ? this.playerMech : this.enemyMech;
+
+    // Update health (server state will update in next snapshot, but this provides immediate feedback)
+    targetMech.health = data.newHealth;
+
+    // Visual feedback for taking damage
+    // Could add screen shake, red flash, etc.
+
+    console.log('[MultiplayerBattleScene] Damage:', data.damage, 'to', data.targetId);
+  }
+
+  /**
+   * Handle mech destroyed event
+   */
+  private handleMechDestroyed(data: any): void {
+    console.log('[MultiplayerBattleScene] Mech destroyed:', data.playerId);
+
+    // The match_end event will trigger the actual victory/defeat screen
+    // This event just handles the destruction animation
   }
 
   /**
