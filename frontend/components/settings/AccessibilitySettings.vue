@@ -24,6 +24,9 @@ const reduceMotion = ref(false)
 const screenReaderAnnouncements = ref(true)
 const focusIndicators = ref(true)
 
+// Troll state
+const showTroll = ref(false)
+
 // Load saved settings from localStorage
 const loadSettings = () => {
   try {
@@ -253,12 +256,22 @@ const announceChange = (message: string) => {
     <section class="setting-group">
       <button
         class="reset-btn"
-        @click="() => { fontSize = 'medium'; highContrastMode = false; reduceMotion = false; screenReaderAnnouncements = true; focusIndicators = true; announceChange('Accessibility settings reset to defaults') }"
+        @click="showTroll = true"
         aria-label="Reset all accessibility settings to default values"
       >
         Reset to Defaults
       </button>
     </section>
+
+    <!-- Troll Overlay -->
+    <Transition name="troll">
+      <div v-if="showTroll" class="troll-overlay" @click="showTroll = false">
+        <div class="troll-message" @click.stop>
+          <h1 class="troll-text">FUCK YOU</h1>
+          <button class="troll-dismiss" @click="showTroll = false">Nice try 😈</button>
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -637,5 +650,83 @@ const announceChange = (message: string) => {
 .no-focus-indicators :focus-visible {
   outline: none !important;
   box-shadow: none !important;
+}
+
+/* Troll Overlay */
+.troll-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.95);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  cursor: pointer;
+}
+
+.troll-message {
+  text-align: center;
+  color: #ff0000;
+  animation: troll-pulse 0.5s ease-in-out infinite alternate;
+}
+
+.troll-text {
+  font-size: 120px;
+  font-weight: 900;
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 10px;
+  text-shadow: 4px 4px 0 #ffff00, -4px -4px 0 #ff00ff, 4px -4px 0 #00ffff, -4px 4px 0 #ff6b00;
+  line-height: 1;
+}
+
+.troll-dismiss {
+  margin-top: 40px;
+  padding: 16px 32px;
+  background: transparent;
+  border: 3px solid #ff0000;
+  color: #ff0000;
+  font-size: 20px;
+  font-weight: 700;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-family: inherit;
+  text-transform: uppercase;
+}
+
+.troll-dismiss:hover {
+  background: #ff0000;
+  color: #000;
+  transform: scale(1.1);
+}
+
+@keyframes troll-pulse {
+  0% {
+    transform: scale(1);
+  }
+  100% {
+    transform: scale(1.05);
+  }
+}
+
+.troll-enter-active,
+.troll-leave-active {
+  transition: all 0.3s ease;
+}
+
+.troll-enter-from,
+.troll-leave-to {
+  opacity: 0;
+  transform: scale(0.5);
+}
+
+.troll-enter-to,
+.troll-leave-from {
+  opacity: 1;
+  transform: scale(1);
 }
 </style>
