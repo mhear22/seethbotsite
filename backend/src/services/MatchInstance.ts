@@ -324,12 +324,31 @@ export class MatchInstance {
     player.connected = false;
 
     if (this.matchState === 'ACTIVE') {
-      // End match - opponent wins
+      // Notify opponent of disconnection
       const opponent = playerId === this.player1.playerId ? this.player2 : this.player1;
+
+      if (opponent.connected && opponent.socket.readyState === 1) {
+        opponent.socket.send(JSON.stringify({
+          type: 'opponent_disconnected'
+        }));
+      }
+
+      // End match - opponent wins by forfeit
       this.endMatch(opponent.playerId, 'disconnect');
     } else if (this.matchState === 'COUNTDOWN') {
       // Cancel match during countdown
       console.log(`[Match ${this.matchId}] Match cancelled during countdown`);
+
+      // Notify other player
+      const opponent = playerId === this.player1.playerId ? this.player2 : this.player1;
+      if (opponent.connected && opponent.socket.readyState === 1) {
+        opponent.socket.send(JSON.stringify({
+          type: 'error',
+          code: 'MATCH_CANCELLED',
+          message: 'Match cancelled - opponent disconnected during countdown'
+        }));
+      }
+
       this.cleanup();
       if (this.onMatchEndCallback) {
         this.onMatchEndCallback(this.matchId);
