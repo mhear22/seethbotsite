@@ -390,3 +390,21 @@ body.chaos .router-nav .dropdown-btn {
   0% { text-shadow: 0 0 5px var(--chaos-color-1, #ff0000); }
   100% { text-shadow: 0 0 15px var(--chaos-color-2, #00ff00); }
 }
+
+/* Keyboard Shortcut Badge in Control Buttons (Ticket #195) */
+.router-nav .control-shortcut {
+  margin-left: 6px;
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+}
+
+.router-nav .control-btn:hover .control-shortcut {
+  opacity: 1;
+}
+
+/* Hide shortcut badges on mobile */
+@media (max-width: 768px) {
+  .router-nav .control-shortcut {
+    display: none;
+  }
+}
