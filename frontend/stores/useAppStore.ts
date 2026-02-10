@@ -29,6 +29,7 @@ export const useAppStore = defineStore('app', () => {
   const savedDarkerMode = localStorage.getItem('darkerMode')
   const savedChaosMode = localStorage.getItem('chaosMode')
   const savedMoldMode = localStorage.getItem('moldMode')
+  const savedPerformanceMode = localStorage.getItem('performanceMode')
   const darkMode = ref(savedDarkMode === 'true')
   const darkerMode = ref(savedDarkerMode === 'true')
   const chaosMode = ref(savedChaosMode === 'true')
@@ -38,6 +39,8 @@ export const useAppStore = defineStore('app', () => {
     ? savedMoldMode === 'true'
     : !isMobileDevice() // Default to false on mobile, true on desktop
   )
+
+  const performanceMode = ref(savedPerformanceMode === 'true')
 
   const showHearts = ref(localStorage.getItem('showHearts') !== 'false')
 
@@ -152,6 +155,12 @@ export const useAppStore = defineStore('app', () => {
     } else {
       stopChaosEffects()
     }
+  }
+
+  const togglePerformanceMode = () => {
+    performanceMode.value = !performanceMode.value
+    localStorage.setItem('performanceMode', performanceMode.value.toString())
+    document.body.classList.toggle('performance-mode', performanceMode.value)
   }
 
   // Chaos mode effects (Ticket #88)
