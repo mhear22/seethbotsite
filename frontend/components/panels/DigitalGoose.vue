@@ -10,7 +10,8 @@ const currentMessage = ref('Honk!')
 // Start in center-right position for better visibility
 const goosePosition = ref({ x: 0, y: 0 }) // Will be set on mount to centered position
 const gooseElement = ref<HTMLElement | null>(null)
-const { playHonk } = useAudio()
+
+const { playGooseHonk } = useAudio()
 
 const messages = [
   'Honk!',
@@ -130,8 +131,8 @@ const honk = async () => {
     currentMessage.value = messages[Math.floor(Math.random() * messages.length)]
   }
 
-  // Play honk sound using useAudio composable
-  playHonk()
+  // Play honk sound
+  playGooseHonk()
 
   // Random chaos behavior
   if (Math.random() > 0.8) {

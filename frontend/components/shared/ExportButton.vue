@@ -3,6 +3,8 @@ import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { exportRepository } from '../../repositories/export.repository'
 import { useAudio } from '@/composables/useAudio'
 
+const { playClick, playButtonClick, playSuccess, playError } = useAudio()
+
 interface Props {
   type: 'rankings' | 'stats' | 'clicks' | 'history' | 'leaderboard'
   userId?: string
@@ -87,12 +89,12 @@ const handleExport = async (format: 'json' | 'csv') => {
         break
     }
 
-    emit('exportComplete')
     playSuccess()
+    emit('exportComplete')
   } catch (error) {
+    playError()
     const errorMessage = error instanceof Error ? error.message : 'Export failed'
     emit('exportError', errorMessage)
-    playError()
   } finally {
     isExporting.value = false
   }

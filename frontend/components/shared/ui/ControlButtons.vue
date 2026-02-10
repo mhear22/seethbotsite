@@ -15,31 +15,36 @@ const emit = defineEmits<{
   'toggle-mika': []
 }>()
 
-const { playClick, playPanelOpen } = useAudio()
+const { playClick, playPanelOpen, playButtonClick } = useAudio()
 
 const handleRankingsToggle = () => {
   playClick()
+  playButtonClick()
   emit('toggle-rankings')
 }
 
 const handleDarkToggle = () => {
   playClick()
+  playButtonClick()
   emit('toggle-dark')
 }
 
 const handleMusicToggle = () => {
   playClick()
+  playButtonClick()
   emit('toggle-music')
 }
 
 const handleFeedToggle = () => {
   playClick()
   playPanelOpen()
+  playButtonClick()
   emit('toggle-feed')
 }
 
 const handleMikaToggle = () => {
   playClick()
+  playButtonClick()
   emit('toggle-mika')
 }
 </script>

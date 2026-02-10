@@ -32,9 +32,8 @@ const toggleFavorite = async () => {
   )
 
   if (success) {
-    emit('toggle', !wasFavorited)
-    // Play success sound when favoriting
     playSuccess()
+    emit('toggle', !wasFavorited)
   } else {
     // Play click sound even on failure for feedback
     playClick()

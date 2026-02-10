@@ -5,6 +5,8 @@ import type { AchievementDisplay, AchievementProgress } from '../../repositories
 import { formatDate } from '../../utils/format'
 import { useAudio } from '@/composables/useAudio'
 
+const { playAchievement, playClick, playSuccess } = useAudio()
+
 const achievements = ref<AchievementDisplay[]>([])
 const progress = ref<AchievementProgress | null>(null)
 const isLoading = ref(true)
@@ -38,19 +40,18 @@ const getProgressColor = (percentage: number): string => {
   return '#fc8181' // Red
 }
 
-const { playClick, playSuccess } = useAudio()
-
 const checkNewAchievements = async () => {
   try {
     checkingForNew.value = true
     newUnlocksMessage.value = null
 
+    playClick()
+
     const result = await achievementsRepository.checkAchievements()
 
     if (result.newUnlocks.length > 0) {
       newUnlocksMessage.value = `🎉 Unlocked ${result.newUnlocks.length} new achievement(s)!`
-      // Play success sound for achievements
-      playSuccess()
+      playAchievement()
       // Reload to show new achievements
       await loadAchievements()
     } else {
