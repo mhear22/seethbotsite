@@ -3,6 +3,33 @@
     <!-- Settings Modal -->
     <GameSettingsModal :is-open="isSettingsOpen" @close="isSettingsOpen = false" />
 
+    <!-- Mode Selection -->
+    <div v-if="battlePhase === 'mode-select'" class="screen mode-select-screen">
+      <div class="screen-content">
+        <h1>Select Battle Mode</h1>
+        <p class="mode-description">Choose how you want to battle</p>
+
+        <div class="mode-options">
+          <button @click="selectSinglePlayer" class="mode-btn single-player-btn">
+            <div class="mode-icon">🤖</div>
+            <h3>Practice vs AI</h3>
+            <p>Battle against AI opponent to test your mech</p>
+          </button>
+
+          <button @click="selectMultiplayer" class="mode-btn multiplayer-btn">
+            <div class="mode-icon">⚔️</div>
+            <h3>Multiplayer Match</h3>
+            <p>Fight against real players online</p>
+            <span class="coming-soon-badge">Phase 1</span>
+          </button>
+        </div>
+
+        <div class="button-group">
+          <button @click="returnToBuilder" class="back-btn">Return to Builder</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Loading State -->
     <div v-if="battlePhase === 'loading'" class="screen loading-screen">
       <div class="screen-content">
@@ -157,6 +184,9 @@ import BattleCanvas from '../mech/BattleCanvas.vue'
 import BattleHUD from '../mech/BattleHUD.vue'
 import GameSettingsModal from '../mech/GameSettingsModal.vue'
 
+// Multiplayer state
+const battleMode = ref<'single-player' | 'multiplayer'>('single-player')
+
 const route = useRoute()
 const router = useRouter()
 const builder = useMechBuilder()
@@ -231,11 +261,8 @@ onMounted(() => {
     return
   }
 
-  // Initialize battle with player mech
-  battle.initializeBattle(builder.loadout.value, builder.totalStats.value)
-
-  // Generate enemy mech (Phase 1: tutorial difficulty)
-  battle.generateEnemy('tutorial')
+  // Start with mode selection
+  battle.battleState.value.phase = 'mode-select'
 
   // Watch battle phase and disable shortcuts during active battle
   watch(battlePhase, (phase) => {
@@ -298,6 +325,24 @@ function handleHudUpdate(data: {
   hudData.enemyRadarX = data.enemyRadarX
   hudData.enemyRadarY = data.enemyRadarY
   targetingState.value = data.targeting
+}
+
+function selectSinglePlayer() {
+  battleMode.value = 'single-player'
+
+  // Initialize battle with player mech
+  battle.initializeBattle(builder.loadout.value, builder.totalStats.value)
+
+  // Generate enemy mech (Phase 1: tutorial difficulty)
+  battle.generateEnemy('tutorial')
+}
+
+function selectMultiplayer() {
+  battleMode.value = 'multiplayer'
+  // TODO: Implement multiplayer matchmaking in next steps
+  alert('Multiplayer functionality will be available after Phase 1 testing!')
+  // For now, fall back to single player
+  selectSinglePlayer()
 }
 
 function returnToBuilder() {
@@ -562,6 +607,76 @@ function returnToBuilder() {
   }
 }
 
+/* Mode Selection Screen */
+.mode-select-screen h1 {
+  color: #fff;
+  font-size: 3rem;
+  margin-bottom: 20px;
+  text-shadow: 0 0 20px rgba(59, 130, 246, 0.8);
+}
+
+.mode-description {
+  color: #9ca3af;
+  font-size: 1.2rem;
+  margin-bottom: 40px;
+}
+
+.mode-options {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 30px;
+  margin-bottom: 40px;
+  max-width: 900px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.mode-btn {
+  background: rgba(0, 0, 0, 0.4);
+  padding: 40px 30px;
+  border-radius: 12px;
+  border: 2px solid rgba(59, 130, 246, 0.3);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.mode-btn:hover {
+  border-color: rgba(59, 130, 246, 0.6);
+  background: rgba(59, 130, 246, 0.1);
+  transform: translateY(-5px);
+  box-shadow: 0 10px 30px rgba(59, 130, 246, 0.3);
+}
+
+.mode-icon {
+  font-size: 4rem;
+  margin-bottom: 20px;
+}
+
+.mode-btn h3 {
+  color: #fff;
+  font-size: 1.5rem;
+  margin-bottom: 10px;
+}
+
+.mode-btn p {
+  color: #9ca3af;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.coming-soon-badge {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: bold;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .stat-grid {
@@ -583,6 +698,10 @@ function returnToBuilder() {
   .return-btn,
   .settings-btn {
     width: 100%;
+  }
+
+  .mode-options {
+    grid-template-columns: 1fr;
   }
 }
 </style>

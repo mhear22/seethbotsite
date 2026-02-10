@@ -40,6 +40,7 @@ import favoritesController from './controllers/favorites.controller';
 import themesController from './controllers/themes.controller';
 import discordController from './controllers/discord.controller';
 import { setupWebSocketServer } from './controllers/presence.controller';
+import { setupMultiplayerWebSocket, getGameStats } from './controllers/multiplayer.controller';
 import { initProfilesDB } from './services/profile.service';
 import { initFavoritesDB } from './services/favorites.service';
 import { initThemeDB } from './services/theme.service';
@@ -130,6 +131,9 @@ app.use('/api/favorites', favoritesController);
 app.use('/api/themes', themesController);
 app.use('/api', discordController);
 
+// Multiplayer game stats endpoint
+app.get('/api/multiplayer/stats', getGameStats);
+
 // Serve raw OpenAPI JSON spec for type generation
 app.get('/api/openapi.json', (req: Request, res: Response) => {
   res.setHeader('Content-Type', 'application/json');
@@ -174,6 +178,9 @@ const server = createServer(app);
 // Setup WebSocket server for user presence BEFORE server starts listening
 setupWebSocketServer(server);
 
+// Setup multiplayer WebSocket server
+setupMultiplayerWebSocket(server);
+
 // Initialize profiles database
 initProfilesDB().catch((err) => {
   console.error('Failed to initialize profiles database:', err);
@@ -196,6 +203,7 @@ server.listen(PORT, () => {
   console.log(`🔒 Security: API key authentication enabled for destructive endpoints`);
   console.log(`⚡ Rate limiting: 100 requests per minute per IP`);
   console.log(`🔗 WebSocket server listening on /ws`);
+  console.log(`🎮 Multiplayer WebSocket server listening on /ws/multiplayer`);
 });
 
 export default app;
