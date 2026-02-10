@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sound Effects Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .sound-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 30px;
+        }
+        .sound-button {
+            padding: 15px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: background 0.2s, transform 0.1s;
+        }
+        .sound-button:hover {
+            background: #45a049;
+        }
+        .sound-button:active {
+            transform: scale(0.95);
+        }
+        .sound-button.playing {
+            background: #2196F3;
+        }
+        .status {
+            text-align: center;
+            margin: 20px 0;
+            padding: 10px;
+            background: #e7f3fe;
+            border-left: 4px solid #2196F3;
+            border-radius: 4px;
+            display: none;
+        }
+        .all-sounds {
+            margin: 30px 0;
+            text-align: center;
+        }
+        .play-all {
+            padding: 15px 30px;
+            background: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        .play-all:hover {
+            background: #1976D2;
+        }
+        .info {
+            margin-top: 30px;
+            padding: 15px;
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔊 Sound Effects Test</h1>
+
+    <div id="status" class="status"></div>
+
+    <div class="all-sounds">
+        <button class="play-all" onclick="playAllSounds()">▶ Play All Sounds (Sequentially)</button>
+    </div>
+
+    <div class="sound-grid">
+        <button class="sound-button" onclick="playSound('click')">
+            🖱️ Click
+        </button>
+        <button class="sound-button" onclick="playSound('success')">
+            ✅ Success
+        </button>
+        <button class="sound-button" onclick="playSound('error')">
+            ❌ Error
+        </button>
+        <button class="sound-button" onclick="playSound('panel')">
+            📂 Panel
+        </button>
+        <button class="sound-button" onclick="playSound('honk')">
+            🦆 Honk
+        </button>
+        <button class="sound-button" onclick="playSound('points')">
+            💰 Points
+        </button>
+        <button class="sound-button" onclick="playSound('notification')">
+            🔔 Notification
+        </button>
+    </div>
+
+    <div class="info">
+        <strong>Instructions:</strong> Click each button to test the corresponding sound effect. All sounds should play in your browser.
+    </div>
+
+    <script>
+        const sounds = {
+            click: 'click.mp3',
+            success: 'success.mp3',
+            error: 'error.mp3',
+            panel: 'panel.mp3',
+            honk: 'honk.mp3',
+            points: 'points.mp3',
+            notification: 'notification.mp3'
+        };
+
+        const audioElements = {};
+
+        // Preload all sounds
+        Object.keys(sounds).forEach(key => {
+            const audio = new Audio(sounds[key]);
+            audio.preload = 'auto';
+            audioElements[key] = audio;
+        });
+
+        function playSound(soundKey) {
+            const audio = audioElements[soundKey];
+            const button = document.querySelector(`button[onclick="playSound('${soundKey}')"]`);
+
+            if (audio) {
+                // Reset audio to start
+                audio.currentTime = 0;
+
+                // Add playing state to button
+                button.classList.add('playing');
+
+                // Play the sound
+                audio.play().then(() => {
+                    showStatus(`Playing: ${soundKey.toUpperCase()}`);
+                }).catch(error => {
+                    showStatus(`Error playing ${soundKey}: ${error.message}`);
+                    console.error('Playback error:', error);
+                });
+
+                // Remove playing state when done
+                audio.onended = () => {
+                    button.classList.remove('playing');
+                    showStatus('');
+                };
+            }
+        }
+
+        async function playAllSounds() {
+            const soundKeys = Object.keys(sounds);
+            showStatus('Playing all sounds...');
+
+            for (const key of soundKeys) {
+                await new Promise((resolve) => {
+                    const audio = audioElements[key];
+                    const button = document.querySelector(`button[onclick="playSound('${key}')"]`);
+
+                    audio.currentTime = 0;
+                    button.classList.add('playing');
+                    showStatus(`Playing: ${key.toUpperCase()}`);
+
+                    audio.play();
+
+                    audio.onended = () => {
+                        button.classList.remove('playing');
+                        resolve();
+                    };
+                });
+
+                // Small delay between sounds
+                await new Promise(resolve => setTimeout(resolve, 200));
+            }
+
+            showStatus('All sounds played!');
+            setTimeout(() => showStatus(''), 2000);
+        }
+
+        function showStatus(message) {
+            const status = document.getElementById('status');
+            if (message) {
+                status.textContent = message;
+                status.style.display = 'block';
+            } else {
+                status.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>
