@@ -11,7 +11,7 @@ const currentMessage = ref('Honk!')
 const goosePosition = ref({ x: 0, y: 0 }) // Will be set on mount to centered position
 const gooseElement = ref<HTMLElement | null>(null)
 
-const { playGooseHonk } = useAudio()
+const { playHonk } = useAudio()
 
 const messages = [
   'Honk!',
@@ -132,7 +132,7 @@ const honk = async () => {
   }
 
   // Play honk sound
-  playGooseHonk()
+  playHonk()
 
   // Random chaos behavior
   if (Math.random() > 0.8) {
@@ -200,9 +200,7 @@ onUnmounted(() => {
     @click="honk"
   >
     <div class="goose-container">
-      <div class="goose-emoji">
-        🪿
-      </div>
+      <img src="/goose.png" alt="goose" class="goose-emoji" />
       <div class="goose-message">{{ currentMessage }}</div>
       <div class="honk-counter">{{ honkCount }} honks</div>
     </div>
@@ -260,14 +258,11 @@ onUnmounted(() => {
 }
 
 .goose-emoji {
-  font-size: 48px;
-  text-align: center;
   margin: 0 auto 8px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  line-height: 1;
   background: rgba(255, 255, 255, 0.15);
   width: 60px;
   height: 60px;
@@ -275,6 +270,7 @@ onUnmounted(() => {
   margin-right: auto;
   transition: transform 0.2s ease;
   animation: float 3s ease-in-out infinite;
+  object-fit: contain;
 }
 
 @keyframes float {
