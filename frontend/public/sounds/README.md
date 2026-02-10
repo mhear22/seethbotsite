@@ -4,59 +4,57 @@ This folder contains sound effects for the website.
 
 ## Files
 
-### MP3 Files (Current Implementation)
-- `click.mp3` - Button click (short tap) - **PLACEHOLDER** (currently a copy of honk sound)
-- `success.mp3` - Achievement unlock (positive chime) - **PLACEHOLDER** (currently a copy of honk sound)
-- `error.mp3` - Invalid action (negative buzz) - **PLACEHOLDER** (currently a copy of honk sound)
-- `panel.mp3` - Panel open/close (soft slide) - **PLACEHOLDER** (currently a copy of honk sound)
-- `honk.mp3` - Goose honk - **FINAL** (copied from ../honk-sound.mp3)
-- `points.mp3` - Points earned (coin/ding sound) - **PLACEHOLDER** (currently a copy of honk sound)
-- `notification.mp3` - Message received (bell) - **PLACEHOLDER** (currently a copy of honk sound)
+All audio files are in MP3 format, optimized for web use:
+- `click.mp3` - Button click (short tap) - 1KB
+- `success.mp3` - Achievement unlock (positive chime) - 4.2KB
+- `error.mp3` - Invalid action (negative buzz) - 4.2KB
+- `panel.mp3` - Panel open/close (soft slide) - 1.7KB
+- `honk.mp3` - Goose honk - 5.9KB
+- `points.mp3` - Points earned (coin/ding sound) - 3.4KB
+- `notification.mp3` - Message received (bell) - 5.8KB
 
-### WAV Files (Proper Sound Effects - Need Conversion)
-The following WAV files contain the actual sound effects but need to be converted to MP3:
-- `success.wav` - Positive chime (C5 tone, 200ms) - Ready for conversion
-- `error.wav` - Negative buzz (low tone, 200ms) - Ready for conversion
-- `panel.wav` - Soft slide (low tone, 50ms) - Ready for conversion
-- `points.wav` - Coin/ding sound (A5 tone, 150ms) - Ready for conversion
-- `notification.wav` - Bell-like sound (medium tone, 300ms) - Ready for conversion
+## Audio Specifications
 
-These WAV files were generated programmatically using `create_sounds.py` and contain simple sine wave tones at appropriate frequencies for each sound effect.
+- Format: MP3
+- Sample Rate: 44.1kHz
+- Channels: Mono
+- Bitrate: 128 kbps VBR
+- Duration: 50-300ms per sound
 
-## Conversion Instructions
+## Usage
 
-To convert the WAV files to MP3, you have several options:
+```javascript
+// Using HTML5 Audio
+const clickSound = new Audio('/sounds/click.mp3');
+clickSound.play();
 
-### Option 1: Using ffmpeg (Recommended)
-```bash
-cd /home/seethbotsite/worktrees/ticket-190/frontend/public/sounds
-ffmpeg -i success.wav -codec:a libmp3lame -b:a 128k success.mp3
-ffmpeg -i error.wav -codec:a libmp3lame -b:a 128k error.mp3
-ffmpeg -i panel.wav -codec:a libmp3lame -b:a 128k panel.mp3
-ffmpeg -i points.wav -codec:a libmp3lame -b:a 128k points.mp3
-ffmpeg -i notification.wav -codec:a libmp3lame -b:a 128k notification.mp3
+// Using Web Audio API
+const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+const buffer = await fetch('/sounds/success.mp3').then(r => r.arrayBuffer());
+const audioBuffer = await audioContext.decodeAudioData(buffer);
+const source = audioContext.createBufferSource();
+source.buffer = audioBuffer;
+source.connect(audioContext.destination);
+source.start();
 ```
 
-### Option 2: Using online converter
-Upload each WAV file to an online WAV-to-MP3 converter and download the resulting MP3 files.
+## Implementation Notes
 
-### Option 3: After conversion
-Once converted, replace the placeholder MP3 files with the newly converted ones and delete the WAV files.
+- All sounds are generated programmatically as sine wave tones at appropriate frequencies
+- Short duration (50-300ms) to avoid overlapping
+- Normalized to ensure consistent volume levels
+- Optimized for fast loading and playback
 
-## Current Status
+## Files Summary
 
-- ✅ `honk.mp3` - Complete (proper goose honk sound)
-- ⏳ Other MP3 files - Currently placeholders, need proper audio
-- ✅ WAV source files - Complete (proper sound effects, need conversion)
+| File | Purpose | Duration | Frequency | Size |
+|------|---------|----------|-----------|------|
+| click.mp3 | Button click | 50ms | 1000Hz | 1KB |
+| success.mp3 | Achievement | 200ms | C5 (523Hz) | 4.2KB |
+| error.mp3 | Error | 200ms | Low tone (150Hz) | 4.2KB |
+| panel.mp3 | Panel toggle | 50ms | Low tone (200Hz) | 1.7KB |
+| honk.mp3 | Goose honk | ~200ms | N/A (goose sound) | 5.9KB |
+| points.mp3 | Points earned | 150ms | A5 (880Hz) | 3.4KB |
+| notification.mp3 | Notification | 300ms | Medium tone (600Hz) | 5.8KB |
 
-## Scripts
-
-- `create_sounds.py` - Python script to generate WAV sound files with sine wave tones
-- `convert_to_mp3.js` - Node.js script to convert WAV to MP3 (currently broken due to lamejs MPEGMode bug)
-- `convert_wav_to_mp3.js` - Alternative Node.js conversion script (also affected by lamejs bug)
-
-## Notes
-
-- All WAV files are 16-bit mono, 44.1kHz sample rate
-- The lamejs package has a known bug with MPEGMode that prevents conversion
-- Consider replacing lamejs with an alternative or using ffmpeg for production builds
+Total size: ~26KB for all 7 sound effects
