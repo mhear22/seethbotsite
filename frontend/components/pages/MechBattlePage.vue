@@ -3,6 +3,14 @@
     <!-- Settings Modal -->
     <GameSettingsModal :is-open="isSettingsOpen" @close="isSettingsOpen = false" />
 
+    <!-- Matchmaking View -->
+    <MatchmakingView
+      v-if="showMatchmaking"
+      :status="matchmakingStatus"
+      :error-message="matchmakingError"
+      @cancel="cancelMatchmaking"
+    />
+
     <!-- Mode Selection -->
     <div v-if="battlePhase === 'mode-select'" class="screen mode-select-screen">
       <div class="screen-content">
@@ -180,18 +188,27 @@ import { useRoute, useRouter } from 'vue-router'
 import { useMechBuilder } from '../../composables/useMechBuilder'
 import { useMechBattle } from '../../composables/useMechBattle'
 import { useKeyboardShortcuts } from '../../composables/useKeyboardShortcuts'
+import { useAuth } from '../../composables/useAuth'
 import BattleCanvas from '../mech/BattleCanvas.vue'
 import BattleHUD from '../mech/BattleHUD.vue'
 import GameSettingsModal from '../mech/GameSettingsModal.vue'
+import MatchmakingView from '../mech/MatchmakingView.vue'
+import { NetworkManager } from '../../lib/battle/NetworkManager'
+import type { MechLoadout } from '../../../shared/types/NetworkMessages'
 
 // Multiplayer state
 const battleMode = ref<'single-player' | 'multiplayer'>('single-player')
+const networkManager = new NetworkManager()
+const matchmakingStatus = ref<'queued' | 'searching' | 'found' | 'error'>('searching')
+const matchmakingError = ref('')
+const showMatchmaking = ref(false)
 
 const route = useRoute()
 const router = useRouter()
 const builder = useMechBuilder()
 const battle = useMechBattle()
 const keyboardShortcuts = useKeyboardShortcuts()
+const auth = useAuth()
 
 const battlePhase = computed(() => battle.battleState.value.phase)
 const battleTime = ref(0)
@@ -281,6 +298,12 @@ onMounted(() => {
 onUnmounted(() => {
   console.log('[MechBattle] Component unmounted, re-enabling keyboard shortcuts')
   keyboardShortcuts.enable()
+
+  // Disconnect from multiplayer if connected
+  if (networkManager.isConnected()) {
+    console.log('[MechBattle] Disconnecting from multiplayer server')
+    networkManager.disconnect()
+  }
 })
 
 function startBattle() {
@@ -337,12 +360,136 @@ function selectSinglePlayer() {
   battle.generateEnemy('tutorial')
 }
 
-function selectMultiplayer() {
+async function selectMultiplayer() {
   battleMode.value = 'multiplayer'
-  // TODO: Implement multiplayer matchmaking in next steps
-  alert('Multiplayer functionality will be available after Phase 1 testing!')
-  // For now, fall back to single player
-  selectSinglePlayer()
+
+  // Check authentication
+  if (!auth.isAuthenticated.value || !auth.token.value) {
+    matchmakingError.value = 'You must be logged in to play multiplayer'
+    matchmakingStatus.value = 'error'
+    showMatchmaking.value = true
+    setTimeout(() => {
+      showMatchmaking.value = false
+      router.push({ name: 'login' })
+    }, 2000)
+    return
+  }
+
+  try {
+    // Show matchmaking UI
+    showMatchmaking.value = true
+    matchmakingStatus.value = 'searching'
+    matchmakingError.value = ''
+
+    // Setup network event handlers
+    setupNetworkHandlers()
+
+    // Connect to multiplayer server
+    console.log('[MechBattle] Connecting to multiplayer server...')
+    await networkManager.connect(auth.token.value)
+    console.log('[MechBattle] Connected! Requesting match...')
+
+    // Convert builder loadout to network format
+    // TODO: Proper conversion from builder parts to weapon/ability configs
+    const loadout: MechLoadout = {
+      chassisType: builder.loadout.value.core?.id || 'core-standard',
+      leftWeapon: {
+        type: 'autocannon',
+        name: builder.loadout.value.leftArm?.name || 'Left Weapon',
+        damage: 20,
+        fireRate: 120,
+        projectileSpeed: 50,
+        energyCost: 10,
+        cooldown: 500
+      },
+      rightWeapon: {
+        type: 'laser',
+        name: builder.loadout.value.rightArm?.name || 'Right Weapon',
+        damage: 15,
+        fireRate: 180,
+        projectileSpeed: 100,
+        energyCost: 8,
+        cooldown: 333
+      },
+      ability: {
+        type: 'shield',
+        name: builder.loadout.value.rack?.name || 'Shield',
+        duration: 3000,
+        cooldown: 15000,
+        energyCost: 50
+      }
+    }
+
+    // Request a match
+    networkManager.requestMatch(loadout)
+    console.log('[MechBattle] Match requested')
+  } catch (error) {
+    console.error('[MechBattle] Failed to connect to multiplayer:', error)
+    matchmakingStatus.value = 'error'
+    matchmakingError.value = 'Failed to connect to multiplayer server'
+    setTimeout(() => {
+      showMatchmaking.value = false
+    }, 3000)
+  }
+}
+
+function cancelMatchmaking() {
+  console.log('[MechBattle] Cancelling matchmaking...')
+  networkManager.cancelMatchmaking()
+  networkManager.disconnect()
+  showMatchmaking.value = false
+  battle.battleState.value.phase = 'mode-select'
+}
+
+function setupNetworkHandlers() {
+  // Match found
+  networkManager.on('match_found', (data: any) => {
+    console.log('[MechBattle] Match found!', data)
+    matchmakingStatus.value = 'found'
+  })
+
+  // Match start
+  networkManager.on('match_start', (data: any) => {
+    console.log('[MechBattle] Match starting!', data)
+    // TODO: Transition to MultiplayerBattleScene
+    // The multiplayer battle infrastructure is complete (NetworkManager, ClientPrediction,
+    // StateInterpolation, MultiplayerBattleScene), but needs to be integrated into the UI.
+    // For now, show a temporary message
+    showMatchmaking.value = false
+    console.error('[MechBattle] MultiplayerBattleScene integration incomplete')
+    matchmakingError.value = 'Multiplayer battle scene not yet integrated. The networking infrastructure is ready, but the UI integration is incomplete.'
+    matchmakingStatus.value = 'error'
+    showMatchmaking.value = true
+    setTimeout(() => {
+      showMatchmaking.value = false
+      networkManager.disconnect()
+      battle.battleState.value.phase = 'mode-select'
+    }, 5000)
+  })
+
+  // Matchmaking status updates
+  networkManager.on('matchmaking_status', (data: any) => {
+    console.log('[MechBattle] Matchmaking status:', data)
+    if (data.status === 'queued') {
+      matchmakingStatus.value = 'queued'
+    }
+  })
+
+  // Errors
+  networkManager.on('server_error', (data: any) => {
+    console.error('[MechBattle] Server error:', data)
+    matchmakingStatus.value = 'error'
+    matchmakingError.value = data.message || 'An error occurred'
+  })
+
+  // Disconnection
+  networkManager.on('disconnected', () => {
+    console.log('[MechBattle] Disconnected from server')
+    if (showMatchmaking.value) {
+      matchmakingStatus.value = 'error'
+      matchmakingError.value = 'Disconnected from server'
+    }
+  })
 }
 
 function returnToBuilder() {

@@ -3,7 +3,7 @@
  * Handles WebSocket connection, message sending/receiving, and event handling
  */
 
-import {
+import type {
   ClientMessage,
   ServerMessage,
   InputMessage,
@@ -17,7 +17,7 @@ import {
   ErrorMessage,
   PlayerInput,
   MechLoadout
-} from '../../shared/types/NetworkMessages';
+} from '../../../shared/types/NetworkMessages';
 
 type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'error';
 

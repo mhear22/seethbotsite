@@ -3,8 +3,8 @@
  * Buffers received states and interpolates between them
  */
 
-import { PlayerState } from '../../shared/types/NetworkMessages';
-import { NETWORK, lerp } from '../../shared/constants/GameConstants';
+import { PlayerState } from '../../../shared/types/NetworkMessages';
+import { NETWORK, lerp } from '../../../shared/constants/GameConstants';
 
 interface BufferedState {
   state: PlayerState;

@@ -9,7 +9,7 @@ import { NetworkManager } from './NetworkManager';
 import { StateInterpolation } from './StateInterpolation';
 import { ClientPrediction } from './ClientPrediction';
 import { MechEntity } from './MechEntity';
-import { PlayerInput, MechLoadout, PlayerState } from '../../shared/types/NetworkMessages';
+import { PlayerInput, MechLoadout, PlayerState } from '../../../shared/types/NetworkMessages';
 import { markRaw } from 'vue';
 
 export interface MultiplayerBattleSceneConfig extends Omit<BattleSceneConfig, 'enemyMech'> {
