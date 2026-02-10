@@ -89,9 +89,10 @@ const handleMikaToggle = () => {
 </template>
 
 <style scoped>
-/* Keyboard Shortcut Badge in Control Buttons (Ticket #195) */
+/* Keyboard Shortcut Badge in Control Buttons */
 .button-shortcut {
-  margin-left: 6px;
+  margin-left: 4px;
+  font-size: 9px;
   opacity: 0.7;
   transition: opacity 0.2s ease;
 }

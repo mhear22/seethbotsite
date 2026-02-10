@@ -391,9 +391,10 @@ body.chaos .router-nav .dropdown-btn {
   100% { text-shadow: 0 0 15px var(--chaos-color-2, #00ff00); }
 }
 
-/* Keyboard Shortcut Badge in Control Buttons (Ticket #195) */
+/* Keyboard Shortcut Badges */
 .router-nav .control-shortcut {
-  margin-left: 6px;
+  margin-left: 4px;
+  font-size: 9px;
   opacity: 0.7;
   transition: opacity 0.2s ease;
 }
