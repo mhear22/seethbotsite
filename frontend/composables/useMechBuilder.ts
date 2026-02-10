@@ -29,6 +29,7 @@ export interface MechPart {
   icon: string                         // Emoji for visual display
   description: string
   stats: MechStats
+  weight: number                       // Weight in arbitrary units (affects speed, acceleration, jump)
   pros: string[]                       // Positive attributes
   cons: string[]                       // Negative attributes
   rarity: 'common' | 'uncommon' | 'rare' | 'legendary'
@@ -40,6 +41,9 @@ export interface MechPart {
 export interface ArmPart extends MechPart {
   type: 'arm'
   weaponType: 'ballistic' | 'energy' | 'melee' | 'support'
+  powerDraw: number                    // Power consumed per shot
+  fireRate?: number                    // Optional custom fire rate in seconds (cooldown between shots)
+  projectileCount?: number             // Optional number of projectiles per shot (default: 1)
 }
 
 export interface CorePart extends MechPart {
@@ -51,12 +55,14 @@ export interface CorePart extends MechPart {
 export interface LegsPart extends MechPart {
   type: 'legs'
   mobilityType: 'bipedal' | 'quadrupedal' | 'hover' | 'tracked'
+  powerCapacity: number                // Maximum power pool
 }
 
 export interface HeadPart extends MechPart {
   type: 'head'
   sensorRange: number
   targetingBonus: number
+  targetingConeAngle: number  // Targeting cone width in degrees
 }
 
 export interface RackPart extends MechPart {
@@ -90,7 +96,10 @@ export const ARM_PRESETS: ArmPart[] = [
     weaponType: 'ballistic',
     icon: 'autocannon',
     description: '20mm rotary cannon with high rate of fire',
-    stats: { health: 10, armor: 5, speed: 0, energy: -10, firepower: 25, accuracy: 15 },
+    stats: { health: 10, armor: 5, speed: 0, energy: -10, firepower: 50, accuracy: 15 },
+    weight: 8,
+    powerDraw: 5,
+    fireRate: 0.12,
     pros: ['High rate of fire', 'Good accuracy', 'Low energy draw'],
     cons: ['Limited range', 'Ammo dependent'],
     rarity: 'common',
@@ -103,8 +112,11 @@ export const ARM_PRESETS: ArmPart[] = [
     type: 'arm',
     weaponType: 'energy',
     icon: 'railgun',
-    description: 'Electromagnetic accelerator firing tungsten rounds',
-    stats: { health: 5, armor: 0, speed: -5, energy: -30, firepower: 50, accuracy: 25 },
+    description: 'High-powered electromagnetic accelerator - devastating single shots',
+    stats: { health: 5, armor: 0, speed: -5, energy: -30, firepower: 400, accuracy: 25 },
+    weight: 12,
+    powerDraw: 25,
+    fireRate: 2.0,
     pros: ['Armor piercing', 'Extreme range', 'High velocity'],
     cons: ['High energy cost', 'Slow rate of fire', 'Heavy'],
     rarity: 'rare',
@@ -117,8 +129,10 @@ export const ARM_PRESETS: ArmPart[] = [
     type: 'arm',
     weaponType: 'melee',
     icon: 'pile-driver',
-    description: 'Pneumatic ram for devastating close combat',
-    stats: { health: 20, armor: 15, speed: 5, energy: -5, firepower: 40, accuracy: 10 },
+    description: 'Devastating pneumatic ram capable of crippling enemies in one strike',
+    stats: { health: 20, armor: 15, speed: 5, energy: -5, firepower: 320, accuracy: 10 },
+    weight: 15,
+    powerDraw: 10,
     pros: ['No ammo', 'Structural damage', 'Bonus armor'],
     cons: ['Melee only', 'Close range required'],
     rarity: 'uncommon',
@@ -131,9 +145,13 @@ export const ARM_PRESETS: ArmPart[] = [
     type: 'arm',
     weaponType: 'ballistic',
     icon: 'missile-pod',
-    description: 'Six-tube short-range missile launcher',
-    stats: { health: 8, armor: 3, speed: 0, energy: -15, firepower: 35, accuracy: 8 },
-    pros: ['Burst damage', 'Area effect', 'Good against groups'],
+    description: 'Six-tube launcher fires full salvo for devastating alpha strikes',
+    stats: { health: 8, armor: 3, speed: 0, energy: -15, firepower: 100, accuracy: 8 },
+    weight: 10,
+    powerDraw: 15,
+    fireRate: 1.0,
+    projectileCount: 6,
+    pros: ['Massive burst damage', 'Area effect', 'Good against groups'],
     cons: ['Low accuracy', 'Ammo limited', 'Reload time'],
     rarity: 'uncommon',
     manufacturer: 'ArmsCore',
@@ -146,7 +164,10 @@ export const ARM_PRESETS: ArmPart[] = [
     weaponType: 'energy',
     icon: 'flamethrower',
     description: 'High-pressure napalm projector',
-    stats: { health: 12, armor: 5, speed: 0, energy: -20, firepower: 30, accuracy: 12 },
+    stats: { health: 12, armor: 5, speed: 0, energy: -20, firepower: 240, accuracy: 12 },
+    weight: 9,
+    powerDraw: 20,
+    fireRate: 0.4,
     pros: ['Area denial', 'No ammo', 'Persistent damage'],
     cons: ['Very short range', 'High energy use', 'Collateral damage'],
     rarity: 'common',
@@ -161,6 +182,8 @@ export const ARM_PRESETS: ArmPart[] = [
     icon: 'shield-gen',
     description: 'Directional energy shield projector',
     stats: { health: 15, armor: 25, speed: -3, energy: -25, firepower: 0, accuracy: 0 },
+    weight: 7,
+    powerDraw: 0,
     pros: ['Blocks incoming fire', 'Energy resistant', 'Regenerates'],
     cons: ['No offensive capability', 'High energy drain', 'Directional only'],
     rarity: 'rare',
@@ -178,6 +201,7 @@ export const CORE_PRESETS: CorePart[] = [
     icon: 'diesel-gen',
     description: 'Reliable diesel-electric hybrid core',
     stats: { health: 100, armor: 25, speed: 0, energy: 50, firepower: 0, accuracy: 0 },
+    weight: 35,
     pros: ['Reliable', 'Easy maintenance', 'Balanced output'],
     cons: ['Moderate energy', 'No special features'],
     rarity: 'common',
@@ -193,6 +217,7 @@ export const CORE_PRESETS: CorePart[] = [
     icon: 'fusion-reactor',
     description: 'Compact fusion reactor with massive output',
     stats: { health: 120, armor: 20, speed: -10, energy: 100, firepower: 0, accuracy: 0 },
+    weight: 50,
     pros: ['Massive energy', 'Powers heavy weapons', '4 equipment slots'],
     cons: ['Heavy', 'Reduced speed', 'Radiation shielding required'],
     rarity: 'legendary',
@@ -208,6 +233,7 @@ export const CORE_PRESETS: CorePart[] = [
     icon: 'gas-turbine',
     description: 'High-RPM turbine for mobility-focused builds',
     stats: { health: 80, armor: 15, speed: 15, energy: 40, firepower: 0, accuracy: 0 },
+    weight: 28,
     pros: ['Lightweight', 'Speed boost', 'Quick startup'],
     cons: ['Lower energy output', 'Fragile', 'Fuel inefficient'],
     rarity: 'uncommon',
@@ -223,6 +249,7 @@ export const CORE_PRESETS: CorePart[] = [
     icon: 'capacitor-bank',
     description: 'Ultra-capacitor array for burst power delivery',
     stats: { health: 90, armor: 18, speed: 0, energy: 70, firepower: 5, accuracy: 0 },
+    weight: 30,
     pros: ['High burst output', 'Energy weapon bonus', 'Fast recharge'],
     cons: ['No sustained output', 'Requires downtime', 'Expensive'],
     rarity: 'rare',
@@ -243,6 +270,8 @@ export const LEGS_PRESETS: LegsPart[] = [
     icon: 'bipedal',
     description: 'Standard two-legged walker configuration',
     stats: { health: 80, armor: 20, speed: 10, energy: 0, firepower: 0, accuracy: 5 },
+    weight: 20,
+    powerCapacity: 100,
     pros: ['Balanced mobility', 'Good stability', 'All-terrain'],
     cons: ['Nothing exceptional', 'Average speed'],
     rarity: 'common',
@@ -257,6 +286,8 @@ export const LEGS_PRESETS: LegsPart[] = [
     icon: 'tracked',
     description: 'Military-grade tank treads for maximum stability',
     stats: { health: 120, armor: 40, speed: -5, energy: 0, firepower: 0, accuracy: 10 },
+    weight: 30,
+    powerCapacity: 120,
     pros: ['Extreme stability', 'Heavy armor', 'Perfect firing platform'],
     cons: ['Slow', 'Difficult terrain penalties', 'Heavy'],
     rarity: 'uncommon',
@@ -271,6 +302,8 @@ export const LEGS_PRESETS: LegsPart[] = [
     icon: 'hover',
     description: 'Anti-gravity propulsion for maximum mobility',
     stats: { health: 50, armor: 10, speed: 25, energy: -20, firepower: 0, accuracy: -5 },
+    weight: 15,
+    powerCapacity: 80,
     pros: ['Very fast', 'Ignores terrain', 'Evasion bonus'],
     cons: ['Fragile', 'Energy drain', 'Unstable firing platform'],
     rarity: 'rare',
@@ -285,6 +318,8 @@ export const LEGS_PRESETS: LegsPart[] = [
     icon: 'quadrupedal',
     description: 'Four-legged walker for rough terrain',
     stats: { health: 100, armor: 25, speed: 8, energy: 0, firepower: 0, accuracy: 8 },
+    weight: 25,
+    powerCapacity: 110,
     pros: ['Very stable', 'Excellent terrain handling', 'Good load capacity'],
     cons: ['Complex mechanics', 'Maintenance intensive', 'Slower than bipedal'],
     rarity: 'uncommon',
@@ -302,12 +337,14 @@ export const HEAD_PRESETS: HeadPart[] = [
     icon: 'standard-optics',
     description: 'Basic visual and thermal sensors',
     stats: { health: 30, armor: 10, speed: 0, energy: -5, firepower: 0, accuracy: 10 },
+    weight: 8,
     pros: ['Reliable', 'Low cost', 'Good visibility'],
     cons: ['Basic sensors', 'No advanced targeting'],
     rarity: 'common',
     manufacturer: 'GenMech',
     sensorRange: 500,
     targetingBonus: 10,
+    targetingConeAngle: 15,
     synergyTags: ['balanced']
   },
   {
@@ -317,12 +354,14 @@ export const HEAD_PRESETS: HeadPart[] = [
     icon: 'targeting-array',
     description: 'Military-grade fire control system',
     stats: { health: 25, armor: 8, speed: 0, energy: -15, firepower: 0, accuracy: 25 },
+    weight: 10,
     pros: ['Excellent accuracy', 'Target tracking', 'Weak point detection'],
     cons: ['Fragile', 'High energy use', 'Expensive'],
     rarity: 'rare',
     manufacturer: 'VoltTech',
     sensorRange: 800,
     targetingBonus: 25,
+    targetingConeAngle: 25,
     synergyTags: ['precision', 'energy']
   },
   {
@@ -332,12 +371,14 @@ export const HEAD_PRESETS: HeadPart[] = [
     icon: 'reinforced',
     description: 'Heavily armored cockpit for survivability',
     stats: { health: 60, armor: 30, speed: 0, energy: 0, firepower: 0, accuracy: 5 },
+    weight: 15,
     pros: ['Very durable', 'Pilot protection', 'EMP resistant'],
     cons: ['Limited sensors', 'Heavy', 'Reduced visibility'],
     rarity: 'uncommon',
     manufacturer: 'ArmorWorks',
     sensorRange: 350,
     targetingBonus: 5,
+    targetingConeAngle: 10,
     synergyTags: ['defensive', 'heavy']
   },
   {
@@ -347,12 +388,14 @@ export const HEAD_PRESETS: HeadPart[] = [
     icon: 'scout-suite',
     description: 'Long-range reconnaissance sensors',
     stats: { health: 20, armor: 5, speed: 5, energy: -10, firepower: 0, accuracy: 15 },
+    weight: 5,
     pros: ['Extended range', 'Multi-spectrum', 'Threat detection'],
     cons: ['Very fragile', 'No armor', 'Vulnerable to EMP'],
     rarity: 'uncommon',
     manufacturer: 'SwiftDrive',
     sensorRange: 1200,
     targetingBonus: 15,
+    targetingConeAngle: 20,
     synergyTags: ['mobility', 'light']
   }
 ]
@@ -366,6 +409,7 @@ export const RACK_PRESETS: RackPart[] = [
     icon: 'smoke-launcher',
     description: 'Deploys smoke screens for cover',
     stats: { health: 5, armor: 0, speed: 0, energy: 0, firepower: 0, accuracy: -5 },
+    weight: 8,
     pros: ['Breaks lock-on', 'Concealment', 'Escape tool'],
     cons: ['Obscures own vision', 'Limited charges'],
     rarity: 'common',
@@ -380,6 +424,7 @@ export const RACK_PRESETS: RackPart[] = [
     icon: 'ammo-feed',
     description: 'Additional ammunition storage and feed system',
     stats: { health: 10, armor: 5, speed: -3, energy: 0, firepower: 10, accuracy: 0 },
+    weight: 12,
     pros: ['More ammo', 'Sustained fire', 'Faster reload'],
     cons: ['Heavy', 'Explosive if hit', 'Only helps ballistic weapons'],
     rarity: 'uncommon',
@@ -394,6 +439,7 @@ export const RACK_PRESETS: RackPart[] = [
     icon: 'jump-jets',
     description: 'Short-burst rockets for vertical mobility',
     stats: { health: 8, armor: 0, speed: 15, energy: -15, firepower: 0, accuracy: 0 },
+    weight: 10,
     pros: ['Vertical mobility', 'Obstacle clearing', 'Repositioning'],
     cons: ['Energy drain', 'Limited fuel', 'Unstable when firing'],
     rarity: 'rare',
@@ -408,6 +454,7 @@ export const RACK_PRESETS: RackPart[] = [
     icon: 'repair-drone',
     description: 'Autonomous repair drones for field maintenance',
     stats: { health: 15, armor: 5, speed: 0, energy: -10, firepower: 0, accuracy: 0 },
+    weight: 15,
     pros: ['Passive healing', 'Repairs all components', 'Long duration'],
     cons: ['Slow repair rate', 'Energy drain', 'Vulnerable drones'],
     rarity: 'legendary',

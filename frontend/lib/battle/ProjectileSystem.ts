@@ -22,51 +22,129 @@ export class ProjectileSystem {
     this.scene = scene
   }
 
-  fireWeapon(mech: MechEntity, targetDirection: THREE.Vector3): Projectile {
-    const weaponType = mech.isPlayer
-      ? (mech.loadout.leftArm?.weaponType || 'ballistic')
-      : 'ballistic'
+  fireWeapon(mech: MechEntity, targetDirection: THREE.Vector3, arm: 'left' | 'right' = 'left'): Projectile | null {
+    // Get correct weapon
+    const armPart = arm === 'left' ? mech.loadout.leftArm : mech.loadout.rightArm
+    if (!armPart) return null
 
-    // Calculate damage based on firepower stat
-    const baseDamage = Math.max(5, mech.stats.firepower / 10)
+    const weaponType = armPart.weaponType || 'ballistic'
 
-    // Accuracy affects spread
-    const accuracyFactor = Math.max(0.1, Math.min(1, mech.stats.accuracy / 100))
-    const spread = (1 - accuracyFactor) * 0.15
-    const direction = targetDirection.clone().add(
-      new THREE.Vector3(
-        (Math.random() - 0.5) * spread,
-        (Math.random() - 0.5) * spread,
-        (Math.random() - 0.5) * spread
-      )
-    ).normalize()
-
-    // Spawn position slightly in front of mech
-    const spawnPosition = mech.position.clone().add(
-      mech.getForwardDirection().multiplyScalar(2)
-    )
-    spawnPosition.y += 2 // Fire from chest height
-
-    // Create projectile mesh
-    const geometry = this.getProjectileGeometry(weaponType)
-    const material = this.getProjectileMaterial(weaponType, mech.isPlayer)
-    const mesh = markRaw(new THREE.Mesh(geometry, material))
-    mesh.position.copy(spawnPosition)
-    this.scene.add(mesh)
-
-    const projectile: Projectile = {
-      id: `proj_${this.nextId++}`,
-      type: weaponType,
-      position: spawnPosition,
-      velocity: direction.multiplyScalar(this.getProjectileSpeed(weaponType)),
-      damage: baseDamage,
-      ownerId: mech.id,
-      lifetime: 3, // 3 seconds
-      mesh
+    // Check power consumption
+    const powerCost = armPart.powerDraw
+    if (mech.currentPower < powerCost) {
+      // Not enough power - can't fire
+      return null
     }
 
-    this.projectiles.push(projectile)
-    return projectile
+    // Consume power
+    mech.currentPower -= powerCost
+
+    // Calculate damage based on firepower stat
+    let baseDamage = Math.max(5, mech.stats.firepower / 10)
+
+    // Handle melee weapons specially
+    if (weaponType === 'melee') {
+      baseDamage *= 2.5 // Melee deals 2.5x damage
+
+      // Very short range spawn position
+      const spawnPosition = mech.position.clone().add(
+        mech.getForwardDirection().multiplyScalar(2)
+      )
+      spawnPosition.y += 2
+
+      // Create melee projectile (short-lived, slow)
+      const geometry = new THREE.BoxGeometry(1, 1, 1)
+      const material = new THREE.MeshStandardMaterial({
+        color: mech.isPlayer ? 0xff6600 : 0xff0066
+      })
+      const mesh = markRaw(new THREE.Mesh(geometry, material))
+      mesh.position.copy(spawnPosition)
+      this.scene.add(mesh)
+
+      // Lunge forward when attacking
+      mech.velocity.add(mech.getForwardDirection().multiplyScalar(8))
+
+      const projectile: Projectile = {
+        id: `proj_${this.nextId++}`,
+        type: 'ballistic',
+        position: spawnPosition,
+        velocity: targetDirection.clone().multiplyScalar(80), // Slow projectile
+        damage: baseDamage,
+        ownerId: mech.id,
+        lifetime: 0.2, // Only 200ms to hit
+        mesh
+      }
+
+      this.projectiles.push(projectile)
+      return projectile
+    }
+
+    // Calculate distance to target for targeting bonus (use 50 as default for AI)
+    const targetDistance = 50
+    const isMoving = mech.velocity.length() > 1.0
+    const targetingBonus = mech.getTargetingBonus(targetDistance, isMoving)
+
+    // Accuracy affects spread
+    const accuracyFactor = Math.max(0.1, Math.min(1, (mech.stats.accuracy / 100) + targetingBonus))
+    const baseSpread = (1 - accuracyFactor) * 0.15
+
+    // Check for multi-projectile weapons
+    const projectileCount = armPart.projectileCount ?? 1
+    let firstProjectile: Projectile | null = null
+
+    // Fire multiple projectiles if specified
+    for (let i = 0; i < projectileCount; i++) {
+      // Add spread for multiple projectiles to create a cone pattern
+      const spreadAngle = projectileCount > 1 ? (i - (projectileCount - 1) / 2) * 0.15 : 0
+
+      // Apply random accuracy spread
+      const direction = targetDirection.clone().add(
+        new THREE.Vector3(
+          (Math.random() - 0.5) * baseSpread,
+          (Math.random() - 0.5) * baseSpread,
+          (Math.random() - 0.5) * baseSpread
+        )
+      ).normalize()
+
+      // Apply cone spread for multi-projectile weapons
+      if (spreadAngle !== 0) {
+        direction.applyAxisAngle(new THREE.Vector3(0, 1, 0), spreadAngle)
+      }
+
+      // Adjust spawn position based on arm (-1.4 for left, +1.4 for right)
+      const armOffset = arm === 'left' ? -1.4 : 1.4
+      const spawnPosition = mech.position.clone()
+        .add(mech.getForwardDirection().multiplyScalar(2))
+        .add(mech.getRightDirection().multiplyScalar(armOffset))
+      spawnPosition.y += 2
+
+      // Create projectile mesh
+      const geometry = this.getProjectileGeometry(weaponType)
+      const material = this.getProjectileMaterial(weaponType, mech.isPlayer)
+      const mesh = markRaw(new THREE.Mesh(geometry, material))
+      mesh.position.copy(spawnPosition)
+      this.scene.add(mesh)
+
+      const projectile: Projectile = {
+        id: `proj_${this.nextId++}`,
+        type: weaponType,
+        position: spawnPosition,
+        velocity: direction.multiplyScalar(this.getProjectileSpeed(weaponType)),
+        damage: baseDamage,
+        ownerId: mech.id,
+        lifetime: 3, // 3 seconds
+        mesh
+      }
+
+      this.projectiles.push(projectile)
+
+      // Return the first projectile for compatibility
+      if (i === 0) {
+        firstProjectile = projectile
+      }
+    }
+
+    return firstProjectile
   }
 
   private getProjectileGeometry(type: string): THREE.BufferGeometry {
@@ -104,11 +182,11 @@ export class ProjectileSystem {
   private getProjectileSpeed(type: string): number {
     switch (type) {
       case 'energy':
-        return 80 // Fast
+        return 400 // Fast
       case 'missile':
-        return 50 // Medium
+        return 240 // Medium
       default: // ballistic
-        return 60 // Fast
+        return 300 // Fast
     }
   }
 
@@ -148,11 +226,21 @@ export class ProjectileSystem {
         // Skip if projectile owner is the target
         if (proj.ownerId === mech.id) continue
 
-        // Simple sphere collision
-        const distance = proj.position.distanceTo(mech.position)
-        const hitRadius = 2 // Mech collision radius
+        // Box collision detection - more accurate for tall mechs
+        // Mech dimensions: 2 wide, 4 tall (core 3 + head 1), 2 deep
+        // Check as a box around the mech's center
+        const mechCenter = mech.position.clone()
+        mechCenter.y += 2 // Center of mech vertically
 
-        if (distance < hitRadius) {
+        const dx = Math.abs(proj.position.x - mechCenter.x)
+        const dy = Math.abs(proj.position.y - mechCenter.y)
+        const dz = Math.abs(proj.position.z - mechCenter.z)
+
+        // Hit box: 1.5 units radius in X/Z (generous), 2.5 units in Y (tall)
+        const hitRadiusXZ = 1.5
+        const hitRadiusY = 2.5
+
+        if (dx < hitRadiusXZ && dy < hitRadiusY && dz < hitRadiusXZ) {
           hits.push({ projectile: proj, target: mech })
         }
       }

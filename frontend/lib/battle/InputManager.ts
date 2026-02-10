@@ -5,8 +5,10 @@ export interface InputState {
   left: boolean
   right: boolean
   jump: boolean
-  shoot: boolean
+  shootLeft: boolean   // Right mouse button (fires left arm)
+  shootRight: boolean  // Left mouse button (fires right arm)
   dash: boolean
+  useAbility: boolean  // E key (rack ability)
   mouseX: number
   mouseY: number
 }
@@ -101,8 +103,10 @@ export class InputManager {
       left: this.keys.get(this.keyBindings.left) || false,
       right: this.keys.get(this.keyBindings.right) || false,
       jump: this.keys.get(this.keyBindings.jump) || false,
-      shoot: this.mouseButtons.get(0) || false, // Left mouse button
+      shootLeft: this.mouseButtons.get(2) || false,  // Right mouse button
+      shootRight: this.mouseButtons.get(0) || false, // Left mouse button
       dash: this.keys.get(this.keyBindings.dash) || this.keys.get('ShiftRight') || false,
+      useAbility: this.keys.get('KeyE') || false,
       mouseX: this.mouseMovement.x,
       mouseY: this.mouseMovement.y
     }

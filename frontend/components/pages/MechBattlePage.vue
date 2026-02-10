@@ -77,12 +77,19 @@
         :enemy-health="battle.enemyHealth.value"
         :enemy-max-health="battle.enemyMaxHealth.value"
         :enemy-name="enemyName"
+        :player-power="hudData.playerPower"
+        :player-max-power="hudData.playerMaxPower"
         :jump-fuel="battle.battleState.value.player?.jumpFuel ?? 0"
         :has-jump-jets="hasJumpJets"
         :dash-cooldown="hudData.dashCooldown"
         :dash-max-cooldown="hudData.dashMaxCooldown"
+        :ability-cooldown="hudData.abilityCooldown"
+        :ability-max-cooldown="hudData.abilityMaxCooldown"
+        :has-rack-ability="hasRackAbility"
+        :ability-name="abilityName"
         :enemy-radar-x="hudData.enemyRadarX"
         :enemy-radar-y="hudData.enemyRadarY"
+        :targeting="targetingState"
       />
     </div>
 
@@ -162,8 +169,20 @@ const isSettingsOpen = ref(false)
 const hudData = reactive({
   dashCooldown: 0,
   dashMaxCooldown: 2,
+  playerPower: 100,
+  playerMaxPower: 100,
+  abilityCooldown: 0,
+  abilityMaxCooldown: 15,
   enemyRadarX: 0,
   enemyRadarY: 0,
+})
+
+const targetingState = ref({
+  isTargeted: false,
+  screenX: 0,
+  screenY: 0,
+  screenWidth: 0,
+  screenHeight: 0
 })
 
 const playerStats = computed(() => {
@@ -177,6 +196,17 @@ const enemyName = computed(() => battle.battleState.value.enemy?.name ?? 'Unknow
 
 const hasJumpJets = computed(() => {
   return battle.battleState.value.player?.loadout.rack?.id === 'rack-jump-jets'
+})
+
+const hasRackAbility = computed(() => {
+  return battle.battleState.value.player?.loadout.rack !== null
+})
+
+const abilityName = computed(() => {
+  const rack = battle.battleState.value.player?.loadout.rack
+  if (!rack) return ''
+  // Extract short name from full name
+  return rack.name.replace(/System|Pack|Bay|Feed/gi, '').trim().toUpperCase()
 })
 
 onMounted(() => {
@@ -245,13 +275,29 @@ function handleTimeUpdate(time: number) {
 function handleHudUpdate(data: {
   dashCooldown: number
   dashMaxCooldown: number
+  playerPower: number
+  playerMaxPower: number
+  abilityCooldown: number
+  abilityMaxCooldown: number
   enemyRadarX: number
   enemyRadarY: number
+  targeting: {
+    isTargeted: boolean
+    screenX: number
+    screenY: number
+    screenWidth: number
+    screenHeight: number
+  }
 }) {
   hudData.dashCooldown = data.dashCooldown
   hudData.dashMaxCooldown = data.dashMaxCooldown
+  hudData.playerPower = data.playerPower
+  hudData.playerMaxPower = data.playerMaxPower
+  hudData.abilityCooldown = data.abilityCooldown
+  hudData.abilityMaxCooldown = data.abilityMaxCooldown
   hudData.enemyRadarX = data.enemyRadarX
   hudData.enemyRadarY = data.enemyRadarY
+  targetingState.value = data.targeting
 }
 
 function returnToBuilder() {

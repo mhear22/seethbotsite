@@ -20,8 +20,19 @@ const emit = defineEmits<{
   (e: 'hud-update', data: {
     dashCooldown: number
     dashMaxCooldown: number
+    playerPower: number
+    playerMaxPower: number
+    abilityCooldown: number
+    abilityMaxCooldown: number
     enemyRadarX: number
     enemyRadarY: number
+    targeting: {
+      isTargeted: boolean
+      screenX: number
+      screenY: number
+      screenWidth: number
+      screenHeight: number
+    }
   }): void
 }>()
 
@@ -76,8 +87,13 @@ onMounted(() => {
       emit('hud-update', {
         dashCooldown: battleScene.getPlayerDashCooldown(),
         dashMaxCooldown: battleScene.getPlayerDashMaxCooldown(),
+        playerPower: battleScene.getPlayerPower(),
+        playerMaxPower: battleScene.getPlayerMaxPower(),
+        abilityCooldown: battleScene.getPlayerAbilityCooldown(),
+        abilityMaxCooldown: battleScene.getPlayerAbilityMaxCooldown(),
         enemyRadarX: radarX,
         enemyRadarY: radarY,
+        targeting: battleScene.getTargetingState()
       })
     }
   }, 50) // 20fps for HUD

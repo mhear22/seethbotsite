@@ -9,8 +9,16 @@ export class PhysicsSystem {
   public speedMultiplier = 1.0
 
   updateMovement(mech: MechEntity, input: InputState, deltaTime: number) {
-    // Calculate base speed from stats
-    const baseSpeed = 8 * this.speedMultiplier * (Math.max(10, mech.stats.speed) / 100)
+    // Get leg type for special handling
+    const legType = mech.loadout.legs?.mobilityType || 'bipedal'
+
+    // Calculate base speed with weight penalty
+    const speedStat = Math.max(10, mech.stats.speed) / 100
+    const weightFactor = mech.weightPenalty // 0.5 to 1.0
+    const baseSpeed = 8 * this.speedMultiplier * speedStat * weightFactor
+
+    // Acceleration also affected by weight (lighter = snappier)
+    const acceleration = 30 * weightFactor
 
     // Get movement directions relative to camera view
     const forward = new THREE.Vector3(0, 0, 1)
@@ -20,12 +28,51 @@ export class PhysicsSystem {
     forward.applyEuler(mech.rotation)
     right.applyEuler(mech.rotation)
 
+    // Leg-specific modifiers
+    let turnSpeed = 1.0
+    let friction = 0.75
+    let backwardSpeedPenalty = 0.6
+    let blockJump = false
+
+    switch (legType) {
+      case 'tracked':
+        // Slow turn rate, high stability, cannot jump
+        turnSpeed = 0.7
+        friction = 0.75 // More planted
+        blockJump = true
+        break
+
+      case 'hover':
+        // Fast turns, low friction (slides)
+        turnSpeed = 1.3
+        friction = 0.95 // Slides more
+        // Oscillate vertically for hover effect
+        mech.position.y += Math.sin(performance.now() * 0.003) * 0.15 * deltaTime
+        break
+
+      case 'quadrupedal':
+        // Better acceleration, stable, better reverse speed
+        turnSpeed = 0.85
+        backwardSpeedPenalty = 0.8 // Better reverse than bipedal
+        break
+
+      case 'bipedal':
+      default:
+        // Standard behavior
+        break
+    }
+
+    // Block jump if tracked legs
+    if (blockJump && input.jump) {
+      input = { ...input, jump: false }
+    }
+
     // WASD movement - add acceleration to velocity
     if (input.forward) {
       mech.velocity.add(forward.clone().multiplyScalar(baseSpeed))
     }
     if (input.backward) {
-      mech.velocity.add(forward.clone().multiplyScalar(-baseSpeed))
+      mech.velocity.add(forward.clone().multiplyScalar(-baseSpeed * backwardSpeedPenalty))
     }
     if (input.left) {
       mech.velocity.add(right.clone().multiplyScalar(baseSpeed))
@@ -37,8 +84,8 @@ export class PhysicsSystem {
     // Apply velocity to position with deltaTime
     mech.position.add(mech.velocity.clone().multiplyScalar(deltaTime))
 
-    // Apply friction (ground) - tighter control
-    mech.velocity.multiplyScalar(0.75)
+    // Apply friction (ground) - affected by leg type
+    mech.velocity.multiplyScalar(friction)
 
     // Clamp to arena bounds
     mech.position.x = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, mech.position.x))
@@ -77,30 +124,43 @@ export class PhysicsSystem {
       }
       dashDir.normalize()
 
-      mech.velocity.copy(dashDir.multiplyScalar(30))
+      // Dash speed and cooldown affected by weight
+      const dashSpeed = 30 * (1.0 + mech.weightPenalty) // Light mechs dash faster
+      const dashCooldown = 2.0 * (2.0 - mech.weightPenalty) // Heavy mechs have longer cooldown
+
+      mech.velocity.copy(dashDir.multiplyScalar(dashSpeed))
       mech.isDashing = true
       mech.dashTimer = mech.DASH_DURATION
-      mech.dashCooldown = mech.DASH_COOLDOWN
+      mech.dashCooldown = dashCooldown
     }
   }
 
   updateJumpJets(mech: MechEntity, input: InputState, deltaTime: number) {
     const hasJumpJets = mech.loadout.rack?.id === 'rack-jump-jets'
+    const legType = mech.loadout.legs?.mobilityType || 'bipedal'
 
-    // Jump jet activation
+    // Tracked legs can't jump
+    if (legType === 'tracked') {
+      input = { ...input, jump: false }
+    }
+
+    // Jump jet activation - initial velocity reduced by weight
+    // Ultra-high jump for extreme vertical mobility
     if (input.jump && mech.jumpFuel > 0 && !mech.isJumping && hasJumpJets) {
-      mech.velocity.y = 12 // Initial upward velocity
+      const jumpVelocity = 200 * mech.weightPenalty
+      mech.velocity.y = jumpVelocity
       mech.isJumping = true
     }
 
-    // Apply gravity
+    // Apply gravity (increased for faster falling)
     if (mech.position.y > 0 || mech.velocity.y > 0) {
-      mech.velocity.y -= 20 * deltaTime // Gravity
+      mech.velocity.y -= 50 * deltaTime // Stronger gravity for faster falling
       mech.position.y += mech.velocity.y * deltaTime
 
-      // Consume jump fuel while airborne and ascending
+      // Consume jump fuel while airborne and ascending (increased by weight)
       if (mech.isJumping && mech.velocity.y > 0) {
-        mech.jumpFuel -= deltaTime * 30
+        const fuelConsumption = 30 * (2.0 - mech.weightPenalty) // Heavy = 45/s, Light = 30/s
+        mech.jumpFuel -= deltaTime * fuelConsumption
         if (mech.jumpFuel < 0) {
           mech.jumpFuel = 0
         }
