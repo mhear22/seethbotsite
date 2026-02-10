@@ -347,7 +347,6 @@ export const useAppStore = defineStore('app', () => {
     }, 300)
 
     tachValue.value = randomValue
-    audio.playGooseHonk()
   }
 
   const onTurnMe = () => {
