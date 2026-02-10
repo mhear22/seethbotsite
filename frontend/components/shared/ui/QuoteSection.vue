@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useFavorites } from '../../../composables/useFavorites'
+import ShortcutBadge from './ShortcutBadge.vue'
 
 defineProps<{
   currentQuote: string
@@ -37,8 +38,9 @@ const formatQuote = (quote: string) => {
 
 <template>
   <div class="quote-section">
-    <div class="quote-text" @click="nextQuote">
+    <div class="quote-text" @click="nextQuote" title="Click or press Ctrl+N for next quote">
       <span v-html="formatQuote(currentQuote)"></span>
+      <ShortcutBadge :shortcut="{ key: 'n', ctrl: true, meta: true }" class="quote-shortcut" />
     </div>
     <button
       @click="handleFavorite"
@@ -64,10 +66,21 @@ const formatQuote = (quote: string) => {
   cursor: pointer;
   transition: transform 0.2s;
   user-select: none;
+  position: relative;
+}
+
+.quote-shortcut {
+  margin-left: 12px;
+  opacity: 0.6;
+  font-size: 10px;
 }
 
 .quote-text:hover {
   transform: scale(1.02);
+}
+
+.quote-text:hover .quote-shortcut {
+  opacity: 1;
 }
 
 .favorite-btn {

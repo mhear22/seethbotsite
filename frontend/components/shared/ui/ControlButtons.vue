@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useAudio } from '@/composables/useAudio'
+import ShortcutBadge from './ShortcutBadge.vue'
 
 defineProps<{
   darkMode?: boolean
@@ -49,24 +50,29 @@ const handleMikaToggle = () => {
       class="rankings-toggle"
       @click="handleRankingsToggle"
       aria-label="Toggle rankings panel"
-      title="Toggle rankings"
-    >👻</button>
+      title="Toggle rankings (Ctrl+R)"
+    >
+      👻
+      <ShortcutBadge :shortcut="{ key: 'r', ctrl: true, meta: true }" class="button-shortcut" />
+    </button>
     <button
       class="dark-toggle"
       @click="handleDarkToggle"
       :aria-label="darkMode ? 'Switch to light mode' : 'Switch to dark mode'"
-      title=""
+      title="Toggle theme (Ctrl+D)"
     >
       {{ darkMode ? '☀️' : '🌙' }}
+      <ShortcutBadge :shortcut="{ key: 'd', ctrl: true, meta: true }" class="button-shortcut" />
     </button>
     <button
       class="music-control"
       @click="handleMusicToggle"
       :aria-label="musicPlaying ? 'Pause music' : 'Play music'"
       :aria-pressed="musicPlaying"
-      title=""
+      title="Toggle music (Ctrl+M)"
     >
       {{ musicPlaying ? '⏸️' : '🎵' }}
+      <ShortcutBadge :shortcut="{ key: 'm', ctrl: true, meta: true }" class="button-shortcut" />
     </button>
     <button
       class="feed-toggle"
@@ -81,3 +87,16 @@ const handleMikaToggle = () => {
     >🌸 Mika</button>
   </div>
 </template>
+
+<style scoped>
+/* Keyboard Shortcut Badge in Control Buttons (Ticket #195) */
+.button-shortcut {
+  margin-left: 6px;
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+}
+
+button:hover .button-shortcut {
+  opacity: 1;
+}
+</style>
