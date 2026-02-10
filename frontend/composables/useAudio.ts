@@ -6,7 +6,7 @@ const SOUND_FILES = {
   success: '/sounds/success.mp3',
   error: '/sounds/error.mp3',
   panelOpen: '/sounds/panel.mp3',
-  honk: '/sounds/honk.mp3',
+  honk: '/sounds/goose-honk.mp3',
   pointsEarned: '/sounds/points.mp3',
   notification: '/sounds/notification.mp3'
 } as const
