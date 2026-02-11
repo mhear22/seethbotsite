@@ -1,7 +1,16 @@
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 
 export function useAudio() {
   const muted = ref(false)
+
+  // Load volume from localStorage (default to 0.5 = 50%)
+  const savedVolume = localStorage.getItem('audioVolume')
+  const volume = ref(savedVolume !== null ? parseFloat(savedVolume) : 0.5)
+
+  // Persist volume changes to localStorage
+  watch(volume, (newVolume) => {
+    localStorage.setItem('audioVolume', newVolume.toString())
+  })
 
   const playSound = (elementId: string, options?: { volume?: number; startTime?: number; rate?: number }) => {
     if (muted.value) return
@@ -16,8 +25,8 @@ export function useAudio() {
     // Ensure audio doesn't loop (fix for button sound looping issue)
     audio.loop = false
 
-    // Set volume (clamp between 0 and 1) - default to 0.5 (50%) as per ticket #172
-    audio.volume = Math.min(Math.max(options?.volume ?? 0.5, 0), 1.0)
+    // Set volume (clamp between 0 and 1) - use current volume setting or override
+    audio.volume = Math.min(Math.max(options?.volume ?? volume.value, 0), 1.0)
 
     // Set playback rate for variety (if supported)
     if (options?.rate && audio.playbackRate !== undefined) {
@@ -48,8 +57,8 @@ export function useAudio() {
     if (!music) return
 
     if (playing && !muted.value) {
-      // Set music to 50% volume (ticket #172)
-      music.volume = 0.5
+      // Set music to current volume setting
+      music.volume = volume.value
       music.play().catch(err => console.log('Music play failed:', err))
     } else {
       music.pause()
@@ -70,54 +79,58 @@ export function useAudio() {
     muted.value = false
   }
 
-  // Sound effect for button clicks - 50% volume (ticket #172)
+  // Sound effect for button clicks
   const playButtonClick = () => {
-    playSound('buttonSound', { volume: 0.5, rate: 1.0 + (Math.random() * 0.1 - 0.05) })
+    playSound('buttonSound', { volume: volume.value, rate: 1.0 + (Math.random() * 0.1 - 0.05) })
   }
 
-  // Sound effect for achievements/milestones - 50% volume (ticket #172)
+  // Sound effect for achievements/milestones
   const playAchievement = () => {
-    playSound('buttonSound', { volume: 0.5, startTime: 0, rate: 1.2 })
+    playSound('buttonSound', { volume: volume.value, startTime: 0, rate: 1.2 })
   }
 
-  // Sound effect for successful actions (purchases, unlocks) - 50% volume (ticket #172)
+  // Sound effect for successful actions (purchases, unlocks)
   const playSuccess = () => {
-    playSound('buttonSound', { volume: 0.5, rate: 1.3 })
+    playSound('buttonSound', { volume: volume.value, rate: 1.3 })
   }
 
-  // Sound effect for error/failure - 50% volume (ticket #172)
+  // Sound effect for error/failure
   const playError = () => {
-    playSound('fartSound', { volume: 0.5, startTime: 0.5 })
+    playSound('fartSound', { volume: volume.value, startTime: 0.5 })
   }
 
-  // Sound effect for goose interaction - 50% volume (ticket #172)
+  // Sound effect for goose interaction
   const playGooseHonk = () => {
-    playSound('gooseHonk', { volume: 0.5 })
+    playSound('gooseHonk', { volume: volume.value })
   }
 
-  // Sound effect for game interactions (clicking, fishing, etc.) - 50% volume (ticket #172)
+  // Sound effect for game interactions (clicking, fishing, etc.)
   const playGameAction = () => {
-    // Fixed at 50% volume as per ticket #172
-    playSound('buttonSound', { volume: 0.5, rate: 0.9 + Math.random() * 0.2 })
+    playSound('buttonSound', { volume: volume.value, rate: 0.9 + Math.random() * 0.2 })
   }
 
-  // Sound effect for panel opening/closing - 50% volume (ticket #172)
+  // Sound effect for panel opening/closing
   const playPanelToggle = () => {
-    playSound('buttonSound', { volume: 0.5, rate: 0.8 })
+    playSound('buttonSound', { volume: volume.value, rate: 0.8 })
   }
 
-  // Sound effect for level up - 50% volume (ticket #172)
+  // Sound effect for level up
   const playLevelUp = () => {
-    playSound('buttonSound', { volume: 0.5, rate: 1.5 })
+    playSound('buttonSound', { volume: volume.value, rate: 1.5 })
     // Play twice for emphasis
     setTimeout(() => {
-      playSound('buttonSound', { volume: 0.5, rate: 1.7 })
+      playSound('buttonSound', { volume: volume.value, rate: 1.7 })
     }, 100)
   }
 
-  // Sound effect for purchase - 50% volume (ticket #172)
+  // Sound effect for purchase
   const playPurchase = () => {
-    playSound('buttonSound', { volume: 0.5, rate: 1.1 })
+    playSound('buttonSound', { volume: volume.value, rate: 1.1 })
+  }
+
+  // Set volume function
+  const setVolume = (newVolume: number) => {
+    volume.value = Math.min(Math.max(newVolume, 0), 1.0)
   }
 
   return {
@@ -134,6 +147,8 @@ export function useAudio() {
     playPurchase,
     toggleMusic,
     muteAll,
-    unmuteAll
+    unmuteAll,
+    volume,
+    setVolume
   }
 }
