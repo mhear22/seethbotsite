@@ -242,7 +242,7 @@ import MultiplayerBattleCanvas from '../mech/MultiplayerBattleCanvas.vue'
 import MultiplayerResultsScreen from '../mech/MultiplayerResultsScreen.vue'
 import { NetworkManager } from '../../lib/battle/NetworkManager'
 import { MechEntity } from '../../lib/battle/MechEntity'
-import type { MechLoadout, MatchFoundMessage, MatchEndMessage } from '../../src/shared/types/NetworkMessages'
+import type { MechLoadout, MatchFoundMessage, MatchEndMessage } from '@shared/types/NetworkMessages'
 
 // Multiplayer state
 const battleMode = ref<'single-player' | 'multiplayer'>('single-player')

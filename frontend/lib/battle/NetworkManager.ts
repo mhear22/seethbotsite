@@ -17,7 +17,7 @@ import type {
   ErrorMessage,
   PlayerInput,
   MechLoadout
-} from '../../src/shared/types/NetworkMessages';
+} from '@shared/types/NetworkMessages';
 
 type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'error';
 

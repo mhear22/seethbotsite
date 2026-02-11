@@ -18,7 +18,7 @@ import { MultiplayerBattleScene } from '../../lib/battle/MultiplayerBattleScene'
 import type { MechEntity } from '../../lib/battle/MechEntity'
 import { useGameSettings } from '../../composables/useGameSettings'
 import MultiplayerHUD from './MultiplayerHUD.vue'
-import type { MatchFoundMessage, MatchEndMessage } from '../../src/shared/types/NetworkMessages'
+import type { MatchFoundMessage, MatchEndMessage } from '@shared/types/NetworkMessages'
 
 const props = defineProps<{
   playerMech: MechEntity
