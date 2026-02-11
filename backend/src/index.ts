@@ -61,7 +61,10 @@ app.use(express.urlencoded({ extended: true }));
 app.use(securityHeaders);
 
 // Rate limiting - applies to all API routes
-app.use('/api/', rateLimiter(500, 60 * 1000)); // 500 requests per minute
+// IMPORTANT: Limit is extremely high because this is a real-time multiplayer game.
+// Players send frequent game state updates, battle actions, position data, etc.
+// during active gameplay. Lower limits would break the core game experience.
+app.use('/api/', rateLimiter(10000, 60 * 1000)); // 10,000 requests per minute
 
 // Log authentication attempts
 app.use('/api/', logAuthAttempt);
@@ -202,7 +205,7 @@ server.listen(PORT, () => {
   console.log(`📁 Serving static files from: ${SERVE_ROOT}`);
   console.log(`✨ Ready to serve the Vue.js app!`);
   console.log(`🔒 Security: API key authentication enabled for destructive endpoints`);
-  console.log(`⚡ Rate limiting: 500 requests per minute per IP`);
+  console.log(`⚡ Rate limiting: 10,000 requests per minute per IP (high for real-time gameplay)`);
   console.log(`🔗 WebSocket server listening on /ws`);
   console.log(`🎮 Multiplayer WebSocket server listening on /ws/multiplayer`);
 });

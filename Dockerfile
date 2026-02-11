@@ -1,8 +1,9 @@
 # Multi-stage build for full-stack application
 
 # Shared build base with native compilation tools
-FROM node:22-alpine3.22 AS builder-base
-RUN apk add --no-cache python3 make g++
+# Using Debian-slim for better native module compatibility (libsql)
+FROM node:22-slim AS builder-base
+RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
 
 # Stage 1: Build backend (TypeScript) - generates OpenAPI spec for frontend
 FROM builder-base AS backend-builder
@@ -66,7 +67,7 @@ RUN --mount=type=cache,target=/root/.npm \
 RUN npx prisma generate
 
 # Stage 4: Production image (minimal)
-FROM node:22-alpine3.22
+FROM node:22-slim
 
 WORKDIR /app/backend
 

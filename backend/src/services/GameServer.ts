@@ -110,6 +110,10 @@ export class GameServer {
       arenaBuildings: buildings
     };
 
+    console.log(`[GameServer] Match ${matchId} messages:`);
+    console.log(`  Player1 (${player1.playerName}): yourId=${match1Message.yourPlayerId}, opponentId=${match1Message.opponentId}`);
+    console.log(`  Player2 (${player2.playerName}): yourId=${match2Message.yourPlayerId}, opponentId=${match2Message.opponentId}`);
+
     if (player1.socket.readyState === 1) {
       player1.socket.send(JSON.stringify(match1Message));
     }

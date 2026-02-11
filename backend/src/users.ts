@@ -167,13 +167,25 @@ export async function validateTokenAndGetUser(token: string): Promise<{ user: Us
       return null;
     }
 
-    // Only update last_used_at if 5+ minutes have passed
+    // Update last_used_at and extend session if 5+ minutes have passed
     const lastUsed = new Date(session.last_used_at).getTime();
-    if (Date.now() - lastUsed > 5 * 60 * 1000) {
+    const sessionAge = Date.now() - lastUsed;
+
+    if (sessionAge > 5 * 60 * 1000) {
+      // Extend session expiry by 30 days from now (rolling window)
+      const newExpiryDate = new Date();
+      newExpiryDate.setDate(newExpiryDate.getDate() + 30);
+
       await prisma.session.update({
         where: { id: session.id },
-        data: { last_used_at: new Date() }
+        data: {
+          last_used_at: new Date(),
+          expires_at: newExpiryDate
+        }
       });
+
+      // Update the session object to return the new expiry
+      session.expires_at = newExpiryDate;
     }
 
     // Get user

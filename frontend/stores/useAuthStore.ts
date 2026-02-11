@@ -68,7 +68,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   // Getters
   const isAuthenticated = computed(() => !!token.value && !!user.value)
-  const isInitialized = computed(() => token.value !== null)
+  const isInitialized = computed(() => initialized)
 
   /**
    * Initialize auth state from localStorage
@@ -79,10 +79,14 @@ export const useAuthStore = defineStore('auth', () => {
     const savedToken = localStorage.getItem(TOKEN_KEY)
     if (savedToken) {
       token.value = savedToken
-      await validateToken()
-    }
+      const isValid = await validateToken()
 
-    initialized = true
+      // Only mark as initialized if validation succeeded or explicitly failed (not network error)
+      initialized = true
+    } else {
+      // No token found, mark as initialized immediately
+      initialized = true
+    }
   }
 
   /**
@@ -136,14 +140,21 @@ export const useAuthStore = defineStore('auth', () => {
         await loadSettings()
 
         return true
-      } else {
-        console.error('Token validation failed')
+      } else if (response.status === 401 || response.status === 403) {
+        // Token is invalid or expired - clear auth
+        console.error('Token validation failed: Invalid or expired token')
         clearAuth()
+        return false
+      } else {
+        // Server error (5xx) or other error - keep token for retry
+        console.error('Token validation failed with status:', response.status)
+        // Don't clear auth on server errors - token might still be valid
         return false
       }
     } catch (error) {
-      console.error('Token validation error:', error)
-      clearAuth()
+      // Network error - keep token for retry
+      console.error('Token validation error (network issue):', error)
+      // Don't clear auth on network errors - token might still be valid
       return false
     }
   }
@@ -198,14 +209,23 @@ export const useAuthStore = defineStore('auth', () => {
 
         console.log('Token refreshed successfully')
         return true
-      } else {
-        console.error('Token refresh failed')
+      } else if (response.status === 401 || response.status === 403) {
+        // Token is invalid or expired - clear auth
+        console.error('Token refresh failed: Invalid or expired token')
         clearAuth()
+        return false
+      } else {
+        // Server error - try again later
+        console.error('Token refresh failed with status:', response.status)
+        // Schedule retry in 5 minutes
+        setTimeout(() => refreshToken(), 5 * 60 * 1000)
         return false
       }
     } catch (err) {
-      console.error('Token refresh error:', err)
-      clearAuth()
+      // Network error - try again later
+      console.error('Token refresh error (network issue):', err)
+      // Schedule retry in 5 minutes
+      setTimeout(() => refreshToken(), 5 * 60 * 1000)
       return false
     }
   }

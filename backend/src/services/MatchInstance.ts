@@ -270,6 +270,13 @@ export class MatchInstance {
       projectiles: this.projectileSystem.getProjectileStates()
     };
 
+    // Debug: Log snapshot player IDs periodically
+    if (Math.random() < 0.01) { // ~1% of the time (once every 5 seconds at 20Hz)
+      console.log(`[Match ${this.matchId}] Snapshot player IDs:`, Object.keys(snapshot.players));
+      console.log(`[Match ${this.matchId}] Player 1: ${this.player1.playerId} (${this.player1.playerName})`);
+      console.log(`[Match ${this.matchId}] Player 2: ${this.player2.playerId} (${this.player2.playerName})`);
+    }
+
     // Send to player 1 with their last seq
     if (this.player1.connected && this.player1.socket.readyState === 1) {
       const p1Snapshot = { ...snapshot, lastProcessedSeq: this.player1.lastInputSeq };

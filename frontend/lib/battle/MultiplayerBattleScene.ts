@@ -137,7 +137,15 @@ export class MultiplayerBattleScene extends BattleScene {
    * Handle state snapshot from server
    */
   private handleStateSnapshot(snapshot: any): void {
-    if (!snapshot.players) return;
+    if (!snapshot.players) {
+      console.warn('[MultiplayerBattleScene] No players in snapshot');
+      return;
+    }
+
+    // Debug: Log player IDs in snapshot
+    const playerIdsInSnapshot = Object.keys(snapshot.players);
+    console.log('[MultiplayerBattleScene] Snapshot player IDs:', playerIdsInSnapshot);
+    console.log('[MultiplayerBattleScene] My ID:', this.yourPlayerId, 'Opponent ID:', this.opponentId);
 
     // Get our player state from server for reconciliation
     const serverPlayerState = snapshot.players[this.yourPlayerId];
@@ -157,12 +165,15 @@ export class MultiplayerBattleScene extends BattleScene {
       this.playerMech.power = predictedState.power;
       this.playerMech.jumpFuel = predictedState.jumpFuel;
       this.playerMech.isDashing = predictedState.isDashing;
+    } else {
+      console.warn('[MultiplayerBattleScene] No player state for yourPlayerId:', this.yourPlayerId);
     }
 
     // Get opponent state
     const opponentState = snapshot.players[this.opponentId];
     if (!opponentState) {
-      console.warn('[MultiplayerBattleScene] No opponent state in snapshot');
+      console.warn('[MultiplayerBattleScene] No opponent state for opponentId:', this.opponentId);
+      console.warn('[MultiplayerBattleScene] Available player IDs in snapshot:', playerIdsInSnapshot);
       return;
     }
 
@@ -347,12 +358,19 @@ export class MultiplayerBattleScene extends BattleScene {
     // This ensures network state takes priority over any AI movement
     const currentState = this.stateInterpolation.getInterpolatedState(Date.now());
     if (currentState) {
+      // Debug: Log when applying interpolated state
+      if (Math.random() < 0.02) { // ~2% of frames
+        console.log('[MultiplayerBattleScene] Applying interpolated state to enemy:', currentState.position);
+      }
+
       this.enemyMech.position.set(
         currentState.position[0],
         currentState.position[1],
         currentState.position[2]
       );
       this.enemyMech.rotation.y = currentState.rotation[1];
+    } else if (Math.random() < 0.02) {
+      console.warn('[MultiplayerBattleScene] No interpolated state available in update()');
     }
   }
 

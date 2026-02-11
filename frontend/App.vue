@@ -88,13 +88,6 @@ onMounted(() => {
   // Refresh rankings every 30 seconds - MEMORY LEAK FIX
   rankingsInterval = setInterval(appStore.loadRankings, 30000)
 
-  // Check auth state on mount (Ticket #197)
-  // This ensures the auth store is properly initialized
-  if (authStore.isInitialized) {
-    console.log('[Auth] Already initialized, validating token...')
-    authStore.validateToken()
-  }
-
   // Initialize account sync (Ticket #177) - only if authenticated
   if (isAuthenticated.value) {
     initSync()
@@ -108,6 +101,15 @@ onMounted(() => {
       cleanupSync()
     }
   })
+
+  // Re-validate token when page becomes visible (Ticket #197 - fix login persistence)
+  const handleVisibilityChange = () => {
+    if (!document.hidden && authStore.token) {
+      console.log('[Auth] Page became visible, re-validating token...')
+      authStore.validateToken()
+    }
+  }
+  document.addEventListener('visibilitychange', handleVisibilityChange)
 
   // Initialize keyboard shortcuts (Ticket #128)
   const shortcuts: Shortcut[] = [
@@ -329,6 +331,9 @@ onUnmounted(() => {
   window.removeEventListener('swipe-detected', handleSwipeDetected)
   window.removeEventListener('swipe-up', handleSwipeUp)
   window.removeEventListener('swipe-down', handleSwipeDown)
+
+  // Cleanup visibility change listener
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
 
   // MEMORY LEAK FIX: Clear intervals and timeouts
   if (heartSpawnTimeout) {
