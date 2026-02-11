@@ -1,13 +1,35 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { useAppStore } from '../../stores/useAppStore'
+import { useAudio } from '../../composables/useAudio'
 import ThemeSwitcher from '../settings/ThemeSwitcher.vue'
 import ThemeSettings from '../settings/ThemeSettings.vue'
 import SyncSettings from '../settings/SyncSettings.vue'
 import DiscordSettings from '../settings/DiscordSettings.vue'
 import AccessibilitySettings from '../settings/AccessibilitySettings.vue'
+import VolumeSlider from '../settings/VolumeSlider.vue'
 
 const appStore = useAppStore()
+const audio = useAudio()
+
+// Volume settings (uses useAudio composable)
+const volume = ref(audio.volume.value)
+
+// Watch for volume changes in useAudio and update local ref
+watch(() => audio.volume.value, (newVolume) => {
+  volume.value = newVolume
+})
+
+// Update audio when slider changes
+watch(volume, (newVolume) => {
+  audio.setVolume(newVolume)
+  // Update all currently playing audio elements
+  const audioIds = ['newMusic', 'fartSound', 'buttonSound', 'gooseHonk']
+  audioIds.forEach(id => {
+    const el = document.getElementById(id) as HTMLAudioElement
+    if (el) el.volume = newVolume
+  })
+})
 
 // Mold settings (local, not yet in store)
 const moldGrowthRate = ref(parseFloat(localStorage.getItem('moldGrowthRate') || '1'))
@@ -67,6 +89,33 @@ const resetToDefaults = () => {
       </div>
 
       <div class="settings-section">
+        <h2 class="section-title">🔊 Volume Control</h2>
+
+        <div class="setting-item volume-setting">
+          <label class="setting-label">
+            <span class="label-text">Master Volume</span>
+            <span class="label-desc">Adjust volume for all sounds and music</span>
+          </label>
+        </div>
+
+        <VolumeSlider v-model="volume" />
+
+        <div class="setting-item">
+          <label class="setting-label">
+            <span class="label-text">Mute All</span>
+            <span class="label-desc">Toggle all sounds on/off</span>
+          </label>
+          <button
+            @click="appStore.toggleMute"
+            class="toggle-btn"
+            :class="{ active: appStore.isMuted }"
+          >
+            {{ appStore.isMuted ? '🔴 Muted' : '🟢 Sound On' }}
+          </button>
+        </div>
+      </div>
+
+      <div class="settings-section">
         <SyncSettings />
       </div>
 
@@ -76,6 +125,37 @@ const resetToDefaults = () => {
 
       <div class="settings-section">
         <AccessibilitySettings />
+      </div>
+
+      <div class="settings-section">
+        <h2 class="section-title">💖 Hearts & Eggs</h2>
+      </div>
+
+      <div class="settings-section">
+        <h2 class="section-title">🔊 Volume Control</h2>
+
+        <div class="setting-item volume-setting">
+          <label class="setting-label">
+            <span class="label-text">Master Volume</span>
+            <span class="label-desc">Adjust the volume for all sounds and music</span>
+          </label>
+        </div>
+
+        <VolumeSlider v-model="volume" />
+
+        <div class="setting-item">
+          <label class="setting-label">
+            <span class="label-text">Mute All</span>
+            <span class="label-desc">Toggle all sounds on/off</span>
+          </label>
+          <button
+            @click="appStore.toggleMute"
+            class="toggle-btn"
+            :class="{ active: appStore.isMuted }"
+          >
+            {{ appStore.isMuted ? '🔴 Muted' : '🟢 Sound On' }}
+          </button>
+        </div>
       </div>
 
       <div class="settings-section">
@@ -292,6 +372,10 @@ const resetToDefaults = () => {
 
 .setting-item:last-child {
   border-bottom: none;
+}
+
+.volume-setting {
+  padding-bottom: 0;
 }
 
 .setting-label {
