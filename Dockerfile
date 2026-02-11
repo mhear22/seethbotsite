@@ -20,7 +20,11 @@ RUN --mount=type=cache,target=/root/.npm \
 COPY backend/tsconfig.json ./
 COPY backend/build-info.json ./build-info.json
 COPY backend/scripts ./scripts/
+COPY backend/prisma ./prisma/
 COPY backend/src ./src/
+
+# Generate Prisma Client
+RUN npx prisma generate
 
 # Build backend (generates dist/openapi.json)
 RUN npm run build
