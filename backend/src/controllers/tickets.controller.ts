@@ -40,7 +40,7 @@ const router = Router();
  */
 router.get('/tickets/settings/ignore-mode', async (req: Request, res: Response) => {
   try {
-    const ignoreMode = getIgnoreMode();
+    const ignoreMode = await getIgnoreMode();
     res.json({ ignoreMode });
   } catch (error) {
     console.error('Error fetching ignore mode:', error);
@@ -79,7 +79,7 @@ router.patch('/tickets/settings/ignore-mode', async (req: Request, res: Response
       return res.status(400).json({ error: 'ignoreMode must be a boolean' });
     }
 
-    setIgnoreMode(ignoreMode);
+    await setIgnoreMode(ignoreMode);
 
     res.json({ ignoreMode, message: `Ticket processing ${ignoreMode ? 'paused' : 'resumed'}` });
   } catch (error) {

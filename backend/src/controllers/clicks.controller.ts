@@ -33,9 +33,9 @@ const router = Router();
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.get('/clicks', (req: Request, res: Response) => {
+router.get('/clicks', async (req: Request, res: Response) => {
   try {
-    const count = getClickCount();
+    const count = await getClickCount();
     res.json({ count, timestamp: new Date().toISOString() });
   } catch (error) {
     console.error('Error getting click count:', error);
@@ -80,9 +80,9 @@ router.get('/clicks', (req: Request, res: Response) => {
  */
 router.post('/clicks/increment',
   // requireApiKey(),
-  (req: Request, res: Response) => {
+  async (req: Request, res: Response) => {
     try {
-      const newCount = incrementClick();
+      const newCount = await incrementClick();
       res.json({ count: newCount, timestamp: new Date().toISOString() });
     } catch (error) {
       console.error('Error incrementing click:', error);
@@ -128,9 +128,9 @@ router.post('/clicks/increment',
  */
 router.post('/clicks/reset',
   // requireApiKey(),
-  (req: Request, res: Response) => {
+  async (req: Request, res: Response) => {
     try {
-      const newCount = resetClick();
+      const newCount = await resetClick();
       res.json({ count: newCount, timestamp: new Date().toISOString() });
     } catch (error) {
       console.error('Error resetting clicks:', error);

@@ -1,0 +1,440 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ============================================================================
+// User & Authentication
+// ============================================================================
+
+model User {
+  id               Int    @id @default(autoincrement())
+  email            String @unique
+  password_hash    String
+  display_name     String?
+  avatar_url       String?
+  banner_url       String?
+  bio              String?
+  status           String?
+  show_email       Int    @default(1)
+  show_joined_date Int    @default(1)
+  is_deleted       Boolean @default(false)
+  discord_id       String?
+  discord_username String?
+  discord_discriminator String?
+  discord_avatar   String?
+  created_at       DateTime @default(now())
+  updated_at       DateTime @default(now())
+
+  sessions              Session[]
+  messages              Message[]
+  gameStats             GameStat[]
+  highScores            HighScore[]
+  dailyChallenges       DailyChallenge[]
+  achievements           Achievement[]
+  activities            Activity[]
+  userPortfolios         UserPortfolio?
+  userFartStats          UserFartStats?
+  profile                Profile?
+  favorites              Favorite[]
+  reactions             Reaction[]
+  theme                  Theme?
+  characterMatches       CharacterMatch[] @relation("Voter")
+
+  @@index([email])
+}
+
+model Session {
+  id          Int      @id @default(autoincrement())
+  user_id     Int
+  device_name String?
+  device_type String?
+  token       String   @unique
+  expires_at  DateTime
+  created_at  DateTime @default(now())
+  last_used_at DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([user_id])
+}
+
+// ============================================================================
+// Tickets
+// ============================================================================
+
+model Ticket {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String
+  status      String   @default("pending")
+  response    String?
+  creator_id  String?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @default(now())
+  type        String   @default("feature")
+  priority    String   @default("medium")
+  tags        String?
+  category    String?
+  dependencies String?
+  is_deleted  Boolean  @default(false)
+
+  @@index([status])
+  @@index([type])
+  @@index([priority])
+  @@index([is_deleted])
+}
+
+model Setting {
+  key        String   @id
+  value      String
+  updated_at DateTime @default(now())
+}
+
+// ============================================================================
+// Clicks
+// ============================================================================
+
+model Click {
+  id        Int      @id @default(autoincrement())
+  count     Int      @default(0)
+  updated_at DateTime @default(now())
+}
+
+// ============================================================================
+// Game Stats
+// ============================================================================
+
+model GameStat {
+  id          Int      @id @default(autoincrement())
+  user_id     Int
+  game_type   String
+  stat_type   String
+  value       Float
+  metadata    String?
+  recorded_at DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([game_type, stat_type])
+  @@index([recorded_at])
+}
+
+model HighScore {
+  id         Int      @id @default(autoincrement())
+  user_id    Int
+  user_name  String?
+  game_type  String
+  score      Int
+  details    String?
+  recorded_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([game_type])
+}
+
+model DailyChallenge {
+  id             Int      @id @default(autoincrement())
+  user_id        Int
+  challenge_type String
+  description    String
+  target_value   Int
+  current_value  Int      @default(0)
+  progress       Float    @default(0)
+  completed      Boolean  @default(false)
+  date           String
+  created_at     DateTime @default(now())
+  completed_at   DateTime?
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, challenge_type, date])
+  @@index([user_id])
+  @@index([date])
+}
+
+model Achievement {
+  id              Int      @id @default(autoincrement())
+  user_id         Int
+  achievement_id  String
+  achievement_name String
+  description     String
+  icon            String?
+  unlocked_at     DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, achievement_id])
+  @@index([user_id])
+}
+
+// ============================================================================
+// Messages
+// ============================================================================
+
+model Conversation {
+  id         Int                    @id @default(autoincrement())
+  type       String
+  created_at DateTime               @default(now())
+  updated_at DateTime               @default(now())
+
+  participants ConversationParticipant[]
+  messages     Message[]
+
+  @@index([id])
+}
+
+model ConversationParticipant {
+  id             Int      @id @default(autoincrement())
+  conversation_id Int
+  user_id        Int
+  joined_at      DateTime @default(now())
+  last_read_at   DateTime?
+
+  conversation Conversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
+
+  @@unique([conversation_id, user_id])
+  @@index([conversation_id])
+  @@index([user_id])
+}
+
+model Message {
+  id             Int      @id @default(autoincrement())
+  conversation_id Int
+  sender_id      Int
+  content        String
+  is_deleted     Boolean  @default(false)
+  created_at     DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
+  user          User       @relation(fields: [sender_id], references: [id], onDelete: Cascade)
+
+  @@index([conversation_id])
+  @@index([sender_id])
+  @@index([created_at])
+}
+
+// ============================================================================
+// Stock Market
+// ============================================================================
+
+model Stock {
+  name          String   @id
+  avatar        String
+  price         Int
+  coolness_score Int
+  shares        Int
+  min_price     Int
+  max_price     Int
+  price_history String
+}
+
+model UserPortfolio {
+  user_id      Int      @id
+  cash         Int      @default(10000)
+  holdings     String   @default("{}")
+  transactions String   @default("[]")
+
+  user User @relation(fields: [user_id], references: [id])
+}
+
+// ============================================================================
+// Activity Feed
+// ============================================================================
+
+model Activity {
+  id            Int      @id @default(autoincrement())
+  user_id       Int
+  user_name     String?
+  user_avatar   String?
+  activity_type String
+  description   String
+  metadata      String?
+  points_change Int      @default(0)
+  game_type     String?
+  recorded_at   DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([activity_type])
+  @@index([recorded_at])
+}
+
+// ============================================================================
+// Farts
+// ============================================================================
+
+model UserFartStats {
+  id             Int      @id @default(autoincrement())
+  user_id        Int      @unique
+  total_farts    Int      @default(0)
+  total_volume   Float    @default(0.0)
+  avg_volume     Float    @default(0.0)
+  max_volume     Float    @default(0.0)
+  min_volume     Float    @default(0.0)
+  first_fart     DateTime?
+  last_fart      DateTime?
+  created_at     DateTime @default(now())
+  updated_at     DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id])
+}
+
+model FartEvent {
+  id                 Int      @id @default(autoincrement())
+  user_id            Int
+  volume             Float
+  bass_gain          Float?
+  bass_frequency     Float?
+  distortion_amount  Float?
+  volume_multiplier  Float?
+  playback_rate      Float?
+  timestamp          DateTime @default(now())
+  user_agent         String?
+  ip_address         String?
+
+  @@index([user_id])
+  @@index([timestamp])
+}
+
+model ProcessingStats {
+  id                   Int      @id @default(autoincrement())
+  date                 String   @unique
+  total_processed      Int      @default(0)
+  simple_playbacks     Int      @default(0)
+  processed_playbacks  Int      @default(0)
+  avg_bass_gain        Float    @default(0.0)
+  avg_distortion       Float    @default(0.0)
+  avg_volume_multiplier Float   @default(0.0)
+  created_at           DateTime @default(now())
+  updated_at           DateTime @default(now())
+}
+
+// ============================================================================
+// Characters
+// ============================================================================
+
+model Character {
+  id         Int            @id @default(autoincrement())
+  name       String
+  image_url  String?
+  elo_rating Int            @default(1200)
+  wins       Int            @default(0)
+  losses     Int            @default(0)
+  is_deleted Boolean        @default(false)
+  created_at DateTime       @default(now())
+  updated_at DateTime       @default(now())
+
+  matchesAsVoter CharacterMatch[] @relation("VotedCharacter")
+  matchesAsWinner CharacterMatch[] @relation("WinnerCharacter")
+
+  @@index([elo_rating])
+}
+
+model CharacterMatch {
+  id          Int      @id @default(autoincrement())
+  character_id Int
+  opponent_id Int
+  winner_id   Int
+  voter_id    Int
+  voted_at    DateTime @default(now())
+
+  character Character @relation("VotedCharacter", fields: [character_id], references: [id])
+  opponent  Character @relation("WinnerCharacter", fields: [winner_id], references: [id])
+  voter     User      @relation("Voter", fields: [voter_id], references: [id])
+}
+
+// ============================================================================
+// Shop & Favorites
+// ============================================================================
+
+model ShopItem {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String
+  price       Int
+  category    String
+  image_url   String?
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @default(now())
+
+  purchasedItems PurchasedItem[]
+
+  @@index([category])
+}
+
+model PurchasedItem {
+  id        Int      @id @default(autoincrement())
+  user_id   Int
+  item_id   Int
+  purchased_at DateTime @default(now())
+
+  item ShopItem @relation(fields: [item_id], references: [id])
+
+  @@unique([user_id, item_id])
+  @@index([user_id])
+}
+
+model Profile {
+  id               Int     @id @default(autoincrement())
+  user_id          Int     @unique
+  theme_preferences String?
+  custom_colors    String?
+  created_at       DateTime @default(now())
+  updated_at       DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+model Favorite {
+  id        Int      @id @default(autoincrement())
+  user_id   Int
+  item_type String
+  item_id   String
+  created_at DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, item_type, item_id])
+  @@index([user_id])
+}
+
+model Reaction {
+  id          Int      @id @default(autoincrement())
+  user_id     Int
+  target_type String
+  target_id   String
+  emoji       String
+  created_at  DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, target_type, target_id])
+  @@index([user_id])
+}
+
+model Theme {
+  id               Int     @id @default(autoincrement())
+  user_id          Int     @unique
+  preset           String  @default("default")
+  custom_colors    String?
+  dark_mode        Boolean @default(true)
+  high_contrast    Boolean @default(false)
+  created_at       DateTime @default(now())
+  updated_at       DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
