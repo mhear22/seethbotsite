@@ -16,7 +16,7 @@ const router = Router();
 /**
  * Helper to extract user from JWT token
  */
-function getUserFromToken(req: Request): { user: any; session: any } | null {
+async function getUserFromToken(req: Request): Promise<{ user: any; session: any } | null> {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return null;
@@ -66,9 +66,9 @@ function getUserFromToken(req: Request): { user: any; session: any } | null {
  *       401:
  *         description: Not authenticated
  */
-router.get('/messages/conversations', (req: Request, res: Response) => {
+router.get('/messages/conversations', async (req: Request, res: Response) => {
   try {
-    const result = getUserFromToken(req);
+    const result = await getUserFromToken(req);
 
     if (!result) {
       return res.status(401).json({ error: 'Not authenticated' });
@@ -124,9 +124,9 @@ router.get('/messages/conversations', (req: Request, res: Response) => {
  *       400:
  *         description: Invalid request
  */
-router.post('/messages/conversations', (req: Request, res: Response) => {
+router.post('/messages/conversations', async (req: Request, res: Response) => {
   try {
-    const result = getUserFromToken(req);
+    const result = await getUserFromToken(req);
 
     if (!result) {
       return res.status(401).json({ error: 'Not authenticated' });
@@ -171,9 +171,9 @@ router.post('/messages/conversations', (req: Request, res: Response) => {
  *       404:
  *         description: Conversation not found
  */
-router.get('/messages/conversations/:id', (req: Request, res: Response) => {
+router.get('/messages/conversations/:id', async (req: Request, res: Response) => {
   try {
-    const result = getUserFromToken(req);
+    const result = await getUserFromToken(req);
 
     if (!result) {
       return res.status(401).json({ error: 'Not authenticated' });
@@ -229,9 +229,9 @@ router.get('/messages/conversations/:id', (req: Request, res: Response) => {
  *       404:
  *         description: Conversation not found
  */
-router.get('/messages/conversations/:id/messages', (req: Request, res: Response) => {
+router.get('/messages/conversations/:id/messages', async (req: Request, res: Response) => {
   try {
-    const result = getUserFromToken(req);
+    const result = await getUserFromToken(req);
 
     if (!result) {
       return res.status(401).json({ error: 'Not authenticated' });
@@ -288,9 +288,9 @@ router.get('/messages/conversations/:id/messages', (req: Request, res: Response)
  *       400:
  *         description: Invalid request
  */
-router.post('/messages/conversations/:id/messages', (req: Request, res: Response) => {
+router.post('/messages/conversations/:id/messages', async (req: Request, res: Response) => {
   try {
-    const result = getUserFromToken(req);
+    const result = await getUserFromToken(req);
 
     if (!result) {
       return res.status(401).json({ error: 'Not authenticated' });
@@ -354,9 +354,9 @@ router.post('/messages/conversations/:id/messages', (req: Request, res: Response
  *       404:
  *         description: Message not found
  */
-router.put('/messages/:id', (req: Request, res: Response) => {
+router.put('/messages/:id', async (req: Request, res: Response) => {
   try {
-    const result = getUserFromToken(req);
+    const result = await getUserFromToken(req);
 
     if (!result) {
       return res.status(401).json({ error: 'Not authenticated' });
@@ -415,9 +415,9 @@ router.put('/messages/:id', (req: Request, res: Response) => {
  *       404:
  *         description: Message not found
  */
-router.delete('/messages/:id', (req: Request, res: Response) => {
+router.delete('/messages/:id', async (req: Request, res: Response) => {
   try {
-    const result = getUserFromToken(req);
+    const result = await getUserFromToken(req);
 
     if (!result) {
       return res.status(401).json({ error: 'Not authenticated' });
@@ -464,9 +464,9 @@ router.delete('/messages/:id', (req: Request, res: Response) => {
  *       404:
  *         description: Conversation not found
  */
-router.post('/messages/conversations/:id/read', (req: Request, res: Response) => {
+router.post('/messages/conversations/:id/read', async (req: Request, res: Response) => {
   try {
-    const result = getUserFromToken(req);
+    const result = await getUserFromToken(req);
 
     if (!result) {
       return res.status(401).json({ error: 'Not authenticated' });

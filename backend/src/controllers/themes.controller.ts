@@ -14,7 +14,7 @@ const router = Router();
 /**
  * Helper to extract user from JWT token
  */
-function getUserFromToken(req: Request): { user: any; session: any } | null {
+async function getUserFromToken(req: Request): Promise<{ user: any; session: any } | null> {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return null;
@@ -27,8 +27,8 @@ function getUserFromToken(req: Request): { user: any; session: any } | null {
 /**
  * Helper to require authentication
  */
-function requireAuth(req: Request, res: Response): { user: any; session: any } | null {
-  const result = getUserFromToken(req);
+async function requireAuth(req: Request, res: Response): Promise<{ user: any; session: any } | null> {
+  const result = await getUserFromToken(req);
   if (!result) {
     res.status(401).json({
       error: 'Unauthorized',
@@ -94,7 +94,7 @@ function requireAuth(req: Request, res: Response): { user: any; session: any } |
  *         description: Unauthorized
  */
 router.get('/', async (req: Request, res: Response) => {
-  const authResult = requireAuth(req, res);
+  const authResult = await requireAuth(req, res);
   if (!authResult) return;
 
   const { user } = authResult;
@@ -177,7 +177,7 @@ router.get('/', async (req: Request, res: Response) => {
  *         description: Unauthorized
  */
 router.put('/', async (req: Request, res: Response) => {
-  const authResult = requireAuth(req, res);
+  const authResult = await requireAuth(req, res);
   if (!authResult) return;
 
   const { user } = authResult;

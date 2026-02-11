@@ -392,7 +392,7 @@ router.post('/discord/sync-avatar', requireAuth, async (req: Request, res: Respo
     const avatarUrl = getDiscordAvatarUrl(user.discord_id, user.discord_avatar);
 
     // Update user's avatar URL
-    const updatedUser = updateUserField(user.id, 'avatar_url', avatarUrl);
+    const updatedUser = await updateUserField(user.id, 'avatar_url', avatarUrl);
 
     res.json({
       success: true,

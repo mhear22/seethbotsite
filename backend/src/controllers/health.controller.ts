@@ -9,7 +9,7 @@ const HEALTH_STATE_PATH = path.resolve(__dirname, '../../data/health-state.json'
 
 // Initialize health state file if it doesn't exist
 if (!fs.existsSync(HEALTH_STATE_PATH)) {
-  const initialState = { lastChecked: null, lastCheckTime: null };
+  const initialState: { lastChecked: Date | null; lastCheckTime: number | null } = { lastChecked: null, lastCheckTime: null };
   // Ensure the directory exists before writing
   const dir = path.dirname(HEALTH_STATE_PATH);
   if (!fs.existsSync(dir)) {

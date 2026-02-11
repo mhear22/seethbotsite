@@ -19,7 +19,7 @@ const router = Router();
 /**
  * Helper to extract user from JWT token
  */
-function getUserFromToken(req: Request): { user: any; session: any } | null {
+async function getUserFromToken(req: Request): Promise<{ user: any; session: any } | null> {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return null;
@@ -89,7 +89,7 @@ function getUserFromToken(req: Request): { user: any; session: any } | null {
  */
 router.post('/sync/upload', async (req: Request, res: Response) => {
   try {
-    const result = getUserFromToken(req);
+    const result = await getUserFromToken(req);
 
     if (!result) {
       return res.status(401).json({ error: 'Not authenticated' });
@@ -296,7 +296,7 @@ router.post('/sync/upload', async (req: Request, res: Response) => {
  */
 router.get('/sync/download', async (req: Request, res: Response) => {
   try {
-    const result = getUserFromToken(req);
+    const result = await getUserFromToken(req);
 
     if (!result) {
       return res.status(401).json({ error: 'Not authenticated' });
@@ -381,7 +381,7 @@ router.get('/sync/download', async (req: Request, res: Response) => {
  */
 router.get('/sync/status', async (req: Request, res: Response) => {
   try {
-    const result = getUserFromToken(req);
+    const result = await getUserFromToken(req);
 
     if (!result) {
       return res.status(401).json({ error: 'Not authenticated' });
@@ -447,7 +447,7 @@ router.get('/sync/status', async (req: Request, res: Response) => {
  */
 router.post('/sync/resolve', async (req: Request, res: Response) => {
   try {
-    const result = getUserFromToken(req);
+    const result = await getUserFromToken(req);
 
     if (!result) {
       return res.status(401).json({ error: 'Not authenticated' });

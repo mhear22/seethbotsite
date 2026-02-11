@@ -60,7 +60,7 @@ export async function initProfilesDB(): Promise<Database.Database> {
   await ensureAvatarDir();
 
   // Read and execute the migration
-  const migrationPath = path.join(__dirname, '..', '..', 'migrations', 'add_profiles.sql');
+  const migrationPath = path.join(__dirname, '..', 'migrations', 'add_profiles.sql');
   try {
     const migrationSQL = await fs.readFile(migrationPath, 'utf-8');
     db.exec(migrationSQL);

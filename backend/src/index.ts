@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express, { Express, Request, Response, NextFunction } from 'express';
 import path from 'path';
 import cors from 'cors';
@@ -40,6 +41,7 @@ import favoritesController from './controllers/favorites.controller';
 import themesController from './controllers/themes.controller';
 import discordController from './controllers/discord.controller';
 import { setupWebSocketServer } from './controllers/presence.controller';
+import { setupMultiplayerWebSocket, getGameStats } from './controllers/multiplayer.controller';
 import { initProfilesDB } from './services/profile.service';
 import { initFavoritesDB } from './services/favorites.service';
 import { initThemeDB } from './services/theme.service';
@@ -59,7 +61,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(securityHeaders);
 
 // Rate limiting - applies to all API routes
-app.use('/api/', rateLimiter(100, 60 * 1000)); // 100 requests per minute
+app.use('/api/', rateLimiter(500, 60 * 1000)); // 500 requests per minute
 
 // Log authentication attempts
 app.use('/api/', logAuthAttempt);
@@ -130,6 +132,9 @@ app.use('/api/favorites', favoritesController);
 app.use('/api/themes', themesController);
 app.use('/api', discordController);
 
+// Multiplayer game stats endpoint
+app.get('/api/multiplayer/stats', getGameStats);
+
 // Serve raw OpenAPI JSON spec for type generation
 app.get('/api/openapi.json', (req: Request, res: Response) => {
   res.setHeader('Content-Type', 'application/json');
@@ -174,6 +179,9 @@ const server = createServer(app);
 // Setup WebSocket server for user presence BEFORE server starts listening
 setupWebSocketServer(server);
 
+// Setup multiplayer WebSocket server
+setupMultiplayerWebSocket(server);
+
 // Initialize profiles database
 initProfilesDB().catch((err) => {
   console.error('Failed to initialize profiles database:', err);
@@ -194,8 +202,9 @@ server.listen(PORT, () => {
   console.log(`📁 Serving static files from: ${SERVE_ROOT}`);
   console.log(`✨ Ready to serve the Vue.js app!`);
   console.log(`🔒 Security: API key authentication enabled for destructive endpoints`);
-  console.log(`⚡ Rate limiting: 100 requests per minute per IP`);
+  console.log(`⚡ Rate limiting: 500 requests per minute per IP`);
   console.log(`🔗 WebSocket server listening on /ws`);
+  console.log(`🎮 Multiplayer WebSocket server listening on /ws/multiplayer`);
 });
 
 export default app;

@@ -18,14 +18,14 @@ const router = Router();
 /**
  * Helper to extract user ID from JWT token
  */
-function getUserIdFromToken(req: Request): number | null {
+async function getUserIdFromToken(req: Request): Promise<number | null> {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return null;
   }
 
   const token = authHeader.substring(7);
-  const result = validateTokenAndGetUser(token);
+  const result = await validateTokenAndGetUser(token);
   return result ? result.user.id : null;
 }
 
@@ -81,8 +81,8 @@ function getUserIdFromToken(req: Request): number | null {
  *       401:
  *         description: Unauthorized
  */
-router.post('/', (req: Request, res: Response) => {
-  const userId = getUserIdFromToken(req);
+router.post('/', async (req: Request, res: Response) => {
+  const userId = await getUserIdFromToken(req);
 
   if (!userId) {
     return res.status(401).json({
@@ -152,8 +152,8 @@ router.post('/', (req: Request, res: Response) => {
  *       401:
  *         description: Unauthorized
  */
-router.post('/force', (req: Request, res: Response) => {
-  const userId = getUserIdFromToken(req);
+router.post('/force', async (req: Request, res: Response) => {
+  const userId = await getUserIdFromToken(req);
 
   if (!userId) {
     return res.status(401).json({
@@ -217,8 +217,8 @@ router.post('/force', (req: Request, res: Response) => {
  *       404:
  *         description: Reaction not found or doesn't belong to user
  */
-router.delete('/:id', (req: Request, res: Response) => {
-  const userId = getUserIdFromToken(req);
+router.delete('/:id', async (req: Request, res: Response) => {
+  const userId = await getUserIdFromToken(req);
 
   if (!userId) {
     return res.status(401).json({
@@ -299,7 +299,7 @@ router.delete('/:id', (req: Request, res: Response) => {
  *                         items:
  *                           type: integer
  */
-router.get('/:targetType/:targetId', (req: Request, res: Response) => {
+router.get('/:targetType/:targetId', async (req: Request, res: Response) => {
   const { targetType, targetId } = req.params;
   const { detailed } = req.query;
 
@@ -326,7 +326,7 @@ router.get('/:targetType/:targetId', (req: Request, res: Response) => {
     const reactions = getReactionsForTarget(targetType as 'message' | 'post' | 'comment', numericTargetId);
 
     // If user is authenticated, mark which reactions belong to them
-    const userId = getUserIdFromToken(req);
+    const userId = await getUserIdFromToken(req);
 
     const enrichedReactions = reactions.map(r => ({
       ...r,
@@ -342,7 +342,7 @@ router.get('/:targetType/:targetId', (req: Request, res: Response) => {
     const reactionCounts = getReactionCountsForTarget(targetType as 'message' | 'post' | 'comment', numericTargetId);
 
     // If user is authenticated, mark which reactions they've made
-    const userId = getUserIdFromToken(req);
+    const userId = await getUserIdFromToken(req);
 
     if (userId) {
       const enrichedCounts = reactionCounts.map(rc => ({
@@ -400,8 +400,8 @@ router.get('/:targetType/:targetId', (req: Request, res: Response) => {
  *       401:
  *         description: Unauthorized
  */
-router.get('/check', (req: Request, res: Response) => {
-  const userId = getUserIdFromToken(req);
+router.get('/check', async (req: Request, res: Response) => {
+  const userId = await getUserIdFromToken(req);
 
   if (!userId) {
     return res.status(401).json({
@@ -454,8 +454,8 @@ router.get('/check', (req: Request, res: Response) => {
  *       401:
  *         description: Unauthorized
  */
-router.get('/user', (req: Request, res: Response) => {
-  const userId = getUserIdFromToken(req);
+router.get('/user', async (req: Request, res: Response) => {
+  const userId = await getUserIdFromToken(req);
 
   if (!userId) {
     return res.status(401).json({
