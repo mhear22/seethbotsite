@@ -139,19 +139,20 @@ describe('useFavorites', () => {
     })
 
     it('should save to localStorage when removing favorite', () => {
-      const { addFavorite, removeFavorite } = useFavorites()
+      const { favorites, addFavorite, removeFavorite } = useFavorites()
 
       const catData = { url: 'http://example.com/cat.jpg' }
       addFavorite('cat', catData)
 
-      const favoriteId = addFavorite ? '' : ''
-      // This test needs to actually get the id from addFavorite
-      // For now, we'll just verify localStorage is updated
+      // Get the id of the favorite we just added
+      const favoriteId = favorites.value[0].id
+      removeFavorite(favoriteId)
 
-      removeFavorite('any-id') // Even if it fails, we verify save is called
-
+      // Verify localStorage is updated (should be empty array now)
       const stored = localStorage.getItem('seethbot-favorites')
       expect(stored).toBeDefined()
+      const parsed = JSON.parse(stored!)
+      expect(parsed).toHaveLength(0)
     })
   })
 

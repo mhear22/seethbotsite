@@ -47,6 +47,10 @@ describe('useKeyboardShortcuts', () => {
   })
 
   afterEach(() => {
+    // Clear all shortcuts to prevent leaking between tests
+    const { result } = instance
+    result.shortcuts.value = []
+
     instance.app.unmount()
     if (instance.root.parentNode) {
       instance.root.parentNode.removeChild(instance.root)
