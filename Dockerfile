@@ -73,6 +73,7 @@ COPY --from=prod-deps /app/backend/package.json ./package.json
 # Copy backend built files
 COPY --from=backend-builder /app/backend/dist ./dist
 COPY --from=backend-builder /app/backend/build-info.json ./build-info.json
+COPY --from=backend-builder /app/backend/prisma ./prisma
 
 # Copy frontend build
 COPY --from=frontend-builder /app/frontend/dist ./webdist
