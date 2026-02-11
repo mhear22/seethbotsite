@@ -1,7 +1,7 @@
 # Multi-stage build for full-stack application
 
 # Shared build base with native compilation tools
-FROM node:20-alpine3.19 AS builder-base
+FROM node:22-alpine3.19 AS builder-base
 RUN apk add --no-cache python3 make g++
 
 # Stage 1: Build backend (TypeScript) - generates OpenAPI spec for frontend
@@ -58,7 +58,7 @@ RUN --mount=type=cache,target=/root/.npm \
     npm ci --omit=dev
 
 # Stage 4: Production image (minimal)
-FROM node:20-alpine3.19
+FROM node:22-alpine3.19
 
 WORKDIR /app/backend
 
