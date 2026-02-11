@@ -46,9 +46,7 @@ export class GameServer {
    * Attempt to create matches from queue
    */
   private attemptMatches(): void {
-    console.log('[GameServer] attemptMatches() called');
     let matchPair = matchmakingService.attemptMatch();
-    console.log('[GameServer] matchPair:', matchPair ? 'found' : 'null');
 
     while (matchPair) {
       try {
