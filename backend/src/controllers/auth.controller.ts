@@ -232,7 +232,7 @@ router.post('/auth/login', async (req: Request, res: Response) => {
  *       401:
  *         description: Invalid or expired token
  */
-router.post('/auth/refresh', (req: Request, res: Response) => {
+router.post('/auth/refresh', async (req: Request, res: Response) => {
   try {
     const { token } = req.body;
 
@@ -241,14 +241,14 @@ router.post('/auth/refresh', (req: Request, res: Response) => {
     }
 
     // Refresh token
-    const newToken = refreshToken(token);
+    const newToken = await refreshToken(token);
 
     if (!newToken) {
       return res.status(401).json({ error: 'Invalid or expired token' });
     }
 
     // Validate new token to get user info
-    const result = validateTokenAndGetUser(newToken);
+    const result = await validateTokenAndGetUser(newToken);
 
     if (!result) {
       return res.status(500).json({ error: 'Failed to create session' });
@@ -327,10 +327,10 @@ router.get('/auth/me', requireAuth, (req: Request, res: Response) => {
  *       401:
  *         description: Not authenticated
  */
-router.post('/auth/logout', requireAuth, (req: Request, res: Response) => {
+router.post('/auth/logout', requireAuth, async (req: Request, res: Response) => {
   try {
     const token = req.headers.authorization!.substring(7);
-    const success = logoutUser(token);
+    const success = await logoutUser(token);
 
     if (success) {
       res.json({ message: 'Logged out successfully' });
@@ -407,14 +407,14 @@ router.get('/auth/sessions', requireAuth, (req: Request, res: Response) => {
  *       404:
  *         description: Session not found
  */
-router.delete('/auth/sessions/:id', requireAuth, (req: Request, res: Response) => {
+router.delete('/auth/sessions/:id', requireAuth, async (req: Request, res: Response) => {
   try {
     const sessionId = parseInt(req.params.id);
     if (isNaN(sessionId)) {
       return res.status(400).json({ error: 'Invalid session ID' });
     }
 
-    const success = deleteSession(sessionId, req.user!.id);
+    const success = await deleteSession(sessionId, req.user!.id);
 
     if (success) {
       res.json({ message: 'Session deleted successfully' });
@@ -440,9 +440,9 @@ router.delete('/auth/sessions/:id', requireAuth, (req: Request, res: Response) =
  *       401:
  *         description: Not authenticated
  */
-router.delete('/auth/sessions/all', requireAuth, (req: Request, res: Response) => {
+router.delete('/auth/sessions/all', requireAuth, async (req: Request, res: Response) => {
   try {
-    const count = deleteAllSessions(req.user!.id);
+    const count = await deleteAllSessions(req.user!.id);
     res.json({ message: 'Logged out from all devices', count });
   } catch (error) {
     console.error('Error deleting all sessions:', error);

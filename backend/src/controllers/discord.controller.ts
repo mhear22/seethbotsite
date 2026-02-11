@@ -226,7 +226,7 @@ router.get('/discord/callback', async (req: Request, res: Response) => {
     const discordUser = await getDiscordUser(tokenData.access_token);
 
     // Link Discord account to user
-    const user = linkDiscordAccount(stateData.userId, {
+    const user = await linkDiscordAccount(stateData.userId, {
       id: discordUser.id,
       username: discordUser.username,
       discriminator: discordUser.discriminator,
@@ -285,9 +285,9 @@ router.get('/discord/callback', async (req: Request, res: Response) => {
  *       401:
  *         description: Not authenticated
  */
-router.post('/discord/unlink', requireAuth, (req: Request, res: Response) => {
+router.post('/discord/unlink', requireAuth, async (req: Request, res: Response) => {
   try {
-    const user = unlinkDiscordAccount(req.user!.id);
+    const user = await unlinkDiscordAccount(req.user!.id);
 
     res.json({
       success: true,

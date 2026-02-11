@@ -20,8 +20,8 @@ declare global {
         id: number;
         email: string;
         display_name: string | null;
-        created_at: string;
-        updated_at: string;
+        created_at: Date | string;
+        updated_at: Date | string;
         discord_id: string | null;
         discord_username: string | null;
         discord_discriminator: string | null;
@@ -33,9 +33,9 @@ declare global {
         device_name: string | null;
         device_type: string | null;
         token: string;
-        expires_at: string;
-        created_at: string;
-        last_used_at: string;
+        expires_at: Date | string;
+        created_at: Date | string;
+        last_used_at: Date | string;
       };
     }
   }
@@ -52,7 +52,7 @@ declare global {
  * @param res - Express response
  * @param next - Express next function
  */
-export function requireAuth(req: Request, res: Response, next: NextFunction): void {
+export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     // Extract token from Authorization header
     const authHeader = req.headers.authorization;
@@ -68,7 +68,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
     const token = authHeader.substring(7);
 
     // Verify token and get user
-    const result = validateTokenAndGetUser(token);
+    const result = await validateTokenAndGetUser(token);
 
     if (!result) {
       res.status(401).json({
@@ -105,7 +105,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
  * @param res - Express response
  * @param next - Express next function
  */
-export function optionalAuth(req: Request, res: Response, next: NextFunction): void {
+export async function optionalAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     // Extract token from Authorization header
     const authHeader = req.headers.authorization;
@@ -114,7 +114,7 @@ export function optionalAuth(req: Request, res: Response, next: NextFunction): v
       const token = authHeader.substring(7);
 
       // Verify token and get user (don't fail if invalid)
-      const result = validateTokenAndGetUser(token);
+      const result = await validateTokenAndGetUser(token);
 
       if (result) {
         // Attach user and session to request
