@@ -117,7 +117,7 @@ export class TicketsService {
     return {
       ...newTicket,
       dependencies: parsedDependencies,
-      blocked: isTicketBlocked(db, parsedDependencies)
+      blocked: await isTicketBlocked( parsedDependencies)
     };
   }
 
@@ -138,7 +138,7 @@ export class TicketsService {
     return {
       ...ticket,
       dependencies,
-      blocked: isTicketBlocked(db, dependencies)
+      blocked: await isTicketBlocked( dependencies)
     };
   }
 
@@ -194,15 +194,15 @@ export class TicketsService {
     const tickets = db.prepare(query).all(...params) as any[];
 
     // Add computed fields to each ticket
-    return tickets.map((ticket: any) => {
+    return Promise.all(tickets.map(async (ticket: any) => {
       const dependencies = safeJsonParse<number[]>(ticket.dependencies, []);
 
       return {
         ...ticket,
         dependencies,
-        blocked: isTicketBlocked(db, dependencies)
+        blocked: await isTicketBlocked(dependencies)
       };
-    });
+    }));
   }
 
   /**
@@ -305,7 +305,7 @@ export class TicketsService {
     return {
       ...updatedTicket,
       dependencies: depsArray,
-      blocked: isTicketBlocked(db, depsArray)
+      blocked: await isTicketBlocked( depsArray)
     };
   }
 

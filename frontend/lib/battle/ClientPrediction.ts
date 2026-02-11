@@ -3,8 +3,10 @@
  * Makes local movement feel instant while maintaining server authority
  */
 
-import { PlayerInput, PlayerState } from '@shared/types/NetworkMessages';
+import type { PlayerInput, PlayerState } from '@shared/types/NetworkMessages';
 import { MECH, PHYSICS, ARENA } from '@shared/constants/GameConstants';
+
+
 
 interface PendingInput {
   seq: number;

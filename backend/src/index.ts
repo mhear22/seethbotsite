@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express, { Express, Request, Response, NextFunction } from 'express';
 import path from 'path';
 import cors from 'cors';
@@ -44,7 +45,6 @@ import { setupMultiplayerWebSocket, getGameStats } from './controllers/multiplay
 import { initProfilesDB } from './services/profile.service';
 import { initFavoritesDB } from './services/favorites.service';
 import { initThemeDB } from './services/theme.service';
-import { initUsersDB } from './users';
 import { createServer } from 'http';
 
 const app: Express = express();
@@ -181,14 +181,6 @@ setupWebSocketServer(server);
 
 // Setup multiplayer WebSocket server
 setupMultiplayerWebSocket(server);
-
-// Initialize users database (includes Discord columns)
-try {
-  initUsersDB();
-  console.log('✓ Users database initialized');
-} catch (err) {
-  console.error('Failed to initialize users database:', err);
-}
 
 // Initialize profiles database
 initProfilesDB().catch((err) => {
