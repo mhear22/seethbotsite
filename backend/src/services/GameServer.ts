@@ -37,9 +37,7 @@ export class GameServer {
    * Start matchmaking loop
    */
   private startMatchmaking(): void {
-    console.log(`[GameServer] Starting matchmaking loop (interval: ${MATCHMAKING.MATCHMAKING_INTERVAL}ms)`);
     this.matchmakingInterval = setInterval(() => {
-      console.log('[GameServer] Matchmaking interval tick');
       this.attemptMatches();
     }, MATCHMAKING.MATCHMAKING_INTERVAL);
   }
@@ -69,7 +67,7 @@ export class GameServer {
   private createMatch(pair: MatchPair): void {
     console.log('[GameServer] createMatch() called');
     const { player1, player2, matchId } = pair;
-    console.log(`[GameServer] Match pair: ${player1?.playerId} vs ${player2?.playerId}, matchId: ${matchId}`);
+    console.log(`[GameServer] Match pair: ${player1?.playerName} vs ${player2?.playerName}, matchId: ${matchId}`);
 
     // Generate arena buildings
     const buildings = this.generateArenaBuildings();
@@ -89,9 +87,7 @@ export class GameServer {
     ];
 
     // Send match_found to both players
-    console.log('[GameServer] Player 1 loadout:', JSON.stringify(player1.loadout));
-    console.log('[GameServer] Player 2 loadout:', JSON.stringify(player2.loadout));
-
+    
     const match1Message: MatchFoundMessage = {
       type: 'match_found',
       matchId,
