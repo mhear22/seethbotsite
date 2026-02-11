@@ -97,35 +97,62 @@
 
     <!-- Active Battle -->
     <div v-if="battlePhase === 'active'" class="battle-container">
-      <BattleCanvas
-        :player-mech="battle.battleState.value.player!"
-        :enemy-mech="battle.battleState.value.enemy!"
-        @battle-end="handleBattleEnd"
-        @damage-dealt="handleDamageDealt"
-        @time-update="handleTimeUpdate"
-        @hud-update="handleHudUpdate"
-      />
+      <!-- Single Player Battle -->
+      <template v-if="battleMode === 'single-player'">
+        <BattleCanvas
+          :player-mech="battle.battleState.value.player!"
+          :enemy-mech="battle.battleState.value.enemy!"
+          @battle-end="handleBattleEnd"
+          @damage-dealt="handleDamageDealt"
+          @time-update="handleTimeUpdate"
+          @hud-update="handleHudUpdate"
+        />
 
-      <BattleHUD
-        :player-health="battle.playerHealth.value"
-        :player-max-health="battle.playerMaxHealth.value"
-        :enemy-health="battle.enemyHealth.value"
-        :enemy-max-health="battle.enemyMaxHealth.value"
-        :enemy-name="enemyName"
-        :player-power="hudData.playerPower"
-        :player-max-power="hudData.playerMaxPower"
-        :jump-fuel="battle.battleState.value.player?.jumpFuel ?? 0"
-        :has-jump-jets="hasJumpJets"
-        :dash-cooldown="hudData.dashCooldown"
-        :dash-max-cooldown="hudData.dashMaxCooldown"
-        :ability-cooldown="hudData.abilityCooldown"
-        :ability-max-cooldown="hudData.abilityMaxCooldown"
-        :has-rack-ability="hasRackAbility"
-        :ability-name="abilityName"
-        :enemy-radar-x="hudData.enemyRadarX"
-        :enemy-radar-y="hudData.enemyRadarY"
-        :targeting="targetingState"
-      />
+        <BattleHUD
+          :player-health="battle.playerHealth.value"
+          :player-max-health="battle.playerMaxHealth.value"
+          :enemy-health="battle.enemyHealth.value"
+          :enemy-max-health="battle.enemyMaxHealth.value"
+          :enemy-name="enemyName"
+          :player-power="hudData.playerPower"
+          :player-max-power="hudData.playerMaxPower"
+          :jump-fuel="battle.battleState.value.player?.jumpFuel ?? 0"
+          :has-jump-jets="hasJumpJets"
+          :dash-cooldown="hudData.dashCooldown"
+          :dash-max-cooldown="hudData.dashMaxCooldown"
+          :ability-cooldown="hudData.abilityCooldown"
+          :ability-max-cooldown="hudData.abilityMaxCooldown"
+          :has-rack-ability="hasRackAbility"
+          :ability-name="abilityName"
+          :enemy-radar-x="hudData.enemyRadarX"
+          :enemy-radar-y="hudData.enemyRadarY"
+          :targeting="targetingState"
+        />
+      </template>
+
+      <!-- Multiplayer Battle -->
+      <template v-else-if="battleMode === 'multiplayer' && matchData && multiplayerPlayerMech && multiplayerOpponentMech && auth.token.value">
+        <MultiplayerBattleCanvas
+          :player-mech="multiplayerPlayerMech"
+          :opponent-mech="multiplayerOpponentMech"
+          :match-data="matchData"
+          :auth-token="auth.token.value"
+          @battle-end="handleMultiplayerBattleEnd"
+          @opponent-disconnected="handleOpponentDisconnected"
+          @damage-dealt="handleDamageDealt"
+          @time-update="handleTimeUpdate"
+          @hud-update="handleHudUpdate"
+        />
+      </template>
+    </div>
+
+    <!-- Countdown Screen (Multiplayer Only) -->
+    <div v-if="battlePhase === 'countdown'" class="screen countdown-screen">
+      <div class="screen-content">
+        <h1 class="countdown-title">{{ countdownRemaining }}</h1>
+        <p class="countdown-subtitle">Match starting...</p>
+        <p class="opponent-name">VS {{ matchData?.opponentName }}</p>
+      </div>
     </div>
 
     <!-- Victory Screen -->
@@ -179,6 +206,24 @@
         </div>
       </div>
     </div>
+
+    <!-- Multiplayer Results Screen -->
+    <MultiplayerResultsScreen
+      v-if="battlePhase === 'multiplayer-results' && multiplayerMatchResult && matchData"
+      :result="multiplayerMatchResult.winnerId === matchData.yourPlayerId ? 'victory' : 'defeat'"
+      :opponent-name="matchData.opponentName"
+      :match-time="battleTime"
+      :your-stats="multiplayerMatchResult.stats"
+      :opponent-stats="{
+        damageDealt: 0,
+        damageReceived: multiplayerMatchResult.stats.damageDealt,
+        shotsHit: 0,
+        shotsFired: 0,
+        timeSurvived: battleTime
+      }"
+      @find-another-match="findAnotherMatch"
+      @return-to-menu="returnToBuilder"
+    />
   </div>
 </template>
 
@@ -193,8 +238,11 @@ import BattleCanvas from '../mech/BattleCanvas.vue'
 import BattleHUD from '../mech/BattleHUD.vue'
 import GameSettingsModal from '../mech/GameSettingsModal.vue'
 import MatchmakingView from '../mech/MatchmakingView.vue'
+import MultiplayerBattleCanvas from '../mech/MultiplayerBattleCanvas.vue'
+import MultiplayerResultsScreen from '../mech/MultiplayerResultsScreen.vue'
 import { NetworkManager } from '../../lib/battle/NetworkManager'
-import type { MechLoadout } from '../../../shared/types/NetworkMessages'
+import { MechEntity } from '../../lib/battle/MechEntity'
+import type { MechLoadout, MatchFoundMessage, MatchEndMessage } from '../../src/shared/types/NetworkMessages'
 
 // Multiplayer state
 const battleMode = ref<'single-player' | 'multiplayer'>('single-player')
@@ -202,6 +250,11 @@ const networkManager = new NetworkManager()
 const matchmakingStatus = ref<'queued' | 'searching' | 'found' | 'error'>('searching')
 const matchmakingError = ref('')
 const showMatchmaking = ref(false)
+const matchData = ref<MatchFoundMessage | null>(null)
+const multiplayerPlayerMech = ref<MechEntity | null>(null)
+const multiplayerOpponentMech = ref<MechEntity | null>(null)
+const multiplayerMatchResult = ref<MatchEndMessage | null>(null)
+const countdownRemaining = ref(3)
 
 const route = useRoute()
 const router = useRouter()
@@ -443,28 +496,34 @@ function cancelMatchmaking() {
 
 function setupNetworkHandlers() {
   // Match found
-  networkManager.on('match_found', (data: any) => {
+  networkManager.on('match_found', (data: MatchFoundMessage) => {
     console.log('[MechBattle] Match found!', data)
     matchmakingStatus.value = 'found'
+    matchData.value = data
+
+    // Create player and opponent mechs for multiplayer
+    createMultiplayerMechs(data)
   })
 
-  // Match start
+  // Match start (countdown completed)
   networkManager.on('match_start', (data: any) => {
     console.log('[MechBattle] Match starting!', data)
-    // TODO: Transition to MultiplayerBattleScene
-    // The multiplayer battle infrastructure is complete (NetworkManager, ClientPrediction,
-    // StateInterpolation, MultiplayerBattleScene), but needs to be integrated into the UI.
-    // For now, show a temporary message
+
+    // Start countdown
+    battle.battleState.value.phase = 'countdown'
     showMatchmaking.value = false
-    console.error('[MechBattle] MultiplayerBattleScene integration incomplete')
-    matchmakingError.value = 'Multiplayer battle scene not yet integrated. The networking infrastructure is ready, but the UI integration is incomplete.'
-    matchmakingStatus.value = 'error'
-    showMatchmaking.value = true
-    setTimeout(() => {
-      showMatchmaking.value = false
-      networkManager.disconnect()
-      battle.battleState.value.phase = 'mode-select'
-    }, 5000)
+    countdownRemaining.value = data.countdown || 3
+
+    // Countdown timer
+    const countdownInterval = setInterval(() => {
+      countdownRemaining.value--
+
+      if (countdownRemaining.value <= 0) {
+        clearInterval(countdownInterval)
+        // Start the actual battle
+        battle.battleState.value.phase = 'active'
+      }
+    }, 1000)
   })
 
   // Matchmaking status updates
@@ -490,6 +549,75 @@ function setupNetworkHandlers() {
       matchmakingError.value = 'Disconnected from server'
     }
   })
+}
+
+function createMultiplayerMechs(data: MatchFoundMessage) {
+  // Create player mech from builder loadout
+  multiplayerPlayerMech.value = new MechEntity({
+    name: 'Your Mech',
+    loadout: builder.loadout.value,
+    stats: builder.totalStats.value,
+    isPlayer: true
+  })
+
+  // Position at spawn location
+  if (data.yourSpawnPosition) {
+    multiplayerPlayerMech.value.position.set(
+      data.yourSpawnPosition[0],
+      data.yourSpawnPosition[1],
+      data.yourSpawnPosition[2]
+    )
+  }
+
+  // Create opponent mech from their loadout
+  // Convert network loadout to builder format (simplified for now)
+  const opponentStats = {
+    maxHealth: 100,
+    armor: 50,
+    firepower: 50,
+    speed: 50,
+    accuracy: 50,
+    energy: 100
+  }
+
+  multiplayerOpponentMech.value = new MechEntity({
+    name: data.opponentName,
+    loadout: {} as any, // Will be determined by server
+    stats: opponentStats,
+    isPlayer: false
+  })
+
+  // Position at opponent spawn location
+  if (data.opponentSpawnPosition) {
+    multiplayerOpponentMech.value.position.set(
+      data.opponentSpawnPosition[0],
+      data.opponentSpawnPosition[1],
+      data.opponentSpawnPosition[2]
+    )
+  }
+}
+
+function handleMultiplayerBattleEnd(result: MatchEndMessage) {
+  console.log('[MechBattle] Multiplayer battle ended:', result)
+  multiplayerMatchResult.value = result
+  battle.battleState.value.phase = 'multiplayer-results'
+}
+
+function handleOpponentDisconnected() {
+  console.log('[MechBattle] Opponent disconnected - you win!')
+  // Will be handled by match_end message from server
+}
+
+function findAnotherMatch() {
+  // Reset state and queue for another match
+  multiplayerMatchResult.value = null
+  matchData.value = null
+  multiplayerPlayerMech.value = null
+  multiplayerOpponentMech.value = null
+  battle.battleState.value.phase = 'mode-select'
+
+  // Automatically queue for another match
+  selectMultiplayer()
 }
 
 function returnToBuilder() {
@@ -824,6 +952,33 @@ function returnToBuilder() {
   font-weight: bold;
 }
 
+/* Countdown Screen */
+.countdown-screen {
+  background: linear-gradient(135deg, #1a1a2e, #16213e);
+}
+
+.countdown-title {
+  color: #f59e0b;
+  font-size: 8rem;
+  margin-bottom: 20px;
+  text-shadow: 0 0 40px rgba(245, 158, 11, 0.8);
+  animation: pulse 1s ease-in-out infinite;
+  font-weight: bold;
+}
+
+.countdown-subtitle {
+  color: #9ca3af;
+  font-size: 1.5rem;
+  margin-bottom: 30px;
+}
+
+.opponent-name {
+  color: #3b82f6;
+  font-size: 2rem;
+  font-weight: bold;
+  text-shadow: 0 0 20px rgba(59, 130, 246, 0.6);
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .stat-grid {
@@ -834,6 +989,10 @@ function returnToBuilder() {
   .victory-title,
   .defeat-title {
     font-size: 2.5rem;
+  }
+
+  .countdown-title {
+    font-size: 5rem;
   }
 
   .button-group {
