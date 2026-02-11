@@ -56,10 +56,14 @@ FROM builder-base AS prod-deps
 WORKDIR /app/backend
 
 COPY backend/package*.json ./
+COPY backend/prisma ./prisma/
 
 # Install ONLY production dependencies
 RUN --mount=type=cache,target=/root/.npm \
     npm ci --omit=dev
+
+# Generate Prisma Client for production
+RUN npx prisma generate
 
 # Stage 4: Production image (minimal)
 FROM node:22-alpine3.19
