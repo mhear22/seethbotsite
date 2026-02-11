@@ -362,7 +362,7 @@ export class BattleScene {
     this.render()
   }
 
-  private update(deltaTime: number) {
+  protected update(deltaTime: number) {
     // Update particles every frame (even during battle ending)
     this.particleSystem.update(deltaTime)
 
