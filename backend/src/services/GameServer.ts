@@ -37,7 +37,9 @@ export class GameServer {
    * Start matchmaking loop
    */
   private startMatchmaking(): void {
+    console.log(`[GameServer] Starting matchmaking loop (interval: ${MATCHMAKING.MATCHMAKING_INTERVAL}ms)`);
     this.matchmakingInterval = setInterval(() => {
+      console.log('[GameServer] Matchmaking interval tick');
       this.attemptMatches();
     }, MATCHMAKING.MATCHMAKING_INTERVAL);
   }
@@ -46,10 +48,17 @@ export class GameServer {
    * Attempt to create matches from queue
    */
   private attemptMatches(): void {
+    console.log('[GameServer] attemptMatches() called');
     let matchPair = matchmakingService.attemptMatch();
+    console.log('[GameServer] matchPair:', matchPair ? 'found' : 'null');
 
     while (matchPair) {
-      this.createMatch(matchPair);
+      try {
+        console.log('[GameServer] Calling createMatch()...');
+        this.createMatch(matchPair);
+      } catch (error) {
+        console.error('[GameServer] Error in createMatch():', error);
+      }
       matchPair = matchmakingService.attemptMatch();
     }
   }
@@ -58,10 +67,13 @@ export class GameServer {
    * Create a new match from a pair of players
    */
   private createMatch(pair: MatchPair): void {
+    console.log('[GameServer] createMatch() called');
     const { player1, player2, matchId } = pair;
+    console.log(`[GameServer] Match pair: ${player1?.playerId} vs ${player2?.playerId}, matchId: ${matchId}`);
 
     // Generate arena buildings
     const buildings = this.generateArenaBuildings();
+    console.log(`[GameServer] Generated ${buildings.length} buildings`);
 
     // Get spawn positions
     const spawn1: [number, number, number] = [
@@ -77,6 +89,9 @@ export class GameServer {
     ];
 
     // Send match_found to both players
+    console.log('[GameServer] Player 1 loadout:', JSON.stringify(player1.loadout));
+    console.log('[GameServer] Player 2 loadout:', JSON.stringify(player2.loadout));
+
     const match1Message: MatchFoundMessage = {
       type: 'match_found',
       matchId,
@@ -110,36 +125,54 @@ export class GameServer {
     }
 
     // Create match instance
-    const match = new MatchInstance(
-      matchId,
-      player1.playerId,
-      player1.playerName,
-      player1.loadout,
-      player1.socket,
-      player2.playerId,
-      player2.playerName,
-      player2.loadout,
-      player2.socket
-    );
+    try {
+      console.log(`[GameServer] Creating match instance: ${matchId}`);
+      const match = new MatchInstance(
+        matchId,
+        player1.playerId,
+        player1.playerName,
+        player1.loadout,
+        player1.socket,
+        player2.playerId,
+        player2.playerName,
+        player2.loadout,
+        player2.socket
+      );
 
-    // Set match end callback
-    match.setOnMatchEnd((matchId) => {
-      this.onMatchEnd(matchId);
-    });
+      // Set match end callback
+      match.setOnMatchEnd((matchId) => {
+        this.onMatchEnd(matchId);
+      });
 
-    // Store match
-    this.matches.set(matchId, match);
+      // Store match
+      this.matches.set(matchId, match);
 
-    // Update player records
-    const p1 = this.players.get(player1.playerId);
-    const p2 = this.players.get(player2.playerId);
-    if (p1) p1.currentMatchId = matchId;
-    if (p2) p2.currentMatchId = matchId;
+      // Update player records
+      const p1 = this.players.get(player1.playerId);
+      const p2 = this.players.get(player2.playerId);
+      if (p1) p1.currentMatchId = matchId;
+      if (p2) p2.currentMatchId = matchId;
 
-    // Start match after a short delay for loading
-    setTimeout(() => {
-      match.start();
-    }, 1000);
+      // Start match after a short delay for loading
+      setTimeout(() => {
+        console.log(`[GameServer] Starting match: ${matchId}`);
+        match.start();
+      }, 1000);
+    } catch (error) {
+      console.error(`[GameServer] Error creating match ${matchId}:`, error);
+      // Notify players of error
+      const errorMessage = {
+        type: 'error',
+        code: 'MATCH_CREATE_FAILED',
+        message: 'Failed to create match'
+      };
+      if (player1.socket.readyState === 1) {
+        player1.socket.send(JSON.stringify(errorMessage));
+      }
+      if (player2.socket.readyState === 1) {
+        player2.socket.send(JSON.stringify(errorMessage));
+      }
+    }
   }
 
   /**
@@ -273,8 +306,15 @@ export class GameServer {
           // Handle acknowledgments (Phase 3)
           break;
 
+        case 'ping':
+          // Respond with pong for latency measurement
+          if (player.socket.readyState === 1) {
+            player.socket.send(JSON.stringify({ type: 'pong' }));
+          }
+          break;
+
         default:
-          console.warn(`[GameServer] Unknown message type from ${player.playerName}`);
+          console.warn(`[GameServer] Unknown message type "${(message as any).type}" from ${player.playerName}`);
       }
     } catch (error) {
       console.error(`[GameServer] Error handling message from ${player.playerName}:`, error);

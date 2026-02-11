@@ -44,8 +44,8 @@ export class MatchmakingService {
 
     this.queueTimeouts.set(player.playerId, timeout);
 
-    // Try to match immediately
-    this.tryMatchPlayers();
+    // Don't try to match immediately - let GameServer's interval handle it
+    // This ensures proper match creation through the GameServer
   }
 
   /**

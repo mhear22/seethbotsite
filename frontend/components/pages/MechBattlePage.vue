@@ -243,6 +243,7 @@ import MultiplayerResultsScreen from '../mech/MultiplayerResultsScreen.vue'
 import { NetworkManager } from '../../lib/battle/NetworkManager'
 import { MechEntity } from '../../lib/battle/MechEntity'
 import type { MechLoadout, MatchFoundMessage, MatchEndMessage } from '@shared/types/NetworkMessages'
+import * as THREE from 'three'
 
 // Multiplayer state
 const battleMode = ref<'single-player' | 'multiplayer'>('single-player')
@@ -423,7 +424,7 @@ async function selectMultiplayer() {
     showMatchmaking.value = true
     setTimeout(() => {
       showMatchmaking.value = false
-      router.push({ name: 'login' })
+      router.push({ name: 'auth', query: { mode: 'login' } })
     }, 2000)
     return
   }
@@ -553,26 +554,42 @@ function setupNetworkHandlers() {
 
 function createMultiplayerMechs(data: MatchFoundMessage) {
   // Create player mech from builder loadout
-  multiplayerPlayerMech.value = new MechEntity({
-    name: 'Your Mech',
-    loadout: builder.loadout.value,
-    stats: builder.totalStats.value,
-    isPlayer: true
-  })
+  const playerSpawnPos = new THREE.Vector3(
+    data.yourSpawnPosition[0],
+    data.yourSpawnPosition[1],
+    data.yourSpawnPosition[2]
+  )
 
-  // Position at spawn location
-  if (data.yourSpawnPosition) {
-    multiplayerPlayerMech.value.position.set(
-      data.yourSpawnPosition[0],
-      data.yourSpawnPosition[1],
-      data.yourSpawnPosition[2]
-    )
-  }
+  multiplayerPlayerMech.value = new MechEntity(
+    data.yourPlayerId,
+    'Your Mech',
+    builder.loadout.value,
+    {
+      ...builder.totalStats.value,
+      currentHealth: builder.totalStats.value.maxHealth
+    },
+    true,
+    playerSpawnPos
+  )
 
   // Create opponent mech from their loadout
-  // Convert network loadout to builder format (simplified for now)
+  const opponentSpawnPos = new THREE.Vector3(
+    data.opponentSpawnPosition[0],
+    data.opponentSpawnPosition[1],
+    data.opponentSpawnPosition[2]
+  )
+
+  // Convert network loadout to builder format
+  const opponentBuilderLoadout: any = {
+    core: { id: data.opponentLoadout.chassisType },
+    leftArm: { name: data.opponentLoadout.leftWeapon.name },
+    rightArm: { name: data.opponentLoadout.rightWeapon.name },
+    rack: { name: data.opponentLoadout.ability.name }
+  }
+
   const opponentStats = {
     maxHealth: 100,
+    currentHealth: 100,
     armor: 50,
     firepower: 50,
     speed: 50,
@@ -580,21 +597,14 @@ function createMultiplayerMechs(data: MatchFoundMessage) {
     energy: 100
   }
 
-  multiplayerOpponentMech.value = new MechEntity({
-    name: data.opponentName,
-    loadout: {} as any, // Will be determined by server
-    stats: opponentStats,
-    isPlayer: false
-  })
-
-  // Position at opponent spawn location
-  if (data.opponentSpawnPosition) {
-    multiplayerOpponentMech.value.position.set(
-      data.opponentSpawnPosition[0],
-      data.opponentSpawnPosition[1],
-      data.opponentSpawnPosition[2]
-    )
-  }
+  multiplayerOpponentMech.value = new MechEntity(
+    data.opponentId,
+    data.opponentName,
+    opponentBuilderLoadout,
+    opponentStats,
+    false,
+    opponentSpawnPos
+  )
 }
 
 function handleMultiplayerBattleEnd(result: MatchEndMessage) {

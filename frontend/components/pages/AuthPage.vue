@@ -1,13 +1,29 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { useAuth } from '../../composables/useAuth'
 import { formatDate } from '../../utils/format'
+
+// Router
+const route = useRoute()
 
 // Auth composable
 const auth = useAuth()
 
 // Form mode: 'login' | 'register' | 'profile'
 const mode = ref<'login' | 'register' | 'profile'>('login')
+
+// Set initial mode from query parameter
+onMounted(() => {
+  const queryMode = route.query.mode as string
+  if (queryMode === 'register') {
+    mode.value = 'register'
+  } else if (queryMode === 'login') {
+    mode.value = 'login'
+  } else if (auth.isAuthenticated.value) {
+    mode.value = 'profile'
+  }
+})
 const showPassword = ref(false)
 
 // Login form

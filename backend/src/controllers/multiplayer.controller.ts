@@ -9,7 +9,7 @@ import { gameServer } from '../services/GameServer';
 import { ClientMessage } from '../shared/types/NetworkMessages';
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+const JWT_SECRET = process.env.SEETHBOT_JWT_SECRET || 'change-this-in-production-secret-key';
 
 /**
  * Setup multiplayer WebSocket server

@@ -44,6 +44,7 @@ import { setupMultiplayerWebSocket, getGameStats } from './controllers/multiplay
 import { initProfilesDB } from './services/profile.service';
 import { initFavoritesDB } from './services/favorites.service';
 import { initThemeDB } from './services/theme.service';
+import { initUsersDB } from './users';
 import { createServer } from 'http';
 
 const app: Express = express();
@@ -60,7 +61,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(securityHeaders);
 
 // Rate limiting - applies to all API routes
-app.use('/api/', rateLimiter(100, 60 * 1000)); // 100 requests per minute
+app.use('/api/', rateLimiter(500, 60 * 1000)); // 500 requests per minute
 
 // Log authentication attempts
 app.use('/api/', logAuthAttempt);
@@ -181,6 +182,14 @@ setupWebSocketServer(server);
 // Setup multiplayer WebSocket server
 setupMultiplayerWebSocket(server);
 
+// Initialize users database (includes Discord columns)
+try {
+  initUsersDB();
+  console.log('✓ Users database initialized');
+} catch (err) {
+  console.error('Failed to initialize users database:', err);
+}
+
 // Initialize profiles database
 initProfilesDB().catch((err) => {
   console.error('Failed to initialize profiles database:', err);
@@ -201,7 +210,7 @@ server.listen(PORT, () => {
   console.log(`📁 Serving static files from: ${SERVE_ROOT}`);
   console.log(`✨ Ready to serve the Vue.js app!`);
   console.log(`🔒 Security: API key authentication enabled for destructive endpoints`);
-  console.log(`⚡ Rate limiting: 100 requests per minute per IP`);
+  console.log(`⚡ Rate limiting: 500 requests per minute per IP`);
   console.log(`🔗 WebSocket server listening on /ws`);
   console.log(`🎮 Multiplayer WebSocket server listening on /ws/multiplayer`);
 });

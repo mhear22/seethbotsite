@@ -54,11 +54,19 @@ export interface AckMessage {
   eventId: string;
 }
 
+/**
+ * Ping message for latency measurement
+ */
+export interface PingMessage {
+  type: 'ping';
+}
+
 export type ClientMessage =
   | InputMessage
   | MatchRequestMessage
   | CancelMatchmakingMessage
-  | AckMessage;
+  | AckMessage
+  | PingMessage;
 
 // ============================================================================
 // Server → Client Messages
@@ -226,6 +234,13 @@ export interface ErrorMessage {
   message: string;
 }
 
+/**
+ * Pong response for latency measurement
+ */
+export interface PongMessage {
+  type: 'pong';
+}
+
 export type ServerMessage =
   | StateSnapshotMessage
   | EventMessage
@@ -234,7 +249,8 @@ export type ServerMessage =
   | MatchEndMessage
   | OpponentDisconnectedMessage
   | MatchmakingStatusMessage
-  | ErrorMessage;
+  | ErrorMessage
+  | PongMessage;
 
 // ============================================================================
 // Shared Types

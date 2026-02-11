@@ -6,6 +6,104 @@ const JWT_SECRET = process.env.SEETHBOT_JWT_SECRET || 'change-this-in-production
 const JWT_EXPIRY = process.env.SEETHBOT_JWT_EXPIRY || '30d';
 
 /**
+ * Initialize the users database
+ */
+export function initUsersDB(): Database.Database {
+  const db = new Database(DB_PATH);
+
+  // Create users table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      display_name TEXT,
+      avatar_url TEXT,
+      banner_url TEXT,
+      bio TEXT,
+      status TEXT,
+      show_email BOOLEAN DEFAULT 1,
+      show_joined_date BOOLEAN DEFAULT 1,
+      is_deleted BOOLEAN DEFAULT 0,
+      theme_preferences TEXT DEFAULT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // Add profile columns if they don't exist (for existing databases)
+  const columnsToAdd = [
+    'avatar_url TEXT',
+    'banner_url TEXT',
+    'bio TEXT',
+    'status TEXT',
+    'show_email BOOLEAN DEFAULT 1',
+    'show_joined_date BOOLEAN DEFAULT 1',
+    'theme_preferences TEXT DEFAULT NULL',
+    'discord_id TEXT',  // UNIQUE constraint removed - can't add UNIQUE to existing table with rows
+    'discord_username TEXT',
+    'discord_discriminator TEXT',
+    'discord_avatar TEXT'
+  ];
+
+  for (const columnDef of columnsToAdd) {
+    const columnName = columnDef.split(' ')[0];
+    try {
+      db.exec(`ALTER TABLE users ADD COLUMN ${columnDef}`);
+    } catch (err) {
+      // Column already exists, ignore the error
+    }
+  }
+
+  // Add UNIQUE index for discord_id separately (handles NULL values correctly)
+  try {
+    db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_discord_id ON users(discord_id) WHERE discord_id IS NOT NULL`);
+  } catch (err) {
+    // Index already exists or failed, ignore
+  }
+
+  // Add is_deleted column if it doesn't exist (for soft deletes) - this check is now redundant but kept for safety
+  try {
+    db.exec(`ALTER TABLE users ADD COLUMN is_deleted BOOLEAN DEFAULT 0`);
+  } catch (err) {
+    // Column already exists, ignore the error
+  }
+
+  // Create sessions table for device tracking
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS sessions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      device_name TEXT,
+      device_type TEXT,
+      token TEXT UNIQUE NOT NULL,
+      expires_at DATETIME NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      last_used_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+
+  // Create index for faster lookups
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+    CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token);
+    CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
+  `);
+
+  return db;
+}
+
+let dbInstance: Database.Database | null = null;
+
+export function getUsersDB(): Database.Database {
+  if (!dbInstance) {
+    dbInstance = initUsersDB();
+  }
+  return dbInstance;
+}
+
+/**
  * User interface
  */
 export interface User {
