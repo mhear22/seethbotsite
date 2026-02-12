@@ -1,5 +1,5 @@
-import Database from 'better-sqlite3';
-import { getDB, parseDependencies, isTicketBlocked, safeJsonParse } from './tickets-db';
+import { prisma } from '../lib/prisma';
+import { parseDependencies, isTicketBlocked, safeJsonParse } from './tickets-db';
 
 /**
  * Create ticket DTO
@@ -39,16 +39,16 @@ export interface TicketWithComputed {
   title: string;
   description: string;
   status: string;
-  response?: string;
-  creator_id?: string;
+  response?: string | null;
+  creator_id?: string | null;
   type: string;
   priority: string;
-  tags?: string;
-  category?: string;
+  tags?: string | null;
+  category?: string | null;
   dependencies: number[];
   blocked: boolean;
-  created_at: string;
-  updated_at: string;
+  created_at: Date;
+  updated_at: Date;
 }
 
 /**
@@ -68,8 +68,6 @@ export class TicketsService {
       throw new Error('Title is required');
     }
 
-    const db = getDB();
-
     // Parse dependencies from description if not explicitly provided
     let parsedDependencies: number[] = [];
     if (dependencies && Array.isArray(dependencies)) {
@@ -80,7 +78,10 @@ export class TicketsService {
 
     // Validate dependencies exist
     for (const depId of parsedDependencies) {
-      const exists = db.prepare('SELECT id FROM tickets WHERE id = ? AND is_deleted = 0').get(depId);
+      const exists = await prisma.ticket.findUnique({
+        where: { id: depId },
+        select: { id: true }
+      });
       if (!exists) {
         throw new Error(`Dependency ticket #${depId} does not exist`);
       }
@@ -92,32 +93,26 @@ export class TicketsService {
     // Store dependencies as JSON string
     const dependenciesJson = parsedDependencies.length > 0 ? JSON.stringify(parsedDependencies) : null;
 
-    // Auto-set status based on dependencies
-    const initialStatus = parsedDependencies.length > 0 ? 'pending' : 'pending';
-
-    const stmt = db.prepare(`
-      INSERT INTO tickets (title, description, status, creator_id, type, priority, tags, category, dependencies, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-    `);
-    const result = stmt.run(
-      title.trim(),
-      (description || '').trim() || null,
-      initialStatus,
-      creator_id || null,
-      type || 'feature',
-      priority || 'medium',
-      tags || null,
-      category || null,
-      dependenciesJson
-    );
-
-    const newTicket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(result.lastInsertRowid) as any;
+    // Create ticket
+    const newTicket = await prisma.ticket.create({
+      data: {
+        title: title.trim(),
+        description: (description || '').trim() || null,
+        status: 'pending',
+        creator_id: creator_id || null,
+        type: type || 'feature',
+        priority: priority || 'medium',
+        tags: tags || null,
+        category: category || null,
+        dependencies: dependenciesJson
+      }
+    });
 
     // Add computed fields to response
     return {
       ...newTicket,
       dependencies: parsedDependencies,
-      blocked: await isTicketBlocked( parsedDependencies)
+      blocked: await isTicketBlocked(parsedDependencies)
     };
   }
 
@@ -125,9 +120,10 @@ export class TicketsService {
    * Get a single ticket by ID
    */
   async getTicket(id: number): Promise<TicketWithComputed | null> {
-    const db = getDB();
+    const ticket = await prisma.ticket.findUnique({
+      where: { id, is_deleted: false }
+    });
 
-    const ticket = db.prepare('SELECT * FROM tickets WHERE id = ? AND is_deleted = 0').get(id) as any;
     if (!ticket) {
       return null;
     }
@@ -138,7 +134,7 @@ export class TicketsService {
     return {
       ...ticket,
       dependencies,
-      blocked: await isTicketBlocked( dependencies)
+      blocked: await isTicketBlocked(dependencies)
     };
   }
 
@@ -152,49 +148,43 @@ export class TicketsService {
     tag?: string;
     category?: string;
   } = {}): Promise<TicketWithComputed[]> {
-    const db = getDB();
     const { status = 'all', type = 'all', priority = 'all', tag, category } = filters;
 
-    let query = 'SELECT * FROM tickets WHERE is_deleted = 0';
-    const params: any[] = [];
+    // Build where clause
+    const where: any = { is_deleted: false };
 
     // Map "in-progress" to "needs-info" for frontend compatibility
     const statusFilter = status === 'in-progress' ? 'needs-info' : status;
 
     if (statusFilter !== 'all') {
-      query += ' AND status = ?';
-      params.push(statusFilter);
+      where.status = statusFilter;
     }
 
     if (type !== 'all') {
-      query += ' AND type = ?';
-      params.push(type);
+      where.type = type;
     }
 
     if (priority !== 'all') {
-      query += ' AND priority = ?';
-      params.push(priority);
+      where.priority = priority;
     }
 
-    // Filter by tag (tags are comma-separated, so we use LIKE)
+    // Filter by tag (tags are comma-separated, so we use contains)
     if (tag && typeof tag === 'string') {
-      query += ' AND tags LIKE ?';
-      params.push(`%${tag}%`);
+      where.tags = { contains: tag };
     }
 
     // Filter by category
     if (category && typeof category === 'string') {
-      query += ' AND category = ?';
-      params.push(category);
+      where.category = category;
     }
 
-    // Sort by created_at for base query (filtering service handles complex sorting)
-    query += ' ORDER BY created_at DESC';
-
-    const tickets = db.prepare(query).all(...params) as any[];
+    const tickets = await prisma.ticket.findMany({
+      where,
+      orderBy: { created_at: 'desc' }
+    });
 
     // Add computed fields to each ticket
-    return Promise.all(tickets.map(async (ticket: any) => {
+    return Promise.all(tickets.map(async (ticket) => {
       const dependencies = safeJsonParse<number[]>(ticket.dependencies, []);
 
       return {
@@ -230,10 +220,11 @@ export class TicketsService {
       throw new Error('Description must be a non-empty string');
     }
 
-    const db = getDB();
-
     // Check if ticket exists (exclude soft-deleted)
-    const existing = db.prepare('SELECT * FROM tickets WHERE id = ? AND is_deleted = 0').get(id) as any;
+    const existing = await prisma.ticket.findUnique({
+      where: { id, is_deleted: false }
+    });
+
     if (!existing) {
       throw new Error('Ticket not found');
     }
@@ -244,68 +235,57 @@ export class TicketsService {
       throw new Error('Cannot edit tickets that are not in pending status');
     }
 
-    // Build update query dynamically
-    const updates: string[] = [];
-    const values: any[] = [];
+    // Build update data
+    const updateData: any = {};
 
     // Auto-reset from "needs-info" to "pending" when user edits title/description
     const shouldResetStatus = (title !== undefined || description !== undefined) && existing.status === 'needs-info';
 
     if (status) {
-      updates.push('status = ?');
-      values.push(status);
+      updateData.status = status;
     } else if (shouldResetStatus) {
-      updates.push('status = ?');
-      values.push('pending');
+      updateData.status = 'pending';
     }
 
     if (response !== undefined) {
-      updates.push('response = ?');
-      values.push(response);
+      updateData.response = response;
     }
     if (title !== undefined) {
-      updates.push('title = ?');
-      values.push(title.trim());
+      updateData.title = title.trim();
     }
     if (description !== undefined) {
-      updates.push('description = ?');
-      values.push(description.trim());
+      updateData.description = description.trim();
     }
     if (type !== undefined) {
-      updates.push('type = ?');
-      values.push(type);
+      updateData.type = type;
     }
     if (priority !== undefined) {
-      updates.push('priority = ?');
-      values.push(priority);
+      updateData.priority = priority;
     }
     if (tags !== undefined) {
-      updates.push('tags = ?');
-      values.push(tags.trim());
+      updateData.tags = tags.trim();
     }
     if (category !== undefined) {
-      updates.push('category = ?');
-      values.push(category.trim());
+      updateData.category = category.trim();
     }
     if (dependencies !== undefined) {
       // Allow manual override of dependencies
       const depsArray = Array.isArray(dependencies) ? dependencies : [];
-      updates.push('dependencies = ?');
-      values.push(depsArray.length > 0 ? JSON.stringify(depsArray) : null);
+      updateData.dependencies = depsArray.length > 0 ? JSON.stringify(depsArray) : null;
     }
-    updates.push('updated_at = CURRENT_TIMESTAMP');
 
-    const stmt = db.prepare(`UPDATE tickets SET ${updates.join(', ')} WHERE id = ?`);
-    stmt.run(...values, id);
-
-    const updatedTicket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(id) as any;
+    // Update ticket
+    const updatedTicket = await prisma.ticket.update({
+      where: { id },
+      data: updateData
+    });
 
     // Add computed fields to response
     const depsArray = safeJsonParse<number[]>(updatedTicket.dependencies, []);
     return {
       ...updatedTicket,
       dependencies: depsArray,
-      blocked: await isTicketBlocked( depsArray)
+      blocked: await isTicketBlocked(depsArray)
     };
   }
 
@@ -313,10 +293,11 @@ export class TicketsService {
    * Soft delete a ticket
    */
   async deleteTicket(id: number, creator_id?: string): Promise<void> {
-    const db = getDB();
-
     // Check if ticket exists (exclude soft-deleted)
-    const existing = db.prepare('SELECT * FROM tickets WHERE id = ? AND is_deleted = 0').get(id) as any;
+    const existing = await prisma.ticket.findUnique({
+      where: { id, is_deleted: false }
+    });
+
     if (!existing) {
       throw new Error('Ticket not found');
     }
@@ -326,24 +307,29 @@ export class TicketsService {
       throw new Error('Unauthorized: You can only delete your own tickets');
     }
 
-    const stmt = db.prepare('UPDATE tickets SET is_deleted = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?');
-    stmt.run(id);
+    await prisma.ticket.update({
+      where: { id },
+      data: { is_deleted: true }
+    });
   }
 
   /**
    * Restore a soft-deleted ticket
    */
   async restoreTicket(id: number): Promise<TicketWithComputed> {
-    const db = getDB();
-
     // Check if ticket exists (include soft-deleted)
-    const existing = db.prepare('SELECT * FROM tickets WHERE id = ? AND is_deleted = 1').get(id) as any;
+    const existing = await prisma.ticket.findUnique({
+      where: { id, is_deleted: true }
+    });
+
     if (!existing) {
       throw new Error('Ticket not found or not deleted');
     }
 
-    const stmt = db.prepare('UPDATE tickets SET is_deleted = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?');
-    stmt.run(id);
+    await prisma.ticket.update({
+      where: { id },
+      data: { is_deleted: false }
+    });
 
     return this.getTicket(id) as Promise<TicketWithComputed>;
   }

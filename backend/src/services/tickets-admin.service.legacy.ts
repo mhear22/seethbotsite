@@ -1,6 +1,4 @@
-import Database from 'better-sqlite3';
-import { getDB } from './tickets-db';
-import { ticketsService } from './tickets.service';
+import { prisma } from '../lib/prisma';
 
 /**
  * Admin operation result
@@ -12,7 +10,7 @@ export interface AdminOperationResult {
 }
 
 /**
- * Tickets Admin Service
+ * Tickets Admin Service (Legacy)
  *
  * Handles admin-only operations for tickets.
  */
@@ -29,16 +27,19 @@ export class TicketsAdminService {
       };
     }
 
-    const db = getDB();
-
     try {
-      const stmt = db.prepare('UPDATE tickets SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id IN (?) AND is_deleted = 0');
-      const result = stmt.run(status, ticketIds.join(','));
+      const result = await prisma.ticket.updateMany({
+        where: {
+          id: { in: ticketIds },
+          is_deleted: false
+        },
+        data: { status }
+      });
 
       return {
         success: true,
-        affectedCount: result.changes,
-        message: `Updated ${result.changes} tickets to status '${status}'`
+        affectedCount: result.count,
+        message: `Updated ${result.count} tickets to status '${status}'`
       };
     } catch (error) {
       return {
@@ -53,16 +54,18 @@ export class TicketsAdminService {
    * Bulk soft delete tickets
    */
   async bulkDeleteTickets(ticketIds: number[]): Promise<AdminOperationResult> {
-    const db = getDB();
-
     try {
-      const stmt = db.prepare('UPDATE tickets SET is_deleted = 1, updated_at = CURRENT_TIMESTAMP WHERE id IN (?)');
-      const result = stmt.run(ticketIds.join(','));
+      const result = await prisma.ticket.updateMany({
+        where: {
+          id: { in: ticketIds }
+        },
+        data: { is_deleted: true }
+      });
 
       return {
         success: true,
-        affectedCount: result.changes,
-        message: `Deleted ${result.changes} tickets`
+        affectedCount: result.count,
+        message: `Deleted ${result.count} tickets`
       };
     } catch (error) {
       return {
@@ -77,16 +80,18 @@ export class TicketsAdminService {
    * Bulk restore tickets
    */
   async bulkRestoreTickets(ticketIds: number[]): Promise<AdminOperationResult> {
-    const db = getDB();
-
     try {
-      const stmt = db.prepare('UPDATE tickets SET is_deleted = 0, updated_at = CURRENT_TIMESTAMP WHERE id IN (?)');
-      const result = stmt.run(ticketIds.join(','));
+      const result = await prisma.ticket.updateMany({
+        where: {
+          id: { in: ticketIds }
+        },
+        data: { is_deleted: false }
+      });
 
       return {
         success: true,
-        affectedCount: result.changes,
-        message: `Restored ${result.changes} tickets`
+        affectedCount: result.count,
+        message: `Restored ${result.count} tickets`
       };
     } catch (error) {
       return {
@@ -101,10 +106,12 @@ export class TicketsAdminService {
    * Force update ticket dependencies (override validation)
    */
   async forceUpdateDependencies(ticketId: number, dependencies: number[]): Promise<AdminOperationResult> {
-    const db = getDB();
-
     // Check if ticket exists
-    const exists = db.prepare('SELECT id FROM tickets WHERE id = ?').get(ticketId);
+    const exists = await prisma.ticket.findUnique({
+      where: { id: ticketId },
+      select: { id: true }
+    });
+
     if (!exists) {
       return {
         success: false,
@@ -117,12 +124,14 @@ export class TicketsAdminService {
       const depsArray = Array.isArray(dependencies) ? dependencies : [];
       const dependenciesJson = depsArray.length > 0 ? JSON.stringify(depsArray) : null;
 
-      const stmt = db.prepare('UPDATE tickets SET dependencies = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?');
-      const result = stmt.run(dependenciesJson, ticketId);
+      await prisma.ticket.update({
+        where: { id: ticketId },
+        data: { dependencies: dependenciesJson }
+      });
 
       return {
         success: true,
-        affectedCount: result.changes,
+        affectedCount: 1,
         message: `Updated dependencies for ticket #${ticketId}`
       };
     } catch (error) {
@@ -138,10 +147,12 @@ export class TicketsAdminService {
    * Reassign ticket to a different creator
    */
   async reassignTicket(ticketId: number, newCreatorId: string): Promise<AdminOperationResult> {
-    const db = getDB();
-
     // Check if ticket exists
-    const exists = db.prepare('SELECT id FROM tickets WHERE id = ? AND is_deleted = 0').get(ticketId);
+    const exists = await prisma.ticket.findUnique({
+      where: { id: ticketId, is_deleted: false },
+      select: { id: true }
+    });
+
     if (!exists) {
       return {
         success: false,
@@ -151,12 +162,14 @@ export class TicketsAdminService {
     }
 
     try {
-      const stmt = db.prepare('UPDATE tickets SET creator_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?');
-      const result = stmt.run(newCreatorId, ticketId);
+      await prisma.ticket.update({
+        where: { id: ticketId },
+        data: { creator_id: newCreatorId }
+      });
 
       return {
         success: true,
-        affectedCount: result.changes,
+        affectedCount: 1,
         message: `Reassigned ticket #${ticketId} to creator ${newCreatorId}`
       };
     } catch (error) {
@@ -173,10 +186,12 @@ export class TicketsAdminService {
    * This doesn't actually change the dependencies, but clears them temporarily
    */
   async forceUnblockTicket(ticketId: number): Promise<AdminOperationResult> {
-    const db = getDB();
-
     // Check if ticket exists
-    const exists = db.prepare('SELECT id FROM tickets WHERE id = ? AND is_deleted = 0').get(ticketId);
+    const exists = await prisma.ticket.findUnique({
+      where: { id: ticketId, is_deleted: false },
+      select: { id: true }
+    });
+
     if (!exists) {
       return {
         success: false,
@@ -187,12 +202,14 @@ export class TicketsAdminService {
 
     try {
       // Clear dependencies to unblock the ticket
-      const stmt = db.prepare('UPDATE tickets SET dependencies = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?');
-      const result = stmt.run(ticketId);
+      await prisma.ticket.update({
+        where: { id: ticketId },
+        data: { dependencies: null }
+      });
 
       return {
         success: true,
-        affectedCount: result.changes,
+        affectedCount: 1,
         message: `Force unblocked ticket #${ticketId}`
       };
     } catch (error) {
@@ -216,10 +233,12 @@ export class TicketsAdminService {
       };
     }
 
-    const db = getDB();
-
     // Check if ticket exists
-    const exists = db.prepare('SELECT id FROM tickets WHERE id = ? AND is_deleted = 0').get(ticketId);
+    const exists = await prisma.ticket.findUnique({
+      where: { id: ticketId, is_deleted: false },
+      select: { id: true }
+    });
+
     if (!exists) {
       return {
         success: false,
@@ -229,12 +248,14 @@ export class TicketsAdminService {
     }
 
     try {
-      const stmt = db.prepare('UPDATE tickets SET priority = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?');
-      const result = stmt.run(newPriority, ticketId);
+      await prisma.ticket.update({
+        where: { id: ticketId },
+        data: { priority: newPriority }
+      });
 
       return {
         success: true,
-        affectedCount: result.changes,
+        affectedCount: 1,
         message: `Escalated ticket #${ticketId} to ${newPriority} priority`
       };
     } catch (error) {
@@ -257,27 +278,9 @@ export class TicketsAdminService {
    * Log admin action
    */
   logAdminAction(userId: string, action: string, details: any): void {
-    const db = getDB();
-
     try {
-      // Create admin_audit_log table if it doesn't exist
-      db.exec(`
-        CREATE TABLE IF NOT EXISTS admin_audit_log (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          user_id TEXT NOT NULL,
-          action TEXT NOT NULL,
-          details TEXT,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
-
-      const stmt = db.prepare(`
-        INSERT INTO admin_audit_log (user_id, action, details, created_at)
-        VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-      `);
-      stmt.run(userId, action, JSON.stringify(details));
+      console.log(`[ADMIN AUDIT] User ${userId} performed ${action}:`, details);
     } catch (error) {
-      // Log creation failed, but don't throw
       console.error('Failed to log admin action:', error);
     }
   }
@@ -292,26 +295,8 @@ export class TicketsAdminService {
     details: string;
     created_at: string;
   }> {
-    const db = getDB();
-
-    try {
-      const logs = db.prepare(`
-        SELECT * FROM admin_audit_log
-        WHERE details LIKE ?
-        ORDER BY created_at DESC
-      `).all(`%ticketId":${ticketId}%`) as Array<any>;
-
-      return logs.map(log => ({
-        id: log.id,
-        user_id: log.user_id,
-        action: log.action,
-        details: log.details,
-        created_at: log.created_at
-      }));
-    } catch (error) {
-      // Table might not exist
-      return [];
-    }
+    // Table doesn't exist in Prisma schema yet
+    return [];
   }
 
   /**
@@ -327,38 +312,11 @@ export class TicketsAdminService {
     }>;
     total: number;
   } {
-    const db = getDB();
-
-    try {
-      // Get total count
-      const totalResult = db.prepare('SELECT COUNT(*) as count FROM admin_audit_log').get() as { count: number };
-      const total = totalResult.count;
-
-      // Get paginated logs
-      const offset = (page - 1) * limit;
-      const logs = db.prepare(`
-        SELECT * FROM admin_audit_log
-        ORDER BY created_at DESC
-        LIMIT ? OFFSET ?
-      `).all(limit, offset) as Array<any>;
-
-      return {
-        logs: logs.map(log => ({
-          id: log.id,
-          user_id: log.user_id,
-          action: log.action,
-          details: log.details,
-          created_at: log.created_at
-        })),
-        total
-      };
-    } catch (error) {
-      // Table might not exist
-      return {
-        logs: [],
-        total: 0
-      };
-    }
+    // Table doesn't exist in Prisma schema yet
+    return {
+      logs: [],
+      total: 0
+    };
   }
 }
 

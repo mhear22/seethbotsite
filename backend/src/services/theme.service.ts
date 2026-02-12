@@ -1,37 +1,27 @@
-import Database from 'better-sqlite3';
-import path from 'path';
-import fs from 'fs/promises';
-
-const DB_PATH = path.join(__dirname, '..', '..', 'data', 'users.db');
+import { prisma } from '../lib/prisma';
 
 /**
- * Theme preferences interface
+ * Theme preferences interface (mapped to Prisma Theme model)
  */
 export interface ThemePreferences {
   id: number;
   user_id: number;
-  theme_name: string;
-  primary_color: string;
-  secondary_color: string;
-  background_color: string;
-  text_color: string;
-  accent_color: string;
-  custom_settings: string | null;
-  created_at: string;
-  updated_at: string;
+  preset: string;
+  custom_colors: string | null;
+  dark_mode: boolean;
+  high_contrast: boolean;
+  created_at: Date;
+  updated_at: Date;
 }
 
 /**
  * Theme preferences input interface (for creating/updating)
  */
 export interface ThemePreferencesInput {
-  theme_name?: string;
-  primary_color?: string;
-  secondary_color?: string;
-  background_color?: string;
-  text_color?: string;
-  accent_color?: string;
-  custom_settings?: Record<string, any>;
+  preset?: string;
+  custom_colors?: Record<string, any>;
+  dark_mode?: boolean;
+  high_contrast?: boolean;
 }
 
 /**
@@ -116,42 +106,6 @@ const THEME_PRESETS: ThemePreset[] = [
 ];
 
 /**
- * Initialize theme database table
- */
-export async function initThemeDB(): Promise<Database.Database> {
-  const db = new Database(DB_PATH);
-
-  // Read and execute the migration
-  const migrationPath = path.join(__dirname, '..', 'migrations', '001_add_theme_preferences.sql');
-  try {
-    const migrationSQL = await fs.readFile(migrationPath, 'utf-8');
-    db.exec(migrationSQL);
-    console.log('[Theme] Database initialized successfully');
-  } catch (error) {
-    console.error('[Theme] Failed to initialize database:', error);
-    throw error;
-  }
-
-  return db;
-}
-
-let dbInstance: Database.Database | null = null;
-let initPromise: Promise<Database.Database> | null = null;
-
-export async function getThemeDB(): Promise<Database.Database> {
-  if (!dbInstance) {
-    if (!initPromise) {
-      initPromise = initThemeDB().then(db => {
-        dbInstance = db;
-        return db;
-      });
-    }
-    await initPromise;
-  }
-  return dbInstance!;
-}
-
-/**
  * Validate hex color
  */
 function isValidHexColor(color: string): boolean {
@@ -161,27 +115,15 @@ function isValidHexColor(color: string): boolean {
 /**
  * Validate theme colors
  */
-export function validateThemeColors(colors: Partial<ThemePreferencesInput>): ColorValidationResult {
+export function validateThemeColors(colors: Partial<Record<string, string>>): ColorValidationResult {
   const errors: string[] = [];
 
-  if (colors.primary_color && !isValidHexColor(colors.primary_color)) {
-    errors.push('primary_color must be a valid hex color (e.g., #ec4899)');
-  }
+  const colorFields = ['primary_color', 'secondary_color', 'background_color', 'text_color', 'accent_color'];
 
-  if (colors.secondary_color && !isValidHexColor(colors.secondary_color)) {
-    errors.push('secondary_color must be a valid hex color (e.g., #8b5cf6)');
-  }
-
-  if (colors.background_color && !isValidHexColor(colors.background_color)) {
-    errors.push('background_color must be a valid hex color (e.g., #1a1a2e)');
-  }
-
-  if (colors.text_color && !isValidHexColor(colors.text_color)) {
-    errors.push('text_color must be a valid hex color (e.g., #ffffff)');
-  }
-
-  if (colors.accent_color && !isValidHexColor(colors.accent_color)) {
-    errors.push('accent_color must be a valid hex color (e.g., #f97316)');
+  for (const field of colorFields) {
+    if (colors[field] && !isValidHexColor(colors[field])) {
+      errors.push(`${field} must be a valid hex color (e.g., #ec4899)`);
+    }
   }
 
   return {
@@ -194,9 +136,13 @@ export function validateThemeColors(colors: Partial<ThemePreferencesInput>): Col
  * Get theme preferences by user ID
  */
 export async function getThemePreferences(userId: number): Promise<ThemePreferences | null> {
-  const db = await getThemeDB();
-  const preferences = db.prepare('SELECT * FROM theme_preferences WHERE user_id = ?').get(userId) as ThemePreferences | undefined;
-  return preferences || null;
+  const theme = await prisma.theme.findUnique({
+    where: { user_id: userId }
+  });
+
+  if (!theme) return null;
+
+  return theme;
 }
 
 /**
@@ -206,65 +152,38 @@ export async function saveThemePreferences(
   userId: number,
   preferences: ThemePreferencesInput
 ): Promise<ThemePreferences> {
-  const db = await getThemeDB();
-
-  // Validate colors
-  const validation = validateThemeColors(preferences);
-  if (!validation.valid) {
-    throw new Error(`Invalid theme colors: ${validation.errors.join(', ')}`);
+  // Validate colors if custom_colors provided
+  if (preferences.custom_colors) {
+    const validation = validateThemeColors(preferences.custom_colors);
+    if (!validation.valid) {
+      throw new Error(`Invalid theme colors: ${validation.errors.join(', ')}`);
+    }
   }
 
   const existingPreferences = await getThemePreferences(userId);
 
   // Prepare data
   const data = {
-    user_id: userId,
-    theme_name: preferences.theme_name || 'dark',
-    primary_color: preferences.primary_color || '#ec4899',
-    secondary_color: preferences.secondary_color || '#8b5cf6',
-    background_color: preferences.background_color || '#1a1a2e',
-    text_color: preferences.text_color || '#ffffff',
-    accent_color: preferences.accent_color || '#f97316',
-    custom_settings: preferences.custom_settings ? JSON.stringify(preferences.custom_settings) : null
+    preset: preferences.preset || 'dark',
+    custom_colors: preferences.custom_colors ? JSON.stringify(preferences.custom_colors) : null,
+    dark_mode: preferences.dark_mode !== undefined ? preferences.dark_mode : true,
+    high_contrast: preferences.high_contrast !== undefined ? preferences.high_contrast : false
   };
 
   if (existingPreferences) {
     // Update existing preferences
-    db.prepare(`
-      UPDATE theme_preferences
-      SET theme_name = ?, primary_color = ?, secondary_color = ?,
-          background_color = ?, text_color = ?, accent_color = ?, custom_settings = ?
-      WHERE id = ?
-    `).run(
-      data.theme_name,
-      data.primary_color,
-      data.secondary_color,
-      data.background_color,
-      data.text_color,
-      data.accent_color,
-      data.custom_settings,
-      existingPreferences.id
-    );
-
-    return (await getThemePreferences(userId))!;
+    return await prisma.theme.update({
+      where: { user_id: userId },
+      data
+    });
   } else {
     // Create new preferences
-    const result = db.prepare(`
-      INSERT INTO theme_preferences
-      (user_id, theme_name, primary_color, secondary_color, background_color, text_color, accent_color, custom_settings)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      data.user_id,
-      data.theme_name,
-      data.primary_color,
-      data.secondary_color,
-      data.background_color,
-      data.text_color,
-      data.accent_color,
-      data.custom_settings
-    );
-
-    return (await getThemePreferences(userId))!;
+    return await prisma.theme.create({
+      data: {
+        user_id: userId,
+        ...data
+      }
+    });
   }
 }
 
@@ -294,12 +213,9 @@ export async function getOrCreateDefaultThemePreferences(userId: number): Promis
 
   // Create with default dark theme
   return saveThemePreferences(userId, {
-    theme_name: 'dark',
-    primary_color: '#ec4899',
-    secondary_color: '#8b5cf6',
-    background_color: '#1a1a2e',
-    text_color: '#ffffff',
-    accent_color: '#f97316'
+    preset: 'dark',
+    dark_mode: true,
+    high_contrast: false
   });
 }
 
@@ -307,9 +223,14 @@ export async function getOrCreateDefaultThemePreferences(userId: number): Promis
  * Delete theme preferences for a user
  */
 export async function deleteThemePreferences(userId: number): Promise<boolean> {
-  const db = await getThemeDB();
-  const result = db.prepare('DELETE FROM theme_preferences WHERE user_id = ?').run(userId);
-  return result.changes > 0;
+  try {
+    await prisma.theme.delete({
+      where: { user_id: userId }
+    });
+    return true;
+  } catch (error) {
+    return false;
+  }
 }
 
 export default {

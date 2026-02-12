@@ -1,5 +1,5 @@
-import Database from 'better-sqlite3';
-import { getDB, safeJsonParse } from './tickets-db';
+import { prisma } from '../lib/prisma';
+import { safeJsonParse, isTicketBlocked } from './tickets-db';
 import { TicketWithComputed, ticketsService } from './tickets.service';
 
 /**
@@ -21,195 +21,155 @@ export interface TicketFilters {
  */
 export class TicketsFilterService {
   /**
-   * Build filter query
-   * Returns SQL query and parameters
+   * Build Prisma where clause from filters
    */
-  buildFilterQuery(filters: TicketFilters): { query: string; params: any[] } {
+  buildWhereClause(filters: TicketFilters): any {
     const { status = 'all', type = 'all', priority = 'all', tag, category } = filters;
 
-    let query = 'SELECT * FROM tickets WHERE is_deleted = 0';
-    const params: any[] = [];
+    const where: any = { is_deleted: false };
 
     // Map "in-progress" to "needs-info" for frontend compatibility
     const statusFilter = status === 'in-progress' ? 'needs-info' : status;
 
     if (statusFilter !== 'all') {
-      query += ' AND status = ?';
-      params.push(statusFilter);
+      where.status = statusFilter;
     }
 
     if (type !== 'all') {
-      query += ' AND type = ?';
-      params.push(type);
+      where.type = type;
     }
 
     if (priority !== 'all') {
-      query += ' AND priority = ?';
-      params.push(priority);
+      where.priority = priority;
     }
 
-    // Filter by tag (tags are comma-separated, so we use LIKE)
+    // Filter by tag (tags are comma-separated, so we use contains)
     if (tag && typeof tag === 'string') {
-      query += ' AND tags LIKE ?';
-      params.push(`%${tag}%`);
+      where.tags = { contains: tag };
     }
 
     // Filter by category
     if (category && typeof category === 'string') {
-      query += ' AND category = ?';
-      params.push(category);
+      where.category = category;
     }
 
-    return { query, params };
+    return where;
   }
 
   /**
    * Filter by status array
    */
-  filterByStatus(query: string, params: any[], statuses: string[]): { query: string; params: any[] } {
+  addStatusFilter(where: any, statuses: string[]): any {
     if (!statuses || statuses.length === 0) {
-      return { query, params };
+      return where;
     }
 
-    const placeholders = statuses.map(() => '?').join(',');
-    query += ` AND status IN (${placeholders})`;
-    params.push(...statuses);
-
-    return { query, params };
+    where.status = { in: statuses };
+    return where;
   }
 
   /**
    * Filter by type array
    */
-  filterByType(query: string, params: any[], types: string[]): { query: string; params: any[] } {
+  addTypeFilter(where: any, types: string[]): any {
     if (!types || types.length === 0) {
-      return { query, params };
+      return where;
     }
 
-    const placeholders = types.map(() => '?').join(',');
-    query += ` AND type IN (${placeholders})`;
-    params.push(...types);
-
-    return { query, params };
+    where.type = { in: types };
+    return where;
   }
 
   /**
    * Filter by priority array
    */
-  filterByPriority(query: string, params: any[], priorities: string[]): { query: string; params: any[] } {
+  addPriorityFilter(where: any, priorities: string[]): any {
     if (!priorities || priorities.length === 0) {
-      return { query, params };
+      return where;
     }
 
-    const placeholders = priorities.map(() => '?').join(',');
-    query += ` AND priority IN (${placeholders})`;
-    params.push(...priorities);
-
-    return { query, params };
+    where.priority = { in: priorities };
+    return where;
   }
 
   /**
    * Filter by category array
    */
-  filterByCategory(query: string, params: any[], categories: string[]): { query: string; params: any[] } {
+  addCategoryFilter(where: any, categories: string[]): any {
     if (!categories || categories.length === 0) {
-      return { query, params };
+      return where;
     }
 
-    const placeholders = categories.map(() => '?').join(',');
-    query += ` AND category IN (${placeholders})`;
-    params.push(...categories);
-
-    return { query, params };
+    where.category = { in: categories };
+    return where;
   }
 
   /**
    * Filter by creator
    */
-  filterByCreator(query: string, params: any[], creatorId: string): { query: string; params: any[] } {
+  addCreatorFilter(where: any, creatorId: string): any {
     if (!creatorId) {
-      return { query, params };
+      return where;
     }
 
-    query += ' AND creator_id = ?';
-    params.push(creatorId);
-
-    return { query, params };
+    where.creator_id = creatorId;
+    return where;
   }
 
   /**
    * Filter by blocked status
    */
-  filterByBlocked(query: string, params: any[], blocked: boolean): { query: string; params: any[] } {
+  async filterByBlocked(tickets: TicketWithComputed[], blocked: boolean): Promise<TicketWithComputed[]> {
     if (blocked === undefined) {
-      return { query, params };
+      return tickets;
     }
 
-    // Note: This is a simplified check - in production, you'd need to
-    // fetch tickets with dependencies and check their status
-    // For now, we'll handle this in application logic after fetching
-    return { query, params };
+    return tickets.filter(ticket => ticket.blocked === blocked);
   }
 
   /**
    * Search tickets by term
    * Searches in title and description fields
    */
-  searchTickets(filters: TicketFilters, searchTerm: string): TicketWithComputed[] {
-    const db = getDB();
-    let { query, params } = this.buildFilterQuery(filters);
+  async searchTickets(filters: TicketFilters, searchTerm: string): Promise<TicketWithComputed[]> {
+    const where = this.buildWhereClause(filters);
 
     // Add search condition
-    query += ' AND (title LIKE ? OR description LIKE ?)';
-    const searchPattern = `%${searchTerm}%`;
-    params.push(searchPattern, searchPattern);
+    where.OR = [
+      { title: { contains: searchTerm } },
+      { description: { contains: searchTerm } }
+    ];
 
-    // Sort by created_at
-    query += ' ORDER BY created_at DESC';
-
-    const tickets = db.prepare(query).all(...params) as any[];
+    const tickets = await prisma.ticket.findMany({
+      where,
+      orderBy: { created_at: 'desc' }
+    });
 
     // Add computed fields to each ticket
-    return tickets.map((ticket: any) => {
+    return Promise.all(tickets.map(async (ticket) => {
       const dependencies = safeJsonParse<number[]>(ticket.dependencies, []);
 
       return {
         ...ticket,
         dependencies,
-        blocked: this.isTicketBlockedLocal(db, dependencies)
+        blocked: await isTicketBlocked(dependencies)
       };
-    });
+    }));
   }
 
   /**
-   * Build sort query
+   * Build Prisma orderBy from sortBy parameter
    */
-  buildSortQuery(query: string, sortBy: string = 'created_at'): string {
+  buildOrderBy(sortBy: string = 'created_at'): any {
     if (sortBy === 'relevance') {
-      // Sort by relevance: older pending tickets first, then newer
-      query += ' ORDER BY CASE status ' +
-                'WHEN \'pending\' THEN 1 ' +
-                'WHEN \'needs-info\' THEN 2 ' +
-                'WHEN \'unresolved\' THEN 2.5 ' +
-                'WHEN \'completed\' THEN 3 ' +
-                'WHEN \'declined\' THEN 4 ' +
-                'ELSE 5 END, created_at ASC';
+      // For relevance, we'll sort in memory after fetching
+      // Sort by status priority first, then by created_at
+      return { created_at: 'asc' as const };
     } else if (sortBy === 'created_at' || sortBy === 'updated_at') {
-      query += ` ORDER BY ${sortBy} DESC`;
+      return { [sortBy]: 'desc' as const };
     } else {
-      query += ' ORDER BY created_at ASC';
+      return { created_at: 'asc' as const };
     }
-
-    return query;
-  }
-
-  /**
-   * Build pagination query
-   */
-  buildPaginationQuery(query: string, page: number = 1, limit: number = 50): { query: string; offset: number } {
-    const offset = (page - 1) * limit;
-    query += ' LIMIT ? OFFSET ?';
-    return { query, offset };
   }
 
   /**
@@ -219,62 +179,59 @@ export class TicketsFilterService {
     tickets: TicketWithComputed[];
     total: number;
   }> {
-    const db = getDB();
     const { page = 1, limit = 50, sortBy = 'relevance' } = filters;
 
-    // Build base query
-    let { query, params } = this.buildFilterQuery(filters);
+    // Build where clause
+    const where = this.buildWhereClause(filters);
 
     // Get total count
-    const countQuery = query.replace('SELECT *', 'SELECT COUNT(*) as count');
-    const totalResult = db.prepare(countQuery).get(...params) as { count: number };
-    const total = totalResult.count;
+    const total = await prisma.ticket.count({ where });
 
-    // Add sorting
-    query = this.buildSortQuery(query, sortBy);
-
-    // Add pagination
-    const offset = (page - 1) * limit;
-    query += ' LIMIT ? OFFSET ?';
-    params.push(limit, offset);
-
-    const tickets = db.prepare(query).all(...params) as any[];
+    // Get tickets with pagination
+    const tickets = await prisma.ticket.findMany({
+      where,
+      orderBy: this.buildOrderBy(sortBy),
+      skip: (page - 1) * limit,
+      take: limit
+    });
 
     // Add computed fields to each ticket
-    const ticketsWithComputed = tickets.map((ticket: any) => {
+    const ticketsWithComputed = await Promise.all(tickets.map(async (ticket) => {
       const dependencies = safeJsonParse<number[]>(ticket.dependencies, []);
 
       return {
         ...ticket,
         dependencies,
-        blocked: this.isTicketBlockedLocal(db, dependencies),
+        blocked: await isTicketBlocked(dependencies),
         relevanceScore: ticketsService.calculateRelevanceScore(ticket),
         daysSinceCreation: ticketsService.getDaysSinceCreation(ticket)
       };
-    });
+    }));
 
-    // If sorting by relevance, sort the results
+    // If sorting by relevance, sort the results in memory
     if (sortBy === 'relevance') {
-      ticketsWithComputed.sort((a, b) => b.relevanceScore - a.relevanceScore);
+      // Custom sort: by status priority, then by relevance score
+      const statusPriority: Record<string, number> = {
+        'pending': 1,
+        'needs-info': 2,
+        'unresolved': 2.5,
+        'completed': 3,
+        'declined': 4
+      };
+
+      ticketsWithComputed.sort((a, b) => {
+        const priorityA = statusPriority[a.status] || 5;
+        const priorityB = statusPriority[b.status] || 5;
+
+        if (priorityA !== priorityB) {
+          return priorityA - priorityB;
+        }
+
+        return b.relevanceScore - a.relevanceScore;
+      });
     }
 
     return { tickets: ticketsWithComputed, total };
-  }
-
-  /**
-   * Local helper to check if ticket is blocked (avoids circular dependency)
-   */
-  private isTicketBlockedLocal(db: Database.Database, dependencies: number[]): boolean {
-    if (!dependencies || dependencies.length === 0) return false;
-
-    for (const depId of dependencies) {
-      const depTicket = db.prepare('SELECT status FROM tickets WHERE id = ? AND is_deleted = 0').get(depId) as { status: string } | undefined;
-      if (!depTicket || !['completed', 'declined'].includes(depTicket.status)) {
-        return true;
-      }
-    }
-
-    return false;
   }
 }
 

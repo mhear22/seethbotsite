@@ -224,7 +224,7 @@ router.get('/mining/progress', (req: Request, res: Response) => {
  *       500:
  *         description: Server error
  */
-router.post('/mining/claim', (req: Request, res: Response) => {
+router.post('/mining/claim', async (req: Request, res: Response) => {
   try {
     const { userId } = req.body;
 
@@ -245,7 +245,7 @@ router.post('/mining/claim', (req: Request, res: Response) => {
 
     // Generate the stock
     const basePrice = Math.round(potential.baseScore / 10);
-    const newStock = stockMarket.addStock({
+    const newStock = await stockMarket.addStock({
       name: potential.name,
       avatar: potential.avatar,
       baseScore: potential.baseScore,

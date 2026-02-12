@@ -1,24 +1,4 @@
 import { prisma } from '../lib/prisma';
-import Database from 'better-sqlite3';
-import path from 'path';
-
-let db: Database.Database | null = null;
-
-/**
- * Get database instance for tickets (LEGACY - for backward compatibility)
- * @deprecated Use Prisma directly instead
- *
- * NOTE: This provides a temporary bridge to the old tickets.db file
- * The proper solution is to migrate all ticket services to use Prisma
- */
-export function getDB(): Database.Database {
-  if (!db) {
-    const dbPath = path.join(__dirname, '../../data/tickets.db');
-    db = new Database(dbPath, { readonly: true });
-  }
-  console.warn('getDB() is deprecated. Use Prisma directly instead.');
-  return db;
-}
 
 /**
  * Parse dependencies from ticket description
