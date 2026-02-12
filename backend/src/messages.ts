@@ -1,84 +1,13 @@
-import Database from 'better-sqlite3';
-import path from 'path';
-import bcrypt from 'bcrypt';
-
-const DB_PATH = path.join(__dirname, '..', 'data', 'messages.db');
-
-/**
- * Initialize the messages database
- */
-export function initMessagesDB(): Database.Database {
-  const db = new Database(DB_PATH);
-
-  // Attach users database for JOIN queries
-  const usersDBPath = path.join(__dirname, '..', 'data', 'users.db');
-  db.exec(`ATTACH DATABASE '${usersDBPath}' AS backend_data`);
-
-  // Create conversations table
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS conversations (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      type TEXT NOT NULL CHECK(type IN ('direct', 'group')),
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-
-  // Create conversation_participants table
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS conversation_participants (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      conversation_id INTEGER NOT NULL,
-      user_id INTEGER NOT NULL,
-      joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      last_read_at DATETIME,
-      FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE,
-      UNIQUE(conversation_id, user_id)
-    )
-  `);
-
-  // Create messages table
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS messages (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      conversation_id INTEGER NOT NULL,
-      sender_id INTEGER NOT NULL,
-      content TEXT NOT NULL,
-      is_deleted BOOLEAN DEFAULT 0,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
-    )
-  `);
-
-  // Create indexes for faster lookups
-  db.exec(`
-    CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id);
-    CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages(sender_id);
-    CREATE INDEX IF NOT EXISTS idx_messages_created ON messages(created_at);
-    CREATE INDEX IF NOT EXISTS idx_conversation_participants_conversation ON conversation_participants(conversation_id);
-    CREATE INDEX IF NOT EXISTS idx_conversation_participants_user ON conversation_participants(user_id);
-  `);
-
-  return db;
-}
-
-let dbInstance: Database.Database | null = null;
-
-export function getMessagesDB(): Database.Database {
-  if (!dbInstance) {
-    dbInstance = initMessagesDB();
-  }
-  return dbInstance;
-}
+import prisma from './lib/prisma';
 
 /**
  * Conversation interface
  */
 export interface Conversation {
   id: number;
-  type: 'direct' | 'group';
-  created_at: string;
-  updated_at: string;
+  type: string;
+  created_at: Date;
+  updated_at: Date;
 }
 
 /**
@@ -88,8 +17,8 @@ export interface ConversationParticipant {
   id: number;
   conversation_id: number;
   user_id: number;
-  joined_at: string;
-  last_read_at: string | null;
+  joined_at: Date;
+  last_read_at: Date | null;
 }
 
 /**
@@ -101,7 +30,7 @@ export interface Message {
   sender_id: number;
   content: string;
   is_deleted: boolean;
-  created_at: string;
+  created_at: Date;
 }
 
 /**
@@ -127,149 +56,234 @@ export interface ConversationWithDetails extends Conversation {
     id: number;
     content: string;
     sender_id: number;
-    created_at: string;
+    created_at: Date;
   };
   unread_count: number;
 }
 
 /**
- * Get user ID from a JWT token
- */
-function getUserIdFromToken(token: string): number | null {
-  try {
-    const jwt = require('jsonwebtoken');
-    const JWT_SECRET = process.env.SEETHBOT_JWT_SECRET || 'change-this-in-production-secret-key';
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
-    return decoded.userId;
-  } catch (error) {
-    return null;
-  }
-}
-
-/**
  * Create a new direct message conversation between two users
  */
-export function createDirectConversation(user1Id: number, user2Id: number): Conversation {
-  const db = getMessagesDB();
-
+export async function createDirectConversation(user1Id: number, user2Id: number): Promise<Conversation> {
   // Check if a direct conversation already exists between these users
-  const existing = db.prepare(`
-    SELECT c.id
-    FROM conversations c
-    JOIN conversation_participants cp1 ON c.id = cp1.conversation_id AND cp1.user_id = ?
-    JOIN conversation_participants cp2 ON c.id = cp2.conversation_id AND cp2.user_id = ?
-    WHERE c.type = 'direct'
-  `).get(user1Id, user2Id) as any;
+  const existingParticipant = await prisma.conversationParticipant.findFirst({
+    where: {
+      user_id: user1Id,
+      conversation: {
+        type: 'direct',
+        participants: {
+          some: {
+            user_id: user2Id,
+          },
+        },
+      },
+    },
+    include: {
+      conversation: true,
+    },
+  });
 
-  if (existing) {
-    return db.prepare('SELECT * FROM conversations WHERE id = ?').get(existing.id) as Conversation;
+  if (existingParticipant) {
+    return existingParticipant.conversation;
   }
 
-  // Create new conversation
-  const result = db.prepare('INSERT INTO conversations (type) VALUES (?)').run('direct');
-  const conversationId = result.lastInsertRowid as number;
+  // Create new conversation with participants in a transaction
+  const conversation = await prisma.conversation.create({
+    data: {
+      type: 'direct',
+      participants: {
+        create: [{ user_id: user1Id }, { user_id: user2Id }],
+      },
+    },
+  });
 
-  // Add participants
-  db.prepare('INSERT INTO conversation_participants (conversation_id, user_id) VALUES (?, ?)').run(conversationId, user1Id);
-  db.prepare('INSERT INTO conversation_participants (conversation_id, user_id) VALUES (?, ?)').run(conversationId, user2Id);
-
-  return db.prepare('SELECT * FROM conversations WHERE id = ?').get(conversationId) as Conversation;
+  return conversation;
 }
 
 /**
  * Get all conversations for a user
  */
-export function getUserConversations(userId: number): ConversationWithDetails[] {
-  const db = getMessagesDB();
+export async function getUserConversations(userId: number): Promise<ConversationWithDetails[]> {
+  const participations = await prisma.conversationParticipant.findMany({
+    where: {
+      user_id: userId,
+    },
+    include: {
+      conversation: {
+        include: {
+          participants: {
+            include: {
+              // Assuming there's a User relation on ConversationParticipant
+              // but since the schema doesn't show it, we need to fetch users separately
+            },
+          },
+          messages: {
+            where: {
+              is_deleted: false,
+            },
+            orderBy: {
+              created_at: 'desc',
+            },
+            take: 1,
+          },
+        },
+      },
+    },
+    orderBy: {
+      conversation: {
+        updated_at: 'desc',
+      },
+    },
+  });
 
-  const conversations = db.prepare(`
-    SELECT DISTINCT c.*
-    FROM conversations c
-    JOIN conversation_participants cp ON c.id = cp.conversation_id
-    WHERE cp.user_id = ?
-    ORDER BY c.updated_at DESC
-  `).all(userId) as Conversation[];
+  // Get all unique user IDs from conversations to batch fetch user data
+  const userIds = new Set<number>();
+  participations.forEach((p) => {
+    p.conversation.participants.forEach((participant) => {
+      userIds.add(participant.user_id);
+    });
+  });
 
-  return conversations.map(conv => {
-    // Get participants
-    const participants = db.prepare(`
-      SELECT cp.user_id, u.display_name, u.avatar_url, u.email
-      FROM conversation_participants cp
-      JOIN backend_data.users u ON cp.user_id = u.id
-      WHERE cp.conversation_id = ?
-    `).all(conv.id) as any[];
+  // Batch fetch users
+  const users = await prisma.user.findMany({
+    where: {
+      id: {
+        in: Array.from(userIds),
+      },
+    },
+    select: {
+      id: true,
+      email: true,
+      display_name: true,
+      avatar_url: true,
+    },
+  });
+
+  const userMap = new Map(users.map((u) => [u.id, u]));
+
+  const results: ConversationWithDetails[] = [];
+
+  for (const participation of participations) {
+    const conv = participation.conversation;
+
+    // Build participants array with user info
+    const participants = conv.participants.map((p) => {
+      const user = userMap.get(p.user_id);
+      return {
+        user_id: p.user_id,
+        display_name: user?.display_name ?? null,
+        avatar_url: user?.avatar_url ?? null,
+        email: user?.email ?? '',
+      };
+    });
 
     // Get last message
-    const lastMessage = db.prepare(`
-      SELECT id, content, sender_id, created_at
-      FROM messages
-      WHERE conversation_id = ? AND is_deleted = 0
-      ORDER BY created_at DESC
-      LIMIT 1
-    `).get(conv.id) as any;
+    const lastMessage = conv.messages[0];
 
     // Get unread count
-    const unreadResult = db.prepare(`
-      SELECT COUNT(*) as count
-      FROM messages m
-      JOIN conversation_participants cp ON m.conversation_id = cp.conversation_id
-      WHERE cp.conversation_id = ?
-        AND cp.user_id = ?
-        AND m.sender_id != ?
-        AND m.created_at > COALESCE(cp.last_read_at, '1970-01-01')
-        AND m.is_deleted = 0
-    `).get(conv.id, userId, userId) as any;
+    const unreadCount = await prisma.message.count({
+      where: {
+        conversation_id: conv.id,
+        sender_id: {
+          not: userId,
+        },
+        is_deleted: false,
+        created_at: {
+          gt: participation.last_read_at ?? new Date(0),
+        },
+      },
+    });
 
-    return {
-      ...conv,
+    results.push({
+      id: conv.id,
+      type: conv.type,
+      created_at: conv.created_at,
+      updated_at: conv.updated_at,
       participants,
-      last_message: lastMessage || undefined,
-      unread_count: unreadResult.count
-    } as ConversationWithDetails;
-  });
+      last_message: lastMessage
+        ? {
+            id: lastMessage.id,
+            content: lastMessage.content,
+            sender_id: lastMessage.sender_id,
+            created_at: lastMessage.created_at,
+          }
+        : undefined,
+      unread_count: unreadCount,
+    });
+  }
+
+  return results;
 }
 
 /**
  * Get messages in a conversation
  */
-export function getConversationMessages(conversationId: number, userId: number, limit: number = 50, offset: number = 0): MessageWithSender[] {
-  const db = getMessagesDB();
-
+export async function getConversationMessages(
+  conversationId: number,
+  userId: number,
+  limit: number = 50,
+  offset: number = 0
+): Promise<MessageWithSender[]> {
   // Verify user is in the conversation
-  const participant = db.prepare('SELECT 1 FROM conversation_participants WHERE conversation_id = ? AND user_id = ?')
-    .get(conversationId, userId);
+  const participant = await prisma.conversationParticipant.findUnique({
+    where: {
+      conversation_id_user_id: {
+        conversation_id: conversationId,
+        user_id: userId,
+      },
+    },
+  });
 
   if (!participant) {
     throw new Error('User is not a participant in this conversation');
   }
 
   // Update conversation updated_at timestamp
-  db.prepare('UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(conversationId);
+  await prisma.conversation.update({
+    where: { id: conversationId },
+    data: { updated_at: new Date() },
+  });
 
   // Get messages with sender info
-  const messages = db.prepare(`
-    SELECT
-      m.*,
-      u.email as sender_email,
-      u.display_name as sender_display_name,
-      u.avatar_url as sender_avatar_url
-    FROM messages m
-    JOIN backend_data.users u ON m.sender_id = u.id
-    WHERE m.conversation_id = ? AND m.is_deleted = 0
-    ORDER BY m.created_at DESC
-    LIMIT ? OFFSET ?
-  `).all(conversationId, limit, offset) as MessageWithSender[];
+  const messages = await prisma.message.findMany({
+    where: {
+      conversation_id: conversationId,
+      is_deleted: false,
+    },
+    include: {
+      user: {
+        select: {
+          email: true,
+          display_name: true,
+          avatar_url: true,
+        },
+      },
+    },
+    orderBy: {
+      created_at: 'desc',
+    },
+    take: limit,
+    skip: offset,
+  });
 
-  // Return in chronological order
-  return messages.reverse();
+  // Transform to MessageWithSender format and reverse for chronological order
+  return messages.reverse().map((msg) => ({
+    id: msg.id,
+    conversation_id: msg.conversation_id,
+    sender_id: msg.sender_id,
+    content: msg.content,
+    is_deleted: msg.is_deleted,
+    created_at: msg.created_at,
+    sender_email: msg.user.email,
+    sender_display_name: msg.user.display_name,
+    sender_avatar_url: msg.user.avatar_url,
+  }));
 }
 
 /**
  * Send a message to a conversation
  */
-export function sendMessage(conversationId: number, senderId: number, content: string): Message {
-  const db = getMessagesDB();
-
+export async function sendMessage(conversationId: number, senderId: number, content: string): Promise<Message> {
   if (!content || content.trim().length === 0) {
     throw new Error('Message content cannot be empty');
   }
@@ -279,31 +293,44 @@ export function sendMessage(conversationId: number, senderId: number, content: s
   }
 
   // Verify user is in the conversation
-  const participant = db.prepare('SELECT 1 FROM conversation_participants WHERE conversation_id = ? AND user_id = ?')
-    .get(conversationId, senderId);
+  const participant = await prisma.conversationParticipant.findUnique({
+    where: {
+      conversation_id_user_id: {
+        conversation_id: conversationId,
+        user_id: senderId,
+      },
+    },
+  });
 
   if (!participant) {
     throw new Error('User is not a participant in this conversation');
   }
 
-  // Insert message
-  const result = db.prepare(`
-    INSERT INTO messages (conversation_id, sender_id, content)
-    VALUES (?, ?, ?)
-  `).run(conversationId, senderId, content.trim());
+  // Create message and update conversation timestamp in a transaction
+  const message = await prisma.$transaction(async (tx) => {
+    const newMessage = await tx.message.create({
+      data: {
+        conversation_id: conversationId,
+        sender_id: senderId,
+        content: content.trim(),
+      },
+    });
 
-  // Update conversation updated_at timestamp
-  db.prepare('UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(conversationId);
+    await tx.conversation.update({
+      where: { id: conversationId },
+      data: { updated_at: new Date() },
+    });
 
-  return db.prepare('SELECT * FROM messages WHERE id = ?').get(result.lastInsertRowid) as Message;
+    return newMessage;
+  });
+
+  return message;
 }
 
 /**
  * Edit a message
  */
-export function editMessage(messageId: number, userId: number, content: string): Message {
-  const db = getMessagesDB();
-
+export async function editMessage(messageId: number, userId: number, content: string): Promise<Message> {
   if (!content || content.trim().length === 0) {
     throw new Error('Message content cannot be empty');
   }
@@ -312,8 +339,10 @@ export function editMessage(messageId: number, userId: number, content: string):
     throw new Error('Message content too long (max 5000 characters)');
   }
 
-  // Verify user owns the message
-  const message = db.prepare('SELECT * FROM messages WHERE id = ?').get(messageId) as Message;
+  // Get the message
+  const message = await prisma.message.findUnique({
+    where: { id: messageId },
+  });
 
   if (!message) {
     throw new Error('Message not found');
@@ -328,19 +357,22 @@ export function editMessage(messageId: number, userId: number, content: string):
   }
 
   // Update message
-  db.prepare('UPDATE messages SET content = ? WHERE id = ?').run(content.trim(), messageId);
+  const updatedMessage = await prisma.message.update({
+    where: { id: messageId },
+    data: { content: content.trim() },
+  });
 
-  return db.prepare('SELECT * FROM messages WHERE id = ?').get(messageId) as Message;
+  return updatedMessage;
 }
 
 /**
  * Delete a message (soft delete)
  */
-export function deleteMessage(messageId: number, userId: number): void {
-  const db = getMessagesDB();
-
-  // Verify user owns the message
-  const message = db.prepare('SELECT * FROM messages WHERE id = ?').get(messageId) as Message;
+export async function deleteMessage(messageId: number, userId: number): Promise<void> {
+  // Get the message
+  const message = await prisma.message.findUnique({
+    where: { id: messageId },
+  });
 
   if (!message) {
     throw new Error('Message not found');
@@ -351,80 +383,140 @@ export function deleteMessage(messageId: number, userId: number): void {
   }
 
   // Soft delete
-  db.prepare('UPDATE messages SET is_deleted = 1 WHERE id = ?').run(messageId);
+  await prisma.message.update({
+    where: { id: messageId },
+    data: { is_deleted: true },
+  });
 }
 
 /**
  * Mark a conversation as read for a user
  */
-export function markConversationAsRead(conversationId: number, userId: number): void {
-  const db = getMessagesDB();
-
+export async function markConversationAsRead(conversationId: number, userId: number): Promise<void> {
   // Verify user is in the conversation
-  const participant = db.prepare('SELECT 1 FROM conversation_participants WHERE conversation_id = ? AND user_id = ?')
-    .get(conversationId, userId);
+  const participant = await prisma.conversationParticipant.findUnique({
+    where: {
+      conversation_id_user_id: {
+        conversation_id: conversationId,
+        user_id: userId,
+      },
+    },
+  });
 
   if (!participant) {
     throw new Error('User is not a participant in this conversation');
   }
 
   // Update last_read_at
-  db.prepare(`
-    UPDATE conversation_participants
-    SET last_read_at = CURRENT_TIMESTAMP
-    WHERE conversation_id = ? AND user_id = ?
-  `).run(conversationId, userId);
+  await prisma.conversationParticipant.update({
+    where: {
+      conversation_id_user_id: {
+        conversation_id: conversationId,
+        user_id: userId,
+      },
+    },
+    data: { last_read_at: new Date() },
+  });
 }
 
 /**
  * Get a single conversation by ID with details
  */
-export function getConversation(conversationId: number, userId: number): ConversationWithDetails | null {
-  const db = getMessagesDB();
-
+export async function getConversation(conversationId: number, userId: number): Promise<ConversationWithDetails | null> {
   // Verify user is in the conversation
-  const participant = db.prepare('SELECT 1 FROM conversation_participants WHERE conversation_id = ? AND user_id = ?')
-    .get(conversationId, userId);
+  const participant = await prisma.conversationParticipant.findUnique({
+    where: {
+      conversation_id_user_id: {
+        conversation_id: conversationId,
+        user_id: userId,
+      },
+    },
+  });
 
   if (!participant) {
     return null;
   }
 
-  const conversation = db.prepare('SELECT * FROM conversations WHERE id = ?').get(conversationId) as Conversation;
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    include: {
+      participants: true,
+      messages: {
+        where: {
+          is_deleted: false,
+        },
+        orderBy: {
+          created_at: 'desc',
+        },
+        take: 1,
+      },
+    },
+  });
 
-  // Get participants
-  const participants = db.prepare(`
-    SELECT cp.user_id, u.display_name, u.avatar_url, u.email
-    FROM conversation_participants cp
-    JOIN backend_data.users u ON cp.user_id = u.id
-    WHERE cp.conversation_id = ?
-  `).all(conversationId) as any[];
+  if (!conversation) {
+    return null;
+  }
+
+  // Fetch user data for all participants
+  const userIds = conversation.participants.map((p) => p.user_id);
+  const users = await prisma.user.findMany({
+    where: {
+      id: {
+        in: userIds,
+      },
+    },
+    select: {
+      id: true,
+      email: true,
+      display_name: true,
+      avatar_url: true,
+    },
+  });
+
+  const userMap = new Map(users.map((u) => [u.id, u]));
+
+  // Build participants array with user info
+  const participants = conversation.participants.map((p) => {
+    const user = userMap.get(p.user_id);
+    return {
+      user_id: p.user_id,
+      display_name: user?.display_name ?? null,
+      avatar_url: user?.avatar_url ?? null,
+      email: user?.email ?? '',
+    };
+  });
 
   // Get last message
-  const lastMessage = db.prepare(`
-    SELECT id, content, sender_id, created_at
-    FROM messages
-    WHERE conversation_id = ? AND is_deleted = 0
-    ORDER BY created_at DESC
-    LIMIT 1
-  `).get(conversationId) as any;
+  const lastMessage = conversation.messages[0];
 
   // Get unread count
-  const unreadResult = db.prepare(`
-    SELECT COUNT(*) as count
-    FROM messages m
-    JOIN conversation_participants cp ON m.conversation_id = cp.conversation_id
-    WHERE cp.conversation_id = ?
-      AND cp.user_id = ?
-      AND m.sender_id != ?
-      AND m.created_at > COALESCE(cp.last_read_at, '1970-01-01')
-      AND m.is_deleted = 0
-  `).get(conversationId, userId, userId) as any;
+  const unreadCount = await prisma.message.count({
+    where: {
+      conversation_id: conversationId,
+      sender_id: {
+        not: userId,
+      },
+      is_deleted: false,
+      created_at: {
+        gt: participant.last_read_at ?? new Date(0),
+      },
+    },
+  });
 
   return {
-    ...conversation,
+    id: conversation.id,
+    type: conversation.type,
+    created_at: conversation.created_at,
+    updated_at: conversation.updated_at,
     participants,
-    last_message: lastMessage || undefined,
-    unread_count: unreadResult.count
-  } as ConversationWithDetails;
+    last_message: lastMessage
+      ? {
+          id: lastMessage.id,
+          content: lastMessage.content,
+          sender_id: lastMessage.sender_id,
+          created_at: lastMessage.created_at,
+        }
+      : undefined,
+    unread_count: unreadCount,
+  };
 }

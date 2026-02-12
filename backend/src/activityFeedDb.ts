@@ -1,48 +1,4 @@
-import Database from 'better-sqlite3';
-import path from 'path';
-
-const DB_PATH = path.join(__dirname, '..', 'data', 'activity_feed.db');
-
-/**
- * Initialize the activity feed database
- */
-export function initActivityFeedDB(): Database.Database {
-  const db = new Database(DB_PATH);
-
-  // Create activity_feed table
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS activity_feed (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id TEXT NOT NULL,
-      user_name TEXT,
-      user_avatar TEXT,
-      activity_type TEXT NOT NULL,
-      description TEXT NOT NULL,
-      metadata TEXT,
-      points_change INTEGER DEFAULT 0,
-      game_type TEXT,
-      recorded_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-
-  // Create indexes for better query performance
-  db.exec(`
-    CREATE INDEX IF NOT EXISTS idx_activity_feed_user ON activity_feed(user_id);
-    CREATE INDEX IF NOT EXISTS idx_activity_feed_type ON activity_feed(activity_type);
-    CREATE INDEX IF NOT EXISTS idx_activity_feed_time ON activity_feed(recorded_at DESC);
-  `);
-
-  return db;
-}
-
-let dbInstance: Database.Database | null = null;
-
-export function getActivityFeedDB(): Database.Database {
-  if (!dbInstance) {
-    dbInstance = initActivityFeedDB();
-  }
-  return dbInstance;
-}
+import prisma from './lib/prisma';
 
 /**
  * Activity types enum
@@ -72,29 +28,29 @@ export interface RecordActivityParams {
   gameType?: 'clicker' | 'fishing';
 }
 
-export function recordActivity(params: RecordActivityParams): number {
-  const db = getActivityFeedDB();
+export async function recordActivity(params: RecordActivityParams): Promise<number> {
+  const userId = parseInt(params.userId, 10);
+  if (isNaN(userId)) {
+    throw new Error(`Invalid userId: ${params.userId}`);
+  }
 
-  const stmt = db.prepare(`
-    INSERT INTO activity_feed (user_id, user_name, user_avatar, activity_type, description, metadata, points_change, game_type)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-
-  const result = stmt.run(
-    params.userId,
-    params.userName || 'Anonymous',
-    params.userAvatar || '👤',
-    params.activityType,
-    params.description,
-    params.metadata ? JSON.stringify(params.metadata) : null,
-    params.pointsChange || 0,
-    params.gameType || null
-  );
+  const activity = await prisma.activity.create({
+    data: {
+      user_id: userId,
+      user_name: params.userName || 'Anonymous',
+      user_avatar: params.userAvatar || '👤',
+      activity_type: params.activityType,
+      description: params.description,
+      metadata: params.metadata ? JSON.stringify(params.metadata) : null,
+      points_change: params.pointsChange || 0,
+      game_type: params.gameType || null,
+    },
+  });
 
   // Keep only the last 1000 activities per user to prevent database bloat
-  cleanupOldActivities(params.userId);
+  await cleanupOldActivities(params.userId);
 
-  return result.lastInsertRowid as number;
+  return activity.id;
 }
 
 /**
@@ -108,35 +64,36 @@ export interface GetActivityFeedParams {
   gameType?: 'clicker' | 'fishing';
 }
 
-export function getActivityFeed(params: GetActivityFeedParams): any[] {
-  const db = getActivityFeedDB();
-
-  let query = 'SELECT * FROM activity_feed WHERE 1=1';
-  const queryParams: any[] = [];
+export async function getActivityFeed(params: GetActivityFeedParams): Promise<any[]> {
+  const where: any = {};
 
   if (params.userId) {
-    query += ' AND user_id = ?';
-    queryParams.push(params.userId);
+    const userId = parseInt(params.userId, 10);
+    if (!isNaN(userId)) {
+      where.user_id = userId;
+    }
   }
 
   if (params.activityType) {
-    query += ' AND activity_type = ?';
-    queryParams.push(params.activityType);
+    where.activity_type = params.activityType;
   }
 
   if (params.gameType) {
-    query += ' AND game_type = ?';
-    queryParams.push(params.gameType);
+    where.game_type = params.gameType;
   }
 
-  query += ' ORDER BY recorded_at DESC LIMIT ? OFFSET ?';
-  queryParams.push(params.limit || 50, params.offset || 0);
+  const rows = await prisma.activity.findMany({
+    where,
+    orderBy: {
+      recorded_at: 'desc',
+    },
+    take: params.limit || 50,
+    skip: params.offset || 0,
+  });
 
-  const rows = db.prepare(query).all(...queryParams);
-
-  return rows.map((row: any) => ({
+  return rows.map((row) => ({
     id: row.id,
-    userId: row.user_id,
+    userId: row.user_id.toString(),
     userName: row.user_name,
     userAvatar: row.user_avatar,
     activityType: row.activity_type,
@@ -144,27 +101,25 @@ export function getActivityFeed(params: GetActivityFeedParams): any[] {
     metadata: row.metadata ? JSON.parse(row.metadata) : null,
     pointsChange: row.points_change,
     gameType: row.game_type,
-    recordedAt: row.recorded_at
+    recordedAt: row.recorded_at,
   }));
 }
 
 /**
  * Get recent activity across all users (for global feed)
  */
-export function getGlobalActivity(params: { limit?: number; offset?: number }): any[] {
-  const db = getActivityFeedDB();
+export async function getGlobalActivity(params: { limit?: number; offset?: number }): Promise<any[]> {
+  const rows = await prisma.activity.findMany({
+    orderBy: {
+      recorded_at: 'desc',
+    },
+    take: params.limit || 50,
+    skip: params.offset || 0,
+  });
 
-  const query = `
-    SELECT * FROM activity_feed
-    ORDER BY recorded_at DESC
-    LIMIT ? OFFSET ?
-  `;
-
-  const rows = db.prepare(query).all(params.limit || 50, params.offset || 0);
-
-  return rows.map((row: any) => ({
+  return rows.map((row) => ({
     id: row.id,
-    userId: row.user_id,
+    userId: row.user_id.toString(),
     userName: row.user_name,
     userAvatar: row.user_avatar,
     activityType: row.activity_type,
@@ -172,91 +127,113 @@ export function getGlobalActivity(params: { limit?: number; offset?: number }): 
     metadata: row.metadata ? JSON.parse(row.metadata) : null,
     pointsChange: row.points_change,
     gameType: row.game_type,
-    recordedAt: row.recorded_at
+    recordedAt: row.recorded_at,
   }));
 }
 
 /**
  * Get activity statistics for a user
  */
-export function getUserActivityStats(userId: string): {
+export async function getUserActivityStats(userId: string): Promise<{
   totalActivities: number;
   pointsEarned: number;
   achievementsUnlocked: number;
   gamesPlayed: number;
-} {
-  const db = getActivityFeedDB();
+}> {
+  const numericUserId = parseInt(userId, 10);
+  if (isNaN(numericUserId)) {
+    return {
+      totalActivities: 0,
+      pointsEarned: 0,
+      achievementsUnlocked: 0,
+      gamesPlayed: 0,
+    };
+  }
 
-  const totalActivities = db.prepare(`
-    SELECT COUNT(*) as count FROM activity_feed
-    WHERE user_id = ?
-  `).get(userId) as { count: number };
+  const totalActivities = await prisma.activity.count({
+    where: { user_id: numericUserId },
+  });
 
-  const pointsEarned = db.prepare(`
-    SELECT SUM(points_change) as total FROM activity_feed
-    WHERE user_id = ? AND points_change > 0
-  `).get(userId) as { total: number | null };
+  const pointsResult = await prisma.activity.aggregate({
+    where: {
+      user_id: numericUserId,
+      points_change: { gt: 0 },
+    },
+    _sum: {
+      points_change: true,
+    },
+  });
 
-  const achievementsUnlocked = db.prepare(`
-    SELECT COUNT(*) as count FROM activity_feed
-    WHERE user_id = ? AND activity_type = ?
-  `).get(userId, ActivityType.ACHIEVEMENT_UNLOCKED) as { count: number };
+  const achievementsUnlocked = await prisma.activity.count({
+    where: {
+      user_id: numericUserId,
+      activity_type: ActivityType.ACHIEVEMENT_UNLOCKED,
+    },
+  });
 
-  const gamesPlayed = db.prepare(`
-    SELECT COUNT(DISTINCT metadata->>'$.sessionId') as count FROM activity_feed
-    WHERE user_id = ? AND activity_type = ?
-  `).get(userId, ActivityType.GAME_PLAYED) as { count: number | null };
+  // For gamesPlayed, we need to count distinct sessionId from metadata
+  // This requires raw query since Prisma doesn't support JSON path extraction directly
+  const gamesPlayedResult = await prisma.$queryRaw<{ count: bigint }[]>`
+    SELECT COUNT(DISTINCT (metadata->>'sessionId')) as count
+    FROM "Activity"
+    WHERE user_id = ${numericUserId} AND activity_type = ${ActivityType.GAME_PLAYED}
+  `;
 
   return {
-    totalActivities: totalActivities.count || 0,
-    pointsEarned: pointsEarned?.total || 0,
-    achievementsUnlocked: achievementsUnlocked.count || 0,
-    gamesPlayed: gamesPlayed?.count || 0
+    totalActivities: totalActivities || 0,
+    pointsEarned: pointsResult._sum.points_change || 0,
+    achievementsUnlocked: achievementsUnlocked || 0,
+    gamesPlayed: Number(gamesPlayedResult[0]?.count || 0),
   };
 }
 
 /**
  * Clean up old activities (keep only last N per user)
  */
-function cleanupOldActivities(userId: string, keepCount: number = 1000): void {
-  const db = getActivityFeedDB();
+async function cleanupOldActivities(userId: string, keepCount: number = 1000): Promise<void> {
+  const numericUserId = parseInt(userId, 10);
+  if (isNaN(numericUserId)) {
+    return;
+  }
 
   // Get count of activities for this user
-  const count = db.prepare(`
-    SELECT COUNT(*) as count FROM activity_feed
-    WHERE user_id = ?
-  `).get(userId) as { count: number };
+  const count = await prisma.activity.count({
+    where: { user_id: numericUserId },
+  });
 
-  if (count.count > keepCount) {
-    // Delete old activities beyond the keep limit
-    const deleteStmt = db.prepare(`
-      DELETE FROM activity_feed
-      WHERE id IN (
-        SELECT id FROM activity_feed
-        WHERE user_id = ?
-        ORDER BY recorded_at ASC
-        LIMIT ?
-      )
-    `);
+  if (count > keepCount) {
+    // Get the IDs of activities to keep (most recent ones)
+    const activitiesToKeep = await prisma.activity.findMany({
+      where: { user_id: numericUserId },
+      orderBy: { recorded_at: 'desc' },
+      take: keepCount,
+      select: { id: true },
+    });
 
-    deleteStmt.run(userId, count.count - keepCount);
+    const idsToKeep = activitiesToKeep.map((a) => a.id);
+
+    // Delete activities that are not in the keep list
+    await prisma.activity.deleteMany({
+      where: {
+        user_id: numericUserId,
+        id: { notIn: idsToKeep },
+      },
+    });
   }
 }
 
 /**
  * Delete old activities globally (cleanup job)
  */
-export function cleanupOldGlobalActivities(daysOld: number = 30): number {
-  const db = getActivityFeedDB();
-
+export async function cleanupOldGlobalActivities(daysOld: number = 30): Promise<number> {
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - daysOld);
 
-  const deleteStmt = db.prepare(`
-    DELETE FROM activity_feed
-    WHERE recorded_at < ?
-  `);
+  const result = await prisma.activity.deleteMany({
+    where: {
+      recorded_at: { lt: cutoffDate },
+    },
+  });
 
-  const result = deleteStmt.run(cutoffDate.toISOString());
-  return result.changes;
+  return result.count;
 }

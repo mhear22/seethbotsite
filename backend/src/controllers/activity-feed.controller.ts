@@ -65,12 +65,12 @@ const router = Router();
  *                 timestamp:
  *                   type: string
  */
-router.get('/', (req: Request, res: Response) => {
+router.get('/', async (req: Request, res: Response) => {
   try {
     const limit = parseInt(req.query.limit as string) || 50;
     const offset = parseInt(req.query.offset as string) || 0;
 
-    const activities = getGlobalActivity({ limit, offset });
+    const activities = await getGlobalActivity({ limit, offset });
 
     res.json({
       activities,
@@ -125,7 +125,7 @@ router.get('/', (req: Request, res: Response) => {
  *       200:
  *         description: User activity feed retrieved successfully
  */
-router.get('/user/:userId', (req: Request, res: Response) => {
+router.get('/user/:userId', async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
     const limit = parseInt(req.query.limit as string) || 50;
@@ -133,7 +133,7 @@ router.get('/user/:userId', (req: Request, res: Response) => {
     const activityType = req.query.type as ActivityType | undefined;
     const gameType = req.query.gameType as 'clicker' | 'fishing' | undefined;
 
-    const activities = getActivityFeed({
+    const activities = await getActivityFeed({
       userId,
       limit,
       offset,
@@ -183,11 +183,11 @@ router.get('/user/:userId', (req: Request, res: Response) => {
  *                 gamesPlayed:
  *                   type: integer
  */
-router.get('/stats/:userId', (req: Request, res: Response) => {
+router.get('/stats/:userId', async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
 
-    const stats = getUserActivityStats(userId);
+    const stats = await getUserActivityStats(userId);
 
     res.json({
       success: true,

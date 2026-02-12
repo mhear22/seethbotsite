@@ -1,4 +1,3 @@
-import Database from 'better-sqlite3';
 import { getDB, safeJsonParse } from './tickets-db';
 
 /**

@@ -1,55 +1,30 @@
 /**
  * Test setup file for Jest
- * Initializes test databases and provides test utilities
+ * Initializes test database and provides test utilities
  */
 
-import fs from 'fs';
-import path from 'path';
-import Database from 'better-sqlite3';
+import { execSync } from 'child_process';
 
 // Set test environment
 process.env.NODE_ENV = 'test';
 process.env.PORT = '3002'; // Use different port for tests
 
-// Create test data directory
-const TEST_DATA_DIR = path.join(__dirname, '..', 'data-test');
-
 export const setupTestDB = () => {
-  // Ensure test data directory exists
-  if (!fs.existsSync(TEST_DATA_DIR)) {
-    fs.mkdirSync(TEST_DATA_DIR, { recursive: true });
+  // Run Prisma migrations for test database
+  console.log('Setting up test database...');
+  try {
+    execSync('npx prisma migrate deploy', { stdio: 'inherit' });
+    console.log('Test database setup complete.');
+  } catch (error) {
+    console.error('Failed to setup test database:', error);
+    throw error;
   }
-
-  // Clean up old test databases
-  const testDBs = ['clicks.db', 'tickets.db', 'stocks.db', 'dev.db'];
-  testDBs.forEach(dbName => {
-    const dbPath = path.join(TEST_DATA_DIR, dbName);
-    if (fs.existsSync(dbPath)) {
-      fs.unlinkSync(dbPath);
-    }
-  });
-
-  // Apply Prisma schema to test database
-  const dbPath = path.join(TEST_DATA_DIR, 'dev.db');
-  const db = new Database(dbPath);
-
-  // Read and execute the migration SQL
-  const migrationDir = path.join(__dirname, '..', 'prisma', 'migrations', '20260211034657_init');
-  const migrationSQL = fs.readFileSync(path.join(migrationDir, 'migration.sql'), 'utf8');
-
-  db.exec(migrationSQL);
-  db.close();
-
-  return TEST_DATA_DIR;
 };
 
 export const cleanupTestDB = () => {
-  if (fs.existsSync(TEST_DATA_DIR)) {
-    const files = fs.readdirSync(TEST_DATA_DIR);
-    files.forEach(file => {
-      fs.unlinkSync(path.join(TEST_DATA_DIR, file));
-    });
-  }
+  // For PostgreSQL, we typically don't drop the database between tests
+  // Instead, transactions are rolled back or data is truncated
+  console.log('Test cleanup complete.');
 };
 
 // Setup before all tests
