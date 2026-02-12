@@ -19,7 +19,7 @@ echo "📝 Updating build info..."
 ./scripts/notify-discord.sh "started" "$BUILD_NUMBER" "$GIT_HASH" "$GIT_BRANCH"
 
 echo "🐳 Building Docker images with Docker Compose..."
-docker-compose build
+docker compose build
 
 echo "✅ Build complete!"
 echo ""
@@ -28,14 +28,14 @@ echo ""
 ./scripts/notify-discord.sh "success" "$BUILD_NUMBER" "$GIT_HASH" "$GIT_BRANCH"
 
 echo "🔄 Restarting services with Docker Compose..."
-docker-compose up -d --force-recreate
+docker compose up -d --force-recreate
 
 echo "⏳ Waiting for services to be healthy..."
 # Wait for PostgreSQL to be healthy
-timeout 60 sh -c 'until docker-compose ps | grep postgres | grep -q "healthy"; do sleep 2; done' || echo "⚠️  PostgreSQL health check timed out, but deployment continues"
+timeout 60 sh -c 'until docker compose ps | grep postgres | grep -q "healthy"; do sleep 2; done' || echo "⚠️  PostgreSQL health check timed out, but deployment continues"
 
 # Wait for server to be healthy
-timeout 60 sh -c 'until docker-compose ps | grep server | grep -q "healthy"; do sleep 2; done' || echo "⚠️  Server health check timed out, but deployment continues"
+timeout 60 sh -c 'until docker compose ps | grep server | grep -q "healthy"; do sleep 2; done' || echo "⚠️  Server health check timed out, but deployment continues"
 
 echo "✅ Deployment complete!"
 echo ""
@@ -44,4 +44,4 @@ echo "📊 API at: http://localhost:8081/api/*"
 echo "🗄️  PostgreSQL at: localhost:5432"
 echo ""
 echo "📋 Service Status:"
-docker-compose ps
+docker compose ps
