@@ -7,6 +7,15 @@
     <div class="canvas-container">
       <canvas ref="canvasRef" class="orbit-canvas"></canvas>
     </div>
+    <div class="controls-hint">
+      <div class="title">Camera Controls</div>
+      <div class="action">
+        <span class="key">←</span> <span class="key">→</span> or <span class="key">A</span> <span class="key">D</span> Rotate
+      </div>
+      <div class="action">
+        <span class="key">↑</span> <span class="key">↓</span> or <span class="key">W</span> <span class="key">S</span> Vertical
+      </div>
+    </div>
     <div class="info-panel">
       <div class="info-item">
         <span class="label">Celestial Bodies:</span>
@@ -18,7 +27,7 @@
       </div>
       <div class="info-item">
         <span class="label">Camera:</span>
-        <span class="value">Auto-rotating</span>
+        <span class="value" :class="{ active: manualControl }">{{ manualControl ? 'Manual (WASD/Arrows)' : 'Auto-rotating' }}</span>
       </div>
     </div>
   </div>
@@ -45,6 +54,11 @@ let orbitLines: THREE.Line[] = []
 // Camera movement
 let cameraAngle = 0
 let cameraRadius = 80
+let cameraVertical = 30
+
+// Camera control state
+const manualControl = ref(false)
+const keysPressed = ref<Set<string>>(new Set())
 
 // Black hole distortion effect
 let blackHoleMaterial: THREE.Material | null = null
@@ -63,6 +77,8 @@ onMounted(() => {
   initScene()
   animate()
   window.addEventListener('resize', handleResize)
+  window.addEventListener('keydown', handleKeyDown)
+  window.addEventListener('keyup', handleKeyUp)
 })
 
 onUnmounted(() => {
@@ -70,6 +86,8 @@ onUnmounted(() => {
     cancelAnimationFrame(animationId)
   }
   window.removeEventListener('resize', handleResize)
+  window.removeEventListener('keydown', handleKeyDown)
+  window.removeEventListener('keyup', handleKeyUp)
   cleanup()
 })
 
@@ -593,15 +611,63 @@ function createStars() {
 function updateCamera() {
   if (!camera) return
 
-  // Camera slowly moves in a circle opposite to planet orbits
-  cameraAngle += 0.0005 // Very slow rotation
+  // Check for manual control keys
+  const hasManualInput = keysPressed.value.has('ArrowLeft') ||
+                        keysPressed.value.has('ArrowRight') ||
+                        keysPressed.value.has('ArrowUp') ||
+                        keysPressed.value.has('ArrowDown') ||
+                        keysPressed.value.has('KeyA') ||
+                        keysPressed.value.has('KeyD') ||
+                        keysPressed.value.has('KeyW') ||
+                        keysPressed.value.has('KeyS')
+
+  if (hasManualInput) {
+    manualControl.value = true
+  }
+
+  if (manualControl.value && hasManualInput) {
+    // Manual camera control with smooth movement
+    const rotationSpeed = 0.02
+    const verticalSpeed = 0.5
+    const zoomSpeed = 1.0
+
+    // Horizontal rotation (Left/Right arrows or A/D)
+    if (keysPressed.value.has('ArrowLeft') || keysPressed.value.has('KeyA')) {
+      cameraAngle += rotationSpeed
+    }
+    if (keysPressed.value.has('ArrowRight') || keysPressed.value.has('KeyD')) {
+      cameraAngle -= rotationSpeed
+    }
+
+    // Vertical movement (Up/Down arrows or W/S)
+    if (keysPressed.value.has('ArrowUp') || keysPressed.value.has('KeyW')) {
+      cameraVertical = Math.min(cameraVertical + verticalSpeed, 80)
+    }
+    if (keysPressed.value.has('ArrowDown') || keysPressed.value.has('KeyS')) {
+      cameraVertical = Math.max(cameraVertical - verticalSpeed, -20)
+    }
+
+    // Zoom (Q/E or +/- could be added later)
+    // Keeping radius fixed for now
+  } else {
+    // Auto-rotate camera (disabled when using manual control)
+    cameraAngle += 0.0005 // Very slow rotation
+  }
 
   const x = Math.cos(cameraAngle) * cameraRadius
   const z = Math.sin(cameraAngle) * cameraRadius
-  const y = 30 // Elevated view
+  const y = cameraVertical
 
   camera.position.set(x, y, z)
   camera.lookAt(0, 0, 0)
+}
+
+function handleKeyDown(event: KeyboardEvent) {
+  keysPressed.value.add(event.code)
+}
+
+function handleKeyUp(event: KeyboardEvent) {
+  keysPressed.value.delete(event.code)
 }
 
 function updateBlackHole(time: number) {
@@ -824,6 +890,42 @@ function cleanup() {
   height: 100%;
 }
 
+.controls-hint {
+  position: fixed;
+  top: 100px;
+  right: 20px;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(10px);
+  padding: 15px;
+  border-radius: 8px;
+  border: 1px solid rgba(100, 100, 150, 0.3);
+  z-index: 10;
+  font-size: 0.85rem;
+  color: #a5b4fc;
+}
+
+.controls-hint .title {
+  color: #fff;
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+
+.controls-hint .key {
+  display: inline-block;
+  background: rgba(139, 92, 246, 0.3);
+  border: 1px solid rgba(139, 92, 246, 0.5);
+  border-radius: 4px;
+  padding: 2px 6px;
+  margin: 2px;
+  font-family: monospace;
+  font-size: 0.8rem;
+  color: #d946ef;
+}
+
+.controls-hint .action {
+  margin: 5px 0;
+}
+
 .info-panel {
   position: fixed;
   bottom: 20px;
@@ -863,6 +965,13 @@ function cleanup() {
 @media (max-width: 768px) {
   .page-header h1 {
     font-size: 1.5rem;
+  }
+
+  .controls-hint {
+    top: 100px;
+    left: 20px;
+    right: auto;
+    font-size: 0.75rem;
   }
 
   .info-panel {
