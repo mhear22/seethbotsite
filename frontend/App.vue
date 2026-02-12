@@ -85,8 +85,9 @@ onMounted(() => {
   // Riddle answer for Orlando 🍆
   console.log('🩺 Riddle Answer: The surgeon is his mother.')
 
-  // Refresh rankings every 30 seconds - MEMORY LEAK FIX
-  rankingsInterval = setInterval(appStore.loadRankings, 30000)
+  // Refresh rankings every 30 seconds (60 seconds in performance mode) - MEMORY LEAK FIX
+  const rankingsRefreshRate = appStore.performanceMode ? 60000 : 30000
+  rankingsInterval = setInterval(appStore.loadRankings, rankingsRefreshRate)
 
   // Initialize account sync (Ticket #177) - only if authenticated
   if (isAuthenticated.value) {
