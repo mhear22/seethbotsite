@@ -7,29 +7,12 @@
 
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { useProfile, type User } from '../composables/useProfile'
+import { useSettingsPersistence } from '../composables/useSettingsPersistence'
 
 const API_BASE = '/api'
 const TOKEN_KEY = 'auth_token'
 const REFRESH_TIMER_KEY = 'auth_refresh_timer'
-
-// Interfaces
-interface User {
-  id: number
-  email: string
-  display_name: string | null
-  avatar_url: string | null
-  banner_url: string | null
-  bio: string | null
-  status: string | null
-  show_email: number
-  show_joined_date: number
-  discord_id: string | null
-  discord_username: string | null
-  discord_discriminator: string | null
-  discord_avatar: string | null
-  created_at: string
-  updated_at: string
-}
 
 interface Session {
   id: number
@@ -42,19 +25,6 @@ interface Session {
   last_used_at: string
 }
 
-interface Settings {
-  darkMode: boolean
-  darkerMode: boolean
-  chaosMode: boolean
-  moldMode: boolean
-  showHearts: boolean
-  maxHearts: number
-  heartSpawnRate: number
-  musicPlaying: boolean
-  isMuted: boolean
-  currentQuoteIndex: number
-}
-
 export const useAuthStore = defineStore('auth', () => {
   // State
   const user = ref<User | null>(null)
@@ -65,6 +35,10 @@ export const useAuthStore = defineStore('auth', () => {
 
   let initialized = false
   let refreshTimer: NodeJS.Timeout | null = null
+
+  // Composables
+  const profile = useProfile(() => token.value)
+  const settingsPersistence = useSettingsPersistence()
 
   // Getters
   const isAuthenticated = computed(() => !!token.value && !!user.value)
@@ -87,33 +61,21 @@ export const useAuthStore = defineStore('auth', () => {
       // No token found, mark as initialized immediately
       initialized = true
     }
+
+    // Initialize settings persistence watcher
+    settingsPersistence.watchSettings()
   }
 
   /**
    * Fetch current user data from server
    */
   const fetchUser = async (): Promise<boolean> => {
-    if (!token.value) return false
-
-    try {
-      const response = await fetch(`${API_BASE}/auth/me`, {
-        headers: {
-          'Authorization': `Bearer ${token.value}`
-        }
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        user.value = data.user
-        return true
-      } else {
-        console.error('Failed to fetch user')
-        return false
-      }
-    } catch (error) {
-      console.error('Fetch user error:', error)
-      return false
+    const fetchedUser = await profile.fetchUser()
+    if (fetchedUser) {
+      user.value = fetchedUser
+      return true
     }
+    return false
   }
 
   /**
@@ -148,13 +110,11 @@ export const useAuthStore = defineStore('auth', () => {
       } else {
         // Server error (5xx) or other error - keep token for retry
         console.error('Token validation failed with status:', response.status)
-        // Don't clear auth on server errors - token might still be valid
         return false
       }
     } catch (error) {
       // Network error - keep token for retry
       console.error('Token validation error (network issue):', error)
-      // Don't clear auth on network errors - token might still be valid
       return false
     }
   }
@@ -173,7 +133,8 @@ export const useAuthStore = defineStore('auth', () => {
     const timeUntilExpiry = expiryDate.getTime() - now.getTime()
 
     // Refresh 30 seconds before expiry
-    const refreshDelay = Math.max(0, timeUntilExpiry - 30000)
+    const refreshDelay = 
+    Math.min(2147483646, Math.max(1000, timeUntilExpiry - 30000))
 
     refreshTimer = setTimeout(async () => {
       console.log('Refreshing token...')
@@ -217,14 +178,12 @@ export const useAuthStore = defineStore('auth', () => {
       } else {
         // Server error - try again later
         console.error('Token refresh failed with status:', response.status)
-        // Schedule retry in 5 minutes
         setTimeout(() => refreshToken(), 5 * 60 * 1000)
         return false
       }
     } catch (err) {
       // Network error - try again later
       console.error('Token refresh error (network issue):', err)
-      // Schedule retry in 5 minutes
       setTimeout(() => refreshToken(), 5 * 60 * 1000)
       return false
     }
@@ -260,7 +219,7 @@ export const useAuthStore = defineStore('auth', () => {
         setAuth(data.token, data.user)
         return { success: true, user: data.user }
       } else {
-        error.value = data.message || 'Registration failed'
+        error.value = data.error || 'Registration failed'
         return { success: false, error: error.value }
       }
     } catch (error) {
@@ -300,7 +259,7 @@ export const useAuthStore = defineStore('auth', () => {
         setAuth(data.token, data.user)
         return { success: true, user: data.user }
       } else {
-        error.value = data.message || 'Login failed'
+        error.value = data.error || 'Login failed'
         return { success: false, error: error.value }
       }
     } catch (error) {
@@ -338,42 +297,22 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
-   * Update user profile
+   * Update user profile (delegates to useProfile composable)
    */
   const updateProfile = async (displayName: string) => {
-    if (!token.value) {
-      return { success: false, error: 'Not authenticated' }
+    // Validate input
+    const validation = profile.validateProfileData(displayName)
+    if (!validation.valid) {
+      return { success: false, error: validation.error }
     }
 
-    loading.value = true
-    error.value = null
+    const result = await profile.updateProfile(displayName)
 
-    try {
-      const response = await fetch(`${API_BASE}/auth/profile`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token.value}`
-        },
-        body: JSON.stringify({ displayName })
-      })
-
-      const data = await response.json()
-
-      if (response.ok && data.success) {
-        user.value = data.user
-        return { success: true, user: data.user }
-      } else {
-        error.value = data.message || 'Update failed'
-        return { success: false, error: error.value }
-      }
-    } catch (error) {
-      console.error('Update failed:', error)
-      error.value = 'Update failed. Please try again.'
-      return { success: false, error: error.value }
-    } finally {
-      loading.value = false
+    if (result.success && result.user) {
+      user.value = result.user
     }
+
+    return result
   }
 
   /**
@@ -407,7 +346,7 @@ export const useAuthStore = defineStore('auth', () => {
         clearAuth()
         return { success: true }
       } else {
-        error.value = data.message || 'Password change failed'
+        error.value = data.error || 'Password change failed'
         return { success: false, error: error.value }
       }
     } catch (error) {
@@ -548,7 +487,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
-   * Load user settings from server
+   * Load user settings (delegates to useSettingsPersistence composable)
    */
   const loadSettings = async (): Promise<void> => {
     if (!token.value || !user.value) {
@@ -556,57 +495,18 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     try {
-      // TODO: Implement backend endpoint for settings sync
-      // For now, load from localStorage
-      console.log('Loading settings from localStorage')
+      // Load settings from localStorage via composable
+      settingsPersistence.loadAllSettings()
     } catch (err) {
       console.error('Failed to load settings:', err)
     }
   }
 
   /**
-   * Save user settings to server
+   * Save user settings (delegates to useSettingsPersistence composable)
    */
-  const saveSettings = async (settings: Partial<Settings>): Promise<boolean> => {
-    if (!token.value || !user.value) {
-      return false
-    }
-
-    try {
-      // TODO: Implement backend endpoint for settings sync
-      // For now, save to localStorage
-      console.log('Saving settings to localStorage:', settings)
-
-      if (settings.darkMode !== undefined) {
-        localStorage.setItem('darkMode', settings.darkMode.toString())
-      }
-      if (settings.darkerMode !== undefined) {
-        localStorage.setItem('darkerMode', settings.darkerMode.toString())
-      }
-      if (settings.chaosMode !== undefined) {
-        localStorage.setItem('chaosMode', settings.chaosMode.toString())
-      }
-      if (settings.moldMode !== undefined) {
-        localStorage.setItem('moldMode', settings.moldMode.toString())
-      }
-      if (settings.showHearts !== undefined) {
-        localStorage.setItem('showHearts', settings.showHearts.toString())
-      }
-      if (settings.maxHearts !== undefined) {
-        localStorage.setItem('maxHearts', settings.maxHearts.toString())
-      }
-      if (settings.heartSpawnRate !== undefined) {
-        localStorage.setItem('heartSpawnRate', settings.heartSpawnRate.toString())
-      }
-      if (settings.currentQuoteIndex !== undefined) {
-        localStorage.setItem('currentQuoteIndex', settings.currentQuoteIndex.toString())
-      }
-
-      return true
-    } catch (err) {
-      console.error('Failed to save settings:', err)
-      return false
-    }
+  const saveSettings = async (settings: Record<string, any>): Promise<boolean> => {
+    return settingsPersistence.saveSettings(settings)
   }
 
   /**
@@ -705,6 +605,10 @@ export const useAuthStore = defineStore('auth', () => {
     // Getters
     isAuthenticated,
     isInitialized,
+
+    // Expose composables for advanced use
+    profile,
+    settingsPersistence,
 
     // Actions
     init,

@@ -73,7 +73,7 @@ describe('Clicks API', () => {
 
   describe('POST /api/clicks/increment', () => {
     it('should increment click count', async () => {
-      const before = getClickCount();
+      const before = await getClickCount();
 
       const response = await request(app).post('/api/clicks/increment');
 
@@ -82,8 +82,8 @@ describe('Clicks API', () => {
     });
 
     it('should return new count', async () => {
-      resetClick();
-      const count1 = getClickCount();
+      await resetClick();
+      const count1 = await getClickCount();
 
       await request(app).post('/api/clicks/increment');
 

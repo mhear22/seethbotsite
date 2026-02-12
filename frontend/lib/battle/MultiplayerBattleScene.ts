@@ -20,6 +20,7 @@ export interface MultiplayerBattleSceneConfig extends Omit<BattleSceneConfig, 'e
   matchId: string;
   yourPlayerId: string;
   opponentId: string;
+  existingNetworkManager?: NetworkManager; // Optional: reuse existing NetworkManager
 }
 
 export class MultiplayerBattleScene extends BattleScene {
@@ -33,7 +34,11 @@ export class MultiplayerBattleScene extends BattleScene {
   private yourPlayerId: string;
   private opponentId: string;
   private connected = false;
-  private matchStarted = false;
+  private matchStarted = true;
+  private ownsNetworkManager = false; // Track if we created the NetworkManager (and should disconnect it)
+
+  // Store event handlers so we can remove them on cleanup
+  private eventHandlers = new Map<string, NetworkEventHandler>();
 
   constructor(config: MultiplayerBattleSceneConfig) {
     // Call parent constructor with opponent mech as enemy
@@ -46,8 +51,19 @@ export class MultiplayerBattleScene extends BattleScene {
     this.yourPlayerId = config.yourPlayerId;
     this.opponentId = config.opponentId;
 
-    // Initialize network manager
-    this.networkManager = markRaw(new NetworkManager());
+    // Initialize network manager - reuse existing if provided, otherwise create new
+    if (config.existingNetworkManager) {
+      console.log('[MultiplayerBattleScene] Reusing existing NetworkManager');
+      this.networkManager = config.existingNetworkManager;
+      // Check if already connected
+      this.connected = this.networkManager.isConnected();
+      console.log('[MultiplayerBattleScene] Already connected:', this.connected);
+      this.ownsNetworkManager = false; // We don't own this, don't disconnect on cleanup
+    } else {
+      console.log('[MultiplayerBattleScene] Creating new NetworkManager');
+      this.networkManager = markRaw(new NetworkManager());
+      this.ownsNetworkManager = true; // We created it, we should disconnect on cleanup
+    }
     this.stateInterpolation = markRaw(new StateInterpolation());
 
     // Initialize client prediction with player's initial state
@@ -67,55 +83,67 @@ export class MultiplayerBattleScene extends BattleScene {
     // Setup network event handlers
     this.setupNetworkHandlers();
 
-    // Connect to server
-    this.connectToServer(config.authToken);
+    // Connect to server only if we created a new NetworkManager
+    if (!config.existingNetworkManager) {
+      this.connectToServer(config.authToken);
+    } else {
+      console.log('[MultiplayerBattleScene] Skipping connection - already connected');
+    }
   }
 
   /**
    * Setup network event handlers
    */
   private setupNetworkHandlers(): void {
-    this.networkManager.on('connected', () => {
+    // Helper to register and track handlers
+    const addHandler = (event: string, handler: NetworkEventHandler) => {
+      console.log('[MultiplayerBattleScene] Registering handler for event:', event);
+      this.eventHandlers.set(event, handler);
+      this.networkManager.on(event, handler);
+    };
+
+    addHandler('connected', () => {
       console.log('[MultiplayerBattleScene] Connected to server');
       this.connected = true;
     });
 
-    this.networkManager.on('disconnected', () => {
+    addHandler('disconnected', () => {
       console.log('[MultiplayerBattleScene] Disconnected from server');
       this.connected = false;
       // Handle disconnection (show message, return to menu, etc.)
     });
 
-    this.networkManager.on('state_snapshot', (data) => {
+    addHandler('state_snapshot', (data) => {
       this.handleStateSnapshot(data);
     });
 
-    this.networkManager.on('match_start', (data) => {
+    addHandler('match_start', (data) => {
       console.log('[MultiplayerBattleScene] Match starting:', data);
       this.matchStarted = true;
+      console.log('[MultiplayerBattleScene] matchStarted set to true');
     });
 
-    this.networkManager.on('match_end', (data) => {
+    addHandler('match_end', (data) => {
       console.log('[MultiplayerBattleScene] Match ended:', data);
       this.handleMatchEnd(data);
     });
 
-    this.networkManager.on('opponent_disconnected', () => {
+    addHandler('opponent_disconnected', () => {
       console.log('[MultiplayerBattleScene] Opponent disconnected');
       // Handle opponent disconnect - you win by default
       this.handleOpponentDisconnect();
     });
 
-    this.networkManager.on('latency_update', (data) => {
+    addHandler('latency_update', (data) => {
       // Update latency display (will be used in Phase 4 for HUD)
       // console.log('[MultiplayerBattleScene] RTT:', data.rtt);
     });
 
-    this.networkManager.on('server_error', (data) => {
+    addHandler('server_error', (data) => {
       console.error('[MultiplayerBattleScene] Server error:', data);
     });
 
-    this.networkManager.on('game_event', (data) => {
+    addHandler('game_event', (data) => {
       this.handleGameEvent(data);
     });
   }
@@ -144,8 +172,6 @@ export class MultiplayerBattleScene extends BattleScene {
 
     // Debug: Log player IDs in snapshot
     const playerIdsInSnapshot = Object.keys(snapshot.players);
-    console.log('[MultiplayerBattleScene] Snapshot player IDs:', playerIdsInSnapshot);
-    console.log('[MultiplayerBattleScene] My ID:', this.yourPlayerId, 'Opponent ID:', this.opponentId);
 
     // Get our player state from server for reconciliation
     const serverPlayerState = snapshot.players[this.yourPlayerId];
@@ -161,8 +187,8 @@ export class MultiplayerBattleScene extends BattleScene {
         predictedState.position[2]
       );
       this.playerMech.mesh.rotation.y = predictedState.rotation[1];
-      this.playerMech.health = predictedState.health;
-      this.playerMech.power = predictedState.power;
+      //this.playerMech.health = predictedState.health;
+      //this.playerMech.power = predictedState.power;
       this.playerMech.jumpFuel = predictedState.jumpFuel;
       this.playerMech.isDashing = predictedState.isDashing;
     } else {
@@ -217,8 +243,11 @@ export class MultiplayerBattleScene extends BattleScene {
    */
   private handleMatchEnd(data: any): void {
     const isVictory = data.winnerId === this.yourPlayerId;
-    // Trigger battle end animation
-    (this as any).triggerBattleEnd(isVictory ? 'victory' : 'defeat');
+    // The battle ending animation should already be triggered by mech_destroyed event
+    // This just ensures we call the callback if not already ending
+    if (!(this as any).battleEnding) {
+      this.onBattleEnd(isVictory ? 'victory' : 'defeat');
+    }
   }
 
   /**
@@ -226,7 +255,19 @@ export class MultiplayerBattleScene extends BattleScene {
    */
   private handleOpponentDisconnect(): void {
     // You win by default
-    (this as any).triggerBattleEnd('victory');
+    if (!(this as any).battleEnding) {
+      (this as any).battleEnding = true;
+      (this as any).battleEndTimer = 2.0;
+      (this as any).battleEndResult = 'victory';
+      this.enemyMech.isDestroyed = true;
+
+      const particleSystem = (this as any).particleSystem;
+      const camera = (this as any).camera;
+      if (particleSystem && camera) {
+        particleSystem.spawnExplosion(this.enemyMech.position.clone());
+        camera.triggerShake(1.0);
+      }
+    }
   }
 
   /**
@@ -300,7 +341,7 @@ export class MultiplayerBattleScene extends BattleScene {
     );
 
     particleSystem.spawnHitEffect(impactPos, 'ballistic');
-    audio.playBulletHitMech();
+    //audio.playBulletHitMech();
 
     console.log('[MultiplayerBattleScene] Projectile hit:', data);
   }
@@ -326,8 +367,23 @@ export class MultiplayerBattleScene extends BattleScene {
   private handleMechDestroyed(data: any): void {
     console.log('[MultiplayerBattleScene] Mech destroyed:', data.playerId);
 
-    // The match_end event will trigger the actual victory/defeat screen
-    // This event just handles the destruction animation
+    // Determine which mech was destroyed
+    const destroyedMech = data.playerId === this.yourPlayerId ? this.playerMech : this.enemyMech;
+    const isVictory = data.playerId !== this.yourPlayerId;
+
+    // Trigger battle ending animation
+    const particleSystem = (this as any).particleSystem;
+    const camera = (this as any).camera;
+
+    if (particleSystem && camera) {
+      particleSystem.spawnExplosion(destroyedMech.position.clone());
+      camera.triggerShake(1.0);
+    }
+
+    destroyedMech.isDestroyed = true;
+    (this as any).battleEnding = true;
+    (this as any).battleEndTimer = 2.0;
+    (this as any).battleEndResult = isVictory ? 'victory' : 'defeat';
   }
 
   /**
@@ -347,6 +403,8 @@ export class MultiplayerBattleScene extends BattleScene {
     // Send inputs to server if connected and match started
     if (this.connected && this.matchStarted) {
       this.sendInputToServer();
+    } else if (Math.random() < 0.01) {
+      console.warn('[MultiplayerBattleScene] Not sending input - connected:', this.connected, 'matchStarted:', this.matchStarted);
     }
 
     // Periodically adjust interpolation delay based on jitter
@@ -389,7 +447,12 @@ export class MultiplayerBattleScene extends BattleScene {
     this.inputSequence++;
 
     // Get current input state
-    const inputState = (this as any).inputManager.getInputState();
+    const inputState = this.inputManager.getInputState();
+
+    if (!inputState) {
+      console.error('[MultiplayerBattleScene] inputState is null/undefined!');
+      return;
+    }
 
     // Get aim direction from camera
     const aimDirection = this.playerMech.getForwardDirection();
@@ -412,6 +475,15 @@ export class MultiplayerBattleScene extends BattleScene {
       }
     };
 
+    console.log('[MultiplayerBattleScene] Sending input:', {
+      seq: this.inputSequence,
+      forward: input.forward,
+      backward: input.backward,
+      left: input.left,
+      right: input.right,
+      jump: input.jump
+    });
+
     // Add input to prediction buffer for reconciliation
     this.clientPrediction.addInput(this.inputSequence, input);
 
@@ -420,11 +492,26 @@ export class MultiplayerBattleScene extends BattleScene {
   }
 
   /**
-   * Override cleanup to disconnect network
+   * Override cleanup to disconnect network (only if we created it)
    */
   cleanup(): void {
     super.cleanup();
-    this.networkManager.disconnect();
+
+    // Remove our event handlers from the NetworkManager
+    for (const [event, handler] of this.eventHandlers.entries()) {
+      this.networkManager.off(event, handler);
+    }
+    this.eventHandlers.clear();
+
+    // Only disconnect if we created the NetworkManager
+    // If it was passed to us, the parent component owns it and will manage its lifecycle
+    if (this.ownsNetworkManager) {
+      console.log('[MultiplayerBattleScene] Disconnecting NetworkManager (we own it)');
+      this.networkManager.disconnect();
+    } else {
+      console.log('[MultiplayerBattleScene] Not disconnecting NetworkManager (we don\'t own it)');
+    }
+
     this.stateInterpolation.clear();
   }
 

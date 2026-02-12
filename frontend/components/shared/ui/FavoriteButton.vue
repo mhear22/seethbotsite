@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useFavoritesStore } from '../../../stores/useFavoritesStore'
-import { useAudio } from '@/composables/useAudio'
+import { useAudio } from '../../../composables/useAudio'
 
 const props = defineProps<{
   itemType: 'page' | 'panel' | 'feature'

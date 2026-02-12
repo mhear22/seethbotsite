@@ -358,6 +358,7 @@ describe('useAuth', () => {
       })
 
       const auth = loadUseAuth()
+      await auth.init()
       mockFetch.mockClear()
 
       const sessionsData = [
@@ -403,6 +404,9 @@ describe('useAuth', () => {
       await auth.login('test@example.com', 'password')
       mockFetch.mockClear()
 
+      // Mock both the DELETE response and the GET /auth/sessions response
+      // (logoutSession calls getSessions after deleting)
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ success: true }) })
       mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ sessions: [] }) })
 
       const result = await auth.logoutSession(42)

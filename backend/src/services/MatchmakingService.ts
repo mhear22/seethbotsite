@@ -32,7 +32,6 @@ export class MatchmakingService {
     this.removeFromQueue(player.playerId);
 
     this.queue.push(player);
-    console.log(`[Matchmaking] Player ${player.playerName} joined queue. Queue size: ${this.queue.length}`);
 
     // Send status update
     this.sendQueueStatus(player);
@@ -57,7 +56,6 @@ export class MatchmakingService {
     if (index !== -1) {
       const player = this.queue[index];
       this.queue.splice(index, 1);
-      console.log(`[Matchmaking] Player ${player.playerName} left queue. Queue size: ${this.queue.length}`);
 
       // Clear timeout
       const timeout = this.queueTimeouts.get(playerId);

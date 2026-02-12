@@ -144,6 +144,8 @@ export class MechEntity {
     // Visual feedback - flash red
     this.flashDamage()
 
+    console.log(`${this.name} took ${actualDamage.toFixed(1)} damage (raw: ${damage}, armor: ${armorReduction * 100}%)`)
+
     if (this.stats.currentHealth <= 0) {
       this.stats.currentHealth = 0
       return true // Defeated

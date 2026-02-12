@@ -99,7 +99,7 @@ export function usePanels(initialState?: Partial<PanelState>) {
     return window.innerWidth <= 768
   }
 
-  const { playPanelOpen } = useAudio()
+  const { playPanelToggle } = useAudio()
 
   const togglePanel = (panelName: keyof PanelState) => {
     const isCurrentlyOpen = panels.value[panelName]
@@ -117,7 +117,7 @@ export function usePanels(initialState?: Partial<PanelState>) {
 
     // Play sound when panel is opened
     if (!isCurrentlyOpen) {
-      playPanelOpen()
+      playPanelToggle()
     }
   }
 
@@ -134,14 +134,14 @@ export function usePanels(initialState?: Partial<PanelState>) {
     panels.value[panelName] = true
 
     // Play sound when panel is opened
-    playPanelOpen()
+    playPanelToggle()
   }
 
   const closePanel = (panelName: keyof PanelState) => {
     panels.value[panelName] = false
 
     // Play sound when panel is closed
-    playPanelOpen()
+    playPanelToggle()
   }
 
   return {

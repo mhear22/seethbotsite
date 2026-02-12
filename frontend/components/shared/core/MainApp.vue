@@ -55,33 +55,43 @@ const route = useRoute()
 const { shortcuts, isHelpOpen, toggleHelp, registerShortcut } = useKeyboardShortcuts()
 
 // Modal items for left dock (Tachometer)
-const leftModals = computed<ModalItem[]>(() => [
-  {
-    id: 'tachometer',
-    title: 'Mold Meter',
-    icon: '🍄',
-    isOpen: appStore.panels.tachometer,
-    position: 'left'
-  }
-])
+const leftModals = computed<ModalItem[]>(() => {
+  // Hide mold meter in performance mode
+  if (appStore.performanceMode) return []
+
+  return [
+    {
+      id: 'tachometer',
+      title: 'Mold Meter',
+      icon: '🍄',
+      isOpen: appStore.panels.tachometer,
+      position: 'left'
+    }
+  ]
+})
 
 // Modal items for right dock (Feed and Active Users)
-const rightModals = computed<ModalItem[]>(() => [
-  {
-    id: 'feed',
-    title: 'Live Feeds',
-    icon: '📰',
-    isOpen: appStore.panels.feed,
-    position: 'right'
-  },
-  {
-    id: 'activeUsers',
-    title: 'Active Users',
-    icon: '👥',
-    isOpen: appStore.panels.activeUsers,
-    position: 'right'
-  }
-])
+const rightModals = computed<ModalItem[]>(() => {
+  // Hide all right dock panels in performance mode
+  if (appStore.performanceMode) return []
+
+  return [
+    {
+      id: 'feed',
+      title: 'Live Feeds',
+      icon: '📰',
+      isOpen: appStore.panels.feed,
+      position: 'right'
+    },
+    {
+      id: 'activeUsers',
+      title: 'Active Users',
+      icon: '👥',
+      isOpen: appStore.panels.activeUsers,
+      position: 'right'
+    }
+  ]
+})
 
 // Route sync
 const onRouteChange = (routeName: string) => {

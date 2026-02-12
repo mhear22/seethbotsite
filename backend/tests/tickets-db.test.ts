@@ -128,57 +128,57 @@ describe('isTicketBlocked', () => {
   });
 
   it('should return false for empty dependencies', () => {
-    const result = isTicketBlocked(db, []);
+    const result = isTicketBlocked([]);
     expect(result).toBe(false);
   });
 
   it('should return false when all dependencies are completed', () => {
-    const result = isTicketBlocked(db, [100]);
+    const result = isTicketBlocked([100]);
     expect(result).toBe(false);
   });
 
   it('should return false when all dependencies are declined', () => {
-    const result = isTicketBlocked(db, [101]);
+    const result = isTicketBlocked([101]);
     expect(result).toBe(false);
   });
 
   it('should return true when dependency is pending', () => {
-    const result = isTicketBlocked(db, [102]);
+    const result = isTicketBlocked([102]);
     expect(result).toBe(true);
   });
 
   it('should return true when dependency is needs-info', () => {
-    const result = isTicketBlocked(db, [103]);
+    const result = isTicketBlocked([103]);
     expect(result).toBe(true);
   });
 
   it('should return true when dependency is unresolved', () => {
-    const result = isTicketBlocked(db, [104]);
+    const result = isTicketBlocked([104]);
     expect(result).toBe(true);
   });
 
   it('should return true when dependency is deleted', () => {
-    const result = isTicketBlocked(db, [105]);
+    const result = isTicketBlocked([105]);
     expect(result).toBe(true);
   });
 
   it('should return true when dependency does not exist', () => {
-    const result = isTicketBlocked(db, [999]);
+    const result = isTicketBlocked([999]);
     expect(result).toBe(true);
   });
 
   it('should return true when any dependency is blocked (mix of completed and pending)', () => {
-    const result = isTicketBlocked(db, [100, 102]);
+    const result = isTicketBlocked([100, 102]);
     expect(result).toBe(true);
   });
 
   it('should return false when all dependencies are completed or declined', () => {
-    const result = isTicketBlocked(db, [100, 101]);
+    const result = isTicketBlocked([100, 101]);
     expect(result).toBe(false);
   });
 
   it('should handle multiple dependencies with mixed statuses', () => {
-    const result = isTicketBlocked(db, [100, 101, 102, 103]);
+    const result = isTicketBlocked([100, 101, 102, 103]);
     expect(result).toBe(true);
   });
 });

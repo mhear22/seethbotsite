@@ -29,7 +29,7 @@ const createTestApp = (): Express => {
   }
 
   // Create initial health state
-  const initialState = { lastChecked: null, lastCheckTime: null };
+  const initialState = { lastChecked: null as string | null, lastCheckTime: null as number | null };
   fs.writeFileSync(testHealthStatePath, JSON.stringify(initialState, null, 2));
 
   // Mount the controller

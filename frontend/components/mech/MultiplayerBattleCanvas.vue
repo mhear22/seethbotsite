@@ -25,6 +25,7 @@ const props = defineProps<{
   opponentMech: MechEntity
   matchData: MatchFoundMessage
   authToken: string
+  existingNetworkManager?: any // Optional: reuse existing NetworkManager instead of creating new one
 }>()
 
 const emit = defineEmits<{
@@ -88,8 +89,9 @@ onMounted(() => {
     matchId: props.matchData.matchId,
     yourPlayerId: props.matchData.yourPlayerId,
     opponentId: props.matchData.opponentId,
-    opponentLoadout: props.matchData.opponentLoadout
-  }))
+    opponentLoadout: props.matchData.opponentLoadout,
+    existingNetworkManager: props.existingNetworkManager  // Pass existing NetworkManager if provided
+  } as ConstructorParameters<typeof MultiplayerBattleScene>[0]))
 
   // Setup network event listeners
   const networkManager = battleScene.getNetworkManager()

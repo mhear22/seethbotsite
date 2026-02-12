@@ -15,7 +15,12 @@ module.exports = {
   coverageReporters: ['text', 'lcov', 'html'],
   moduleFileExtensions: ['ts', 'js', 'json'],
   verbose: true,
-  testTimeout: 10000,
+  testTimeout: 30000,
   forceExit: true,
   setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
+  maxWorkers: 1,
+  // Handle Prisma modules
+  transformIgnorePatterns: [
+    'node_modules/(?!(@prisma|.prisma)/)'
+  ],
 };

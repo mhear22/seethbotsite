@@ -45,6 +45,18 @@ vi.mock('../../composables/useRankings', () => ({
   }),
 }))
 
+// Mock useRankingsStore
+vi.mock('../../stores/useRankingsStore', () => ({
+  useRankingsStore: () => ({
+    rankings: { value: [] },
+    loading: { value: false },
+    error: { value: null },
+    loadRankings: mockLoadRankings,
+    getTrendClass: mockGetTrendClass,
+    clearRankings: vi.fn(),
+  }),
+}))
+
 const mockTogglePanel = vi.fn()
 vi.mock('../../composables/usePanels', () => ({
   usePanels: () => ({
@@ -175,7 +187,8 @@ describe('useAppStore', () => {
   })
 
   describe('toggleChaosMode', () => {
-    it('toggles chaos mode on', () => {
+    it('toggles chaos mode on when performance mode is disabled', () => {
+      localStorage.setItem('performanceMode', 'false')
       const store = useAppStore()
 
       store.toggleChaosMode()
@@ -184,7 +197,8 @@ describe('useAppStore', () => {
       expect(localStorage.getItem('chaosMode')).toBe('true')
     })
 
-    it('toggles chaos mode off', () => {
+    it('toggles chaos mode off when performance mode is disabled', () => {
+      localStorage.setItem('performanceMode', 'false')
       localStorage.setItem('chaosMode', 'true')
       const store = useAppStore()
 
@@ -193,10 +207,20 @@ describe('useAppStore', () => {
       expect(store.chaosMode).toBe(false)
       expect(localStorage.getItem('chaosMode')).toBe('false')
     })
+
+    it('does not toggle chaos mode when performance mode is enabled', () => {
+      localStorage.setItem('performanceMode', 'true')
+      const store = useAppStore()
+
+      store.toggleChaosMode()
+
+      expect(store.chaosMode).toBe(false)
+    })
   })
 
   describe('toggleMoldMode', () => {
-    it('toggles mold mode off when on', () => {
+    it('toggles mold mode off when on and performance mode is disabled', () => {
+      localStorage.setItem('performanceMode', 'false')
       const store = useAppStore()
       expect(store.moldMode).toBe(true)
 
@@ -206,7 +230,8 @@ describe('useAppStore', () => {
       expect(localStorage.getItem('moldMode')).toBe('false')
     })
 
-    it('toggles mold mode on when off', () => {
+    it('toggles mold mode on when off and performance mode is disabled', () => {
+      localStorage.setItem('performanceMode', 'false')
       localStorage.setItem('moldMode', 'false')
       const store = useAppStore()
 
@@ -214,6 +239,16 @@ describe('useAppStore', () => {
 
       expect(store.moldMode).toBe(true)
       expect(localStorage.getItem('moldMode')).toBe('true')
+    })
+
+    it('does not toggle mold mode when performance mode is enabled', () => {
+      localStorage.setItem('performanceMode', 'true')
+      localStorage.setItem('moldMode', 'false')
+      const store = useAppStore()
+
+      store.toggleMoldMode()
+
+      expect(store.moldMode).toBe(false)
     })
   })
 
