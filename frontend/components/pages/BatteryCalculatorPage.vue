@@ -4,6 +4,9 @@ import { useRouter } from 'vue-router'
 import { useAppStore } from '../../stores/useAppStore'
 import { useSolarStore } from '../../composables/useSolarStore'
 import { useBatteryCalculator, BATTERY_PRESETS } from '../../composables/useBatteryCalculator'
+import { useBatteryChart } from '../../composables/useBatteryChart'
+import BatterySettings from '../battery/BatterySettings.vue'
+import BatteryChart from '../battery/BatteryChart.vue'
 
 const store = useAppStore()
 const router = useRouter()
@@ -24,85 +27,27 @@ function handleAddCustom() {
   showCustomModal.value = false
 }
 
-// 24hr Chart
-const hourlyData = computed(() => battery.generateHourlyData(estimatedKW.value))
-const hoverHour = ref<number | null>(null)
-
-// Chart layout constants
-const CL = 55, CR = 745, CT = 15, CB = 275
-const CW = CR - CL, CH = CB - CT
-
-function hourToX(h: number): number {
-  return CL + (h / 24) * CW
-}
-
-const maxKW = computed(() => {
-  const m = Math.max(...hourlyData.value.map(p => Math.max(p.solarKW, p.usageKW)))
-  return Math.max(m * 1.15, 0.5)
+// Chart logic
+const hourlyData = computed(() => {
+  const data = battery.generateHourlyData(estimatedKW.value)
+  console.log('Hourly data:', data)
+  return data
 })
 
-const maxKWh = computed(() => {
-  const m = Math.max(...hourlyData.value.map(p => p.batteryKWh))
-  return Math.max(m * 1.15, 0.5)
+const chart = useBatteryChart(
+  hourlyData,
+  battery.solarKWAtTime,
+  estimatedKW
+)
+
+// Debug chart data
+console.log('Chart data:', {
+  maxKW: chart.maxKW,
+  maxKWh: chart.maxKWh,
+  solarPath: chart.solarAreaPath,
+  batteryPoints: chart.batteryLinePoints,
+  usagePoints: chart.usageLinePoints
 })
-
-function kwToY(v: number): number {
-  return CB - (v / maxKW.value) * CH
-}
-
-function kwhToY(v: number): number {
-  return CB - (v / maxKWh.value) * CH
-}
-
-const solarAreaPath = computed(() => {
-  let d = `M ${CL} ${CB}`
-  for (let t = 0; t <= 24; t += 0.25) {
-    const solar = battery.solarKWAtTime(t, estimatedKW.value)
-    d += ` L ${hourToX(t).toFixed(1)} ${kwToY(solar).toFixed(1)}`
-  }
-  d += ` L ${CR} ${CB} Z`
-  return d
-})
-
-const batteryLinePoints = computed(() => {
-  return hourlyData.value
-    .map(p => `${hourToX(p.hour).toFixed(1)},${kwhToY(p.batteryKWh).toFixed(1)}`)
-    .join(' ')
-})
-
-const usageLinePoints = computed(() => {
-  return hourlyData.value
-    .map(p => `${hourToX(p.hour).toFixed(1)},${kwToY(p.usageKW).toFixed(1)}`)
-    .join(' ')
-})
-
-const hoverData = computed(() => {
-  if (hoverHour.value === null) return null
-  return hourlyData.value[hoverHour.value] ?? null
-})
-
-const tooltipX = computed(() => {
-  if (hoverHour.value === null) return 0
-  const x = hourToX(hoverHour.value)
-  return x > CR - 175 ? x - 170 : x + 12
-})
-
-function onChartHover(event: MouseEvent) {
-  const svg = event.currentTarget as SVGSVGElement
-  const rect = svg.getBoundingClientRect()
-  const x = event.clientX - rect.left
-  const svgX = (x / rect.width) * 800
-  const hour = Math.round(((svgX - CL) / CW) * 24)
-  hoverHour.value = (hour >= 0 && hour <= 24) ? hour : null
-}
-
-function formatHour(h: number): string {
-  if (h === 0 || h === 24) return '12am'
-  if (h === 12) return '12pm'
-  return h < 12 ? h + 'am' : (h - 12) + 'pm'
-}
-
-const chartHourLabels = [0, 3, 6, 9, 12, 15, 18, 21, 24]
 </script>
 
 <template>
@@ -138,57 +83,17 @@ const chartHourLabels = [0, 3, 6, 9, 12, 15, 18, 21, 24]
         <button class="toolbar-btn primary" @click="router.push('/solar')">Go to Panel Calculator</button>
       </div>
 
-      <!-- Settings -->
-      <div class="card">
-        <h3>Settings</h3>
-        <div class="settings-grid">
-          <div class="setting-field">
-            <label>Peak Sun Hours</label>
-            <input type="number" v-model.number="battery.settings.value.peakSunHours" min="1" max="12" step="0.5" />
-          </div>
-          <div class="setting-field">
-            <label>Daily Usage (kWh)</label>
-            <input type="number" v-model.number="battery.settings.value.dailyUsageKWh" min="1" max="200" step="1" />
-          </div>
-          <div class="setting-field">
-            <label>Days of Autonomy</label>
-            <input type="number" v-model.number="battery.settings.value.daysOfAutonomy" min="1" max="7" step="1" />
-          </div>
-          <div class="setting-field">
-            <label>Daylight Hours</label>
-            <input type="number" v-model.number="battery.settings.value.daylightHours" min="6" max="18" step="0.5" />
-          </div>
-        </div>
-      </div>
-
-      <!-- Battery Options -->
-      <div class="card">
-        <h3>Battery Options</h3>
-        <div class="presets-grid">
-          <div
-            v-for="preset in BATTERY_PRESETS"
-            :key="preset.id"
-            class="preset-card"
-          >
-            <div class="preset-name">{{ preset.name }}</div>
-            <div class="preset-specs">
-              <span>{{ preset.capacityKWh }} kWh</span>
-              <span>{{ preset.powerKW }} kW</span>
-              <span>{{ preset.efficiency }}% eff</span>
-              <span>{{ preset.warrantyYears }} yr warranty</span>
-            </div>
-            <button class="add-btn" @click="battery.addPreset(preset)">+ Add</button>
-          </div>
-          <!-- Custom battery card -->
-          <div class="preset-card custom-preset" @click="showCustomModal = true">
-            <div class="preset-name">Custom Battery</div>
-            <div class="preset-specs">
-              <span>Define your own specs</span>
-            </div>
-            <span class="add-btn">+ Configure</span>
-          </div>
-        </div>
-      </div>
+      <!-- Settings Component -->
+      <BatterySettings
+        :settings="battery.settings.value"
+        :presets="BATTERY_PRESETS"
+        @update:peak-sun-hours="battery.settings.value.peakSunHours = $event"
+        @update:daily-usage-k-wh="battery.settings.value.dailyUsageKWh = $event"
+        @update:days-of-autonomy="battery.settings.value.daysOfAutonomy = $event"
+        @update:daylight-hours="battery.settings.value.daylightHours = $event"
+        @add-preset="battery.addPreset($event)"
+        @open-custom-modal="showCustomModal = true"
+      />
 
       <!-- Selected Batteries -->
       <div class="card" v-if="battery.selectedBatteries.value.length > 0">
@@ -219,86 +124,30 @@ const chartHourLabels = [0, 3, 6, 9, 12, 15, 18, 21, 24]
         </div>
       </div>
 
-      <!-- 24hr Graph -->
-      <div class="card chart-card">
-        <h3>24-Hour Energy Profile</h3>
-        <svg viewBox="0 0 800 330" class="chart-svg" @mousemove="onChartHover" @mouseleave="hoverHour = null">
-          <!-- Grid lines -->
-          <line
-            v-for="h in chartHourLabels" :key="'vg-'+h"
-            :x1="hourToX(h)" :y1="CT" :x2="hourToX(h)" :y2="CB"
-            class="chart-grid"
-          />
-          <line
-            v-for="frac in [0.25, 0.5, 0.75]" :key="'hg-'+frac"
-            :x1="CL" :y1="CB - frac * CH" :x2="CR" :y2="CB - frac * CH"
-            class="chart-grid"
-          />
-
-          <!-- Axes -->
-          <line :x1="CL" :y1="CT" :x2="CL" :y2="CB" class="chart-axis" />
-          <line :x1="CR" :y1="CT" :x2="CR" :y2="CB" class="chart-axis" />
-          <line :x1="CL" :y1="CB" :x2="CR" :y2="CB" class="chart-axis" />
-
-          <!-- Solar area -->
-          <path :d="solarAreaPath" class="solar-area" />
-
-          <!-- Usage line -->
-          <polyline :points="usageLinePoints" class="usage-line" />
-
-          <!-- Battery line -->
-          <polyline :points="batteryLinePoints" class="battery-line" />
-
-          <!-- Left Y-axis labels (kW) -->
-          <text :x="CL - 8" :y="CB + 4" text-anchor="end" class="axis-label">0</text>
-          <text :x="CL - 8" :y="CB - CH / 2 + 4" text-anchor="end" class="axis-label">{{ (maxKW / 2).toFixed(1) }}</text>
-          <text :x="CL - 8" :y="CT + 4" text-anchor="end" class="axis-label">{{ maxKW.toFixed(1) }}</text>
-          <text :x="CL - 8" :y="CT - 5" text-anchor="end" class="axis-unit">kW</text>
-
-          <!-- Right Y-axis labels (kWh) -->
-          <text :x="CR + 8" :y="CB + 4" text-anchor="start" class="axis-label">0</text>
-          <text :x="CR + 8" :y="CB - CH / 2 + 4" text-anchor="start" class="axis-label">{{ (maxKWh / 2).toFixed(1) }}</text>
-          <text :x="CR + 8" :y="CT + 4" text-anchor="start" class="axis-label">{{ maxKWh.toFixed(1) }}</text>
-          <text :x="CR + 8" :y="CT - 5" text-anchor="start" class="axis-unit">kWh</text>
-
-          <!-- X-axis labels -->
-          <g v-for="h in chartHourLabels" :key="'xl-'+h">
-            <line :x1="hourToX(h)" :y1="CB" :x2="hourToX(h)" :y2="CB + 5" class="chart-axis" />
-            <text :x="hourToX(h)" :y="CB + 18" text-anchor="middle" class="axis-label">{{ formatHour(h) }}</text>
-          </g>
-
-          <!-- Legend -->
-          <g transform="translate(55, 305)">
-            <rect x="0" y="0" width="16" height="10" rx="2" class="legend-solar-swatch" />
-            <text x="22" y="9" class="legend-text">Solar (kW)</text>
-            <line x1="150" y1="5" x2="174" y2="5" class="legend-usage-line" />
-            <text x="180" y="9" class="legend-text">Usage (kW)</text>
-            <line x1="290" y1="5" x2="314" y2="5" class="legend-battery-line" />
-            <text x="320" y="9" class="legend-text">Battery (kWh)</text>
-          </g>
-
-          <!-- Hover elements -->
-          <g v-if="hoverHour !== null && hoverData">
-            <line
-              :x1="hourToX(hoverHour)" :y1="CT"
-              :x2="hourToX(hoverHour)" :y2="CB"
-              class="hover-line"
-            />
-            <circle :cx="hourToX(hoverHour)" :cy="kwToY(hoverData.solarKW)" r="4" class="dot-solar" />
-            <circle :cx="hourToX(hoverHour)" :cy="kwToY(hoverData.usageKW)" r="4" class="dot-usage" />
-            <circle :cx="hourToX(hoverHour)" :cy="kwhToY(hoverData.batteryKWh)" r="4" class="dot-battery" />
-
-            <!-- Tooltip -->
-            <g :transform="`translate(${tooltipX}, 22)`">
-              <rect x="0" y="0" width="160" height="78" rx="8" class="tooltip-bg" />
-              <text x="10" y="16" class="tt-title">{{ formatHour(hoverHour) }}</text>
-              <text x="10" y="34" class="tt-solar">Solar: {{ hoverData.solarKW.toFixed(2) }} kW</text>
-              <text x="10" y="50" class="tt-usage">Usage: {{ hoverData.usageKW.toFixed(2) }} kW</text>
-              <text x="10" y="66" class="tt-battery">Stored: {{ hoverData.batteryKWh.toFixed(1) }} kWh</text>
-            </g>
-          </g>
-        </svg>
-      </div>
+      <!-- Chart Component -->
+      <BatteryChart
+        :CL="chart.CL"
+        :CR="chart.CR"
+        :CT="chart.CT"
+        :CB="chart.CB"
+        :CH="chart.CH"
+        :CW="chart.CW"
+        :chartHourLabels="chart.chartHourLabels"
+        :solarAreaPath="chart.solarAreaPath.value"
+        :usageLinePoints="chart.usageLinePoints.value"
+        :batteryLinePoints="chart.batteryLinePoints.value"
+        :maxKW="chart.maxKW.value"
+        :maxKWh="chart.maxKWh.value"
+        :hoverHour="chart.hoverHour.value"
+        :hoverData="chart.hoverData.value"
+        :tooltipX="chart.tooltipX.value"
+        :hourToX="chart.hourToX"
+        :kwToY="chart.kwToY"
+        :kwhToY="chart.kwhToY"
+        :formatHour="chart.formatHour"
+        @chart-hover="chart.onChartHover($event)"
+        @chart-leave="chart.hoverHour.value = null"
+      />
 
       <!-- Results -->
       <div class="card results-card">
@@ -394,8 +243,14 @@ const chartHourLabels = [0, 3, 6, 9, 12, 15, 18, 21, 24]
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .page-header h1 {
@@ -447,271 +302,83 @@ const chartHourLabels = [0, 3, 6, 9, 12, 15, 18, 21, 24]
   color: #ddd;
 }
 
-.battery-page.dark .back-btn:hover {
-  background: #3a3a55;
-}
-
-/* Card base */
+/* Cards */
 .card {
-  background: rgba(255, 255, 255, 0.95);
-  border-radius: 16px;
+  background: white;
+  border-radius: 12px;
   padding: 24px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  backdrop-filter: blur(8px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
 }
 
 .battery-page.dark .card {
-  background: rgba(30, 30, 45, 0.95);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  background: #1e1e2e;
+  border-color: #333;
 }
 
 .card h3 {
-  margin: 0 0 16px;
+  margin: 0 0 20px 0;
   font-size: 1.3rem;
   color: #333;
 }
 
 .battery-page.dark .card h3 {
-  color: #eee;
-}
-
-/* Warning card */
-.warning-card {
-  border: 2px solid #ffb347;
-}
-
-.warning-card p {
-  color: #666;
-  margin: 0 0 12px;
-}
-
-.battery-page.dark .warning-card p {
-  color: #aaa;
+  color: #e0e0e0;
 }
 
 /* Summary card */
 .summary-card {
-  border: 1px solid rgba(255, 145, 164, 0.3);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.summary-card h3 {
+  color: white;
 }
 
 .summary-grid {
-  display: flex;
-  gap: 24px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 20px;
 }
 
 .summary-stat {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  gap: 8px;
 }
 
 .summary-value {
-  font-size: 1.4rem;
-  font-weight: bold;
-  color: #ff91a4;
+  font-size: 1.8rem;
+  font-weight: 700;
 }
 
 .summary-label {
-  font-size: 0.8rem;
-  color: #888;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.battery-page.dark .summary-label {
-  color: #999;
-}
-
-/* Settings */
-.settings-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 16px;
-}
-
-.setting-field label {
-  display: block;
-  font-size: 0.85rem;
-  color: #666;
-  margin-bottom: 6px;
-}
-
-.battery-page.dark .setting-field label {
-  color: #aaa;
-}
-
-.setting-field input {
-  width: 100%;
-  padding: 8px 12px;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  font-size: 0.95rem;
-  background: #f8f8f8;
-  color: #333;
-  box-sizing: border-box;
-}
-
-.setting-field input:focus {
-  outline: none;
-  border-color: #ff91a4;
-  box-shadow: 0 0 0 3px rgba(255, 145, 164, 0.15);
-}
-
-.battery-page.dark .setting-field input {
-  background: #2a2a40;
-  border-color: #444;
-  color: #eee;
-}
-
-.battery-page.dark .setting-field input:focus {
-  border-color: #ff91a4;
-  box-shadow: 0 0 0 3px rgba(255, 145, 164, 0.2);
-}
-
-/* Presets grid */
-.presets-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 12px;
-}
-
-.preset-card {
-  padding: 16px;
-  border: 1px solid #e0e0e0;
-  border-radius: 12px;
-  background: #fafafa;
-  transition: all 0.2s ease;
-}
-
-.preset-card:hover {
-  border-color: #ff91a4;
-  box-shadow: 0 2px 8px rgba(255, 145, 164, 0.15);
-}
-
-.battery-page.dark .preset-card {
-  background: #1e1e30;
-  border-color: #444;
-}
-
-.battery-page.dark .preset-card:hover {
-  border-color: #ff91a4;
-}
-
-.custom-preset {
-  border-style: dashed;
-  cursor: pointer;
-  text-align: center;
-}
-
-.custom-preset:hover {
-  border-color: #ffb347;
-  box-shadow: 0 2px 8px rgba(255, 179, 71, 0.15);
-}
-
-.preset-name {
-  font-weight: 600;
-  font-size: 0.95rem;
-  margin-bottom: 8px;
-  color: #333;
-}
-
-.battery-page.dark .preset-name {
-  color: #eee;
-}
-
-.preset-specs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 10px;
-}
-
-.custom-preset .preset-specs {
-  justify-content: center;
-}
-
-.preset-specs span {
-  font-size: 0.75rem;
-  padding: 2px 8px;
-  border-radius: 6px;
-  background: rgba(255, 145, 164, 0.1);
-  color: #888;
-}
-
-.battery-page.dark .preset-specs span {
-  background: rgba(255, 145, 164, 0.08);
-  color: #999;
-}
-
-.add-btn {
-  padding: 6px 14px;
-  border: none;
-  border-radius: 8px;
-  background: linear-gradient(135deg, #ff91a4, #ffb347);
-  color: white;
-  font-size: 0.85rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.add-btn:hover {
-  opacity: 0.9;
-  transform: translateY(-1px);
-}
-
-/* Toolbar buttons */
-.toolbar-btn {
-  padding: 6px 16px;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  background: #f8f8f8;
-  color: #333;
-  cursor: pointer;
   font-size: 0.9rem;
-  transition: all 0.2s ease;
-}
-
-.toolbar-btn:hover:not(:disabled) {
-  background: #eee;
-  transform: translateY(-1px);
-}
-
-.toolbar-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.toolbar-btn.primary {
-  background: linear-gradient(135deg, #ff91a4, #ffb347);
-  color: white;
-  border: none;
-}
-
-.toolbar-btn.primary:hover:not(:disabled) {
   opacity: 0.9;
 }
 
-.battery-page.dark .toolbar-btn {
-  background: #2a2a40;
-  border-color: #444;
-  color: #ddd;
+/* Warning card */
+.warning-card {
+  background: #fff3cd;
+  border: 2px solid #ffc107;
 }
 
-.battery-page.dark .toolbar-btn:hover:not(:disabled) {
-  background: #3a3a55;
+.warning-card h3 {
+  color: #856404;
 }
 
-.battery-page.dark .toolbar-btn.primary {
-  background: linear-gradient(135deg, #ff91a4, #ffb347);
-  color: white;
+.warning-card p {
+  color: #856404;
+  margin: 8px 0 16px;
 }
 
 /* Selected batteries */
 .selected-header {
   display: flex;
-  align-items: center;
   justify-content: space-between;
+  align-items: center;
   margin-bottom: 16px;
 }
 
@@ -722,361 +389,162 @@ const chartHourLabels = [0, 3, 6, 9, 12, 15, 18, 21, 24]
 .selected-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
 }
 
 .selected-entry {
   display: flex;
-  align-items: center;
   justify-content: space-between;
+  align-items: center;
   padding: 12px 16px;
-  border: 1px solid #e0e0e0;
-  border-radius: 10px;
-  background: #fafafa;
+  background: #f8f8f8;
+  border-radius: 8px;
 }
 
 .battery-page.dark .selected-entry {
-  background: #1e1e30;
-  border-color: #444;
+  background: #2a2a40;
 }
 
 .entry-info {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
 }
 
 .entry-name {
   font-weight: 600;
-  font-size: 0.95rem;
   color: #333;
 }
 
 .battery-page.dark .entry-name {
-  color: #eee;
+  color: #e0e0e0;
 }
 
 .entry-spec {
-  font-size: 0.8rem;
-  color: #888;
+  font-size: 0.85rem;
+  color: #666;
 }
 
 .battery-page.dark .entry-spec {
-  color: #999;
+  color: #b0b0b0;
 }
 
 .qty-controls {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
 }
 
 .qty-btn {
   width: 32px;
   height: 32px;
   border: 1px solid #ddd;
-  border-radius: 8px;
-  background: #f0f0f0;
+  border-radius: 6px;
+  background: white;
   color: #333;
-  font-size: 1.1rem;
-  font-weight: bold;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s ease;
+  font-size: 1.2rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
 }
 
 .qty-btn:hover {
-  background: #e0e0e0;
+  background: #f0f0f0;
 }
 
 .battery-page.dark .qty-btn {
-  background: #2a2a40;
-  border-color: #555;
-  color: #ddd;
-}
-
-.battery-page.dark .qty-btn:hover {
-  background: #3a3a55;
+  background: #1e1e2e;
+  border-color: #444;
+  color: #e0e0e0;
 }
 
 .qty-value {
-  font-weight: bold;
-  font-size: 1.1rem;
-  min-width: 24px;
+  min-width: 30px;
   text-align: center;
-  color: #333;
-}
-
-.battery-page.dark .qty-value {
-  color: #eee;
+  font-weight: 600;
 }
 
 .totals-row {
   display: flex;
   justify-content: space-between;
   padding: 12px 16px;
-  border-top: 2px solid rgba(255, 145, 164, 0.3);
-  margin-top: 4px;
-  font-weight: 600;
-  color: #ff91a4;
+  border-top: 2px solid #ddd;
+  font-weight: 700;
+  font-size: 1.05rem;
 }
 
-/* 24hr Chart */
-.chart-svg {
-  width: 100%;
-  cursor: crosshair;
-}
-
-.chart-grid {
-  stroke: #e8e8e8;
-  stroke-width: 0.5;
-}
-
-.battery-page.dark .chart-grid {
-  stroke: #333;
-}
-
-.chart-axis {
-  stroke: #ccc;
-  stroke-width: 1;
-}
-
-.battery-page.dark .chart-axis {
-  stroke: #555;
-}
-
-.axis-label {
-  fill: #888;
-  font-size: 10px;
-  font-family: system-ui, sans-serif;
-}
-
-.battery-page.dark .axis-label {
-  fill: #777;
-}
-
-.axis-unit {
-  fill: #999;
-  font-size: 9px;
-  font-family: system-ui, sans-serif;
-}
-
-.battery-page.dark .axis-unit {
-  fill: #666;
-}
-
-.legend-text {
-  fill: #888;
-  font-size: 10px;
-  font-family: system-ui, sans-serif;
-}
-
-.battery-page.dark .legend-text {
-  fill: #777;
-}
-
-.legend-solar-swatch {
-  fill: rgba(255, 179, 71, 0.4);
-  stroke: #ffb347;
-  stroke-width: 1;
-}
-
-.legend-usage-line {
-  stroke: #ff91a4;
-  stroke-width: 2;
-  stroke-dasharray: 4 3;
-}
-
-.legend-battery-line {
-  stroke: #22c55e;
-  stroke-width: 2.5;
-}
-
-.solar-area {
-  fill: rgba(255, 179, 71, 0.3);
-  stroke: #ffb347;
-  stroke-width: 1.5;
-}
-
-.usage-line {
-  fill: none;
-  stroke: #ff91a4;
-  stroke-width: 2;
-  stroke-dasharray: 6 4;
-  stroke-linejoin: round;
-}
-
-.battery-line {
-  fill: none;
-  stroke: #22c55e;
-  stroke-width: 2.5;
-  stroke-linejoin: round;
-}
-
-.hover-line {
-  stroke: #888;
-  stroke-width: 1;
-  stroke-dasharray: 3 3;
-}
-
-.battery-page.dark .hover-line {
-  stroke: #666;
-}
-
-.dot-solar {
-  fill: #ffb347;
-  stroke: white;
-  stroke-width: 1.5;
-}
-
-.dot-usage {
-  fill: #ff91a4;
-  stroke: white;
-  stroke-width: 1.5;
-}
-
-.dot-battery {
-  fill: #22c55e;
-  stroke: white;
-  stroke-width: 1.5;
-}
-
-.battery-page.dark .dot-solar,
-.battery-page.dark .dot-usage,
-.battery-page.dark .dot-battery {
-  stroke: #1e1e2d;
-}
-
-.tooltip-bg {
-  fill: rgba(255, 255, 255, 0.95);
-  stroke: #ddd;
-  stroke-width: 1;
-}
-
-.battery-page.dark .tooltip-bg {
-  fill: rgba(30, 30, 45, 0.95);
-  stroke: #555;
-}
-
-.tt-title {
-  fill: #333;
-  font-size: 11px;
-  font-weight: 600;
-  font-family: system-ui, sans-serif;
-}
-
-.battery-page.dark .tt-title {
-  fill: #eee;
-}
-
-.tt-solar {
-  fill: #c07808;
-  font-size: 10px;
-  font-family: system-ui, sans-serif;
-}
-
-.tt-usage {
-  fill: #d04060;
-  font-size: 10px;
-  font-family: system-ui, sans-serif;
-}
-
-.tt-battery {
-  fill: #16803c;
-  font-size: 10px;
-  font-family: system-ui, sans-serif;
-}
-
-.battery-page.dark .tt-solar {
-  fill: #ffb347;
-}
-
-.battery-page.dark .tt-usage {
-  fill: #ff91a4;
-}
-
-.battery-page.dark .tt-battery {
-  fill: #4ade80;
+.battery-page.dark .totals-row {
+  border-color: #444;
 }
 
 /* Results */
 .results-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 12px;
+  gap: 16px;
+  margin-bottom: 24px;
 }
 
 .stat-card {
-  text-align: center;
+  background: #f8f8f8;
   padding: 16px;
-  background: linear-gradient(135deg, rgba(255, 145, 164, 0.1), rgba(255, 179, 71, 0.1));
-  border-radius: 12px;
-  border: 1px solid rgba(255, 145, 164, 0.2);
+  border-radius: 8px;
+  text-align: center;
 }
 
 .battery-page.dark .stat-card {
-  background: linear-gradient(135deg, rgba(255, 145, 164, 0.08), rgba(255, 179, 71, 0.08));
-  border-color: rgba(255, 145, 164, 0.15);
+  background: #2a2a40;
 }
 
 .stat-value {
   font-size: 1.5rem;
-  font-weight: bold;
+  font-weight: 700;
   color: #ff91a4;
-  margin-bottom: 4px;
+  margin-bottom: 8px;
 }
 
 .stat-label {
-  font-size: 0.8rem;
-  color: #888;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  font-size: 0.85rem;
+  color: #666;
 }
 
 .battery-page.dark .stat-label {
-  color: #999;
+  color: #b0b0b0;
 }
 
-/* Coverage bars */
+/* Coverage */
 .coverage-section {
-  margin-top: 20px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
 }
 
 .coverage-row {
-  display: flex;
-  align-items: center;
+  display: grid;
+  grid-template-columns: 180px 1fr 60px;
   gap: 12px;
+  align-items: center;
 }
 
 .coverage-label {
-  min-width: 160px;
   font-size: 0.9rem;
-  color: #555;
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  font-weight: 600;
+  color: #333;
 }
 
 .battery-page.dark .coverage-label {
-  color: #ccc;
+  color: #e0e0e0;
 }
 
 .check {
-  color: #22c55e;
-  font-weight: bold;
-  font-size: 1.1rem;
+  color: #51cf66;
+  margin-left: 8px;
 }
 
 .progress-bar {
-  flex: 1;
-  height: 20px;
-  background: #e8e8e8;
-  border-radius: 10px;
+  height: 24px;
+  background: #eee;
+  border-radius: 12px;
   overflow: hidden;
 }
 
@@ -1086,35 +554,73 @@ const chartHourLabels = [0, 3, 6, 9, 12, 15, 18, 21, 24]
 
 .progress-fill {
   height: 100%;
-  border-radius: 10px;
-  transition: width 0.4s ease;
+  transition: width 0.5s ease;
 }
 
 .progress-fill.best {
-  background: linear-gradient(90deg, #22c55e, #4ade80);
+  background: linear-gradient(90deg, #51cf66, #37b24d);
 }
 
 .progress-fill.worst {
-  background: linear-gradient(90deg, #f59e0b, #fbbf24);
+  background: linear-gradient(90deg, #ff8787, #ff6b6b);
 }
 
 .coverage-pct {
-  min-width: 44px;
-  text-align: right;
   font-weight: 600;
-  font-size: 0.9rem;
-  color: #555;
+  text-align: right;
+  color: #666;
 }
 
 .battery-page.dark .coverage-pct {
-  color: #ccc;
+  color: #b0b0b0;
+}
+
+/* Toolbar buttons */
+.toolbar-btn {
+  padding: 8px 16px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: white;
+  color: #333;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+}
+
+.toolbar-btn:hover {
+  background: #f0f0f0;
+}
+
+.toolbar-btn.primary {
+  background: linear-gradient(45deg, #ff91a4, #ffb347);
+  color: white;
+  border: none;
+}
+
+.toolbar-btn.primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(255, 145, 164, 0.3);
+}
+
+.toolbar-btn.primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.battery-page.dark .toolbar-btn {
+  background: #2a2a40;
+  border-color: #444;
+  color: #e0e0e0;
 }
 
 /* Modal */
 .modal-overlay {
   position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1124,82 +630,90 @@ const chartHourLabels = [0, 3, 6, 9, 12, 15, 18, 21, 24]
 .modal-card {
   background: white;
   border-radius: 16px;
-  padding: 28px;
+  padding: 32px;
+  max-width: 500px;
   width: 90%;
-  max-width: 420px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
 }
 
 .battery-page.dark .modal-card {
-  background: #1e1e2d;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  background: #1e1e2e;
 }
 
 .modal-card h3 {
-  margin: 0 0 20px;
-  font-size: 1.3rem;
-  color: #333;
-}
-
-.battery-page.dark .modal-card h3 {
-  color: #eee;
+  margin: 0 0 24px 0;
+  font-size: 1.5rem;
 }
 
 .modal-fields {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.setting-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.setting-field label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #555;
+}
+
+.battery-page.dark .setting-field label {
+  color: #b0b0b0;
+}
+
+.setting-field input {
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: all 0.2s ease;
+}
+
+.battery-page.dark .setting-field input {
+  background: #2a2a40;
+  border-color: #444;
+  color: #e0e0e0;
+}
+
+.setting-field input:focus {
+  outline: none;
+  border-color: #ff91a4;
+  box-shadow: 0 0 0 3px rgba(255, 145, 164, 0.1);
 }
 
 .modal-actions {
   display: flex;
+  gap: 12px;
   justify-content: flex-end;
-  gap: 10px;
-  margin-top: 20px;
 }
 
-/* Responsive */
-@media (max-width: 600px) {
+@media (max-width: 768px) {
   .battery-page {
-    padding: 60px 12px 30px;
+    padding: 60px 16px 30px;
   }
 
   .page-header h1 {
-    font-size: 1.8rem;
-  }
-
-  .card {
-    padding: 16px;
-  }
-
-  .presets-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .settings-grid {
-    grid-template-columns: 1fr 1fr;
+    font-size: 2rem;
   }
 
   .results-grid {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .coverage-row {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 6px;
-  }
-
-  .coverage-label {
-    min-width: auto;
-  }
-
-  .progress-bar {
-    width: 100%;
+    grid-template-columns: 1fr;
+    gap: 8px;
   }
 
   .coverage-pct {
-    min-width: auto;
+    text-align: left;
   }
 }
 </style>
