@@ -217,8 +217,11 @@ export class MultiplayerBattleScene extends BattleScene {
    */
   private handleMatchEnd(data: any): void {
     const isVictory = data.winnerId === this.yourPlayerId;
-    // Trigger battle end animation
-    (this as any).triggerBattleEnd(isVictory ? 'victory' : 'defeat');
+    // The battle ending animation should already be triggered by mech_destroyed event
+    // This just ensures we call the callback if not already ending
+    if (!(this as any).battleEnding) {
+      this.onBattleEnd(isVictory ? 'victory' : 'defeat');
+    }
   }
 
   /**
@@ -226,7 +229,19 @@ export class MultiplayerBattleScene extends BattleScene {
    */
   private handleOpponentDisconnect(): void {
     // You win by default
-    (this as any).triggerBattleEnd('victory');
+    if (!(this as any).battleEnding) {
+      (this as any).battleEnding = true;
+      (this as any).battleEndTimer = 2.0;
+      (this as any).battleEndResult = 'victory';
+      this.enemyMech.isDestroyed = true;
+
+      const particleSystem = (this as any).particleSystem;
+      const camera = (this as any).camera;
+      if (particleSystem && camera) {
+        particleSystem.spawnExplosion(this.enemyMech.position.clone());
+        camera.triggerShake(1.0);
+      }
+    }
   }
 
   /**
@@ -300,7 +315,7 @@ export class MultiplayerBattleScene extends BattleScene {
     );
 
     particleSystem.spawnHitEffect(impactPos, 'ballistic');
-    audio.playBulletHitMech();
+    //audio.playBulletHitMech();
 
     console.log('[MultiplayerBattleScene] Projectile hit:', data);
   }
@@ -326,8 +341,23 @@ export class MultiplayerBattleScene extends BattleScene {
   private handleMechDestroyed(data: any): void {
     console.log('[MultiplayerBattleScene] Mech destroyed:', data.playerId);
 
-    // The match_end event will trigger the actual victory/defeat screen
-    // This event just handles the destruction animation
+    // Determine which mech was destroyed
+    const destroyedMech = data.playerId === this.yourPlayerId ? this.playerMech : this.enemyMech;
+    const isVictory = data.playerId !== this.yourPlayerId;
+
+    // Trigger battle ending animation
+    const particleSystem = (this as any).particleSystem;
+    const camera = (this as any).camera;
+
+    if (particleSystem && camera) {
+      particleSystem.spawnExplosion(destroyedMech.position.clone());
+      camera.triggerShake(1.0);
+    }
+
+    destroyedMech.isDestroyed = true;
+    (this as any).battleEnding = true;
+    (this as any).battleEndTimer = 2.0;
+    (this as any).battleEndResult = isVictory ? 'victory' : 'defeat';
   }
 
   /**

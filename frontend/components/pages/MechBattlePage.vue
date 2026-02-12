@@ -100,8 +100,8 @@
       <!-- Single Player Battle -->
       <template v-if="battleMode === 'single-player'">
         <BattleCanvas
-          :player-mech="battle.battleState.value.player!"
-          :enemy-mech="battle.battleState.value.enemy!"
+          :player-mech="(battle.battleState.value.player! as MechEntity)"
+          :enemy-mech="(battle.battleState.value.enemy! as MechEntity)"
           @battle-end="handleBattleEnd"
           @damage-dealt="handleDamageDealt"
           @time-update="handleTimeUpdate"
@@ -133,8 +133,8 @@
       <!-- Multiplayer Battle -->
       <template v-else-if="battleMode === 'multiplayer' && matchData && multiplayerPlayerMech && multiplayerOpponentMech && auth.token.value">
         <MultiplayerBattleCanvas
-          :player-mech="multiplayerPlayerMech"
-          :opponent-mech="multiplayerOpponentMech"
+          :player-mech="(multiplayerPlayerMech as MechEntity)"
+          :opponent-mech="(multiplayerOpponentMech as MechEntity)"
           :match-data="matchData"
           :auth-token="auth.token.value"
           @battle-end="handleMultiplayerBattleEnd"

@@ -496,7 +496,7 @@ export class BattleScene {
       )
 
       // Play hit sound
-      this.audio.playBulletHitMech()
+      //this.audio.playBulletHitMech()
 
       // Track damage dealt by player
       if (hit.target === this.enemyMech) {
@@ -690,7 +690,7 @@ export class BattleScene {
             projectile.type
           )
           // Play hit sound for building impacts
-          this.audio.playBulletHit()
+          //this.audio.playBulletHit()
           this.projectileSystem.removeProjectile(projectile)
           break
         }

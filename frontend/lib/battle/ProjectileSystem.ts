@@ -226,6 +226,9 @@ export class ProjectileSystem {
         // Skip if projectile owner is the target
         if (proj.ownerId === mech.id) continue
 
+        // Skip if mech is already destroyed
+        if (mech.isDestroyed) continue
+
         // Box collision detection - more accurate for tall mechs
         // Mech dimensions: 2 wide, 4 tall (core 3 + head 1), 2 deep
         // Check as a box around the mech's center

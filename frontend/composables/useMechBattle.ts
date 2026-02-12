@@ -4,7 +4,7 @@ import { MechEntity, type CombatStats } from '../lib/battle/MechEntity'
 import type { MechLoadout, MechStats } from './useMechBuilder'
 
 export interface BattleState {
-  phase: 'loading' | 'ready' | 'active' | 'victory' | 'defeat'
+  phase: 'loading' | 'ready' | 'active' | 'victory' | 'defeat' | 'mode-select'
   player: MechEntity | null
   enemy: MechEntity | null
   time: number
@@ -45,6 +45,7 @@ export function useMechBattle() {
       true, // isPlayer
       new THREE.Vector3(0, 0, 15) // Spawn position
     )
+    battleState.value.player.rotation.y = Math.PI // Face enemy
 
     battleState.value.phase = 'ready'
   }

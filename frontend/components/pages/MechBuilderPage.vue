@@ -120,8 +120,9 @@
         </button>
 
         <button
-          v-if="currentStep === 5 && isComplete"
+          v-if="currentStep === 5"
           @click="goToBattle"
+          :disabled="!isComplete || warnings.length > 0"
           class="nav-btn battle-btn"
         >
           ⚔️ Battle!
@@ -219,7 +220,7 @@ const canProceed = computed(() => {
 })
 
 const canShare = computed(() => {
-  return loadout.value.core !== null && loadout.value.legs !== null && loadout.value.head !== null
+  return isComplete.value && warnings.value.length === 0
 })
 
 const selectedArmForPreview = computed(() => {
@@ -295,7 +296,14 @@ function shareBuild() {
 
 function goToBattle() {
   if (!isComplete.value) return
-  router.push('/mech-battle')
+
+  // Export build code and pass via query parameter
+  const buildCode = exportBuild()
+
+  router.push({
+    name: 'mech-battle',
+    query: { build: buildCode }
+  })
 }
 
 // Load build from URL on mount
