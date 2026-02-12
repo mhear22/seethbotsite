@@ -1,32 +1,77 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import Modal from '../shared/ui/Modal.vue'
 import TicketForm from '../shared/ui/TicketForm.vue'
 import TicketFilters from '../shared/ui/TicketFilters.vue'
 import TicketDetailsModal from '../shared/tickets/TicketDetailsModal.vue'
+import TicketStatistics from '../tickets/TicketStatistics.vue'
+import TicketCard from '../tickets/TicketCard.vue'
 import { useFavorites } from '../../composables/useFavorites'
-import { useTicketsStore } from '../../stores/useTicketsStore'
-import { formatDate } from '../../utils/format'
+import { useTicketsStore, type Ticket } from '../../stores/useTicketsStore'
 import { useAuthStore } from '../../stores/useAuthStore'
-import type { Ticket, TicketStats } from '../../stores/useTicketsStore'
+import { useNotification } from '../../composables/useNotification'
+import { useFilterState } from '../../composables/useFilterState'
+import { useTicketOperations } from '../../composables/useTicketOperations'
+import { useTicketUI } from '../../composables/useTicketUI'
+import { useTicketSettings } from '../../composables/useTicketSettings'
+import { formatDate } from '../../utils/format'
 
-// Use stores instead of local state
+// Stores
 const ticketsStore = useTicketsStore()
 const authStore = useAuthStore()
 
-const showNewTicketModal = ref(false)
-const notification = ref<{ show: boolean; message: string; type: 'success' | 'error' }>({
-  show: false,
-  message: '',
-  type: 'success'
+// Composables
+const { notification, showNotification, hideNotification } = useNotification()
+const { toggleFavorite, isFavorite } = useFavorites()
+const settings = useTicketSettings()
+const ui = useTicketUI()
+const operations = useTicketOperations(settings.creatorId)
+
+// Filter configuration
+const filterConfig = useFilterState<Ticket>({
+  items: computed(() => ticketsStore.tickets),
+  filterFn: (ticket, filters) => {
+    // Status filter
+    if (filters.filterStatus) {
+      const statusFilter = filters.filterStatus === 'in-progress' ? 'needs-info' : filters.filterStatus
+      if (ticket.status !== statusFilter) return false
+    }
+
+    // Type filter
+    if (filters.filterType && ticket.type !== filters.filterType) return false
+
+    // Priority filter
+    if (filters.filterPriority && ticket.priority !== filters.filterPriority) return false
+
+    // Tag filter
+    if (filters.filterTag) {
+      const tag = filters.filterTag.toLowerCase().trim()
+      if (!ticket.tags || !ticket.tags.toLowerCase().includes(tag)) return false
+    }
+
+    // Category filter
+    if (filters.filterCategory) {
+      const category = filters.filterCategory.toLowerCase().trim()
+      if (!ticket.category || ticket.category.toLowerCase() !== category) return false
+    }
+
+    return true
+  },
+  searchFn: (ticket, query) => {
+    const lowerQuery = query.toLowerCase().trim()
+    return ticket.title.toLowerCase().includes(lowerQuery) ||
+           ticket.description.toLowerCase().includes(lowerQuery)
+  }
 })
 
-// Filter state (default to pending per ticket #151)
+// Filter state refs for TicketFilters component
 const filterStatus = ref('pending')
 const filterType = ref('')
 const filterPriority = ref('')
 const filterTag = ref('')
 const filterCategory = ref('')
+const searchQuery = ref('')
+const ticketFiltersRef = ref<InstanceType<typeof TicketFilters> | null>(null)
 
 // Combined filters object for TicketFilters component
 const filters = computed({
@@ -45,68 +90,23 @@ const filters = computed({
     filterPriority.value = value.filterPriority
     filterTag.value = value.filterTag
     filterCategory.value = value.filterCategory
+
+    // Sync with filterConfig
+    filterConfig.searchQuery.value = value.searchQuery
+    filterConfig.setFilters({
+      filterStatus: value.filterStatus,
+      filterType: value.filterType,
+      filterPriority: value.filterPriority,
+      filterTag: value.filterTag,
+      filterCategory: value.filterCategory
+    })
   }
 })
 
-// Search state
-const searchQuery = ref('')
-const ticketFiltersRef = ref<InstanceType<typeof TicketFilters> | null>(null)
-
-// Favorites composable
-const { toggleFavorite, isFavorite } = useFavorites()
-
-// Admin state
-const showAdminPanel = ref(false)
-const closingTicket = ref<Ticket | null>(null)
-const showForm = ref(false)
-const closeForm = ref({
-  status: 'completed' as 'completed' | 'declined',
-  response: ''
-})
-
-// Expanded descriptions state (Set of ticket IDs that are expanded)
-const expandedTicketIds = ref<Set<number>>(new Set())
-
-// Ticket completion confirmation state
-const confirmingTicket = ref<Ticket | null>(null)
-const showConfirmModal = ref(false)
-const unresolvedForm = ref({
-  reason: ''
-})
-
-// User/Creator state
-const creatorId = ref<string>('')
-
-// New ticket form state
-const newTicket = ref({
-  title: '',
-  description: '',
-  type: 'feature' as 'feature' | 'bug' | 'feedback', // Kept for backend compatibility
-  priority: 'medium' as 'high' | 'medium' | 'low', // Kept for backend compatibility
-  tags: '',
-  category: ''
-})
-
-// Edit ticket modal state
-const showEditModal = ref(false)
-const editingTicket = ref<Ticket | null>(null)
-const editForm = ref({
-  title: '',
-  description: '',
-  type: 'feature' as 'feature' | 'bug' | 'feedback',
-  priority: 'medium' as 'high' | 'medium' | 'low',
-  tags: '',
-  category: ''
-})
-
-// Local error state for form validation
-const formError = ref<string | null>(null)
-
-// Ticket details modal state
-const showDetailsModal = ref(false)
+// Viewing ticket for details modal
 const viewingTicket = ref<Ticket | null>(null)
 
-// Status colors
+// Status colors and labels
 const statusColors = {
   pending: 'bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900 dark:text-yellow-200 dark:border-yellow-700',
   'needs-info': 'bg-orange-100 text-orange-800 border-orange-300 dark:bg-orange-900 dark:text-orange-200 dark:border-orange-700',
@@ -123,96 +123,11 @@ const statusLabels = {
   unresolved: '⚠️ Unresolved'
 }
 
-// Filter options (no "all" option per ticket #151)
-const statusOptions = [
-  { value: 'pending', label: '⏳ Pending' },
-  { value: 'in-progress', label: '🔄 In Progress' },
-  { value: 'completed', label: '✅ Complete' }
-]
-
-const typeOptions = [
-  { value: 'feature', label: '✨ Feature' },
-  { value: 'bug', label: '🐛 Bug' },
-  { value: 'feedback', label: '💬 Feedback' }
-]
-
-const priorityOptions = [
-  { value: 'high', label: '🔴 High' },
-  { value: 'medium', label: '🟡 Medium' },
-  { value: 'low', label: '🟢 Low' }
-]
-
-// Computed property for filtered tickets
-const filteredTickets = computed(() => {
-  let result = ticketsStore.tickets
-
-  if (filterStatus.value) {
-    const statusFilter = filterStatus.value === 'in-progress' ? 'needs-info' : filterStatus.value
-    result = result.filter(t => t.status === statusFilter)
-  }
-
-  if (filterType.value) {
-    result = result.filter(t => t.type === filterType.value)
-  }
-
-  if (filterPriority.value) {
-    result = result.filter(t => t.priority === filterPriority.value)
-  }
-
-  // Filter by tag
-  if (filterTag.value) {
-    const tag = filterTag.value.toLowerCase().trim()
-    result = result.filter(t =>
-      t.tags && t.tags.toLowerCase().includes(tag)
-    )
-  }
-
-  // Filter by category
-  if (filterCategory.value) {
-    const category = filterCategory.value.toLowerCase().trim()
-    result = result.filter(t =>
-      t.category && t.category.toLowerCase() === category
-    )
-  }
-
-  // Search filter
-  if (searchQuery.value.trim()) {
-    const query = searchQuery.value.toLowerCase().trim()
-    result = result.filter(t =>
-      t.title.toLowerCase().includes(query) ||
-      t.description.toLowerCase().includes(query)
-    )
-  }
-
-  return result
-})
-
-// Kanban columns
-const kanbanColumns = computed(() => {
-  return {
-    pending: ticketsStore.tickets.filter(t => t.status === 'pending'),
-    inProgress: ticketsStore.tickets.filter(t => t.status === 'needs-info'),
-    completed: ticketsStore.tickets.filter(t => t.status === 'completed')
-  }
-})
-
-// Generate or get creator ID
-const getOrCreateCreatorId = (): string => {
-  let id = localStorage.getItem('tickets-creator-id')
-  if (!id) {
-    // Generate a random ID
-    id = 'user_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
-    localStorage.setItem('tickets-creator-id', id)
-  }
-  return id
-}
-
-// Check if a ticket belongs to the current user
+// Helper functions
 const isOwnTicket = (ticket: Ticket): boolean => {
-  return !!(ticket.creator_id && ticket.creator_id === creatorId.value)
+  return !!(ticket.creator_id && ticket.creator_id === settings.creatorId.value)
 }
 
-// Favorite helpers
 const handleTicketFavorite = (ticket: Ticket, e: Event) => {
   e.stopPropagation()
   toggleFavorite('ticket', ticket)
@@ -222,416 +137,82 @@ const isTicketFavorite = (ticket: Ticket): boolean => {
   return isFavorite('ticket', ticket)
 }
 
-// Expand/collapse ticket description
 const toggleTicketDescription = (ticketId: number, e: Event) => {
   e.stopPropagation()
-  if (expandedTicketIds.value.has(ticketId)) {
-    expandedTicketIds.value.delete(ticketId)
-  } else {
-    expandedTicketIds.value.add(ticketId)
-  }
-  // Force reactivity by creating a new Set
-  expandedTicketIds.value = new Set(expandedTicketIds.value)
-}
-
-// Open ticket details modal
-const openTicketDetails = (ticket: Ticket, e: Event) => {
-  e.stopPropagation()
-  viewingTicket.value = ticket
-  showDetailsModal.value = true
-}
-
-// Close ticket details modal
-const closeTicketDetails = () => {
-  showDetailsModal.value = false
-  viewingTicket.value = null
+  ui.toggleDescription(ticketId)
 }
 
 const isTicketDescriptionExpanded = (ticketId: number): boolean => {
-  return expandedTicketIds.value.has(ticketId)
+  return ui.isExpanded(ticketId)
 }
 
-// Load tickets
-const loadTickets = async () => {
-  await ticketsStore.loadTickets()
+const openTicketDetails = (ticket: Ticket, e: Event) => {
+  e.stopPropagation()
+  viewingTicket.value = ticket
+  ui.detailsModal.open(ticket)
 }
 
-// Load ticket statistics
-const loadTicketStats = async () => {
-  await ticketsStore.loadTicketStats()
+const closeTicketDetails = () => {
+  ui.detailsModal.close()
+  viewingTicket.value = null
 }
 
-// Watch for filter changes and reload tickets
-// Note: We don't need to reload on filter changes anymore since we filter client-side
-// This is handled by the filteredTickets computed property
-
-// Show notification
-const showNotification = (message: string, type: 'success' | 'error' = 'success') => {
-  notification.value = {
-    show: true,
-    message,
-    type
-  }
-  setTimeout(() => {
-    notification.value.show = false
-  }, 3000)
-}
-
-// Hide notification
-const hideNotification = () => {
-  notification.value.show = false
-}
-
-// Submit new ticket
-const submitTicket = async () => {
-  if (!newTicket.value.title.trim()) {
-    formError.value = 'Title is required'
-    return
-  }
-
-  try {
-    await ticketsStore.createTicket({
-      title: newTicket.value.title.trim(),
-      description: newTicket.value.description.trim() || null,
-      type: newTicket.value.type,
-      priority: newTicket.value.priority,
-      tags: newTicket.value.tags.trim() || null,
-      category: newTicket.value.category.trim() || null,
-      creator_id: creatorId.value
-    })
-
-    // Reset form and close modal
-    newTicket.value = {
-      title: '',
-      description: '',
-      type: 'feature',
-      priority: 'medium',
-      tags: '',
-      category: ''
-    }
-    formError.value = null
-    showNewTicketModal.value = false
-
-    // Show success notification
-    showNotification('Ticket submitted successfully!')
-
-    // Reload tickets
-    await loadTickets()
-  } catch (err) {
-    // Error is already set in store
-    showNotification(ticketsStore.error || 'Failed to submit ticket', 'error')
+// Wrapped operations with modal management
+const handleSubmitTicket = async () => {
+  const success = await operations.submitTicket()
+  if (success) {
+    ui.newTicketModal.close()
   }
 }
 
-// Start editing a ticket
-const startEdit = (ticket: Ticket) => {
-  formError.value = null
-  editingTicket.value = ticket
-  editForm.value = {
-    title: ticket.title,
-    description: ticket.description,
-    type: ticket.type,
-    priority: ticket.priority,
-    tags: ticket.tags || '',
-    category: ticket.category || ''
-  }
-  showEditModal.value = true
+const handleStartEdit = (ticket: Ticket) => {
+  operations.startEdit(ticket)
+  ui.editModal.open(ticket)
 }
 
-// Cancel editing
-const cancelEdit = () => {
-  editingTicket.value = null
-  showEditModal.value = false
-  editForm.value = {
-    title: '',
-    description: '',
-    type: 'feature',
-    priority: 'medium',
-    tags: '',
-    category: ''
+const handleCancelEdit = () => {
+  operations.cancelEdit()
+  ui.editModal.close()
+}
+
+const handleSaveEdit = async () => {
+  const success = await operations.saveEdit()
+  if (success) {
+    ui.editModal.close()
   }
 }
 
-// Save edited ticket
-const saveEdit = async () => {
-  if (!editingTicket.value) return
-  if (!editForm.value.title.trim()) {
-    formError.value = 'Title is required'
-    return
-  }
+const handleStartConfirmTicket = (ticket: Ticket) => {
+  operations.startConfirmTicket(ticket)
+  ui.confirmModal.open(ticket)
+}
 
-  try {
-    await ticketsStore.updateTicket(editingTicket.value.id, {
-      title: editForm.value.title.trim(),
-      description: editForm.value.description.trim() || null,
-      type: editForm.value.type,
-      priority: editForm.value.priority,
-      tags: editForm.value.tags.trim() || null,
-      category: editForm.value.category.trim() || null
-    })
+const handleCancelConfirmTicket = () => {
+  operations.cancelConfirmTicket()
+  ui.confirmModal.close()
+}
 
-    // Reset edit state and close modal
-    editingTicket.value = null
-    formError.value = null
-    showEditModal.value = false
-    editForm.value = {
-      title: '',
-      description: '',
-      type: 'feature',
-      priority: 'medium',
-      tags: '',
-      category: ''
-    }
-
-    // Show success notification
-    showNotification('Ticket updated successfully!')
-
-    // Reload tickets
-    await loadTickets()
-  } catch (err) {
-    // Error is already set in store
-    showNotification(ticketsStore.error || 'Failed to update ticket', 'error')
+const handleConfirmTicket = async () => {
+  const success = await operations.confirmTicket()
+  if (success) {
+    ui.confirmModal.close()
   }
 }
 
-// Toggle ignore mode
-const toggleIgnoreMode = async () => {
-  const newValue = !ignoreMode.value
-
-  // Save to localStorage for quick UI response
-  localStorage.setItem('tickets-ignore-mode', String(newValue))
-  ignoreMode.value = newValue
-
-  // Sync with backend (don't wait for it to succeed for UI)
-  try {
-    await fetch('/api/tickets/settings/ignore-mode', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ignoreMode: newValue })
-    })
-  } catch (err) {
-    console.error('Failed to sync ignore mode with backend:', err)
-    // UI already updated, so no action needed
+const handleMarkUnresolved = async () => {
+  const success = await operations.markUnresolved()
+  if (success) {
+    ui.confirmModal.close()
   }
 }
 
-// Load ignore mode from backend
-const loadIgnoreMode = async () => {
-  try {
-    const response = await fetch('/api/tickets/settings/ignore-mode')
-    if (response.ok) {
-      const data = await response.json()
-      ignoreMode.value = data.ignoreMode
-      localStorage.setItem('tickets-ignore-mode', String(data.ignoreMode))
-    }
-  } catch (err) {
-    // Fallback to localStorage if backend fails
-    console.warn('Failed to load ignore mode from backend, using localStorage')
-    const savedIgnoreMode = localStorage.getItem('tickets-ignore-mode')
-    if (savedIgnoreMode) {
-      ignoreMode.value = savedIgnoreMode === 'true'
-    }
-  }
-}
-
-// Load last collection timestamp
-const loadLastCollection = async () => {
-  try {
-    const response = await fetch('/api/tickets/settings/last-collection')
-    if (response.ok) {
-      const data = await response.json()
-      lastCollection.value = data.lastCollection
-    }
-  } catch (err) {
-    console.warn('Failed to load last collection from backend:', err)
-  }
-}
-
-// Load estimated wait time
-const loadEstimatedWaitTime = async () => {
-  try {
-    const response = await fetch('/api/tickets/estimated-wait-time')
-    if (response.ok) {
-      const data = await response.json()
-      if (data.estimatedWaitTimeMinutes !== null) {
-        estimatedWaitTime.value = {
-          minutes: data.estimatedWaitTimeMinutes,
-          sampleSize: data.sampleSize
-        }
-      }
-    }
-  } catch (err) {
-    console.warn('Failed to load estimated wait time from backend:', err)
-  }
-}
-
-// Start closing a ticket
-const startCloseTicket = (ticket: Ticket) => {
-  formError.value = null
-  closingTicket.value = ticket
-  closeForm.value = {
-    status: 'completed',
-    response: ''
-  }
-  showForm.value = false
-}
-
-// Cancel closing ticket
-const cancelCloseTicket = () => {
-  closingTicket.value = null
-  closeForm.value = {
-    status: 'completed',
-    response: ''
-  }
-}
-
-// Close ticket
-const closeTicket = async () => {
-  if (!closingTicket.value) return
-
-  try {
-    await ticketsStore.updateTicket(closingTicket.value.id, {
-      status: closeForm.value.status === 'completed' ? 'completed' : 'declined',
-      response: closeForm.value.response
-    })
-
-    // Reset form
-    closingTicket.value = null
-    closeForm.value = {
-      status: 'completed',
-      response: ''
-    }
-
-    // Show success notification
-    showNotification('Ticket closed successfully!')
-
-    // Reload tickets
-    await loadTickets()
-  } catch (err) {
-    showNotification(ticketsStore.error || 'Failed to close ticket', 'error')
-  }
-}
-
-// Start confirming a ticket
-const startConfirmTicket = (ticket: Ticket) => {
-  formError.value = null
-  confirmingTicket.value = ticket
-  showConfirmModal.value = true
-}
-
-// Cancel confirming ticket
-const cancelConfirmTicket = () => {
-  confirmingTicket.value = null
-  showConfirmModal.value = false
-  unresolvedForm.value = {
-    reason: ''
-  }
-}
-
-// Confirm ticket completion
-const confirmTicket = async () => {
-  if (!confirmingTicket.value) return
-
-  try {
-    await ticketsStore.updateTicket(confirmingTicket.value.id, {
-      status: 'completed',
-      response: confirmingTicket.value.response || (unresolvedForm.value.reason ? `Confirmed: ${unresolvedForm.value.reason}` : 'Confirmed by human reviewer')
-    })
-
-    // Reset form
-    confirmingTicket.value = null
-    showConfirmModal.value = false
-    unresolvedForm.value = {
-      reason: ''
-    }
-
-    // Show success notification
-    showNotification('Ticket confirmed successfully!')
-
-    // Reload tickets
-    await loadTickets()
-  } catch (err) {
-    showNotification(ticketsStore.error || 'Failed to confirm ticket', 'error')
-  }
-}
-
-// Mark ticket as unresolved
-const markUnresolved = async () => {
-  if (!confirmingTicket.value) return
-  if (!unresolvedForm.value.reason.trim()) {
-    formError.value = 'Reason is required to mark ticket as unresolved'
-    return
-  }
-
-  try {
-    await ticketsStore.updateTicket(confirmingTicket.value.id, {
-      status: 'unresolved',
-      response: `Unresolved: ${unresolvedForm.value.reason}`
-    })
-
-    // Reset form
-    confirmingTicket.value = null
-    showConfirmModal.value = false
-    unresolvedForm.value = {
-      reason: ''
-    }
-
-    // Show success notification
-    showNotification('Ticket marked as unresolved!')
-
-    // Reload tickets
-    await loadTickets()
-  } catch (err) {
-    showNotification(ticketsStore.error || 'Failed to mark ticket as unresolved', 'error')
-  }
-}
-
-// Close own ticket (user)
-const closeOwnTicket = async (ticket: Ticket) => {
-  try {
-    await ticketsStore.updateTicket(ticket.id, {
-      status: 'completed',
-      creator_id: creatorId.value
-    })
-
-    // Show success notification
-    showNotification('Ticket closed successfully!')
-
-    // Reload tickets
-    await loadTickets()
-  } catch (err) {
-    showNotification(ticketsStore.error || 'Failed to close ticket', 'error')
-  }
-}
-
-// Delete own ticket (user)
-const deleteOwnTicket = async (ticket: Ticket) => {
-  if (!confirm(`Are you sure you want to delete "${ticket.title}"?`)) {
-    return
-  }
-
-  try {
-    await ticketsStore.deleteTicket(ticket.id, creatorId.value)
-
-    // Reload tickets
-    await loadTickets()
-  } catch (err) {
-    showNotification(ticketsStore.error || 'Failed to delete ticket', 'error')
-  }
-}
-
-// Load on mount
+// Load data on mount
 onMounted(async () => {
-  // Initialize auth store
   await authStore.init()
-
-  // Initialize creator ID
-  creatorId.value = getOrCreateCreatorId()
-  loadIgnoreMode()
-  loadLastCollection()
-  loadEstimatedWaitTime()
-  loadTickets()
-  loadTicketStats()
+  settings.initCreatorId()
+  await settings.loadSettings()
+  await ticketsStore.loadTickets()
+  await ticketsStore.loadTicketStats()
 
   // Keyboard shortcuts
   const handleKeyDown = (e: KeyboardEvent) => {
@@ -643,7 +224,7 @@ onMounted(async () => {
     // 'n' or 'c' to create new ticket
     if ((e.key === 'n' || e.key === 'c' || e.key === 'N' || e.key === 'C') && !e.ctrlKey && !e.metaKey) {
       e.preventDefault()
-      showNewTicketModal.value = true
+      ui.newTicketModal.open()
     }
 
     // '/' to focus search
@@ -654,24 +235,11 @@ onMounted(async () => {
   }
 
   window.addEventListener('keydown', handleKeyDown)
-})
 
-// Cleanup keyboard shortcuts
-onUnmounted(() => {
-  const handleKeyDown = (e: KeyboardEvent) => {
-    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-      return
-    }
-    if ((e.key === 'n' || e.key === 'c' || e.key === 'N' || e.key === 'C') && !e.ctrlKey && !e.metaKey) {
-      e.preventDefault()
-      showNewTicketModal.value = true
-    }
-    if (e.key === '/' && !e.ctrlKey && !e.metaKey) {
-      e.preventDefault()
-      ticketFiltersRef.value?.searchInputRef?.focus()
-    }
-  }
-  window.removeEventListener('keydown', handleKeyDown)
+  // Cleanup
+  onUnmounted(() => {
+    window.removeEventListener('keydown', handleKeyDown)
+  })
 })
 </script>
 
@@ -699,106 +267,18 @@ onUnmounted(() => {
             <input
               type="checkbox"
               :checked="ticketsStore.ignoreMode"
-              @change="toggleIgnoreMode"
+              @change="settings.toggleIgnoreMode"
             />
             <span class="toggle-slider"></span>
           </label>
           <span class="toggle-label">
-            {{ ignoreMode ? '🚫 Paused - Ignoring all tickets' : '✅ Active - Processing tickets' }}
+            {{ ticketsStore.ignoreMode ? '🚫 Paused - Ignoring all tickets' : '✅ Active - Processing tickets' }}
           </span>
         </div>
       </div>
 
       <!-- Ticket Statistics -->
-      <div v-if="ticketsStore.ticketStats" class="ticket-stats-section">
-        <div class="stats-header">
-          <span class="stats-icon">📊</span>
-          <h3 class="stats-title">Ticket Statistics</h3>
-        </div>
-        <div class="stats-grid">
-          <!-- Total Tickets Card -->
-          <div class="stat-card stat-primary">
-            <div class="stat-icon stat-icon-primary">🎫</div>
-            <div class="stat-content">
-              <span class="stat-label">Total Tickets</span>
-              <span class="stat-value">{{ ticketsStore.ticketStats.totalTickets }}</span>
-            </div>
-          </div>
-
-          <!-- Status Breakdown Card -->
-          <div class="stat-card stat-status">
-            <div class="stat-icon stat-icon-status">📋</div>
-            <div class="stat-content">
-              <span class="stat-label">By Status</span>
-              <div class="status-breakdown">
-                <span :class="['status-badge', statusColors.pending]">
-                  ⏳ {{ ticketsStore.ticketStats.byStatus.pending || 0 }}
-                </span>
-                <span :class="['status-badge', statusColors['needs-info']]">
-                  🔄 {{ ticketsStore.ticketStats.byStatus['needs-info'] || 0 }}
-                </span>
-                <span :class="['status-badge', statusColors.completed]">
-                  ✅ {{ ticketsStore.ticketStats.byStatus.completed || 0 }}
-                </span>
-                <span :class="['status-badge', statusColors.declined]">
-                  ❌ {{ ticketsStore.ticketStats.byStatus.declined || 0 }}
-                </span>
-                <span v-if="ticketsStore.ticketStats.byStatus.unresolved" :class="['status-badge', statusColors.unresolved]">
-                  ⚠️ {{ ticketsStore.ticketStats.byStatus.unresolved }}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Oldest Ticket Card -->
-          <div class="stat-card">
-            <div class="stat-icon">📅</div>
-            <div class="stat-content">
-              <span class="stat-label">Oldest Ticket</span>
-              <div class="ticket-info">
-                <span class="ticket-id">#{{ ticketsStore.ticketStats.oldestTicket.id }}</span>
-                <span class="ticket-title">{{ ticketsStore.ticketStats.oldestTicket.title }}</span>
-              </div>
-              <span class="ticket-date">{{ formatDate(ticketsStore.ticketStats.oldestTicket.created_at, true) }}</span>
-            </div>
-          </div>
-
-          <!-- Newest Ticket Card -->
-          <div class="stat-card">
-            <div class="stat-icon">✨</div>
-            <div class="stat-content">
-              <span class="stat-label">Newest Ticket</span>
-              <div class="ticket-info">
-                <span class="ticket-id">#{{ ticketsStore.ticketStats.newestTicket.id }}</span>
-                <span class="ticket-title">{{ ticketsStore.ticketStats.newestTicket.title }}</span>
-              </div>
-              <span class="ticket-date">{{ formatDate(ticketsStore.ticketStats.newestTicket.created_at, true) }}</span>
-            </div>
-          </div>
-
-          <!-- Date Range Card -->
-          <div class="stat-card">
-            <div class="stat-icon">📈</div>
-            <div class="stat-content">
-              <span class="stat-label">Date Range</span>
-              <div class="date-range">
-                <div class="date-row">
-                  <span class="date-label">Created:</span>
-                  <span class="date-value">{{ formatDate(ticketsStore.ticketStats.dates.oldestCreated, true) }}</span>
-                  <span class="date-separator">→</span>
-                  <span class="date-value">{{ formatDate(ticketsStore.ticketStats.dates.newestCreated, true) }}</span>
-                </div>
-                <div v-if="ticketsStore.ticketStats.dates.oldestCompleted" class="date-row completed-date">
-                  <span class="date-label">Completed:</span>
-                  <span class="date-value">{{ formatDate(ticketsStore.ticketStats.dates.oldestCompleted, true) }}</span>
-                  <span class="date-separator">→</span>
-                  <span class="date-value">{{ formatDate(ticketsStore.ticketStats.dates.newestCompleted, true) }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <TicketStatistics :ticket-stats="ticketsStore.ticketStats" />
 
       <!-- Notification Toast -->
       <div v-if="notification.show" class="notification" :class="`notification-${notification.type}`" role="status" aria-live="polite">
@@ -815,186 +295,102 @@ onUnmounted(() => {
       </div>
 
       <button
-        @click="showNewTicketModal = true"
+        @click="ui.newTicketModal.open()"
         class="new-ticket-btn"
       >
         + New Ticket
       </button>
 
-      <!-- Filter Chips (buttons instead of dropdown per ticket #151) -->
+      <!-- Filter Chips -->
       <TicketFilters ref="ticketFiltersRef" v-model="filters" />
 
       <!-- Filtered Tickets List -->
-      <div  class="tickets-list">
+      <div class="tickets-list">
         <div v-if="ticketsStore.loading" class="loading-state" aria-live="polite" aria-busy="true">
           <div class="loading-spinner" aria-hidden="true"></div>
           <span>Loading tickets...</span>
         </div>
-        <div v-else-if="filteredTickets.length === 0" class="empty-state" role="status">
+        <div v-else-if="filterConfig.filtered.value.length === 0" class="empty-state" role="status">
           No tickets match your filters.
         </div>
-        <div
-          v-for="ticket in filteredTickets"
+        <TicketCard
+          v-for="ticket in filterConfig.filtered.value"
           :key="ticket.id"
-          class="ticket-card"
-        >
-          <div class="ticket-header">
-            <h3 class="ticket-title">{{ ticket.title }}</h3>
-            <div class="ticket-badges">
-              <span class="ticket-status" :class="statusColors[ticket.status]">
-                {{ statusLabels[ticket.status] }}
-              </span>
-              <button
-                @click="handleTicketFavorite(ticket, $event)"
-                :class="['ticket-favorite-btn', { favorited: isTicketFavorite(ticket) }]"
-                :title="isTicketFavorite(ticket) ? 'Remove from favorites' : 'Add to favorites'"
-              >
-                ⭐
-              </button>
-            </div>
-          </div>
-
-          <!-- Expandable Description -->
-          <button
-            @click="toggleTicketDescription(ticket.id, $event)"
-            class="ticket-expand-btn"
-            :class="{ expanded: isTicketDescriptionExpanded(ticket.id) }"
-          >
-            <span class="expand-icon">{{ isTicketDescriptionExpanded(ticket.id) ? '▼' : '▶' }}</span>
-            <span class="expand-text">
-              {{ isTicketDescriptionExpanded(ticket.id) ? 'Show Less' : 'More Details' }}
-            </span>
-          </button>
-
-          <div
-            v-if="isTicketDescriptionExpanded(ticket.id)"
-            class="ticket-description"
-          >
-            {{ ticket.description }}
-          </div>
-
-          <!-- Tags and Category -->
-          <div v-if="ticket.tags || ticket.category" class="ticket-tags-category">
-            <div v-if="ticket.tags" class="ticket-tags">
-              <span
-                v-for="tag in ticket.tags.split(',').map(t => t.trim()).filter(t => t)"
-                :key="tag"
-                class="tag-chip"
-              >
-                🏷️ {{ tag }}
-              </span>
-            </div>
-            <div v-if="ticket.category" class="ticket-category">
-              <span class="category-chip">📁 {{ ticket.category }}</span>
-            </div>
-          </div>
-
-          <div class="ticket-meta">
-            <span class="ticket-date">Created: {{ formatDate(ticket.created_at, true) }}</span>
-            <div class="ticket-actions">
-              <button
-                @click="openTicketDetails(ticket, $event)"
-                class="view-details-btn"
-                :disabled="loading"
-                title="View full ticket details"
-              >
-                👁️ View Details
-              </button>
-              <button
-                v-if="ticket.status === 'pending'"
-                @click="startEdit(ticket)"
-                class="edit-ticket-btn"
-                :disabled="ticketsStore.loading"
-                title="Edit ticket"
-              >
-                ✏️ Edit
-              </button>
-              <button
-                v-if="isOwnTicket(ticket) && ticket.status === 'pending'"
-                @click="closeOwnTicket(ticket)"
-                class="close-ticket-btn"
-                :disabled="ticketsStore.loading"
-                title="Mark as completed"
-              >
-                ✅ Close
-              </button>
-              <button
-                v-if="isOwnTicket(ticket) && ticket.status === 'pending'"
-                @click="deleteOwnTicket(ticket)"
-                class="delete-ticket-btn"
-                :disabled="ticketsStore.loading"
-                title="Delete ticket"
-              >
-                🗑️ Delete
-              </button>
-            </div>
-          </div>
-          <div v-if="ticket.response" class="ticket-response">
-            <div class="response-label">Response:</div>
-            <div class="response-text">{{ ticket.response }}</div>
-          </div>
-        </div>
+          :ticket="ticket"
+          :status-colors="statusColors"
+          :status-labels="statusLabels"
+          :is-own-ticket="isOwnTicket"
+          :is-ticket-favorite="isTicketFavorite"
+          :is-ticket-description-expanded="isTicketDescriptionExpanded"
+          :loading="ticketsStore.loading"
+          @favorite="handleTicketFavorite"
+          @toggle-description="toggleTicketDescription"
+          @view-details="openTicketDetails"
+          @edit="handleStartEdit"
+          @close="operations.closeOwnTicket"
+          @delete="operations.deleteOwnTicket"
+        />
       </div>
     </div>
 
     <!-- New Ticket Modal -->
     <Modal
-      :is-open="showNewTicketModal"
+      :is-open="ui.newTicketModal.isOpen.value"
       title="Create New Ticket"
-      @close="showNewTicketModal = false"
+      @close="ui.newTicketModal.close()"
     >
       <TicketForm
-        v-model:title="newTicket.title"
-        v-model:description="newTicket.description"
-        v-model:tags="newTicket.tags"
-        v-model:category="newTicket.category"
+        v-model:title="operations.newTicketForm.formData.value.title"
+        v-model:description="operations.newTicketForm.formData.value.description"
+        v-model:tags="operations.newTicketForm.formData.value.tags"
+        v-model:category="operations.newTicketForm.formData.value.category"
         :is-editing="false"
         :loading="ticketsStore.loading"
         :estimated-wait-time-minutes="ticketsStore.estimatedWaitTime?.minutes ?? null"
         :sample-size="ticketsStore.estimatedWaitTime?.sampleSize ?? 0"
-        @submit="submitTicket"
-        @cancel="showNewTicketModal = false"
+        @submit="handleSubmitTicket"
+        @cancel="ui.newTicketModal.close()"
       />
     </Modal>
 
     <!-- Edit Ticket Modal -->
     <Modal
-      :is-open="showEditModal"
+      :is-open="ui.editModal.isOpen.value"
       title="Edit Ticket"
-      @close="cancelEdit"
+      @close="handleCancelEdit"
     >
       <TicketForm
-        v-model:title="editForm.title"
-        v-model:description="editForm.description"
-        v-model:tags="editForm.tags"
-        v-model:category="editForm.category"
+        v-model:title="operations.editTicketForm.formData.value.title"
+        v-model:description="operations.editTicketForm.formData.value.description"
+        v-model:tags="operations.editTicketForm.formData.value.tags"
+        v-model:category="operations.editTicketForm.formData.value.category"
         :is-editing="true"
         :loading="ticketsStore.loading"
-        @submit="saveEdit"
-        @cancel="cancelEdit"
+        @submit="handleSaveEdit"
+        @cancel="handleCancelEdit"
       />
     </Modal>
 
     <!-- Confirm Ticket Modal -->
     <Modal
-      :is-open="showConfirmModal"
-      :title="confirmingTicket ? `Review Ticket #${confirmingTicket.id}` : 'Review Ticket'"
-      @close="cancelConfirmTicket"
+      :is-open="ui.confirmModal.isOpen.value"
+      :title="operations.confirmingTicket.value ? `Review Ticket #${operations.confirmingTicket.value.id}` : 'Review Ticket'"
+      @close="handleCancelConfirmTicket"
     >
-      <div v-if="confirmingTicket" class="confirm-modal-content">
+      <div v-if="operations.confirmingTicket.value" class="confirm-modal-content">
         <div class="ticket-preview">
-          <h3>{{ confirmingTicket.title }}</h3>
-          <p>{{ confirmingTicket.description }}</p>
-          <div v-if="confirmingTicket.response" class="existing-response">
+          <h3>{{ operations.confirmingTicket.value.title }}</h3>
+          <p>{{ operations.confirmingTicket.value.description }}</p>
+          <div v-if="operations.confirmingTicket.value.response" class="existing-response">
             <strong>Current Response:</strong>
-            <p>{{ confirmingTicket.response }}</p>
+            <p>{{ operations.confirmingTicket.value.response }}</p>
           </div>
         </div>
 
         <div class="confirm-actions">
           <div class="action-buttons">
             <button
-              @click="confirmTicket"
+              @click="handleConfirmTicket"
               class="btn-confirm"
               :disabled="ticketsStore.loading"
             >
@@ -1005,15 +401,15 @@ onUnmounted(() => {
               <label for="unresolved-reason">Or mark as unresolved:</label>
               <textarea
                 id="unresolved-reason"
-                v-model="unresolvedForm.reason"
+                v-model="operations.unresolvedForm.formData.value.reason"
                 placeholder="Explain why this ticket is not properly completed..."
                 class="input-field textarea-field"
                 rows="3"
               ></textarea>
               <button
-                @click="markUnresolved"
+                @click="handleMarkUnresolved"
                 class="btn-unresolved"
-                :disabled="ticketsStore.loading || !unresolvedForm.reason.trim()"
+                :disabled="ticketsStore.loading || !operations.unresolvedForm.formData.value.reason.trim()"
               >
                 ⚠️ Mark as Unresolved
               </button>
@@ -1025,7 +421,7 @@ onUnmounted(() => {
 
     <!-- Ticket Details Modal -->
     <TicketDetailsModal
-      :is-open="showDetailsModal"
+      :is-open="ui.detailsModal.isOpen.value"
       :ticket="viewingTicket"
       @close="closeTicketDetails"
     />
@@ -1035,291 +431,69 @@ onUnmounted(() => {
 <style scoped>
 .tickets-page {
   min-height: 100vh;
-  padding: 100px 20px 85px; /* Add bottom padding for mobile-bottom-nav (70px + 15px) */
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 20px;
 }
 
 .tickets-container {
-  max-width: 800px;
+  max-width: 1000px;
   margin: 0 auto;
 }
 
 .tickets-header {
+  background: white;
+  padding: 30px;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  margin-bottom: 30px;
   text-align: center;
-  margin-bottom: 40px;
 }
 
 .tickets-header h1 {
-  font-size: 2.5rem;
-  margin: 0 0 10px 0;
+  margin: 0 0 8px 0;
+  color: #2d3748;
+  font-size: 32px;
+  font-weight: 700;
 }
 
 .tickets-header p {
+  margin: 0 0 16px 0;
   color: #718096;
-  margin: 0;
+  font-size: 16px;
 }
 
-/* Ticket Statistics Section */
-.ticket-stats-section {
-  background: rgba(255, 255, 255, 0.95);
-  padding: 24px;
-  border-radius: 16px;
-  margin-bottom: 24px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-  border: 1px solid #e2e8f0;
+.keyboard-hints {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 16px;
 }
 
-.stats-header {
+.hint {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 20px;
+  gap: 6px;
+  font-size: 13px;
+  color: #718096;
 }
 
-.stats-icon {
-  font-size: 1.75rem;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
-}
-
-.stats-title {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: #2d3748;
-  margin: 0;
-  letter-spacing: -0.02em;
-}
-
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 16px;
-}
-
-.stat-card {
-  background: white;
-  padding: 20px;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-  border: 1px solid #e2e8f0;
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-  transition: all 0.2s ease;
-}
-
-.stat-card:hover {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-  transform: translateY(-2px);
-}
-
-.stat-card.stat-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border: none;
-}
-
-.stat-card.stat-status {
+.hint kbd {
   background: #f7fafc;
   border: 1px solid #e2e8f0;
-}
-
-.stat-icon {
-  font-size: 2rem;
-  flex-shrink: 0;
-  line-height: 1;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
-}
-
-.stat-icon-primary,
-.stat-icon-status {
-  filter: brightness(1.3);
-}
-
-.stat-content {
-  flex: 1;
-  min-width: 0;
-}
-
-.stat-label {
-  display: block;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #718096;
-  margin-bottom: 8px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.stat-primary .stat-label {
-  color: rgba(255, 255, 255, 0.85);
-}
-
-.stat-value {
-  display: block;
-  font-size: 2.5rem;
-  font-weight: 800;
-  color: #2d3748;
-  line-height: 1;
-}
-
-.stat-primary .stat-value {
-  color: white;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-}
-
-.status-breakdown {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.status-breakdown .status-badge {
-  padding: 4px 10px;
-  border-radius: 16px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.ticket-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-bottom: 8px;
-}
-
-.ticket-id {
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: #718096;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.ticket-title {
-  font-size: 0.9rem;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-family: monospace;
+  font-size: 12px;
   font-weight: 600;
   color: #2d3748;
-  line-height: 1.4;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.ticket-date {
-  font-size: 0.8rem;
-  color: #718096;
-  font-weight: 500;
-}
-
-.date-range {
-  font-size: 0.85rem;
-  line-height: 1.7;
-}
-
-.date-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.date-label {
-  font-weight: 600;
-  color: #718096;
-}
-
-.date-value {
-  font-weight: 600;
-  color: #2d3748;
-}
-
-.date-separator {
-  color: #cbd5e0;
-  font-weight: 500;
-}
-
-.completed-date {
-  margin-top: 6px;
-  padding-top: 6px;
-  border-top: 1px dashed #e2e8f0;
-}
-
-/* Dark mode ticket stats */
-.dark .ticket-stats-section {
-  background: rgba(40, 44, 52, 0.95);
-  border-color: #4a5568;
-}
-
-.dark .stats-header .stats-title {
-  color: #e2e8f0;
-}
-
-.dark .stat-card {
-  background: #2d3748;
-  border-color: #4a5568;
-}
-
-.dark .stat-card:hover {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
-}
-
-.dark .stat-card.stat-primary {
-  background: linear-gradient(135deg, #805ad5 0%, #6b46c1 100%);
-  border: none;
-}
-
-.dark .stat-card.stat-status {
-  background: #1a202c;
-  border-color: #4a5568;
-}
-
-.dark .stat-label {
-  color: #a0aec0;
-}
-
-.dark .stat-primary .stat-label {
-  color: rgba(255, 255, 255, 0.85);
-}
-
-.dark .stat-value {
-  color: #e2e8f0;
-}
-
-.dark .stat-primary .stat-value {
-  color: white;
-}
-
-.dark .ticket-id {
-  color: #a0aec0;
-}
-
-.dark .ticket-title,
-.dark .date-value {
-  color: #cbd5e0;
-}
-
-.dark .ticket-date,
-.dark .date-label {
-  color: #718096;
-}
-
-.dark .date-separator {
-  color: #4a5568;
-}
-
-.dark .completed-date {
-  border-top-color: #4a5568;
 }
 
 .ignore-mode-toggle {
+  margin-top: 20px;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 12px;
-  margin-top: 16px;
-  padding: 12px 16px;
-  background: #f7fafc;
-  border-radius: 8px;
-  border: 1px solid #e2e8f0;
 }
 
 .toggle-switch {
@@ -1521,84 +695,35 @@ onUnmounted(() => {
   cursor: pointer;
   transition: all 0.2s;
   margin-bottom: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .new-ticket-btn:hover {
   background: #3182ce;
   transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.new-ticket-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .tickets-list {
   display: flex;
   flex-direction: column;
-  gap: 20px;
-}
-
-.kanban-board {
-  width: 100%;
-}
-
-.kanban-columns {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 20px;
-  width: 100%;
-}
-
-.kanban-column {
-  display: flex;
-  flex-direction: column;
-  background: #f7fafc;
-  border-radius: 12px;
-  padding: 16px;
-  min-height: 400px;
-  max-height: 800px;
-  overflow-y: auto;
-}
-
-.column-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16px;
-  padding-bottom: 12px;
-  border-bottom: 2px solid #e2e8f0;
-}
-
-.column-header h3 {
-  margin: 0;
-  font-size: 1.2rem;
-  color: #2d3748;
-}
-
-.column-count {
-  background: #e2e8f0;
-  color: #4a5568;
-  padding: 4px 12px;
-  border-radius: 12px;
-  font-weight: 600;
-  font-size: 0.9rem;
-}
-
-.column-tickets {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.empty-column {
-  text-align: center;
-  padding: 40px 20px;
-  color: #a0aec0;
-  font-style: italic;
+  gap: 16px;
 }
 
 .loading-state,
 .empty-state {
+  background: white;
+  padding: 40px 20px;
+  border-radius: 12px;
   text-align: center;
-  padding: 60px 20px;
   color: #718096;
-  font-size: 18px;
+  font-size: 16px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .loading-state {
@@ -1609,12 +734,12 @@ onUnmounted(() => {
 }
 
 .loading-spinner {
-  width: 48px;
-  height: 48px;
+  width: 40px;
+  height: 40px;
   border: 4px solid #e2e8f0;
   border-top-color: #4299e1;
   border-radius: 50%;
-  animation: spin 1s linear infinite;
+  animation: spin 0.8s linear infinite;
 }
 
 @keyframes spin {
@@ -1623,444 +748,6 @@ onUnmounted(() => {
   }
 }
 
-.keyboard-hints {
-  display: flex;
-  gap: 16px;
-  justify-content: center;
-  margin-top: 12px;
-  flex-wrap: wrap;
-}
-
-.hint {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  color: #718096;
-}
-
-.hint kbd {
-  background: white;
-  border: 1px solid #cbd5e0;
-  border-radius: 4px;
-  padding: 2px 8px;
-  font-size: 12px;
-  font-family: 'Courier New', monospace;
-  font-weight: 600;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-  color: #2d3748;
-}
-
-.ticket-card {
-  background: white;
-  padding: 20px;
-  border-radius: 12px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
-  border: 1px solid #e2e8f0;
-}
-
-.ticket-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.ticket-title {
-  margin: 0;
-  color: #2d3748;
-  font-size: 1.25rem;
-  flex: 1;
-}
-
-.ticket-status {
-  padding: 4px 10px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
-  border: 1px solid;
-}
-
-.ticket-badges {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  align-items: center;
-}
-
-.ticket-favorite-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  border: 2px solid #cbd5e0;
-  background: white;
-  color: #cbd5e0;
-  font-size: 0.9rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
-  padding: 0;
-  flex-shrink: 0;
-}
-
-.ticket-favorite-btn:hover {
-  transform: scale(1.1);
-  border-color: #f6d365;
-  color: #f6d365;
-}
-
-.ticket-favorite-btn.favorited {
-  background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
-  border-color: #f6d365;
-  color: white;
-  box-shadow: 0 2px 6px rgba(246, 211, 101, 0.3);
-}
-
-.ticket-favorite-btn.favorited:hover {
-  transform: scale(1.15);
-  box-shadow: 0 3px 8px rgba(246, 211, 101, 0.4);
-}
-
-.dark .ticket-favorite-btn {
-  background: #2d3748;
-  border-color: #4a5568;
-  color: #718096;
-}
-
-.dark .ticket-favorite-btn:hover {
-  border-color: #f6d365;
-  color: #f6d365;
-}
-
-.dark .ticket-favorite-btn.favorited {
-  background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
-  border-color: #f6d365;
-}
-
-.ticket-type {
-  padding: 4px 10px;
-  border-radius: 20px;
-  font-size: 11px;
-  font-weight: 600;
-  white-space: nowrap;
-  border: 1px solid;
-}
-
-.ticket-type.type-feature {
-  background: #ebf8ff;
-  color: #2b6cb0;
-  border-color: #bee3f8;
-}
-
-.ticket-type.type-bug {
-  background: #fff5f5;
-  color: #c53030;
-  border-color: #fc8181;
-}
-
-.ticket-type.type-feedback {
-  background: #f7fafc;
-  color: #4a5568;
-  border-color: #cbd5e0;
-}
-
-.ticket-priority {
-  padding: 4px 10px;
-  border-radius: 20px;
-  font-size: 11px;
-  font-weight: 600;
-  white-space: nowrap;
-  border: 1px solid;
-}
-
-.ticket-priority.priority-high {
-  background: #fff5f5;
-  color: #c53030;
-  border-color: #fc8181;
-}
-
-.ticket-priority.priority-medium {
-  background: #fffaf0;
-  color: #c05621;
-  border-color: #fbd38d;
-}
-
-.ticket-priority.priority-low {
-  background: #f0fff4;
-  color: #276749;
-  border-color: #9ae6b4;
-}
-
-.ticket-description {
-  color: #4a5568;
-  line-height: 1.6;
-  margin-bottom: 12px;
-}
-
-.ticket-expand-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 12px;
-  background: #f7fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  color: #4a5568;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-  margin-bottom: 8px;
-}
-
-.ticket-expand-btn:hover {
-  background: #edf2f7;
-  border-color: #cbd5e0;
-  transform: translateY(-1px);
-}
-
-.ticket-expand-btn .expand-icon {
-  font-size: 10px;
-  transition: transform 0.2s;
-}
-
-.ticket-expand-btn.expanded {
-  background: #ebf8ff;
-  border-color: #bee3f8;
-  color: #2b6cb0;
-}
-
-.ticket-expand-btn.expanded:hover {
-  background: #e6fffa;
-  border-color: #9ae6b4;
-}
-
-.ticket-meta {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding-top: 12px;
-  border-top: 1px solid #e2e8f0;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.ticket-date {
-  font-size: 13px;
-  color: #a0aec0;
-}
-
-.ticket-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.edit-ticket-btn,
-.close-ticket-btn,
-.delete-ticket-btn,
-.view-details-btn {
-  padding: 6px 14px;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.edit-ticket-btn {
-  background: #ed8936;
-}
-
-.edit-ticket-btn:hover:not(:disabled) {
-  background: #dd6b20;
-  transform: translateY(-1px);
-}
-
-.close-ticket-btn {
-  background: #48bb78;
-}
-
-.close-ticket-btn:hover:not(:disabled) {
-  background: #38a169;
-  transform: translateY(-1px);
-}
-
-.delete-ticket-btn {
-  background: #f56565;
-}
-
-.delete-ticket-btn:hover:not(:disabled) {
-  background: #e53e3e;
-  transform: translateY(-1px);
-}
-
-.view-details-btn {
-  background: #4299e1;
-}
-
-.view-details-btn:hover:not(:disabled) {
-  background: #3182ce;
-  transform: translateY(-1px);
-}
-
-.edit-ticket-btn:disabled,
-.close-ticket-btn:disabled,
-.delete-ticket-btn:disabled,
-.view-details-btn:disabled {
-  background: #cbd5e0;
-  cursor: not-allowed;
-  transform: none;
-}
-
-.ticket-response {
-  margin-top: 16px;
-  padding: 14px;
-  background: #f7fafc;
-  border-radius: 8px;
-  border-left: 4px solid #4299e1;
-}
-
-.response-label {
-  font-weight: 600;
-  color: #2d3748;
-  margin-bottom: 6px;
-  font-size: 14px;
-}
-
-.response-text {
-  color: #4a5568;
-  line-height: 1.6;
-  font-size: 14px;
-}
-
-/* Dark mode */
-.dark .tickets-page {
-  background: #1a202c;
-}
-
-/* Dark mode h1 uses global gradient style */
-
-.dark .tickets-header p {
-  color: #a0aec0;
-}
-
-.dark .ticket-card {
-  background: #2d3748;
-  border-color: #4a5568;
-}
-
-.dark .ticket-title,
-.dark .response-label {
-  color: #e2e8f0;
-}
-
-.dark .ticket-expand-btn {
-  background: #2d3748;
-  border-color: #4a5568;
-  color: #cbd5e0;
-}
-
-.dark .ticket-expand-btn:hover {
-  background: #4a5568;
-  border-color: #718096;
-}
-
-.dark .ticket-expand-btn.expanded {
-  background: #2a4365;
-  border-color: #4a6fa5;
-  color: #90cdf4;
-}
-
-.dark .ticket-expand-btn.expanded:hover {
-  background: #285e61;
-  border-color: #38b2ac;
-}
-
-.dark .ticket-description,
-.dark .ticket-response,
-.dark .response-text {
-  color: #cbd5e0;
-}
-
-.dark .ticket-meta {
-  border-top-color: #4a5568;
-}
-
-.dark .ticket-response {
-  background: #1a202c;
-}
-
-.dark .ignore-mode-toggle {
-  background: #2d3748;
-  border-color: #4a5568;
-}
-
-.dark .toggle-slider {
-  background-color: #4a5568;
-}
-
-.dark .toggle-label {
-  color: #cbd5e0;
-}
-
-.dark .last-collection {
-  background: #2a4365;
-  border-color: #4a6fa5;
-}
-
-.dark .collection-text {
-  color: #90cdf4;
-}
-
-/* Dark mode kanban styles */
-.dark .kanban-column {
-  background: #2d3748;
-}
-
-.dark .column-header {
-  border-bottom-color: #4a5568;
-}
-
-.dark .column-header h3 {
-  color: #e2e8f0;
-}
-
-.dark .column-count {
-  background: #4a5568;
-  color: #cbd5e0;
-}
-
-.dark .empty-column {
-  color: #718096;
-}
-
-.dark .loading-spinner {
-  border-color: #4a5568;
-  border-top-color: #4299e1;
-}
-
-.dark .keyboard-hints {
-  margin-top: 12px;
-}
-
-.dark .hint {
-  color: #a0aec0;
-}
-
-.dark .hint kbd {
-  background: #2d3748;
-  border-color: #4a5568;
-  color: #e2e8f0;
-}
-
-/* Confirm/Unresolved Modal Styles */
 .confirm-modal-content {
   display: flex;
   flex-direction: column;
@@ -2072,59 +759,120 @@ onUnmounted(() => {
   background: #f7fafc;
   border-radius: 8px;
   border: 1px solid #e2e8f0;
-  margin-bottom: 16px;
 }
 
 .ticket-preview h3 {
-  margin: 0 0 12px 0;
+  margin: 0 0 8px 0;
   color: #2d3748;
-  font-size: 1.1rem;
+  font-size: 18px;
+  font-weight: 600;
 }
 
 .ticket-preview p {
-  margin: 0 0 12px 0;
+  margin: 0;
   color: #4a5568;
+  font-size: 14px;
   line-height: 1.6;
 }
 
 .existing-response {
+  margin-top: 12px;
   padding-top: 12px;
   border-top: 1px solid #e2e8f0;
 }
 
 .existing-response strong {
   display: block;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   color: #2d3748;
   font-size: 14px;
 }
 
 .existing-response p {
-  margin: 0;
   color: #718096;
   font-size: 13px;
-  font-style: italic;
 }
 
 .confirm-actions {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
 }
 
-.api-key-input {
+.action-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.btn-confirm,
+.btn-unresolved {
+  width: 100%;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-confirm {
+  background: #48bb78;
+  color: white;
+}
+
+.btn-confirm:hover:not(:disabled) {
+  background: #38a169;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(72, 187, 120, 0.3);
+}
+
+.btn-confirm:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-unresolved {
+  background: #ed8936;
+  color: white;
+}
+
+.btn-unresolved:hover:not(:disabled) {
+  background: #dd6b20;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(237, 137, 54, 0.3);
+}
+
+.btn-unresolved:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.unresolved-section {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  padding: 16px;
+  background: #fffaf0;
+  border-radius: 8px;
+  border: 1px solid #feebc8;
+}
+
+.unresolved-section label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #744210;
 }
 
 .input-field {
+  width: 100%;
   padding: 10px 12px;
-  border: 2px solid #e2e8f0;
-  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
   font-size: 14px;
-  font-weight: 500;
-  transition: all 0.2s;
+  font-family: inherit;
+  transition: border-color 0.2s;
 }
 
 .input-field:focus {
@@ -2138,113 +886,98 @@ onUnmounted(() => {
   min-height: 80px;
 }
 
-.action-buttons {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+.dark .tickets-header {
+  background: #2d3748;
 }
 
-.btn-confirm {
-  width: 100%;
-  padding: 14px 20px;
-  background: #48bb78;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
+.dark .tickets-header h1 {
+  color: #e2e8f0;
 }
 
-.btn-confirm:hover:not(:disabled) {
-  background: #38a169;
-  transform: translateY(-1px);
+.dark .tickets-header p {
+  color: #cbd5e0;
 }
 
-.btn-confirm:disabled {
-  background: #cbd5e0;
-  cursor: not-allowed;
-  transform: none;
+.dark .hint {
+  color: #cbd5e0;
 }
 
-.unresolved-section {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 16px;
-  background: #fff5f5;
-  border-radius: 8px;
-  border: 1px solid #fed7d7;
+.dark .hint kbd {
+  background: #4a5568;
+  border-color: #718096;
+  color: #e2e8f0;
 }
 
-.unresolved-section label {
-  font-size: 13px;
-  font-weight: 600;
-  color: #c53030;
+.dark .toggle-label {
+  color: #cbd5e0;
 }
 
-.btn-unresolved {
-  width: 100%;
-  padding: 12px 16px;
-  background: #e53e3e;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
+.dark .last-collection {
+  background: #2c5282;
+  border-color: #2b6cb0;
 }
 
-.btn-unresolved:hover:not(:disabled) {
-  background: #c53030;
-  transform: translateY(-1px);
+.dark .collection-text {
+  color: #90cdf4;
 }
 
-.btn-unresolved:disabled {
-  background: #feb2b2;
-  cursor: not-allowed;
-  transform: none;
+.dark .error-message {
+  background: #742a2a;
+  color: #feb2b2;
+  border-color: #9b2c2c;
 }
 
-.review-ticket-btn {
-  padding: 6px 14px;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  background: #805ad5;
+.dark .error-close {
+  color: #feb2b2;
 }
 
-.review-ticket-btn:hover:not(:disabled) {
-  background: #6b46c1;
-  transform: translateY(-1px);
+.dark .error-close:hover {
+  color: #fc8181;
 }
 
-.review-ticket-btn:disabled {
-  background: #cbd5e0;
-  cursor: not-allowed;
-  transform: none;
+.dark .loading-state,
+.dark .empty-state {
+  background: #2d3748;
+  color: #cbd5e0;
 }
 
-/* Dark mode confirm modal */
+.dark .loading-spinner {
+  border-color: #4a5568;
+  border-top-color: #4299e1;
+}
+
 .dark .ticket-preview {
   background: #1a202c;
   border-color: #4a5568;
 }
 
-.dark .ticket-preview h3,
+.dark .ticket-preview h3 {
+  color: #e2e8f0;
+}
+
+.dark .ticket-preview p {
+  color: #cbd5e0;
+}
+
+.dark .existing-response {
+  border-top-color: #4a5568;
+}
+
 .dark .existing-response strong {
   color: #e2e8f0;
 }
 
-.dark .ticket-preview p,
 .dark .existing-response p {
-  color: #cbd5e0;
+  color: #a0aec0;
+}
+
+.dark .unresolved-section {
+  background: #744210;
+  border-color: #975a16;
+}
+
+.dark .unresolved-section label {
+  color: #feebc8;
 }
 
 .dark .input-field {
@@ -2255,84 +988,5 @@ onUnmounted(() => {
 
 .dark .input-field:focus {
   border-color: #4299e1;
-  box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.2);
-}
-
-.dark .unresolved-section {
-  background: #742a2a;
-  border-color: #9b2c2c;
-}
-
-.dark .unresolved-section label {
-  color: #fc8181;
-}
-
-/* Dark mode error message */
-.dark .error-message {
-  background: #742a2a;
-  color: #fc8181;
-  border-color: #9b2c2c;
-}
-
-.dark .error-close {
-  color: #fc8181;
-}
-
-.dark .error-close:hover {
-  color: #fff5f5;
-}
-
-/* Tags and Category Styles */
-.ticket-tags-category {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-  margin-bottom: 12px;
-}
-
-.ticket-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.tag-chip {
-  display: inline-block;
-  padding: 4px 10px;
-  background: #ebf8ff;
-  color: #2b6cb0;
-  border-radius: 16px;
-  font-size: 12px;
-  font-weight: 500;
-  border: 1px solid #bee3f8;
-}
-
-.ticket-category {
-  display: flex;
-  align-items: center;
-}
-
-.category-chip {
-  display: inline-block;
-  padding: 4px 10px;
-  background: #faf5ff;
-  color: #6b46c1;
-  border-radius: 16px;
-  font-size: 12px;
-  font-weight: 500;
-  border: 1px solid #d6bcfa;
-}
-
-.dark .tag-chip {
-  background: #2c5282;
-  color: #bee3f8;
-  border-color: #2b6cb0;
-}
-
-.dark .category-chip {
-  background: #44337a;
-  color: #d6bcfa;
-  border-color: #6b46c1;
 }
 </style>
