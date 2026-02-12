@@ -12,7 +12,7 @@ const router = Router();
  * GET /api/achievements
  * Get unlocked achievements for the current user
  */
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   try {
     const userId = req.headers['x-user-id'] as string;
 
@@ -20,7 +20,7 @@ router.get('/', (req, res) => {
       return res.status(400).json({ error: 'User ID required' });
     }
 
-    const achievements = getAchievements(userId);
+    const achievements = await getAchievements(userId);
 
     res.json({
       success: true,
@@ -86,7 +86,7 @@ router.get('/progress', (req, res) => {
  * Check and unlock achievements based on current stats
  * This can be called automatically when stats are recorded
  */
-router.post('/check', (req, res) => {
+router.post('/check', async (req, res) => {
   try {
     const userId = req.headers['x-user-id'] as string;
 
@@ -94,7 +94,7 @@ router.post('/check', (req, res) => {
       return res.status(400).json({ error: 'User ID required' });
     }
 
-    const newUnlocks = checkAchievements(userId);
+    const newUnlocks = await checkAchievements(userId);
 
     res.json({
       success: true,

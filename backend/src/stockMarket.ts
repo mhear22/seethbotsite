@@ -1,6 +1,6 @@
 // Stock Market System
 
-import { getStocksDB } from './stocksDb';
+import prisma from './lib/prisma';
 
 export interface Stock {
   name: string
@@ -47,126 +47,186 @@ const rankings = [
 export const stocks: { [name: string]: Stock } = {}
 
 // Initialize stocks from database or rankings
-function initStocks() {
-  const db = getStocksDB();
+async function initStocks() {
+  try {
+    // Check if stocks exist in database
+    const count = await prisma.stock.count();
 
-  // Check if stocks exist in database
-  const row = db.prepare('SELECT COUNT(*) as count FROM stocks').get() as { count: number };
+    if (count === 0) {
+      // Insert initial stocks from rankings
+      for (const person of rankings) {
+        const basePrice = Math.round(person.score / 10);
+        const stock: Stock = {
+          name: person.name,
+          avatar: person.avatar,
+          price: basePrice,
+          coolnessScore: person.score,
+          shares: 1000, // Total shares available
+          minPrice: Math.max(10, Math.round(basePrice * 0.5)), // Min 50% of base, minimum €10
+          maxPrice: Math.round(basePrice * 5), // Max 5x base price
+          priceHistory: [
+            { timestamp: Date.now() - 30000, price: basePrice },
+            { timestamp: Date.now(), price: basePrice }
+          ]
+        };
 
-  if (row.count === 0) {
-    // Insert initial stocks from rankings
-    rankings.forEach(person => {
-      const basePrice = Math.round(person.score / 10)
-      const stock: Stock = {
-        name: person.name,
-        avatar: person.avatar,
-        price: basePrice,
-        coolnessScore: person.score,
-        shares: 1000, // Total shares available
-        minPrice: Math.max(10, Math.round(basePrice * 0.5)), // Min 50% of base, minimum €10
-        maxPrice: Math.round(basePrice * 5), // Max 5x base price
-        priceHistory: [
-          { timestamp: Date.now() - 30000, price: basePrice },
-          { timestamp: Date.now(), price: basePrice }
-        ]
+        await prisma.stock.create({
+          data: {
+            name: stock.name,
+            avatar: stock.avatar,
+            price: stock.price,
+            coolness_score: stock.coolnessScore,
+            shares: stock.shares,
+            min_price: stock.minPrice,
+            max_price: stock.maxPrice,
+            price_history: JSON.stringify(stock.priceHistory)
+          }
+        });
+
+        stocks[person.name] = stock;
       }
-      db.prepare(`
-        INSERT INTO stocks (name, avatar, price, coolness_score, shares, min_price, max_price, price_history)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(
-        stock.name,
-        stock.avatar,
-        stock.price,
-        stock.coolnessScore,
-        stock.shares,
-        stock.minPrice,
-        stock.maxPrice,
-        JSON.stringify(stock.priceHistory)
-      )
-      stocks[person.name] = stock
-    })
-  } else {
-    // Load stocks from database
-    const stockRows = db.prepare('SELECT * FROM stocks').all() as any[];
-    stockRows.forEach(row => {
-      stocks[row.name] = {
-        name: row.name,
-        avatar: row.avatar,
-        price: row.price,
-        coolnessScore: row.coolness_score,
-        shares: row.shares,
-        minPrice: row.min_price,
-        maxPrice: row.max_price,
-        priceHistory: JSON.parse(row.price_history)
-      }
-    })
+    } else {
+      // Load stocks from database
+      const stockRows = await prisma.stock.findMany();
+      stockRows.forEach(row => {
+        stocks[row.name] = {
+          name: row.name,
+          avatar: row.avatar,
+          price: row.price,
+          coolnessScore: row.coolness_score,
+          shares: row.shares,
+          minPrice: row.min_price,
+          maxPrice: row.max_price,
+          priceHistory: JSON.parse(row.price_history)
+        };
+      });
+    }
+  } catch (error) {
+    console.error('Failed to initialize stocks:', error);
+    throw error;
   }
 }
 
-initStocks()
+// Initialize stocks at module load time
+let initPromise: Promise<void> | null = null;
+
+function ensureStocksInitialized(): Promise<void> {
+  if (!initPromise) {
+    initPromise = initStocks();
+  }
+  return initPromise;
+}
+
+// Start initialization immediately
+ensureStocksInitialized().catch(error => {
+  console.error('Failed to initialize stocks at module load:', error);
+});
 
 // Helper function to save stock to database
-function saveStock(name: string) {
+async function saveStock(name: string) {
   const stock = stocks[name];
   if (!stock) return;
 
-  const db = getStocksDB();
-  db.prepare(`
-    UPDATE stocks
-    SET price = ?, shares = ?, price_history = ?
-    WHERE name = ?
-  `).run(
-    stock.price,
-    stock.shares,
-    JSON.stringify(stock.priceHistory),
-    name
-  );
+  try {
+    await prisma.stock.update({
+      where: { name },
+      data: {
+        price: stock.price,
+        shares: stock.shares,
+        price_history: JSON.stringify(stock.priceHistory)
+      }
+    });
+  } catch (error) {
+    console.error(`Failed to save stock ${name}:`, error);
+  }
 }
 
 // Initialize user portfolio from database
-export function initUserPortfolio(userId: string): UserPortfolio {
-  const db = getStocksDB();
+export async function initUserPortfolio(userId: string): Promise<UserPortfolio> {
+  // Convert string userId to number for Prisma
+  const userIdNum = parseInt(userId, 10);
 
-  // Check if portfolio exists in database
-  const row = db.prepare('SELECT * FROM user_portfolios WHERE user_id = ?').get(userId) as any;
-
-  if (!row) {
-    // Create new portfolio
-    const portfolio: UserPortfolio = {
-      userId,
-      cash: 10000, // €10,000 starting cash
-      holdings: {},
-      transactions: []
-    }
-    db.prepare(`
-      INSERT INTO user_portfolios (user_id, cash, holdings, transactions)
-      VALUES (?, ?, ?, ?)
-    `).run(userId, portfolio.cash, JSON.stringify(portfolio.holdings), JSON.stringify(portfolio.transactions))
-    return portfolio
+  if (isNaN(userIdNum)) {
+    throw new Error(`Invalid userId: ${userId} cannot be converted to a number`);
   }
 
-  // Load existing portfolio
-  return {
-    userId: row.user_id,
-    cash: row.cash,
-    holdings: JSON.parse(row.holdings),
-    transactions: JSON.parse(row.transactions)
+  try {
+    // Check if portfolio exists in database
+    const row = await prisma.userPortfolio.findUnique({
+      where: { user_id: userIdNum }
+    });
+
+    if (!row) {
+      // Create new portfolio - this will fail if user doesn't exist in User table
+      // due to foreign key constraint
+      const portfolio: UserPortfolio = {
+        userId,
+        cash: 10000, // €10,000 starting cash
+        holdings: {},
+        transactions: []
+      };
+
+      try {
+        await prisma.userPortfolio.create({
+          data: {
+            user_id: userIdNum,
+            cash: portfolio.cash,
+            holdings: JSON.stringify(portfolio.holdings),
+            transactions: JSON.stringify(portfolio.transactions)
+          }
+        });
+      } catch (createError: any) {
+        // If it's a foreign key constraint error, the user doesn't exist
+        if (createError.code === 'P2003') {
+          throw new Error(`User with ID ${userId} does not exist in the database`);
+        }
+        throw createError;
+      }
+
+      return portfolio;
+    }
+
+    // Load existing portfolio
+    return {
+      userId: row.user_id.toString(),
+      cash: row.cash,
+      holdings: JSON.parse(row.holdings),
+      transactions: JSON.parse(row.transactions)
+    };
+  } catch (error) {
+    console.error(`Failed to initialize portfolio for user ${userId}:`, error);
+    throw error;
   }
 }
 
 // Helper function to save portfolio to database
-function savePortfolio(userId: string, portfolio: UserPortfolio) {
-  const db = getStocksDB();
-  db.prepare(`
-    UPDATE user_portfolios
-    SET cash = ?, holdings = ?, transactions = ?
-    WHERE user_id = ?
-  `).run(portfolio.cash, JSON.stringify(portfolio.holdings), JSON.stringify(portfolio.transactions), userId)
+async function savePortfolio(userId: string, portfolio: UserPortfolio) {
+  const userIdNum = parseInt(userId, 10);
+
+  if (isNaN(userIdNum)) {
+    console.error(`Invalid userId: ${userId} cannot be converted to a number`);
+    return;
+  }
+
+  try {
+    await prisma.userPortfolio.update({
+      where: { user_id: userIdNum },
+      data: {
+        cash: portfolio.cash,
+        holdings: JSON.stringify(portfolio.holdings),
+        transactions: JSON.stringify(portfolio.transactions)
+      }
+    });
+  } catch (error) {
+    console.error(`Failed to save portfolio for user ${userId}:`, error);
+  }
 }
 
 // Buy shares
-export function buyShares(userId: string, stockName: string, shares: number): { success: boolean; message: string; newPrice?: number; newCash?: number } {
-  const portfolio = initUserPortfolio(userId)
+export async function buyShares(userId: string, stockName: string, shares: number): Promise<{ success: boolean; message: string; newPrice?: number; newCash?: number }> {
+  await ensureStocksInitialized();
+
+  const portfolio = await initUserPortfolio(userId);
   const stock = stocks[stockName]
 
   if (!stock) {
@@ -215,15 +275,17 @@ export function buyShares(userId: string, stockName: string, shares: number): { 
   })
 
   // Save to database
-  savePortfolio(userId, portfolio)
-  saveStock(stockName)
+  await savePortfolio(userId, portfolio)
+  await saveStock(stockName)
 
   return { success: true, message: `Bought ${shares} shares of ${stockName}`, newPrice: stock.price, newCash: portfolio.cash }
 }
 
 // Sell shares
-export function sellShares(userId: string, stockName: string, shares: number): { success: boolean; message: string; newPrice?: number; newCash?: number } {
-  const portfolio = initUserPortfolio(userId)
+export async function sellShares(userId: string, stockName: string, shares: number): Promise<{ success: boolean; message: string; newPrice?: number; newCash?: number }> {
+  await ensureStocksInitialized();
+
+  const portfolio = await initUserPortfolio(userId);
   const stock = stocks[stockName]
 
   if (!stock) {
@@ -265,8 +327,8 @@ export function sellShares(userId: string, stockName: string, shares: number): {
   })
 
   // Save to database
-  savePortfolio(userId, portfolio)
-  saveStock(stockName)
+  await savePortfolio(userId, portfolio)
+  await saveStock(stockName)
 
   return { success: true, message: `Sold ${shares} shares of ${stockName}`, newPrice: stock.price, newCash: portfolio.cash }
 }
@@ -282,13 +344,13 @@ export function getStock(name: string): Stock | undefined {
 }
 
 // Get user portfolio
-export function getUserPortfolio(userId: string): UserPortfolio {
-  return initUserPortfolio(userId)
+export async function getUserPortfolio(userId: string): Promise<UserPortfolio> {
+  return await initUserPortfolio(userId)
 }
 
 // Calculate portfolio value
-export function calculatePortfolioValue(userId: string): number {
-  const portfolio = initUserPortfolio(userId)
+export async function calculatePortfolioValue(userId: string): Promise<number> {
+  const portfolio = await initUserPortfolio(userId)
   let value = portfolio.cash
 
   Object.entries(portfolio.holdings).forEach(([stockName, shares]) => {
@@ -302,52 +364,59 @@ export function calculatePortfolioValue(userId: string): number {
 }
 
 // Add a new stock to the market (for GPU mining feature)
-export function addStock(config: {
+export async function addStock(config: {
   name: string
   avatar: string
   baseScore: number
   basePrice?: number
-}): Stock {
-  const db = getStocksDB();
+}): Promise<Stock> {
+  await ensureStocksInitialized();
 
-  // Check if stock already exists
-  const existing = db.prepare('SELECT * FROM stocks WHERE name = ?').get(config.name) as any;
-  if (existing) {
-    // Return existing stock
-    return stocks[config.name]!;
+  try {
+    // Check if stock already exists
+    const existing = await prisma.stock.findUnique({
+      where: { name: config.name }
+    });
+
+    if (existing) {
+      // Return existing stock
+      return stocks[config.name]!;
+    }
+
+    const price = config.basePrice || Math.round(config.baseScore / 10);
+    const stock: Stock = {
+      name: config.name,
+      avatar: config.avatar,
+      price,
+      coolnessScore: config.baseScore,
+      shares: 1000, // Total shares available
+      minPrice: Math.max(10, Math.round(price * 0.5)), // Min 50% of base, minimum €10
+      maxPrice: Math.round(price * 5), // Max 5x base price
+      priceHistory: [
+        { timestamp: Date.now(), price }
+      ]
+    };
+
+    // Insert into database
+    await prisma.stock.create({
+      data: {
+        name: stock.name,
+        avatar: stock.avatar,
+        price: stock.price,
+        coolness_score: stock.coolnessScore,
+        shares: stock.shares,
+        min_price: stock.minPrice,
+        max_price: stock.maxPrice,
+        price_history: JSON.stringify(stock.priceHistory)
+      }
+    });
+
+    // Add to in-memory store
+    stocks[config.name] = stock;
+
+    return stock;
+  } catch (error) {
+    console.error(`Failed to add stock ${config.name}:`, error);
+    throw error;
   }
-
-  const price = config.basePrice || Math.round(config.baseScore / 10);
-  const stock: Stock = {
-    name: config.name,
-    avatar: config.avatar,
-    price,
-    coolnessScore: config.baseScore,
-    shares: 1000, // Total shares available
-    minPrice: Math.max(10, Math.round(price * 0.5)), // Min 50% of base, minimum €10
-    maxPrice: Math.round(price * 5), // Max 5x base price
-    priceHistory: [
-      { timestamp: Date.now(), price }
-    ]
-  };
-
-  // Insert into database
-  db.prepare(`
-    INSERT INTO stocks (name, avatar, price, coolness_score, shares, min_price, max_price, price_history)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    stock.name,
-    stock.avatar,
-    stock.price,
-    stock.coolnessScore,
-    stock.shares,
-    stock.minPrice,
-    stock.maxPrice,
-    JSON.stringify(stock.priceHistory)
-  );
-
-  // Add to in-memory store
-  stocks[config.name] = stock;
-
-  return stock;
 }

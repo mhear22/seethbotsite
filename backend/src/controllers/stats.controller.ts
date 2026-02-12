@@ -178,7 +178,7 @@ router.post('/record', (req: Request, res: Response) => {
  *       500:
  *         description: Server error
  */
-router.post('/highscore', (req: Request, res: Response) => {
+router.post('/highscore', async (req: Request, res: Response) => {
   try {
     const { userId, userName, gameType, score, details } = req.body;
 
@@ -194,7 +194,7 @@ router.post('/highscore', (req: Request, res: Response) => {
       return res.status(400).json({ error: 'score is required and must be a number' });
     }
 
-    const wasUpdated = updateHighScore({
+    const wasUpdated = await updateHighScore({
       userId,
       userName,
       gameType,
@@ -202,7 +202,7 @@ router.post('/highscore', (req: Request, res: Response) => {
       details
     });
 
-    const existingScore = getLeaderboard({ gameType, limit: 100 })
+    const existingScore = (await getLeaderboard({ gameType, limit: 100 }))
       .find(entry => entry.userId === userId)?.score || 0;
 
     const isNewRecord = score > existingScore || !wasUpdated;
@@ -283,7 +283,7 @@ router.post('/highscore', (req: Request, res: Response) => {
  *       500:
  *         description: Server error
  */
-router.post('/history', (req: Request, res: Response) => {
+router.post('/history', async (req: Request, res: Response) => {
   try {
     const { userId, gameType, statType, limit, offset } = req.body;
 
@@ -291,7 +291,7 @@ router.post('/history', (req: Request, res: Response) => {
       return res.status(400).json({ error: 'userId is required' });
     }
 
-    const history = getStatsHistory({
+    const history = await getStatsHistory({
       userId,
       gameType,
       statType,

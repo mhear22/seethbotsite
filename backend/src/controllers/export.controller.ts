@@ -163,7 +163,7 @@ router.get('/rankings', (req: Request, res: Response) => {
  *       500:
  *         description: Server error
  */
-router.post('/stats', (req: Request, res: Response) => {
+router.post('/stats', async (req: Request, res: Response) => {
   try {
     const { userId, gameType, format = 'json' } = req.body;
 
@@ -176,7 +176,7 @@ router.post('/stats', (req: Request, res: Response) => {
     }
 
     // Get user stats
-    const stats = getUserStats({ userId, gameType });
+    const stats = await getUserStats({ userId, gameType });
 
     // Format data for export
     const exportData = {
@@ -253,7 +253,7 @@ router.post('/stats', (req: Request, res: Response) => {
  *       500:
  *         description: Server error
  */
-router.post('/clicks', (req: Request, res: Response) => {
+router.post('/clicks', async (req: Request, res: Response) => {
   try {
     const { userId, limit = 100, format = 'json' } = req.body;
 
@@ -266,7 +266,7 @@ router.post('/clicks', (req: Request, res: Response) => {
     }
 
     // Get click stats history
-    const history = getStatsHistory({
+    const history = await getStatsHistory({
       userId,
       gameType: 'clicker',
       statType: 'click',
@@ -352,7 +352,7 @@ router.post('/clicks', (req: Request, res: Response) => {
  *       500:
  *         description: Server error
  */
-router.post('/history', (req: Request, res: Response) => {
+router.post('/history', async (req: Request, res: Response) => {
   try {
     const { userId, gameType, statType, limit = 500, format = 'json' } = req.body;
 
@@ -365,7 +365,7 @@ router.post('/history', (req: Request, res: Response) => {
     }
 
     // Get stats history
-    const history = getStatsHistory({
+    const history = await getStatsHistory({
       userId,
       gameType,
       statType,
@@ -444,7 +444,7 @@ router.post('/history', (req: Request, res: Response) => {
  *       500:
  *         description: Server error
  */
-router.post('/leaderboard', (req: Request, res: Response) => {
+router.post('/leaderboard', async (req: Request, res: Response) => {
   try {
     const { gameType, limit = 50, format = 'json' } = req.body;
 
@@ -457,7 +457,7 @@ router.post('/leaderboard', (req: Request, res: Response) => {
     }
 
     // Get leaderboard
-    const leaderboard = getLeaderboard({ gameType, limit });
+    const leaderboard = await getLeaderboard({ gameType, limit });
 
     // Format data for export
     const exportData = leaderboard.map(entry => ({
