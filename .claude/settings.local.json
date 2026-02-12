@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git:*)",
+      "Bash(wc:*)",
+      "Bash(find:*)",
+      "Edit",
+      "Bash(./deploy.sh:*)",
+      "Bash(cd:*)",
+      "Bash(npm run build)",
+      "Bash(npm run test)",
+      "Bash(docker builder prune:*)",
+      "Bash(tee:*)"
+    ]
+  },
+  "model": "sonnet",
+  "statusLine": {
+    "type": "command",
+    "command": "/Users/mikaheares/.claude/statusline.sh"
+  }
+}

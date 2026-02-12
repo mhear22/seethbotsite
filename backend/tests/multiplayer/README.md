@@ -141,7 +141,10 @@ Tests WebSocket connection handling and authentication:
 ## Running the Tests
 
 ```bash
-# Run all multiplayer tests
+# Run all multiplayer tests (recommended)
+npm run test:multiplayer
+
+# Or using Jest directly
 npm test -- multiplayer
 
 # Run with coverage

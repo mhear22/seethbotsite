@@ -51,6 +51,7 @@ describe('usePanels', () => {
         coolnessPanel: true,
         mining: false,
         activeUsers: true,
+        favorites: true,
       })
     })
 

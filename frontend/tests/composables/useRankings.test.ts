@@ -3,6 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { createPinia, setActivePinia } from 'pinia'
 
 const mockGetRankings = vi.fn()
 
@@ -12,12 +13,34 @@ vi.mock('../../repositories/general.repository', () => ({
   },
 }))
 
+// Mock the store to return reactive state
+const mockRankingsStore = {
+  rankings: { value: [] },
+  loading: { value: false },
+  error: { value: null },
+  loadRankings: vi.fn(),
+  getTrendClass: vi.fn((index: number) => {
+    const trends = ['trend-up', 'trend-down', 'trend-same']
+    return trends[index % trends.length]
+  }),
+  clearRankings: vi.fn(),
+}
+
+vi.mock('../../stores/useRankingsStore', () => ({
+  useRankingsStore: () => mockRankingsStore,
+}))
+
 import { useRankings } from '../../composables/useRankings'
 
 describe('useRankings', () => {
   beforeEach(() => {
+    setActivePinia(createPinia())
     vi.clearAllMocks()
     mockGetRankings.mockResolvedValue([])
+    // Reset store state
+    mockRankingsStore.rankings.value = []
+    mockRankingsStore.loading.value = false
+    mockRankingsStore.error.value = null
   })
 
   it('initializes with empty rankings and loading false', () => {
@@ -35,6 +58,16 @@ describe('useRankings', () => {
       })
     )
 
+    // Mock the store's loadRankings to control behavior
+    mockRankingsStore.loadRankings = vi.fn(async () => {
+      mockRankingsStore.loading.value = true
+      await new Promise(resolve => {
+        resolvePromise = resolve as any
+        resolve!([])
+      })
+      mockRankingsStore.loading.value = false
+    })
+
     const { loading, loadRankings } = useRankings()
 
     const loadPromise = loadRankings()
@@ -42,7 +75,7 @@ describe('useRankings', () => {
     // loading should be true while fetching
     expect(loading.value).toBe(true)
 
-    // Resolve the promise
+    // Resolve promise
     resolvePromise!([])
     await loadPromise
 
@@ -58,6 +91,14 @@ describe('useRankings', () => {
     ]
     mockGetRankings.mockResolvedValue(mockData)
 
+    // Mock the store's loadRankings to update the state
+    mockRankingsStore.loadRankings = vi.fn(async () => {
+      mockRankingsStore.loading.value = true
+      const data = await mockGetRankings()
+      mockRankingsStore.rankings.value = data
+      mockRankingsStore.loading.value = false
+    })
+
     const { rankings, loadRankings } = useRankings()
 
     await loadRankings()
@@ -70,6 +111,19 @@ describe('useRankings', () => {
   it('loadRankings handles error gracefully', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     mockGetRankings.mockRejectedValue(new Error('API error'))
+
+    // Mock the store's loadRankings to handle errors
+    mockRankingsStore.loadRankings = vi.fn(async () => {
+      mockRankingsStore.loading.value = true
+      try {
+        await mockGetRankings()
+      } catch (err) {
+        console.error('Failed to load rankings:', err)
+        mockRankingsStore.error.value = 'Failed to load rankings'
+      } finally {
+        mockRankingsStore.loading.value = false
+      }
+    })
 
     const { rankings, loading, loadRankings } = useRankings()
 

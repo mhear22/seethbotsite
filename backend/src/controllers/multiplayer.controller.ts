@@ -93,7 +93,7 @@ export function setupMultiplayerWebSocket(server: any) {
       });
 
       // Handle WebSocket error
-      ws.on('error', (error) => {
+      ws.on('error', (error: Error) => {
         console.error(`[Multiplayer] WebSocket error for ${userName}:`, error);
         gameServer.handleDisconnect(userId);
       });

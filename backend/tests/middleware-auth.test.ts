@@ -7,12 +7,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { requireAuth, optionalAuth, requireUserIdMatch, requireAdmin } from '../src/middleware/auth';
-import { registerUser, loginUser, initUsersDB } from '../src/users';
-
-// Initialize the users database before running tests
-beforeAll(() => {
-  initUsersDB();
-});
+import { registerUser, loginUser } from '../src/users';
 
 // Mock request, response, and next function
 let mockRequest: Partial<Request>;
@@ -122,7 +117,7 @@ describe('requireAuth middleware', () => {
 
     // Validate token to get session info
     const { validateTokenAndGetUser } = await import('../src/users');
-    const sessionData = validateTokenAndGetUser(token);
+    const sessionData = await validateTokenAndGetUser(token);
 
     // Delete the session to make the token invalid
     const { deleteSession } = await import('../src/users');

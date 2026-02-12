@@ -105,7 +105,6 @@ export class MatchInstance {
    * Start the match with countdown
    */
   public start(): void {
-    console.log(`[Match ${this.matchId}] Starting countdown...`);
 
     // Send match_start to both players
     this.broadcast({
@@ -125,7 +124,6 @@ export class MatchInstance {
       } else {
         clearInterval(countdownInterval);
         this.matchState = 'ACTIVE';
-        console.log(`[Match ${this.matchId}] Match started!`);
         this.startGameLoop();
       }
     }, 1000);

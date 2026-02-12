@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, toRef } from 'vue'
 import { useAudio } from '../composables/useAudio'
 import { useCat } from '../composables/useCat'
 import { usePanels } from '../composables/usePanels'
@@ -227,7 +227,7 @@ export const useAppStore = defineStore('app', () => {
     quotes,
     temer3Quotes,
     adviceSlips,
-    tachValue: uiEffectsStore.tachValue,
+    tachValue: toRef(uiEffectsStore, 'tachValue'),
 
     // Getters
     currentQuote,
@@ -239,12 +239,12 @@ export const useAppStore = defineStore('app', () => {
     catLoading: cat.catLoading,
 
     // UI Effects (delegated to uiEffectsStore)
-    chaosMode: uiEffectsStore.chaosMode,
-    moldMode: uiEffectsStore.moldMode,
-    performanceMode: uiEffectsStore.performanceMode,
-    showHearts: uiEffectsStore.showHearts,
-    maxHearts: uiEffectsStore.maxHearts,
-    heartSpawnRate: uiEffectsStore.heartSpawnRate,
+    chaosMode: toRef(uiEffectsStore, 'chaosMode'),
+    moldMode: toRef(uiEffectsStore, 'moldMode'),
+    performanceMode: toRef(uiEffectsStore, 'performanceMode'),
+    showHearts: toRef(uiEffectsStore, 'showHearts'),
+    maxHearts: toRef(uiEffectsStore, 'maxHearts'),
+    heartSpawnRate: toRef(uiEffectsStore, 'heartSpawnRate'),
 
     // Stores (expose for backward compatibility)
     auth: authStore,

@@ -5,6 +5,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import Database from 'better-sqlite3';
 
 // Set test environment
 process.env.NODE_ENV = 'test';
@@ -20,13 +21,24 @@ export const setupTestDB = () => {
   }
 
   // Clean up old test databases
-  const testDBs = ['clicks.db', 'tickets.db', 'stocks.db'];
+  const testDBs = ['clicks.db', 'tickets.db', 'stocks.db', 'dev.db'];
   testDBs.forEach(dbName => {
     const dbPath = path.join(TEST_DATA_DIR, dbName);
     if (fs.existsSync(dbPath)) {
       fs.unlinkSync(dbPath);
     }
   });
+
+  // Apply Prisma schema to test database
+  const dbPath = path.join(TEST_DATA_DIR, 'dev.db');
+  const db = new Database(dbPath);
+
+  // Read and execute the migration SQL
+  const migrationDir = path.join(__dirname, '..', 'prisma', 'migrations', '20260211034657_init');
+  const migrationSQL = fs.readFileSync(path.join(migrationDir, 'migration.sql'), 'utf8');
+
+  db.exec(migrationSQL);
+  db.close();
 
   return TEST_DATA_DIR;
 };

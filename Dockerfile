@@ -2,7 +2,7 @@
 
 # Shared build base with native compilation tools
 # Using Debian-slim for better native module compatibility (libsql)
-FROM node:22-slim AS builder-base
+FROM node:24-slim AS builder-base
 RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
 
 # Stage 1: Build backend (TypeScript) - generates OpenAPI spec for frontend
@@ -15,7 +15,7 @@ COPY backend/package*.json ./
 
 # Install with cache mount
 RUN --mount=type=cache,target=/root/.npm \
-    npm ci
+    npm install --frozen-lockfile
 
 # Copy backend source (separate layer for better caching)
 COPY backend/tsconfig.json ./
@@ -40,7 +40,7 @@ COPY frontend/package*.json ./
 
 # Install with cache mount
 RUN --mount=type=cache,target=/root/.npm \
-    npm ci
+    npm install --frozen-lockfile
 
 # Copy backend OpenAPI spec for type generation
 COPY --from=backend-builder /app/backend/dist/openapi.json ../backend/dist/openapi.json
@@ -61,13 +61,13 @@ COPY backend/prisma ./prisma/
 
 # Install ONLY production dependencies
 RUN --mount=type=cache,target=/root/.npm \
-    npm ci --omit=dev
+    npm install --frozen-lockfile --omit=dev
 
 # Generate Prisma Client for production
 RUN npx prisma generate
 
 # Stage 4: Production image (minimal)
-FROM node:22-slim
+FROM node:24-slim
 
 WORKDIR /app/backend
 
