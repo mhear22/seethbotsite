@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed, toRef } from 'vue'
+import { ref, computed, toRef, watch } from 'vue'
 import { useAudio } from '../composables/useAudio'
 import { useCat } from '../composables/useCat'
 import { usePanels } from '../composables/usePanels'
@@ -211,6 +211,22 @@ export const useAppStore = defineStore('app', () => {
     showBreadcrumb.value = !showBreadcrumb.value
     localStorage.setItem('showBreadcrumb', showBreadcrumb.value.toString())
   }
+
+  // Watch for performance mode changes and close heavy panels
+  watch(() => uiEffectsStore.performanceMode, (isPerformanceMode) => {
+    if (isPerformanceMode) {
+      // Close live feeds, active users, and mold meter panels when performance mode is enabled
+      if (panels.panels.value.feed) {
+        panels.panels.value.feed = false
+      }
+      if (panels.panels.value.tachometer) {
+        panels.panels.value.tachometer = false
+      }
+      if (panels.panels.value.activeUsers) {
+        panels.panels.value.activeUsers = false
+      }
+    }
+  })
 
   return {
     // State

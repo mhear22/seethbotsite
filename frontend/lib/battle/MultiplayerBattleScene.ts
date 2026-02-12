@@ -161,8 +161,8 @@ export class MultiplayerBattleScene extends BattleScene {
         predictedState.position[2]
       );
       this.playerMech.mesh.rotation.y = predictedState.rotation[1];
-      this.playerMech.health = predictedState.health;
-      this.playerMech.power = predictedState.power;
+      //this.playerMech.health = predictedState.health;
+      //this.playerMech.power = predictedState.power;
       this.playerMech.jumpFuel = predictedState.jumpFuel;
       this.playerMech.isDashing = predictedState.isDashing;
     } else {

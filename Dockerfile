@@ -20,6 +20,7 @@ RUN --mount=type=cache,target=/root/.npm \
 # Copy backend source (separate layer for better caching)
 COPY backend/tsconfig.json ./
 COPY backend/build-info.json ./build-info.json
+COPY backend/prisma.config.ts ./prisma.config.ts
 COPY backend/scripts ./scripts/
 COPY backend/prisma ./prisma/
 COPY backend/src ./src/
@@ -57,6 +58,7 @@ FROM builder-base AS prod-deps
 WORKDIR /app/backend
 
 COPY backend/package*.json ./
+COPY backend/prisma.config.ts ./prisma.config.ts
 COPY backend/prisma ./prisma/
 
 # Install ONLY production dependencies
@@ -69,6 +71,9 @@ RUN npx prisma generate
 # Stage 4: Production image (minimal)
 FROM node:24-slim
 
+# Install sqlite3 for database health checks
+RUN apt-get update && apt-get install -y sqlite3 && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app/backend
 
 # Copy production dependencies
@@ -79,6 +84,11 @@ COPY --from=prod-deps /app/backend/package.json ./package.json
 COPY --from=backend-builder /app/backend/dist ./dist
 COPY --from=backend-builder /app/backend/build-info.json ./build-info.json
 COPY --from=backend-builder /app/backend/prisma ./prisma
+COPY --from=backend-builder /app/backend/prisma.config.ts ./prisma.config.ts
+
+# Copy startup script
+COPY backend/scripts/start.sh ./scripts/start.sh
+RUN chmod +x ./scripts/start.sh
 
 # Copy frontend build
 COPY --from=frontend-builder /app/frontend/dist ./webdist
@@ -98,4 +108,4 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD node -e "require('http').get('http://localhost:3000/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
-CMD ["node", "dist/index.js"]
+CMD ["./scripts/start.sh"]

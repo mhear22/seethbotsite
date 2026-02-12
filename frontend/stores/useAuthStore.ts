@@ -218,7 +218,7 @@ export const useAuthStore = defineStore('auth', () => {
         setAuth(data.token, data.user)
         return { success: true, user: data.user }
       } else {
-        error.value = data.message || 'Registration failed'
+        error.value = data.error || 'Registration failed'
         return { success: false, error: error.value }
       }
     } catch (error) {
@@ -258,7 +258,7 @@ export const useAuthStore = defineStore('auth', () => {
         setAuth(data.token, data.user)
         return { success: true, user: data.user }
       } else {
-        error.value = data.message || 'Login failed'
+        error.value = data.error || 'Login failed'
         return { success: false, error: error.value }
       }
     } catch (error) {
@@ -345,7 +345,7 @@ export const useAuthStore = defineStore('auth', () => {
         clearAuth()
         return { success: true }
       } else {
-        error.value = data.message || 'Password change failed'
+        error.value = data.error || 'Password change failed'
         return { success: false, error: error.value }
       }
     } catch (error) {

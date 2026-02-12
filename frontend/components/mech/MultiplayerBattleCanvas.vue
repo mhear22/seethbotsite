@@ -89,7 +89,7 @@ onMounted(() => {
     yourPlayerId: props.matchData.yourPlayerId,
     opponentId: props.matchData.opponentId,
     opponentLoadout: props.matchData.opponentLoadout
-  }))
+  } as ConstructorParameters<typeof MultiplayerBattleScene>[0]))
 
   // Setup network event listeners
   const networkManager = battleScene.getNetworkManager()
