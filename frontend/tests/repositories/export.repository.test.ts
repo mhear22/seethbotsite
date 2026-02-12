@@ -42,7 +42,8 @@ describe('exportRepository', () => {
   function mockFetchFailure(status = 500) {
     global.fetch = vi.fn().mockResolvedValue({
       ok: false,
-      status
+      status,
+      json: vi.fn().mockResolvedValue({ error: 'Server error' })
     })
   }
 
@@ -189,7 +190,7 @@ describe('exportRepository', () => {
       mockFetchFailure(500)
 
       await expect(exportRepository.exportRankings()).rejects.toThrow(
-        'Failed to export rankings'
+        'Server error'
       )
     })
 
@@ -198,7 +199,7 @@ describe('exportRepository', () => {
 
       await expect(
         exportRepository.exportStats({ userId: 'user-1', format: 'json' })
-      ).rejects.toThrow('Failed to export stats')
+      ).rejects.toThrow('Server error')
     })
   })
 

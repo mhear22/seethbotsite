@@ -23,6 +23,20 @@ body {
   transition: background 0.5s ease;
 }
 
+/* Performance mode optimizations (Ticket #perf) */
+body.performance-mode,
+body.performance-mode * {
+  animation: none !important;
+  transition: none !important;
+}
+
+/* Re-enable only essential transitions in performance mode */
+body.performance-mode a,
+body.performance-mode button,
+body.performance-mode .control-btn {
+  transition: transform 0.1s ease, opacity 0.1s ease;
+}
+
 body.dark {
   background: linear-gradient(135deg, #9333ea 0%, #7c3aed 50%, #5b21b6 100%);
 }

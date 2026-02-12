@@ -1,16 +1,16 @@
 /**
- * Tests for useAuth composable
+ * Tests for useAuthStore Pinia store
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
-import { useAuth } from '../../composables/useAuth'
+import { useAuthStore } from '../../stores/useAuthStore'
 
 // Mock global fetch
 const mockFetch = vi.fn()
 global.fetch = mockFetch
 
-describe('useAuth', () => {
+describe('useAuthStore', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     localStorage.clear()
@@ -22,22 +22,15 @@ describe('useAuth', () => {
     mockFetch.mockReset()
   })
 
-  /**
-   * Helper: Create a fresh auth instance
-   */
-  const loadUseAuth = () => {
-    return useAuth()
-  }
-
   describe('initialization', () => {
     it('should initialize with no auth when no token in localStorage', () => {
-      const auth = loadUseAuth()
+      const store = useAuthStore()
 
-      expect(auth.user.value).toBeNull()
-      expect(auth.token.value).toBeNull()
-      expect(auth.isAuthenticated.value).toBe(false)
-      expect(auth.loading.value).toBe(false)
-      expect(auth.error.value).toBeNull()
+      expect(store.user).toBeNull()
+      expect(store.token).toBeNull()
+      expect(store.isAuthenticated).toBe(false)
+      expect(store.loading).toBe(false)
+      expect(store.error).toBeNull()
     })
 
     it('should initialize with token from localStorage and validate it', async () => {
@@ -59,11 +52,12 @@ describe('useAuth', () => {
         })
       })
 
-      const auth = loadUseAuth()
-      await auth.init()
+      const store = useAuthStore()
+      await store.init()
 
-      expect(auth.token.value).toBe('saved-token-123')
-      expect(auth.isAuthenticated.value).toBe(true)
+      expect(store.token).toBe('saved-token-123')
+      expect(store.user).not.toBeNull()
+      expect(store.isAuthenticated).toBe(true)
     })
   })
 
@@ -73,14 +67,14 @@ describe('useAuth', () => {
         ok: true,
         json: async () => ({
           success: true,
+          token: 'new-token-abc',
           user: { id: 1, email: 'new@example.com', display_name: 'New User' }
         })
       })
 
-      const auth = loadUseAuth()
-      await auth.register('new@example.com', 'password123', 'New User')
+      const store = useAuthStore()
+      await store.register('new@example.com', 'password123', 'New User')
 
-      // Find the register call (might not be the first if initAuth also fetched)
       const registerCall = mockFetch.mock.calls.find(
         (call: any[]) => call[0] === '/api/auth/register'
       )
@@ -99,16 +93,19 @@ describe('useAuth', () => {
         ok: true,
         json: async () => ({
           success: true,
+          token: 'new-token',
           user: { id: 1, email: 'new@example.com', display_name: 'New User' }
         })
       })
 
-      const auth = loadUseAuth()
-      const result = await auth.register('new@example.com', 'password123')
+      const store = useAuthStore()
+      const result = await store.register('new@example.com', 'password123')
 
       expect(result.success).toBe(true)
       expect(result.user).toBeDefined()
       expect(result.user!.email).toBe('new@example.com')
+      expect(store.token).toBe('new-token')
+      expect(store.isAuthenticated).toBe(true)
     })
 
     it('should return error on failure', async () => {
@@ -120,8 +117,8 @@ describe('useAuth', () => {
         })
       })
 
-      const auth = loadUseAuth()
-      const result = await auth.register('existing@example.com', 'password123')
+      const store = useAuthStore()
+      const result = await store.register('existing@example.com', 'password123')
 
       expect(result.success).toBe(false)
       expect(result.error).toBe('Email already exists')
@@ -139,8 +136,8 @@ describe('useAuth', () => {
         })
       })
 
-      const auth = loadUseAuth()
-      await auth.login('user@example.com', 'mypassword')
+      const store = useAuthStore()
+      await store.login('user@example.com', 'mypassword')
 
       const loginCall = mockFetch.mock.calls.find(
         (call: any[]) => call[0] === '/api/auth/login'
@@ -164,12 +161,12 @@ describe('useAuth', () => {
         })
       })
 
-      const auth = loadUseAuth()
-      const result = await auth.login('user@example.com', 'password')
+      const store = useAuthStore()
+      const result = await store.login('user@example.com', 'password')
 
       expect(result.success).toBe(true)
-      expect(auth.token.value).toBe('login-token-xyz')
-      expect(auth.isAuthenticated.value).toBe(true)
+      expect(store.token).toBe('login-token-xyz')
+      expect(store.isAuthenticated).toBe(true)
       expect(localStorage.getItem('auth_token')).toBe('login-token-xyz')
     })
 
@@ -182,8 +179,8 @@ describe('useAuth', () => {
         })
       })
 
-      const auth = loadUseAuth()
-      const result = await auth.login('user@example.com', 'wrongpassword')
+      const store = useAuthStore()
+      const result = await store.login('user@example.com', 'wrongpassword')
 
       expect(result.success).toBe(false)
       expect(result.error).toBe('Invalid credentials')
@@ -194,51 +191,25 @@ describe('useAuth', () => {
     it('should clear auth state', async () => {
       mockFetch.mockResolvedValue({ ok: true })
 
-      const auth = loadUseAuth()
+      const store = useAuthStore()
+      store.token = 'existing-token'
+      store.user = { id: 1, email: 'test@example.com', display_name: 'Test' } as any
 
-      // Login first to have a token
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          success: true,
-          token: 'existing-token',
-          user: { id: 1, email: 'test@example.com', display_name: 'Test' }
-        })
-      })
+      await store.logout()
 
-      await auth.login('test@example.com', 'password')
-      expect(auth.token.value).toBe('existing-token')
-
-      // Now logout
-      mockFetch.mockResolvedValueOnce({ ok: true })
-      await auth.logout()
-
-      expect(auth.user.value).toBeNull()
-      expect(auth.token.value).toBeNull()
-      expect(auth.isAuthenticated.value).toBe(false)
+      expect(store.user).toBeNull()
+      expect(store.token).toBeNull()
+      expect(store.isAuthenticated).toBe(false)
       expect(localStorage.getItem('auth_token')).toBeNull()
     })
 
     it('should call /auth/logout endpoint', async () => {
       mockFetch.mockResolvedValue({ ok: true })
 
-      const auth = loadUseAuth()
+      const store = useAuthStore()
+      store.token = 'token-for-logout'
 
-      // Login first
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          success: true,
-          token: 'token-for-logout',
-          user: { id: 1, email: 'test@example.com', display_name: 'Test' }
-        })
-      })
-
-      await auth.login('test@example.com', 'password')
-      mockFetch.mockClear()
-
-      mockFetch.mockResolvedValueOnce({ ok: true })
-      await auth.logout()
+      await store.logout()
 
       const logoutCall = mockFetch.mock.calls.find(
         (call: any[]) => call[0] === '/api/auth/logout'
@@ -250,22 +221,7 @@ describe('useAuth', () => {
 
   describe('updateProfile', () => {
     it('should send PATCH with displayName', async () => {
-      const auth = loadUseAuth()
-
-      // Login first
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          success: true,
-          token: 'update-token',
-          user: { id: 1, email: 'test@example.com', display_name: 'Old Name' }
-        })
-      })
-
-      await auth.login('test@example.com', 'password')
-      mockFetch.mockClear()
-
-      mockFetch.mockResolvedValueOnce({
+      mockFetch.mockResolvedValue({
         ok: true,
         json: async () => ({
           success: true,
@@ -273,7 +229,10 @@ describe('useAuth', () => {
         })
       })
 
-      await auth.updateProfile('New Name')
+      const store = useAuthStore()
+      store.token = 'update-token'
+
+      await store.updateProfile('New Name')
 
       const profileCall = mockFetch.mock.calls.find(
         (call: any[]) => call[0] === '/api/auth/profile'
@@ -283,31 +242,37 @@ describe('useAuth', () => {
       const body = JSON.parse(profileCall![1].body)
       expect(body.displayName).toBe('New Name')
     })
+
+    it('should update user on success', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          success: true,
+          user: { id: 1, email: 'test@example.com', display_name: 'Updated Name' }
+        })
+      })
+
+      const store = useAuthStore()
+      store.token = 'update-token'
+
+      const result = await store.updateProfile('Updated Name')
+
+      expect(result.success).toBe(true)
+      expect(store.user!.display_name).toBe('Updated Name')
+    })
   })
 
   describe('changePassword', () => {
     it('should send correct request', async () => {
-      const auth = loadUseAuth()
-
-      // Login first
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          success: true,
-          token: 'pw-token',
-          user: { id: 1, email: 'test@example.com', display_name: 'Test' }
-        })
-      })
-
-      await auth.login('test@example.com', 'password')
-      mockFetch.mockClear()
-
-      mockFetch.mockResolvedValueOnce({
+      mockFetch.mockResolvedValue({
         ok: true,
         json: async () => ({ success: true })
       })
 
-      const result = await auth.changePassword('oldpass', 'newpass')
+      const store = useAuthStore()
+      store.token = 'pw-token'
+
+      const result = await store.changePassword('oldpass', 'newpass')
 
       const pwCall = mockFetch.mock.calls.find(
         (call: any[]) => call[0] === '/api/auth/password'
@@ -319,57 +284,56 @@ describe('useAuth', () => {
       expect(body.newPassword).toBe('newpass')
       expect(result.success).toBe(true)
     })
+
+    it('should clear auth after password change', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ success: true })
+      })
+
+      const store = useAuthStore()
+      store.token = 'pw-token'
+      store.user = { id: 1, email: 'test@example.com' } as any
+
+      await store.changePassword('oldpass', 'newpass')
+
+      expect(store.token).toBeNull()
+      expect(store.user).toBeNull()
+    })
   })
 
   describe('deleteAccount', () => {
     it('should clear auth on success', async () => {
-      const auth = loadUseAuth()
+      mockFetch.mockResolvedValue({ ok: true })
 
-      // Login first
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          success: true,
-          token: 'delete-token',
-          user: { id: 1, email: 'test@example.com', display_name: 'Test' }
-        })
-      })
+      const store = useAuthStore()
+      store.token = 'delete-token'
+      store.user = { id: 1, email: 'test@example.com' } as any
 
-      await auth.login('test@example.com', 'password')
-      mockFetch.mockClear()
-
-      mockFetch.mockResolvedValueOnce({ ok: true })
-
-      const result = await auth.deleteAccount('mypassword')
+      const result = await store.deleteAccount('mypassword')
 
       expect(result.success).toBe(true)
-      expect(auth.token.value).toBeNull()
-      expect(auth.isAuthenticated.value).toBe(false)
+      expect(store.token).toBeNull()
+      expect(store.isAuthenticated).toBe(false)
       expect(localStorage.getItem('auth_token')).toBeNull()
     })
   })
 
   describe('getSessions', () => {
     it('should return sessions array', async () => {
-      localStorage.setItem('auth_token', 'sessions-token')
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({ id: 1, email: 'test@example.com', display_name: 'Test' })
-      })
-
-      const auth = loadUseAuth()
-      mockFetch.mockClear()
-
       const sessionsData = [
         { id: 1, user_id: 1, device_name: 'Chrome', token: 'tok1', expires_at: '', created_at: '', last_used_at: '' },
         { id: 2, user_id: 1, device_name: 'Firefox', token: 'tok2', expires_at: '', created_at: '', last_used_at: '' }
       ]
-      mockFetch.mockResolvedValueOnce({
+      mockFetch.mockResolvedValue({
         ok: true,
         json: async () => ({ sessions: sessionsData })
       })
 
-      const sessions = await auth.getSessions()
+      const store = useAuthStore()
+      store.token = 'sessions-token'
+
+      const sessions = await store.getSessions()
 
       expect(sessions).toHaveLength(2)
       expect(sessions[0].device_name).toBe('Chrome')
@@ -377,10 +341,9 @@ describe('useAuth', () => {
     })
 
     it('should return empty array when no token', async () => {
-      // No token in localStorage, so no auth
-      const auth = loadUseAuth()
+      const store = useAuthStore()
 
-      const sessions = await auth.getSessions()
+      const sessions = await store.getSessions()
 
       expect(sessions).toEqual([])
     })
@@ -388,24 +351,12 @@ describe('useAuth', () => {
 
   describe('logoutSession', () => {
     it('should send DELETE to /auth/sessions/:id', async () => {
-      const auth = loadUseAuth()
+      mockFetch.mockResolvedValue({ ok: true })
 
-      // Login first
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          success: true,
-          token: 'session-token',
-          user: { id: 1, email: 'test@example.com', display_name: 'Test' }
-        })
-      })
+      const store = useAuthStore()
+      store.token = 'session-token'
 
-      await auth.login('test@example.com', 'password')
-      mockFetch.mockClear()
-
-      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ sessions: [] }) })
-
-      const result = await auth.logoutSession(42)
+      const result = await store.logoutSession(42)
 
       const deleteCall = mockFetch.mock.calls.find(
         (call: any[]) => call[0] === '/api/auth/sessions/42'
@@ -418,55 +369,32 @@ describe('useAuth', () => {
 
   describe('logoutAll', () => {
     it('should clear auth after deleting all sessions', async () => {
-      const auth = loadUseAuth()
+      mockFetch.mockResolvedValue({ ok: true })
 
-      // Login first
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          success: true,
-          token: 'all-session-token',
-          user: { id: 1, email: 'test@example.com', display_name: 'Test' }
-        })
-      })
+      const store = useAuthStore()
+      store.token = 'all-session-token'
+      store.user = { id: 1, email: 'test@example.com' } as any
 
-      await auth.login('test@example.com', 'password')
-      mockFetch.mockClear()
-
-      mockFetch.mockResolvedValueOnce({ ok: true })
-
-      const result = await auth.logoutAll()
+      const result = await store.logoutAll()
 
       const deleteAllCall = mockFetch.mock.calls.find(
         (call: any[]) => call[0] === '/api/auth/sessions/all' && call[1]?.method === 'DELETE'
       )
       expect(deleteAllCall).toBeDefined()
       expect(result.success).toBe(true)
-      expect(auth.token.value).toBeNull()
-      expect(auth.isAuthenticated.value).toBe(false)
+      expect(store.token).toBeNull()
+      expect(store.isAuthenticated).toBe(false)
     })
   })
 
   describe('fetchWithAuth', () => {
     it('should add Bearer header when token exists', async () => {
-      const auth = loadUseAuth()
+      mockFetch.mockResolvedValue({ ok: true, json: async () => ({}) })
 
-      // Login first
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          success: true,
-          token: 'bearer-token',
-          user: { id: 1, email: 'test@example.com', display_name: 'Test' }
-        })
-      })
+      const store = useAuthStore()
+      store.token = 'bearer-token'
 
-      await auth.login('test@example.com', 'password')
-      mockFetch.mockClear()
-
-      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) })
-
-      await auth.fetchWithAuth('/api/some-endpoint', { method: 'GET' })
+      await store.fetchWithAuth('/api/some-endpoint', { method: 'GET' })
 
       const fetchCall = mockFetch.mock.calls.find(
         (call: any[]) => call[0] === '/api/some-endpoint'

@@ -40,7 +40,8 @@ export const useAppStore = defineStore('app', () => {
     : !isMobileDevice() // Default to false on mobile, true on desktop
   )
 
-  const performanceMode = ref(savedPerformanceMode === 'true')
+  // Performance mode defaults to true (opt-out for fancy effects)
+  const performanceMode = ref(savedPerformanceMode !== null ? savedPerformanceMode === 'true' : true)
 
   const showHearts = ref(localStorage.getItem('showHearts') !== 'false')
 
@@ -146,6 +147,12 @@ export const useAppStore = defineStore('app', () => {
   }
 
   const toggleChaosMode = () => {
+    // Don't allow chaos mode in performance mode
+    if (performanceMode.value) {
+      console.log('Chaos mode is disabled in performance mode')
+      return
+    }
+
     chaosMode.value = !chaosMode.value
     localStorage.setItem('chaosMode', chaosMode.value.toString())
     document.body.classList.toggle('chaos', chaosMode.value)
@@ -161,6 +168,24 @@ export const useAppStore = defineStore('app', () => {
     performanceMode.value = !performanceMode.value
     localStorage.setItem('performanceMode', performanceMode.value.toString())
     document.body.classList.toggle('performance-mode', performanceMode.value)
+
+    // When performance mode is enabled, disable resource-intensive effects
+    if (performanceMode.value) {
+      // Stop chaos mode
+      if (chaosMode.value) {
+        chaosMode.value = false
+        localStorage.setItem('chaosMode', 'false')
+        document.body.classList.remove('chaos')
+        stopChaosEffects()
+      }
+      // Stop mold mode
+      if (moldMode.value) {
+        moldMode.value = false
+        localStorage.setItem('moldMode', 'false')
+        stopMoldSpawner()
+        clearMoldCircles()
+      }
+    }
   }
 
   // Chaos mode effects (Ticket #88)
@@ -607,6 +632,12 @@ export const useAppStore = defineStore('app', () => {
 
   // Toggle mold mode (Ticket #112)
   const toggleMoldMode = () => {
+    // Don't allow mold mode in performance mode
+    if (performanceMode.value) {
+      console.log('Mold mode is disabled in performance mode')
+      return
+    }
+
     moldMode.value = !moldMode.value
     localStorage.setItem('moldMode', moldMode.value.toString())
 

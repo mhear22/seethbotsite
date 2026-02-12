@@ -553,6 +553,11 @@ function setupNetworkHandlers() {
 }
 
 function createMultiplayerMechs(data: MatchFoundMessage) {
+  console.log('[MechBattle] Creating multiplayer mechs with data:')
+  console.log('  Your Player ID:', data.yourPlayerId)
+  console.log('  Opponent ID:', data.opponentId)
+  console.log('  Opponent Name:', data.opponentName)
+
   // Create player mech from builder loadout
   const playerSpawnPos = new THREE.Vector3(
     data.yourSpawnPosition[0],

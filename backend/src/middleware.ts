@@ -13,8 +13,13 @@ interface RateLimitEntry {
 
 const rateLimitStore = new Map<string, RateLimitEntry>();
 
+// IMPORTANT: These limits are intentionally EXTREMELY HIGH because this is a real-time
+// multiplayer game app. During active gameplay, users send frequent WebSocket messages,
+// game state updates, and API calls (battle actions, position updates, etc.).
+// A typical 60-second battle could easily generate 100+ requests per player.
+// Lower limits would break the core multiplayer experience.
 const DEFAULT_WINDOW_MS = 60 * 1000; // 1 minute
-const DEFAULT_MAX_REQUESTS = 100;
+const DEFAULT_MAX_REQUESTS = 10000; // Very high - this is a real-time game, not a typical REST API
 
 /**
  * Rate limiter middleware
