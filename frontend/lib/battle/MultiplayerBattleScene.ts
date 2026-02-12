@@ -34,7 +34,7 @@ export class MultiplayerBattleScene extends BattleScene {
   private yourPlayerId: string;
   private opponentId: string;
   private connected = false;
-  private matchStarted = false;
+  private matchStarted = true;
   private ownsNetworkManager = false; // Track if we created the NetworkManager (and should disconnect it)
 
   // Store event handlers so we can remove them on cleanup
@@ -55,7 +55,9 @@ export class MultiplayerBattleScene extends BattleScene {
     if (config.existingNetworkManager) {
       console.log('[MultiplayerBattleScene] Reusing existing NetworkManager');
       this.networkManager = config.existingNetworkManager;
+      // Check if already connected
       this.connected = this.networkManager.isConnected();
+      console.log('[MultiplayerBattleScene] Already connected:', this.connected);
       this.ownsNetworkManager = false; // We don't own this, don't disconnect on cleanup
     } else {
       console.log('[MultiplayerBattleScene] Creating new NetworkManager');
@@ -95,6 +97,7 @@ export class MultiplayerBattleScene extends BattleScene {
   private setupNetworkHandlers(): void {
     // Helper to register and track handlers
     const addHandler = (event: string, handler: NetworkEventHandler) => {
+      console.log('[MultiplayerBattleScene] Registering handler for event:', event);
       this.eventHandlers.set(event, handler);
       this.networkManager.on(event, handler);
     };
@@ -117,6 +120,7 @@ export class MultiplayerBattleScene extends BattleScene {
     addHandler('match_start', (data) => {
       console.log('[MultiplayerBattleScene] Match starting:', data);
       this.matchStarted = true;
+      console.log('[MultiplayerBattleScene] matchStarted set to true');
     });
 
     addHandler('match_end', (data) => {
@@ -168,8 +172,6 @@ export class MultiplayerBattleScene extends BattleScene {
 
     // Debug: Log player IDs in snapshot
     const playerIdsInSnapshot = Object.keys(snapshot.players);
-    console.log('[MultiplayerBattleScene] Snapshot player IDs:', playerIdsInSnapshot);
-    console.log('[MultiplayerBattleScene] My ID:', this.yourPlayerId, 'Opponent ID:', this.opponentId);
 
     // Get our player state from server for reconciliation
     const serverPlayerState = snapshot.players[this.yourPlayerId];
@@ -401,6 +403,8 @@ export class MultiplayerBattleScene extends BattleScene {
     // Send inputs to server if connected and match started
     if (this.connected && this.matchStarted) {
       this.sendInputToServer();
+    } else if (Math.random() < 0.01) {
+      console.warn('[MultiplayerBattleScene] Not sending input - connected:', this.connected, 'matchStarted:', this.matchStarted);
     }
 
     // Periodically adjust interpolation delay based on jitter
@@ -443,7 +447,12 @@ export class MultiplayerBattleScene extends BattleScene {
     this.inputSequence++;
 
     // Get current input state
-    const inputState = (this as any).inputManager.getInputState();
+    const inputState = this.inputManager.getInputState();
+
+    if (!inputState) {
+      console.error('[MultiplayerBattleScene] inputState is null/undefined!');
+      return;
+    }
 
     // Get aim direction from camera
     const aimDirection = this.playerMech.getForwardDirection();
@@ -465,6 +474,15 @@ export class MultiplayerBattleScene extends BattleScene {
         z: aimDirection.z
       }
     };
+
+    console.log('[MultiplayerBattleScene] Sending input:', {
+      seq: this.inputSequence,
+      forward: input.forward,
+      backward: input.backward,
+      left: input.left,
+      right: input.right,
+      jump: input.jump
+    });
 
     // Add input to prediction buffer for reconciliation
     this.clientPrediction.addInput(this.inputSequence, input);
