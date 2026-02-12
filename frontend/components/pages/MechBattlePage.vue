@@ -137,6 +137,7 @@
           :opponent-mech="(multiplayerOpponentMech as MechEntity)"
           :match-data="matchData"
           :auth-token="auth.token.value"
+          :existing-network-manager="networkManager"
           @battle-end="handleMultiplayerBattleEnd"
           @opponent-disconnected="handleOpponentDisconnected"
           @damage-dealt="handleDamageDealt"

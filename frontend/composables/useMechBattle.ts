@@ -4,7 +4,7 @@ import { MechEntity, type CombatStats } from '../lib/battle/MechEntity'
 import type { MechLoadout, MechStats } from './useMechBuilder'
 
 export interface BattleState {
-  phase: 'loading' | 'ready' | 'active' | 'victory' | 'defeat' | 'mode-select'
+  phase: 'loading' | 'ready' | 'active' | 'victory' | 'defeat' | 'mode-select' | 'countdown'
   player: MechEntity | null
   enemy: MechEntity | null
   time: number
