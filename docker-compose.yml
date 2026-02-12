@@ -1,6 +1,38 @@
 version: '3.8'
 
 services:
+  # Seethbot Server (Full Stack)
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        GIT_HASH: ${GIT_HASH:-$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")}
+        GIT_BRANCH: ${GIT_BRANCH:-$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")}
+    image: seethbotsite-server:latest
+    container_name: seethbot-server
+    restart: unless-stopped
+    ports:
+      - "8081:3000"
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL:-postgresql://seethbot:${POSTGRES_PASSWORD:-seethbot_secret_change_me}@postgres:5432/seethbot?schema=public}
+      GIT_HASH: ${GIT_HASH:-unknown}
+      GIT_BRANCH: ${GIT_BRANCH:-unknown}
+    volumes:
+      - seethbot-data:/app/backend/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - seethbot-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
+
   # PostgreSQL Database
   postgres:
     image: postgres:16-alpine
@@ -63,6 +95,8 @@ services:
 
 volumes:
   postgres_data:
+    driver: local
+  seethbot-data:
     driver: local
 
 networks:
