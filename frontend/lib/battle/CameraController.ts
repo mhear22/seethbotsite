@@ -40,11 +40,11 @@ export class CameraController {
   }
 
   update(deltaTime: number, mouseX: number, mouseY: number) {
-    const baseSensitivity = 0.002
+    const baseSensitivity = 0.0003
     const sensitivity = baseSensitivity * this.sensitivityMultiplier
 
     // Apply invert settings
-    const xMultiplier = this.invertMouseX ? -1 : 1
+    const xMultiplier = this.invertMouseX ? 1 : -1
     const yMultiplier = this.invertMouseY ? -1 : 1
 
     // Convert raw integer mouse input into velocity impulses
