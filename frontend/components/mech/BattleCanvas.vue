@@ -11,6 +11,7 @@ import { useGameSettings } from '../../composables/useGameSettings'
 const props = defineProps<{
   playerMech: MechEntity
   enemyMech: MechEntity
+  mapId?: string
 }>()
 
 const emit = defineEmits<{
@@ -47,6 +48,7 @@ onMounted(() => {
     canvas: canvasRef.value,
     playerMech: props.playerMech,
     enemyMech: props.enemyMech,
+    mapId: props.mapId,
     onBattleEnd: (result) => {
       emit('battle-end', result)
     },

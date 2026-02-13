@@ -38,6 +38,38 @@
       </div>
     </div>
 
+    <!-- Map Selection (Single Player Only) -->
+    <div v-if="battlePhase === 'map-select'" class="screen map-select-screen">
+      <div class="screen-content">
+        <h1>Select Arena</h1>
+        <p class="mode-description">Choose your battleground</p>
+
+        <div class="map-grid">
+          <button
+            v-for="map in availableMaps"
+            :key="map.id"
+            @click="selectMap(map.id)"
+            class="map-btn"
+            :class="{ 'selected': selectedMapId === map.id }"
+          >
+            <div class="map-preview">
+              <div class="map-icon">{{ getMapIcon(map.id) }}</div>
+            </div>
+            <div class="map-info">
+              <h3>{{ map.name }}</h3>
+              <p class="map-size">{{ map.arena.width }}x{{ map.arena.depth }}</p>
+            </div>
+            <div v-if="selectedMapId === map.id" class="selected-indicator">SELECTED</div>
+          </button>
+        </div>
+
+        <div class="button-group">
+          <button @click="confirmMapSelection" class="start-btn">Continue</button>
+          <button @click="returnToModeSelect" class="back-btn">Back</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Loading State -->
     <div v-if="battlePhase === 'loading'" class="screen loading-screen">
       <div class="screen-content">
@@ -102,6 +134,7 @@
         <BattleCanvas
           :player-mech="(battle.battleState.value.player! as MechEntity)"
           :enemy-mech="(battle.battleState.value.enemy! as MechEntity)"
+          :map-id="selectedMapId"
           @battle-end="handleBattleEnd"
           @damage-dealt="handleDamageDealt"
           @time-update="handleTimeUpdate"
@@ -244,6 +277,8 @@ import MultiplayerResultsScreen from '../mech/MultiplayerResultsScreen.vue'
 import { NetworkManager } from '../../lib/battle/NetworkManager'
 import { MechEntity } from '../../lib/battle/MechEntity'
 import type { MechLoadout, MatchFoundMessage, MatchEndMessage } from '@shared/types/NetworkMessages'
+import { SINGLE_PLAYER_MAP_IDS, getAllMaps, getMapById } from '@shared/maps'
+import type { MapDefinition } from '@shared/types/MapDefinition'
 import * as THREE from 'three'
 
 // Multiplayer state
@@ -257,6 +292,10 @@ const multiplayerPlayerMech = ref<MechEntity | null>(null)
 const multiplayerOpponentMech = ref<MechEntity | null>(null)
 const multiplayerMatchResult = ref<MatchEndMessage | null>(null)
 const countdownRemaining = ref(3)
+
+// Single player map selection
+const selectedMapId = ref<string>(SINGLE_PLAYER_MAP_IDS[0])
+const availableMaps = getAllMaps()
 
 const route = useRoute()
 const router = useRouter()
@@ -407,12 +446,43 @@ function handleHudUpdate(data: {
 
 function selectSinglePlayer() {
   battleMode.value = 'single-player'
+  // Go to map selection first
+  battle.battleState.value.phase = 'map-select'
+}
 
-  // Initialize battle with player mech
-  battle.initializeBattle(builder.loadout.value, builder.totalStats.value)
+function selectMap(mapId: string) {
+  selectedMapId.value = mapId
+}
 
-  // Generate enemy mech (Phase 1: tutorial difficulty)
-  battle.generateEnemy('tutorial')
+function confirmMapSelection() {
+  const mapDef = getMapById(selectedMapId.value)
+  const playerSpawn = mapDef?.spawnPoints.find(s => s.playerSlot === 0)
+  const enemySpawn = mapDef?.spawnPoints.find(s => s.playerSlot === 1)
+
+  // Initialize battle with player mech using map spawn position
+  battle.initializeBattle(
+    builder.loadout.value,
+    builder.totalStats.value,
+    playerSpawn
+  )
+
+  // Generate enemy mech at map spawn position
+  battle.generateEnemy('tutorial', enemySpawn)
+}
+
+function returnToModeSelect() {
+  battle.battleState.value.phase = 'mode-select'
+}
+
+function getMapIcon(mapId: string): string {
+  const icons: Record<string, string> = {
+    'default_arena': '🏟️',
+    'ruined_highway': '🛣️',
+    'reactor_core': '⚡',
+    'space_colony': '🚀',
+    'mega_factory': '🏭'
+  }
+  return icons[mapId] || '🗺️'
 }
 
 async function selectMultiplayer() {
@@ -894,6 +964,87 @@ function returnToBuilder() {
     transform: scale(1.05);
     opacity: 0.9;
   }
+}
+
+/* Map Selection Screen */
+.map-select-screen h1 {
+  color: #fff;
+  font-size: 3rem;
+  margin-bottom: 20px;
+  text-shadow: 0 0 20px rgba(59, 130, 246, 0.8);
+}
+
+.map-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+  margin-bottom: 40px;
+  max-width: 900px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.map-btn {
+  background: rgba(0, 0, 0, 0.4);
+  padding: 20px;
+  border-radius: 12px;
+  border: 2px solid rgba(59, 130, 246, 0.3);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.map-btn:hover {
+  border-color: rgba(59, 130, 246, 0.6);
+  background: rgba(59, 130, 246, 0.1);
+  transform: translateY(-5px);
+  box-shadow: 0 10px 30px rgba(59, 130, 246, 0.3);
+}
+
+.map-btn.selected {
+  border-color: #10b981;
+  background: rgba(16, 185, 129, 0.15);
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.4);
+}
+
+.map-preview {
+  width: 80px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 15px;
+}
+
+.map-icon {
+  font-size: 3rem;
+}
+
+.map-info h3 {
+  color: #fff;
+  font-size: 1.1rem;
+  margin-bottom: 5px;
+  text-align: center;
+}
+
+.map-size {
+  color: #9ca3af;
+  font-size: 0.85rem;
+}
+
+.selected-indicator {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #fff;
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: 0.7rem;
+  font-weight: bold;
 }
 
 /* Mode Selection Screen */

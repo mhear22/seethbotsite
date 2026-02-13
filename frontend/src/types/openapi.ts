@@ -8089,204 +8089,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/tickets/settings/ignore-mode": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get ticket processing ignore mode
-         * @description Returns whether ticket processing is paused (ignoring all tickets)
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Ignore mode status retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /** @example false */
-                            ignoreMode?: boolean;
-                        };
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /**
-         * Update ticket processing ignore mode
-         * @description Sets whether ticket processing is paused
-         */
-        patch: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        ignoreMode: boolean;
-                    };
-                };
-            };
-            responses: {
-                /** @description Ignore mode updated successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Bad request - invalid ignoreMode value */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        trace?: never;
-    };
-    "/api/tickets/next-task": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get next task and update last collection time
-         * @description Returns the next pending ticket to work on (excluding those collected in the last hour) and updates the last collection timestamp. Designed for heartbeat automation.
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Next task retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            ticket?: {
-                                id?: number;
-                                title?: string;
-                                description?: string;
-                                status?: string;
-                                ticketType?: string;
-                                priority?: string;
-                                created_at?: string;
-                                updated_at?: string;
-                            } | null;
-                            /** @example 2024-02-04T00:00:00.000Z */
-                            lastCollection?: string;
-                        };
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/tickets/settings/last-collection": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get last ticket collection timestamp
-         * @description Returns the timestamp of the last ticket collection
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Last collection timestamp retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /** @example 2024-02-04T00:00:00.000Z */
-                            lastCollection?: string | null;
-                        };
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /**
-         * Update last ticket collection timestamp
-         * @description Updates the timestamp of the last ticket collection. No authentication required.
-         */
-        patch: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        /** Format: date-time */
-                        lastCollection: string;
-                    };
-                };
-            };
-            responses: {
-                /** @description Last collection updated successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        trace?: never;
-    };
     "/api/tickets": {
         parameters: {
             query?: never;
@@ -8433,7 +8235,7 @@ export interface paths {
         };
         trace?: never;
     };
-    "/api/tickets/estimated-wait-time": {
+    "/api/tickets/tags": {
         parameters: {
             query?: never;
             header?: never;
@@ -8441,8 +8243,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get estimated wait time for new tickets
-         * @description Returns the average completion time based on the last 10 completed tickets. Used to estimate how long new tickets might take to process.
+         * Get all tags used across tickets
+         * @description Returns a list of all unique tags used in tickets, sorted by usage count
          */
         get: {
             parameters: {
@@ -8453,19 +8255,19 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Estimated wait time retrieved successfully */
+                /** @description Tags retrieved successfully */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
                         "application/json": {
-                            /** @description Estimated wait time in minutes (null if insufficient data) */
-                            estimatedWaitTimeMinutes?: number;
-                            /** @description Number of completed tickets used for calculation */
-                            sampleSize?: number;
-                            /** @description Average completion time in hours (null if insufficient data) */
-                            averageCompletionTimeHours?: number;
+                            tags?: {
+                                /** @example ui */
+                                name?: string;
+                                /** @example 5 */
+                                count?: number;
+                            }[];
                         };
                     };
                 };
@@ -8479,7 +8281,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/tickets/stats": {
+    "/api/tickets/categories": {
         parameters: {
             query?: never;
             header?: never;
@@ -8487,8 +8289,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get ticketing statistics
-         * @description Returns ticket statistics including total count, status breakdown, and date ranges
+         * Get all categories used across tickets
+         * @description Returns a list of all unique categories used in tickets, sorted by usage count
          */
         get: {
             parameters: {
@@ -8499,37 +8301,71 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Statistics retrieved successfully */
+                /** @description Categories retrieved successfully */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
                         "application/json": {
-                            /** @example 42 */
-                            totalTickets?: number;
-                            byStatus?: {
-                                pending?: number;
-                                "needs-info"?: number;
-                                completed?: number;
-                                declined?: number;
-                            };
-                            oldestTicket?: {
+                            categories?: {
+                                /** @example ui */
+                                name?: string;
+                                /** @example 3 */
+                                count?: number;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tickets/next-task": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get next task and update last collection time
+         * @description Returns the next pending ticket to work on (excluding those collected in the last hour) and updates the last collection timestamp. Designed for heartbeat automation.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Next task retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            ticket?: {
                                 id?: number;
                                 title?: string;
+                                description?: string;
+                                status?: string;
+                                ticketType?: string;
+                                priority?: string;
                                 created_at?: string;
-                            };
-                            newestTicket?: {
-                                id?: number;
-                                title?: string;
-                                created_at?: string;
-                            };
-                            dates?: {
-                                oldestCreated?: string;
-                                newestCreated?: string;
-                                oldestCompleted?: string;
-                                newestCompleted?: string;
-                            };
+                                updated_at?: string;
+                            } | null;
+                            /** @example 2024-02-04T00:00:00.000Z */
+                            lastCollection?: string;
                         };
                     };
                 };
@@ -8728,98 +8564,6 @@ export interface paths {
         };
         trace?: never;
     };
-    "/api/tickets/tags": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get all tags used across tickets
-         * @description Returns a list of all unique tags used in tickets, sorted by usage count
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Tags retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            tags?: {
-                                /** @example ui */
-                                name?: string;
-                                /** @example 5 */
-                                count?: number;
-                            }[];
-                        };
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/tickets/categories": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get all categories used across tickets
-         * @description Returns a list of all unique categories used in tickets, sorted by usage count
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Categories retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            categories?: {
-                                /** @example ui */
-                                name?: string;
-                                /** @example 3 */
-                                count?: number;
-                            }[];
-                        };
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/tickets/search": {
         parameters: {
             query?: never;
@@ -8888,6 +8632,262 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tickets/settings/ignore-mode": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get ticket processing ignore mode
+         * @description Returns whether ticket processing is paused (ignoring all tickets)
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Ignore mode status retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example false */
+                            ignoreMode?: boolean;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update ticket processing ignore mode
+         * @description Sets whether ticket processing is paused
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        ignoreMode: boolean;
+                    };
+                };
+            };
+            responses: {
+                /** @description Ignore mode updated successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Bad request - invalid ignoreMode value */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/tickets/settings/last-collection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get last ticket collection timestamp
+         * @description Returns the timestamp of the last ticket collection
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Last collection timestamp retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example 2024-02-04T00:00:00.000Z */
+                            lastCollection?: string | null;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update last ticket collection timestamp
+         * @description Updates the timestamp of the last ticket collection. No authentication required.
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** Format: date-time */
+                        lastCollection: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Last collection updated successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/tickets/estimated-wait-time": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get estimated wait time for new tickets
+         * @description Returns the average completion time based on the last 10 completed tickets. Used to estimate how long new tickets might take to process.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Estimated wait time retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @description Estimated wait time in minutes (null if insufficient data) */
+                            estimatedWaitTimeMinutes?: number;
+                            /** @description Number of completed tickets used for calculation */
+                            sampleSize?: number;
+                            /** @description Average completion time in hours (null if insufficient data) */
+                            averageCompletionTimeHours?: number;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tickets/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get ticketing statistics
+         * @description Returns ticket statistics including total count, status breakdown, and date ranges
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Statistics retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example 42 */
+                            totalTickets?: number;
+                            byStatus?: {
+                                pending?: number;
+                                "needs-info"?: number;
+                                completed?: number;
+                                declined?: number;
+                            };
+                            oldestTicket?: {
+                                id?: number;
+                                title?: string;
+                                created_at?: string;
+                            };
+                            newestTicket?: {
+                                id?: number;
+                                title?: string;
+                                created_at?: string;
+                            };
+                            dates?: {
+                                oldestCreated?: string;
+                                newestCreated?: string;
+                                oldestCompleted?: string;
+                                newestCompleted?: string;
+                            };
+                        };
+                    };
                 };
             };
         };

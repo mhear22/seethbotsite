@@ -3,8 +3,13 @@ import * as THREE from 'three'
 import { MechEntity, type CombatStats } from '../lib/battle/MechEntity'
 import type { MechLoadout, MechStats } from './useMechBuilder'
 
+export interface SpawnPosition {
+  position: [number, number, number]
+  facingAngle: number
+}
+
 export interface BattleState {
-  phase: 'loading' | 'ready' | 'active' | 'victory' | 'defeat' | 'mode-select' | 'countdown'
+  phase: 'loading' | 'ready' | 'active' | 'victory' | 'defeat' | 'mode-select' | 'map-select' | 'countdown' | 'multiplayer-results'
   player: MechEntity | null
   enemy: MechEntity | null
   time: number
@@ -34,8 +39,17 @@ export function useMechBattle() {
     }
   }
 
-  function initializeBattle(playerLoadout: MechLoadout, playerStats: MechStats) {
+  function initializeBattle(
+    playerLoadout: MechLoadout,
+    playerStats: MechStats,
+    playerSpawn?: SpawnPosition
+  ) {
     const combatStats = convertStatsToCombat(playerStats)
+
+    const spawnPos = playerSpawn
+      ? new THREE.Vector3(playerSpawn.position[0], playerSpawn.position[1], playerSpawn.position[2])
+      : new THREE.Vector3(0, 0, 15)
+    const facingAngle = playerSpawn?.facingAngle ?? Math.PI
 
     battleState.value.player = new MechEntity(
       'player',
@@ -43,14 +57,17 @@ export function useMechBattle() {
       playerLoadout,
       combatStats,
       true, // isPlayer
-      new THREE.Vector3(0, 0, 15) // Spawn position
+      spawnPos
     )
-    battleState.value.player.rotation.y = Math.PI // Face enemy
+    battleState.value.player.rotation.y = facingAngle
 
     battleState.value.phase = 'ready'
   }
 
-  function generateEnemy(difficulty: 'tutorial' | 'easy' | 'medium' | 'hard' | 'boss' = 'tutorial') {
+  function generateEnemy(
+    difficulty: 'tutorial' | 'easy' | 'medium' | 'hard' | 'boss' = 'tutorial',
+    enemySpawn?: SpawnPosition
+  ) {
     // Enemy presets based on difficulty
     const enemyConfigs = {
       tutorial: {
@@ -127,14 +144,22 @@ export function useMechBattle() {
       rack: null
     }
 
-    battleState.value.enemy = new MechEntity(
+    const spawnPos = enemySpawn
+      ? new THREE.Vector3(enemySpawn.position[0], enemySpawn.position[1], enemySpawn.position[2])
+      : new THREE.Vector3(0, 0, -15)
+    const facingAngle = enemySpawn?.facingAngle ?? 0
+
+    const enemy = new MechEntity(
       'enemy',
       config.name,
       enemyLoadout,
       config.stats,
       false, // Not player
-      new THREE.Vector3(0, 0, -15) // Spawn position opposite player
+      spawnPos
     )
+    enemy.rotation.y = facingAngle
+
+    battleState.value.enemy = enemy
   }
 
   function startBattle() {

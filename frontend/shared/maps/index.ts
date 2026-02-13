@@ -24,6 +24,15 @@ export const MULTIPLAYER_MAP_IDS = [
   megaFactory.id,
 ];
 
+/** All single-player map IDs (includes all maps for variety) */
+export const SINGLE_PLAYER_MAP_IDS = [
+  defaultArena.id,
+  ruinedHighway.id,
+  reactorCore.id,
+  spaceColony.id,
+  megaFactory.id,
+];
+
 export function getMapById(id: string): MapDefinition | undefined {
   return MAP_REGISTRY.get(id);
 }
