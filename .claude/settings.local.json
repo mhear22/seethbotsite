@@ -7,12 +7,8 @@
       "Edit",
       "Bash(./deploy.sh:*)",
       "Bash(cd:*)",
-      "Bash(npm run build)",
-      "Bash(npm run test)",
-      "Bash(docker builder prune:*)",
-      "Bash(tee:*)",
-      "Bash(npm install:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx:*)",
+      "Bash(timeout:*)"
     ]
   },
   "model": "sonnet",

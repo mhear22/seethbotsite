@@ -15,6 +15,10 @@ export class StateInterpolation {
   private stateBuffer: BufferedState[] = [];
   private bufferDuration: number;
   private renderDelay: number;
+  // Estimated offset: clientTime = serverTime + clockOffset
+  private clockOffset: number = 0;
+  private clockOffsetSamples: number[] = [];
+  private readonly MAX_OFFSET_SAMPLES = 10;
 
   constructor(bufferDuration = NETWORK.INTERPOLATION_BUFFER) {
     this.bufferDuration = bufferDuration;
@@ -23,11 +27,28 @@ export class StateInterpolation {
 
   /**
    * Add a new state to the buffer
+   * Converts server timestamps to client time domain to avoid clock skew issues
    */
   public addState(state: PlayerState, serverTime: number): void {
+    const clientNow = Date.now();
+
+    // Estimate clock offset using running median
+    // offset = clientTime - serverTime (positive means client clock is ahead)
+    const sampleOffset = clientNow - serverTime;
+    this.clockOffsetSamples.push(sampleOffset);
+    if (this.clockOffsetSamples.length > this.MAX_OFFSET_SAMPLES) {
+      this.clockOffsetSamples.shift();
+    }
+    // Use median to filter outliers (jitter spikes)
+    const sorted = [...this.clockOffsetSamples].sort((a, b) => a - b);
+    this.clockOffset = sorted[Math.floor(sorted.length / 2)];
+
+    // Store timestamp in client time domain
+    const clientTimestamp = serverTime + this.clockOffset;
+
     this.stateBuffer.push({
       state: this.cloneState(state),
-      timestamp: serverTime
+      timestamp: clientTimestamp
     });
 
     // Keep buffer size reasonable (max 1 second of history)
@@ -169,6 +190,8 @@ export class StateInterpolation {
    */
   public clear(): void {
     this.stateBuffer = [];
+    this.clockOffsetSamples = [];
+    this.clockOffset = 0;
   }
 
   /**

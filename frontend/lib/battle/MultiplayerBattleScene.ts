@@ -53,16 +53,12 @@ export class MultiplayerBattleScene extends BattleScene {
 
     // Initialize network manager - reuse existing if provided, otherwise create new
     if (config.existingNetworkManager) {
-      console.log('[MultiplayerBattleScene] Reusing existing NetworkManager');
       this.networkManager = config.existingNetworkManager;
-      // Check if already connected
       this.connected = this.networkManager.isConnected();
-      console.log('[MultiplayerBattleScene] Already connected:', this.connected);
-      this.ownsNetworkManager = false; // We don't own this, don't disconnect on cleanup
+      this.ownsNetworkManager = false;
     } else {
-      console.log('[MultiplayerBattleScene] Creating new NetworkManager');
       this.networkManager = markRaw(new NetworkManager());
-      this.ownsNetworkManager = true; // We created it, we should disconnect on cleanup
+      this.ownsNetworkManager = true;
     }
     this.stateInterpolation = markRaw(new StateInterpolation());
 
@@ -71,8 +67,8 @@ export class MultiplayerBattleScene extends BattleScene {
       position: [this.playerMech.position.x, this.playerMech.position.y, this.playerMech.position.z],
       rotation: [0, this.playerMech.mesh.rotation.y, 0],
       velocity: [0, 0, 0],
-      health: this.playerMech.health,
-      power: this.playerMech.power,
+      health: this.playerMech.stats.currentHealth,
+      power: this.playerMech.currentPower,
       jumpFuel: this.playerMech.jumpFuel,
       isDashing: this.playerMech.isDashing,
       isJumping: false,
@@ -83,11 +79,8 @@ export class MultiplayerBattleScene extends BattleScene {
     // Setup network event handlers
     this.setupNetworkHandlers();
 
-    // Connect to server only if we created a new NetworkManager
     if (!config.existingNetworkManager) {
       this.connectToServer(config.authToken);
-    } else {
-      console.log('[MultiplayerBattleScene] Skipping connection - already connected');
     }
   }
 
@@ -95,49 +88,36 @@ export class MultiplayerBattleScene extends BattleScene {
    * Setup network event handlers
    */
   private setupNetworkHandlers(): void {
-    // Helper to register and track handlers
     const addHandler = (event: string, handler: NetworkEventHandler) => {
-      console.log('[MultiplayerBattleScene] Registering handler for event:', event);
       this.eventHandlers.set(event, handler);
       this.networkManager.on(event, handler);
     };
 
     addHandler('connected', () => {
-      console.log('[MultiplayerBattleScene] Connected to server');
       this.connected = true;
     });
 
     addHandler('disconnected', () => {
-      console.log('[MultiplayerBattleScene] Disconnected from server');
       this.connected = false;
-      // Handle disconnection (show message, return to menu, etc.)
     });
 
     addHandler('state_snapshot', (data) => {
       this.handleStateSnapshot(data);
     });
 
-    addHandler('match_start', (data) => {
-      console.log('[MultiplayerBattleScene] Match starting:', data);
+    addHandler('match_start', () => {
       this.matchStarted = true;
-      console.log('[MultiplayerBattleScene] matchStarted set to true');
     });
 
     addHandler('match_end', (data) => {
-      console.log('[MultiplayerBattleScene] Match ended:', data);
       this.handleMatchEnd(data);
     });
 
     addHandler('opponent_disconnected', () => {
-      console.log('[MultiplayerBattleScene] Opponent disconnected');
-      // Handle opponent disconnect - you win by default
       this.handleOpponentDisconnect();
     });
 
-    addHandler('latency_update', (data) => {
-      // Update latency display (will be used in Phase 4 for HUD)
-      // console.log('[MultiplayerBattleScene] RTT:', data.rtt);
-    });
+    addHandler('latency_update', () => {});
 
     addHandler('server_error', (data) => {
       console.error('[MultiplayerBattleScene] Server error:', data);
@@ -154,10 +134,8 @@ export class MultiplayerBattleScene extends BattleScene {
   private async connectToServer(authToken: string): Promise<void> {
     try {
       await this.networkManager.connect(authToken);
-      console.log('[MultiplayerBattleScene] Successfully connected');
     } catch (error) {
       console.error('[MultiplayerBattleScene] Failed to connect:', error);
-      // Handle connection failure (show error, return to menu)
     }
   }
 
@@ -165,13 +143,7 @@ export class MultiplayerBattleScene extends BattleScene {
    * Handle state snapshot from server
    */
   private handleStateSnapshot(snapshot: any): void {
-    if (!snapshot.players) {
-      console.warn('[MultiplayerBattleScene] No players in snapshot');
-      return;
-    }
-
-    // Debug: Log player IDs in snapshot
-    const playerIdsInSnapshot = Object.keys(snapshot.players);
+    if (!snapshot.players) return;
 
     // Get our player state from server for reconciliation
     const serverPlayerState = snapshot.players[this.yourPlayerId];
@@ -191,51 +163,14 @@ export class MultiplayerBattleScene extends BattleScene {
       //this.playerMech.power = predictedState.power;
       this.playerMech.jumpFuel = predictedState.jumpFuel;
       this.playerMech.isDashing = predictedState.isDashing;
-    } else {
-      console.warn('[MultiplayerBattleScene] No player state for yourPlayerId:', this.yourPlayerId);
     }
 
     // Get opponent state
     const opponentState = snapshot.players[this.opponentId];
-    if (!opponentState) {
-      console.warn('[MultiplayerBattleScene] No opponent state for opponentId:', this.opponentId);
-      console.warn('[MultiplayerBattleScene] Available player IDs in snapshot:', playerIdsInSnapshot);
-      return;
-    }
+    if (!opponentState) return;
 
-    // Add to interpolation buffer
+    // Add to interpolation buffer - actual state application happens in update()
     this.stateInterpolation.addState(opponentState, snapshot.serverTime);
-
-    // Get interpolated state
-    const interpolatedState = this.stateInterpolation.getInterpolatedState(Date.now());
-    if (!interpolatedState) {
-      console.warn('[MultiplayerBattleScene] No interpolated state available');
-      return;
-    }
-
-    // Debug: Log opponent position every second
-    if (Math.random() < 0.05) { // ~20Hz / 20 = once per second
-      console.log('[MultiplayerBattleScene] Opponent pos:', interpolatedState.position);
-    }
-
-    // Apply interpolated state to enemy mech (opponent)
-    this.enemyMech.position.set(
-      interpolatedState.position[0],
-      interpolatedState.position[1],
-      interpolatedState.position[2]
-    );
-
-    // Update rotation on the MechEntity, not directly on mesh
-    // (mesh rotation gets synced from this.rotation in update())
-    this.enemyMech.rotation.y = interpolatedState.rotation[1];
-
-    // Update health/power bars
-    this.enemyMech.health = interpolatedState.health;
-    this.enemyMech.power = interpolatedState.power;
-    this.enemyMech.jumpFuel = interpolatedState.jumpFuel;
-
-    // Update flags
-    this.enemyMech.isDashing = interpolatedState.isDashing;
   }
 
   /**
@@ -245,7 +180,7 @@ export class MultiplayerBattleScene extends BattleScene {
     const isVictory = data.winnerId === this.yourPlayerId;
     // The battle ending animation should already be triggered by mech_destroyed event
     // This just ensures we call the callback if not already ending
-    if (!(this as any).battleEnding) {
+    if (!this.battleEnding) {
       this.onBattleEnd(isVictory ? 'victory' : 'defeat');
     }
   }
@@ -255,18 +190,14 @@ export class MultiplayerBattleScene extends BattleScene {
    */
   private handleOpponentDisconnect(): void {
     // You win by default
-    if (!(this as any).battleEnding) {
-      (this as any).battleEnding = true;
-      (this as any).battleEndTimer = 2.0;
-      (this as any).battleEndResult = 'victory';
+    if (!this.battleEnding) {
+      this.battleEnding = true;
+      this.battleEndTimer = 2.0;
+      this.battleEndResult = 'victory';
       this.enemyMech.isDestroyed = true;
 
-      const particleSystem = (this as any).particleSystem;
-      const camera = (this as any).camera;
-      if (particleSystem && camera) {
-        particleSystem.spawnExplosion(this.enemyMech.position.clone());
-        camera.triggerShake(1.0);
-      }
+      this.particleSystem.spawnExplosion(this.enemyMech.position.clone());
+      this.camera.triggerShake(1.0);
     }
   }
 
@@ -311,39 +242,19 @@ export class MultiplayerBattleScene extends BattleScene {
    * Handle projectile spawned event
    */
   private handleProjectileSpawned(data: any): void {
-    // Access projectile system from parent class
-    const projectileSystem = (this as any).projectileSystem;
-    if (!projectileSystem) return;
-
-    // Determine which mech fired (for visual projectile spawning)
-    const shooter = data.ownerId === this.yourPlayerId ? this.playerMech : this.enemyMech;
-
-    // Create visual projectile
-    // The projectile system will handle the visual representation
-    // Server is authoritative for hit detection
-    console.log('[MultiplayerBattleScene] Projectile spawned:', data.projectileId);
+    // Server is authoritative for hit detection - visual-only
   }
 
-  /**
-   * Handle projectile hit event
-   */
   private handleProjectileHit(data: any): void {
-    const particleSystem = (this as any).particleSystem;
-    const audio = (this as any).audio;
+    if (!data.position) return;
 
-    if (!particleSystem || !audio) return;
-
-    // Spawn impact effects at hit position
     const impactPos = new THREE.Vector3(
       data.position[0],
       data.position[1],
       data.position[2]
     );
 
-    particleSystem.spawnHitEffect(impactPos, 'ballistic');
-    //audio.playBulletHitMech();
-
-    console.log('[MultiplayerBattleScene] Projectile hit:', data);
+    this.particleSystem.spawnHitEffect(impactPos, 'ballistic');
   }
 
   /**
@@ -352,83 +263,102 @@ export class MultiplayerBattleScene extends BattleScene {
   private handleDamage(data: any): void {
     const targetMech = data.targetId === this.yourPlayerId ? this.playerMech : this.enemyMech;
 
-    // Update health (server state will update in next snapshot, but this provides immediate feedback)
-    targetMech.health = data.newHealth;
+    // Update health immediately for visual feedback (server snapshot will confirm)
+    targetMech.stats.currentHealth = data.newHealth;
 
-    // Visual feedback for taking damage
-    // Could add screen shake, red flash, etc.
-
-    console.log('[MultiplayerBattleScene] Damage:', data.damage, 'to', data.targetId);
+    // Screen shake when player takes damage
+    if (data.targetId === this.yourPlayerId) {
+      this.camera.triggerShake(0.4);
+    }
   }
 
   /**
    * Handle mech destroyed event
    */
   private handleMechDestroyed(data: any): void {
-    console.log('[MultiplayerBattleScene] Mech destroyed:', data.playerId);
-
-    // Determine which mech was destroyed
     const destroyedMech = data.playerId === this.yourPlayerId ? this.playerMech : this.enemyMech;
     const isVictory = data.playerId !== this.yourPlayerId;
 
-    // Trigger battle ending animation
-    const particleSystem = (this as any).particleSystem;
-    const camera = (this as any).camera;
-
-    if (particleSystem && camera) {
-      particleSystem.spawnExplosion(destroyedMech.position.clone());
-      camera.triggerShake(1.0);
-    }
+    this.particleSystem.spawnExplosion(destroyedMech.position.clone());
+    this.camera.triggerShake(1.0);
 
     destroyedMech.isDestroyed = true;
-    (this as any).battleEnding = true;
-    (this as any).battleEndTimer = 2.0;
-    (this as any).battleEndResult = isVictory ? 'victory' : 'defeat';
+    this.battleEnding = true;
+    this.battleEndTimer = 2.0;
+    this.battleEndResult = isVictory ? 'victory' : 'defeat';
   }
 
+  // Counter for periodic interpolation delay adjustment
+  private adjustDelayCounter = 0;
+
   /**
-   * Override update method to send inputs to server
-   * In multiplayer, we skip the parent's enemy AI/physics updates
-   * since the opponent is controlled by network state
+   * Override update method for multiplayer
+   * Only runs: player physics, camera, particles, network input, and opponent interpolation.
+   * Skips: enemy AI, local projectile collisions, local damage/combat.
    */
   protected update(deltaTime: number): void {
-    // We need to manually do what parent does but skip enemy AI
-    // This is a simplified version - in production you might want to refactor
-    // the parent class to make enemy updates optional
+    // Update particles
+    this.particleSystem.update(deltaTime);
 
-    // For now, just call parent update which includes both player and enemy
-    // The enemy AI will run, but network state will override it each snapshot
-    super.update(deltaTime);
+    // Handle battle ending animation
+    if (this.battleEnding) {
+      this.battleEndTimer -= deltaTime;
+      const defeated = this.battleEndResult === 'victory' ? this.enemyMech : this.playerMech;
+      defeated.playDestroyAnimation(deltaTime);
 
-    // Send inputs to server if connected and match started
+      const input = this.inputManager.getInputState();
+      this.camera.update(deltaTime, input.mouseX, input.mouseY);
+      this.inputManager.resetMouseMovement();
+
+      if (this.battleEndTimer <= 0) {
+        this.onBattleEnd(this.battleEndResult);
+        this.stop();
+      }
+      return;
+    }
+
+    const input = this.inputManager.getInputState();
+
+    // Update player mech physics (local prediction)
+    this.physicsSystem.updateDash(this.playerMech, input, deltaTime);
+    if (!this.playerMech.isDashing) {
+      this.physicsSystem.updateMovement(this.playerMech, input, deltaTime);
+    }
+    this.physicsSystem.updateJumpJets(this.playerMech, input, deltaTime);
+    // Skip building collisions for player in multiplayer - server is authoritative
+    this.playerMech.update(deltaTime);
+    this.playerMech.updatePower(deltaTime);
+
+    // Send inputs to server
     if (this.connected && this.matchStarted) {
       this.sendInputToServer();
-    } else if (Math.random() < 0.01) {
-      console.warn('[MultiplayerBattleScene] Not sending input - connected:', this.connected, 'matchStarted:', this.matchStarted);
     }
 
-    // Periodically adjust interpolation delay based on jitter
-    if (Math.random() < 0.01) { // 1% chance each frame
-      this.stateInterpolation.adjustRenderDelay();
-    }
-
-    // Apply the latest interpolated state for smooth opponent movement
-    // This ensures network state takes priority over any AI movement
+    // Interpolate opponent position for smooth rendering
     const currentState = this.stateInterpolation.getInterpolatedState(Date.now());
     if (currentState) {
-      // Debug: Log when applying interpolated state
-      if (Math.random() < 0.02) { // ~2% of frames
-        console.log('[MultiplayerBattleScene] Applying interpolated state to enemy:', currentState.position);
-      }
-
       this.enemyMech.position.set(
         currentState.position[0],
         currentState.position[1],
         currentState.position[2]
       );
       this.enemyMech.rotation.y = currentState.rotation[1];
-    } else if (Math.random() < 0.02) {
-      console.warn('[MultiplayerBattleScene] No interpolated state available in update()');
+      this.enemyMech.stats.currentHealth = currentState.health;
+      this.enemyMech.currentPower = currentState.power;
+      this.enemyMech.jumpFuel = currentState.jumpFuel;
+      this.enemyMech.isDashing = currentState.isDashing;
+    }
+    this.enemyMech.update(deltaTime);
+
+    // Update camera
+    this.camera.update(deltaTime, input.mouseX, input.mouseY);
+    this.inputManager.resetMouseMovement();
+
+    // Adjust interpolation delay every ~100 frames instead of randomly
+    this.adjustDelayCounter++;
+    if (this.adjustDelayCounter >= 100) {
+      this.adjustDelayCounter = 0;
+      this.stateInterpolation.adjustRenderDelay();
     }
   }
 
@@ -449,10 +379,7 @@ export class MultiplayerBattleScene extends BattleScene {
     // Get current input state
     const inputState = this.inputManager.getInputState();
 
-    if (!inputState) {
-      console.error('[MultiplayerBattleScene] inputState is null/undefined!');
-      return;
-    }
+    if (!inputState) return;
 
     // Get aim direction from camera
     const aimDirection = this.playerMech.getForwardDirection();
@@ -475,15 +402,6 @@ export class MultiplayerBattleScene extends BattleScene {
       }
     };
 
-    console.log('[MultiplayerBattleScene] Sending input:', {
-      seq: this.inputSequence,
-      forward: input.forward,
-      backward: input.backward,
-      left: input.left,
-      right: input.right,
-      jump: input.jump
-    });
-
     // Add input to prediction buffer for reconciliation
     this.clientPrediction.addInput(this.inputSequence, input);
 
@@ -503,13 +421,8 @@ export class MultiplayerBattleScene extends BattleScene {
     }
     this.eventHandlers.clear();
 
-    // Only disconnect if we created the NetworkManager
-    // If it was passed to us, the parent component owns it and will manage its lifecycle
     if (this.ownsNetworkManager) {
-      console.log('[MultiplayerBattleScene] Disconnecting NetworkManager (we own it)');
       this.networkManager.disconnect();
-    } else {
-      console.log('[MultiplayerBattleScene] Not disconnecting NetworkManager (we don\'t own it)');
     }
 
     this.stateInterpolation.clear();

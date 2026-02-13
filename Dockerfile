@@ -3,7 +3,7 @@
 # Shared build base with native compilation tools
 # Using Debian-slim for better native module compatibility (libsql)
 FROM node:24-slim AS builder-base
-RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y python3 make g++ openssl && rm -rf /var/lib/apt/lists/*
 
 # Stage 1: Build backend (TypeScript) - generates OpenAPI spec for frontend
 FROM builder-base AS backend-builder
@@ -71,8 +71,7 @@ RUN npx prisma generate
 # Stage 4: Production image (minimal)
 FROM node:24-slim
 
-# Install sqlite3 for database health checks
-RUN apt-get update && apt-get install -y sqlite3 && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app/backend
 

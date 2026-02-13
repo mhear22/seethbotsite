@@ -507,25 +507,23 @@ function setupNetworkHandlers() {
     createMultiplayerMechs(data)
   })
 
-  // Match start (countdown completed)
+  // Match start countdown - server sends countdown=3, 2, 1 then starts game loop
+  let countdownTimeout: ReturnType<typeof setTimeout> | null = null
   networkManager.on('match_start', (data: any) => {
-    console.log('[MechBattle] Match starting!', data)
-
-    // Start countdown
-    battle.battleState.value.phase = 'countdown'
     showMatchmaking.value = false
+    battle.battleState.value.phase = 'countdown'
     countdownRemaining.value = data.countdown || 3
 
-    // Countdown timer
-    const countdownInterval = setInterval(() => {
-      countdownRemaining.value--
+    // Clear any previous timeout to prevent duplicates
+    if (countdownTimeout) clearTimeout(countdownTimeout)
 
-      if (countdownRemaining.value <= 0) {
-        clearInterval(countdownInterval)
-        // Start the actual battle
+    // When we receive countdown=1, start battle after 1 second (server starts game loop at 0)
+    if (data.countdown === 1) {
+      countdownTimeout = setTimeout(() => {
+        countdownRemaining.value = 0
         battle.battleState.value.phase = 'active'
-      }
-    }, 1000)
+      }, 1000)
+    }
   })
 
   // Matchmaking status updates

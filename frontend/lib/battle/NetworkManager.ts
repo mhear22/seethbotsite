@@ -274,7 +274,6 @@ export class NetworkManager {
       timestamp: Date.now(),
       input
     };
-    console.log('[NetworkManager] Sending input message:', { seq, timestamp: message.timestamp, input });
     this.send(message);
   }
 

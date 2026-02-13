@@ -1,6 +1,15 @@
 import { prisma } from '../lib/prisma';
 
 /**
+ * Get database instance for tickets (STUB for backward compatibility)
+ * @deprecated Use Prisma directly instead
+ */
+export function getDB(): any {
+  console.warn('getDB() is deprecated. Use Prisma directly instead.');
+  return null;
+}
+
+/**
  * Parse dependencies from ticket description
  * Looks for patterns like "depends on #123", "requires #123", "blocked by #123"
  * Supports multiple ticket IDs like "depends on #123 and #124" or "requires #123, #124"

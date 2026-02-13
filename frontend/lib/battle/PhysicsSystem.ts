@@ -15,10 +15,10 @@ export class PhysicsSystem {
     // Calculate base speed with weight penalty
     const speedStat = Math.max(10, mech.stats.speed) / 100
     const weightFactor = mech.weightPenalty // 0.5 to 1.0
-    const baseSpeed = 8 * this.speedMultiplier * speedStat * weightFactor
+    const targetSpeed = 8 * this.speedMultiplier * speedStat * weightFactor
 
-    // Acceleration also affected by weight (lighter = snappier)
-    const acceleration = 30 * weightFactor
+    // Acceleration rate (units/s²) - how fast we reach target speed
+    const accelRate = 60 * weightFactor
 
     // Get movement directions relative to camera view
     const forward = new THREE.Vector3(0, 0, 1)
@@ -29,36 +29,31 @@ export class PhysicsSystem {
     right.applyEuler(mech.rotation)
 
     // Leg-specific modifiers
-    let turnSpeed = 1.0
-    let friction = 0.75
+    // frictionRate: higher = stops faster. Expressed as decay per second.
+    let frictionRate = 8.0
     let backwardSpeedPenalty = 0.6
     let blockJump = false
 
     switch (legType) {
       case 'tracked':
-        // Slow turn rate, high stability, cannot jump
-        turnSpeed = 0.7
-        friction = 0.75 // More planted
+        frictionRate = 8.0
         blockJump = true
         break
 
       case 'hover':
-        // Fast turns, low friction (slides)
-        turnSpeed = 1.3
-        friction = 0.95 // Slides more
+        frictionRate = 2.0 // Slides more
         // Oscillate vertically for hover effect
         mech.position.y += Math.sin(performance.now() * 0.003) * 0.15 * deltaTime
         break
 
       case 'quadrupedal':
-        // Better acceleration, stable, better reverse speed
-        turnSpeed = 0.85
-        backwardSpeedPenalty = 0.8 // Better reverse than bipedal
+        frictionRate = 6.0
+        backwardSpeedPenalty = 0.8
         break
 
       case 'bipedal':
       default:
-        // Standard behavior
+        frictionRate = 8.0
         break
     }
 
@@ -67,25 +62,31 @@ export class PhysicsSystem {
       input = { ...input, jump: false }
     }
 
-    // WASD movement - add acceleration to velocity
-    if (input.forward) {
-      mech.velocity.add(forward.clone().multiplyScalar(baseSpeed))
-    }
-    if (input.backward) {
-      mech.velocity.add(forward.clone().multiplyScalar(-baseSpeed * backwardSpeedPenalty))
-    }
-    if (input.left) {
-      mech.velocity.add(right.clone().multiplyScalar(baseSpeed))
-    }
-    if (input.right) {
-      mech.velocity.add(right.clone().multiplyScalar(-baseSpeed))
+    // Calculate desired movement direction
+    const moveDir = new THREE.Vector3()
+    if (input.forward) moveDir.add(forward)
+    if (input.backward) moveDir.add(forward.clone().multiplyScalar(-backwardSpeedPenalty))
+    if (input.left) moveDir.add(right)
+    if (input.right) moveDir.sub(right)
+
+    if (moveDir.lengthSq() > 0) {
+      moveDir.normalize()
+      // Accelerate toward target velocity (frame-rate independent)
+      const targetVel = moveDir.multiplyScalar(targetSpeed)
+      const diffX = targetVel.x - mech.velocity.x
+      const diffZ = targetVel.z - mech.velocity.z
+      const step = accelRate * deltaTime
+      mech.velocity.x += Math.sign(diffX) * Math.min(Math.abs(diffX), step)
+      mech.velocity.z += Math.sign(diffZ) * Math.min(Math.abs(diffZ), step)
+    } else {
+      // No input: apply friction (frame-rate independent exponential decay)
+      const frictionFactor = Math.exp(-frictionRate * deltaTime)
+      mech.velocity.x *= frictionFactor
+      mech.velocity.z *= frictionFactor
     }
 
-    // Apply velocity to position with deltaTime
+    // Apply velocity to position
     mech.position.add(mech.velocity.clone().multiplyScalar(deltaTime))
-
-    // Apply friction (ground) - affected by leg type
-    mech.velocity.multiplyScalar(friction)
 
     // Clamp to arena bounds
     mech.position.x = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, mech.position.x))

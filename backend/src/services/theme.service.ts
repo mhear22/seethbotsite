@@ -220,6 +220,15 @@ export async function getOrCreateDefaultThemePreferences(userId: number): Promis
 }
 
 /**
+ * Initialize theme database (STUB for backward compatibility)
+ * @deprecated Theme table is managed by Prisma migrations
+ */
+export async function initThemeDB(): Promise<void> {
+  console.warn('initThemeDB() is deprecated. Theme table is managed by Prisma migrations.');
+  return;
+}
+
+/**
  * Delete theme preferences for a user
  */
 export async function deleteThemePreferences(userId: number): Promise<boolean> {

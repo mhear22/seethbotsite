@@ -71,7 +71,8 @@ export class BattleScene {
   private animationId: number | null = null
   private lastTime: number = 0
   private battleTime: number = 0
-  private onBattleEnd: (result: 'victory' | 'defeat') => void
+  private handleResizeBound: () => void
+  protected onBattleEnd: (result: 'victory' | 'defeat') => void
   private onDamageDealt: (amount: number) => void
 
   // Dual weapon cooldowns
@@ -79,9 +80,9 @@ export class BattleScene {
   private lastRightArmShot: number = 0
 
   // Battle ending animation
-  private battleEnding: boolean = false
-  private battleEndTimer: number = 0
-  private battleEndResult: 'victory' | 'defeat' = 'victory'
+  protected battleEnding: boolean = false
+  protected battleEndTimer: number = 0
+  protected battleEndResult: 'victory' | 'defeat' = 'victory'
 
   constructor(config: BattleSceneConfig) {
     this.playerMech = config.playerMech
@@ -131,7 +132,8 @@ export class BattleScene {
     this.addMechsToScene()
 
     // Handle window resize
-    window.addEventListener('resize', () => this.handleResize())
+    this.handleResizeBound = () => this.handleResize()
+    window.addEventListener('resize', this.handleResizeBound)
   }
 
   private setupSky() {
@@ -542,6 +544,7 @@ export class BattleScene {
 
   cleanup() {
     this.stop()
+    window.removeEventListener('resize', this.handleResizeBound)
     this.inputManager.cleanup()
     this.projectileSystem.cleanup()
     this.particleSystem.cleanup()

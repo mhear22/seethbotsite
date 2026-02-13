@@ -28,6 +28,14 @@ export class InputManager {
     dash: string
   }
 
+  // Store bound handlers for cleanup
+  private handleKeyDown: (e: KeyboardEvent) => void
+  private handleKeyUp: (e: KeyboardEvent) => void
+  private handleMouseDown: (e: MouseEvent) => void
+  private handleMouseUp: (e: MouseEvent) => void
+  private handleMouseMove: (e: MouseEvent) => void
+  private handlePointerLockChange: () => void
+
   constructor(canvas: HTMLCanvasElement, keyBindings?: {
     forward: string
     backward: string
@@ -45,51 +53,46 @@ export class InputManager {
       jump: 'Space',
       dash: 'ShiftLeft'
     }
+
+    // Create bound handlers
+    this.handleKeyDown = (e: KeyboardEvent) => {
+      this.keys.set(e.code, true)
+      if (e.code === 'Space') e.preventDefault()
+    }
+    this.handleKeyUp = (e: KeyboardEvent) => {
+      this.keys.set(e.code, false)
+    }
+    this.handleMouseDown = (e: MouseEvent) => {
+      this.mouseButtons.set(e.button, true)
+      if (document.pointerLockElement !== this.canvas) {
+        this.canvas.requestPointerLock()
+      }
+    }
+    this.handleMouseUp = (e: MouseEvent) => {
+      this.mouseButtons.set(e.button, false)
+    }
+    this.handleMouseMove = (e: MouseEvent) => {
+      if (document.pointerLockElement === this.canvas) {
+        this.mouseAccumulator.x += e.movementX
+        this.mouseAccumulator.y += e.movementY
+      }
+    }
+    this.handlePointerLockChange = () => {
+      if (document.pointerLockElement !== this.canvas) {
+        this.mouseButtons.set(0, false)
+      }
+    }
+
     this.setupListeners()
   }
 
   private setupListeners() {
-    // Keyboard events
-    window.addEventListener('keydown', (e) => {
-      this.keys.set(e.code, true)
-      // Prevent space from scrolling page
-      if (e.code === 'Space') {
-        e.preventDefault()
-      }
-    })
-
-    window.addEventListener('keyup', (e) => {
-      this.keys.set(e.code, false)
-    })
-
-    // Mouse events
-    this.canvas.addEventListener('mousedown', (e) => {
-      this.mouseButtons.set(e.button, true)
-      // Request pointer lock for FPS-style mouse control
-      if (document.pointerLockElement !== this.canvas) {
-        this.canvas.requestPointerLock()
-      }
-    })
-
-    this.canvas.addEventListener('mouseup', (e) => {
-      this.mouseButtons.set(e.button, false)
-    })
-
-    this.canvas.addEventListener('mousemove', (e) => {
-      if (document.pointerLockElement === this.canvas) {
-        // Accumulate raw movement values (integers from browser)
-        this.mouseAccumulator.x += e.movementX
-        this.mouseAccumulator.y += e.movementY
-      }
-    })
-
-    // Pointer lock change
-    document.addEventListener('pointerlockchange', () => {
-      if (document.pointerLockElement !== this.canvas) {
-        // Pointer lock lost - stop shooting
-        this.mouseButtons.set(0, false)
-      }
-    })
+    window.addEventListener('keydown', this.handleKeyDown)
+    window.addEventListener('keyup', this.handleKeyUp)
+    this.canvas.addEventListener('mousedown', this.handleMouseDown)
+    this.canvas.addEventListener('mouseup', this.handleMouseUp)
+    this.canvas.addEventListener('mousemove', this.handleMouseMove)
+    document.addEventListener('pointerlockchange', this.handlePointerLockChange)
   }
 
   getInputState(): InputState {
@@ -119,6 +122,14 @@ export class InputManager {
   }
 
   cleanup() {
+    // Remove all event listeners
+    window.removeEventListener('keydown', this.handleKeyDown)
+    window.removeEventListener('keyup', this.handleKeyUp)
+    this.canvas.removeEventListener('mousedown', this.handleMouseDown)
+    this.canvas.removeEventListener('mouseup', this.handleMouseUp)
+    this.canvas.removeEventListener('mousemove', this.handleMouseMove)
+    document.removeEventListener('pointerlockchange', this.handlePointerLockChange)
+
     // Release pointer lock
     if (document.pointerLockElement === this.canvas) {
       document.exitPointerLock()

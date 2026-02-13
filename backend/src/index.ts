@@ -196,7 +196,7 @@ initFavoritesDB().catch((err) => {
 });
 
 // Initialize theme database
-initThemeDB().catch((err) => {
+initThemeDB().catch((err: any) => {
   console.error('Failed to initialize theme database:', err);
 });
 

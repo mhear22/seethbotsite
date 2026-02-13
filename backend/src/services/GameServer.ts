@@ -286,8 +286,6 @@ export class GameServer {
     const player = this.players.get(playerId);
     if (!player) return;
 
-    console.log(`[GameServer] Received message type "${message.type}" from ${player.playerName}`);
-
     try {
       switch (message.type) {
         case 'match_request':
@@ -299,7 +297,6 @@ export class GameServer {
           break;
 
         case 'input':
-          console.log('[GameServer] Received input message:', message);
           this.handleInput(player, message);
           break;
 
