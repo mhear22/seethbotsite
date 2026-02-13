@@ -105,7 +105,7 @@ router.get('/', async (req: Request, res: Response) => {
     // Parse custom_settings JSON if present
     const responseData = {
       ...preferences,
-      custom_settings: preferences.custom_settings ? JSON.parse(preferences.custom_settings) : null
+      custom_settings: preferences.custom_colors ? JSON.parse(preferences.custom_colors) : null
     };
 
     res.json({ preferences: responseData });
@@ -198,7 +198,7 @@ router.put('/', async (req: Request, res: Response) => {
     // Parse custom_settings JSON if present
     const responseData = {
       ...updatedPreferences,
-      custom_settings: updatedPreferences.custom_settings ? JSON.parse(updatedPreferences.custom_settings) : null
+      custom_settings: updatedPreferences.custom_colors ? JSON.parse(updatedPreferences.custom_colors) : null
     };
 
     res.json({ preferences: responseData });
