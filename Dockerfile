@@ -14,9 +14,9 @@ WORKDIR /app/backend
 COPY backend/package*.json ./
 
 # Install with cache mount and memory optimization
-# Note: Using --maxsockets 1 to limit concurrency and reduce memory usage
+# Note: Using npm ci for faster, reliable builds with lower memory usage
 RUN --mount=type=cache,target=/root/.npm \
-    npm install --frozen-lockfile --prefer-offline --no-audit --maxsockets 1
+    npm ci --prefer-offline --no-audit
 
 # Copy backend source (separate layer for better caching)
 COPY backend/tsconfig.json ./
@@ -41,9 +41,9 @@ WORKDIR /app/frontend
 COPY frontend/package*.json ./
 
 # Install with cache mount and memory optimization
-# Note: Using --maxsockets 1 to limit concurrency and reduce memory usage
+# Note: Using npm ci for faster, reliable builds with lower memory usage
 RUN --mount=type=cache,target=/root/.npm \
-    npm install --frozen-lockfile --prefer-offline --no-audit --maxsockets 1
+    npm ci --prefer-offline --no-audit
 
 # Copy backend OpenAPI spec for type generation
 COPY --from=backend-builder /app/backend/dist/openapi.json ../backend/dist/openapi.json
@@ -64,9 +64,9 @@ COPY backend/prisma.config.ts ./prisma.config.ts
 COPY backend/prisma ./prisma/
 
 # Install ONLY production dependencies with memory optimization
-# Note: Using --maxsockets 1 to limit concurrency and reduce memory usage
+# Note: Using npm ci for faster, reliable builds with lower memory usage
 RUN --mount=type=cache,target=/root/.npm \
-    npm install --frozen-lockfile --omit=dev --prefer-offline --no-audit --maxsockets 1
+    npm ci --omit=dev --prefer-offline --no-audit
 
 # Generate Prisma Client for production
 RUN npx prisma generate
