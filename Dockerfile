@@ -14,7 +14,7 @@ WORKDIR /app/backend
 COPY backend/package*.json ./
 
 # Install with cache mount and memory optimization
-# Note: Limiting concurrency to reduce memory usage
+# Note: Using --maxsockets 1 to limit concurrency and reduce memory usage
 RUN --mount=type=cache,target=/root/.npm \
     npm install --frozen-lockfile --prefer-offline --no-audit --maxsockets 1
 
@@ -41,7 +41,7 @@ WORKDIR /app/frontend
 COPY frontend/package*.json ./
 
 # Install with cache mount and memory optimization
-# Note: Limiting concurrency to reduce memory usage
+# Note: Using --maxsockets 1 to limit concurrency and reduce memory usage
 RUN --mount=type=cache,target=/root/.npm \
     npm install --frozen-lockfile --prefer-offline --no-audit --maxsockets 1
 
@@ -64,7 +64,7 @@ COPY backend/prisma.config.ts ./prisma.config.ts
 COPY backend/prisma ./prisma/
 
 # Install ONLY production dependencies with memory optimization
-# Note: Limiting concurrency to reduce memory usage
+# Note: Using --maxsockets 1 to limit concurrency and reduce memory usage
 RUN --mount=type=cache,target=/root/.npm \
     npm install --frozen-lockfile --omit=dev --prefer-offline --no-audit --maxsockets 1
 
