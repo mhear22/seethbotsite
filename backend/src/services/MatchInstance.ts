@@ -184,8 +184,8 @@ export class MatchInstance {
     this.updatePlayerPhysics(this.player2);
 
     // Check building collisions for both players
-    this.checkBuildingCollisions(this.player1);
-    this.checkBuildingCollisions(this.player2);
+    this.checkBuildingCollisions(this.player1, deltaTime);
+    this.checkBuildingCollisions(this.player2, deltaTime);
 
     // Process dynamic elements (conveyors, rotating arms, pistons)
     if (this.map) {
@@ -306,40 +306,65 @@ export class MatchInstance {
   }
 
   /**
-   * Check building AABB collisions and push mech out
+   * Check building AABB collisions - both horizontal push-out and landing on top
    */
-  private checkBuildingCollisions(player: PlayerData): void {
+  private checkBuildingCollisions(player: PlayerData, dt: number): void {
     if (this.buildingAABBs.length === 0) return;
 
     const state = player.state;
     const mechRadius = 2;
+    const mechHeight = 5; // Mech height for collision
     const px = state.position[0];
     const py = state.position[1];
     const pz = state.position[2];
 
+    // Track highest surface we're standing on
+    let groundY = this.floorY;
+
     for (const aabb of this.buildingAABBs) {
-      // Check if mech center is near the AABB (with radius)
-      const closestX = Math.max(aabb.minX, Math.min(px, aabb.maxX));
-      const closestZ = Math.max(aabb.minZ, Math.min(pz, aabb.maxZ));
+      // Check if horizontally within building bounds (with mech radius)
+      const horizontallyAbove = px >= aabb.minX - mechRadius && px <= aabb.maxX + mechRadius &&
+                                 pz >= aabb.minZ - mechRadius && pz <= aabb.maxZ + mechRadius;
 
-      // Only check Y overlap for buildings mech could be at (not above/below)
-      if (py + 3 < aabb.minY || py > aabb.maxY) continue;
-
-      const dx = px - closestX;
-      const dz = pz - closestZ;
-      const distSq = dx * dx + dz * dz;
-
-      if (distSq < mechRadius * mechRadius) {
-        const dist = Math.sqrt(distSq);
-        if (dist > 0) {
-          const pushX = (dx / dist) * (mechRadius - dist);
-          const pushZ = (dz / dist) * (mechRadius - dist);
-          state.position[0] += pushX;
-          state.position[2] += pushZ;
-        } else {
-          state.position[0] += mechRadius;
+      // Check for landing on top of building
+      if (horizontallyAbove && state.velocity[1] <= 0) {
+        const topSurfaceY = aabb.maxY;
+        // Check if falling onto the top surface (within landing range)
+        if (py >= topSurfaceY && py <= topSurfaceY + mechHeight && topSurfaceY > groundY) {
+          groundY = topSurfaceY;
         }
       }
+
+      // Horizontal push-out collision (only if inside building vertically)
+      if (py + mechHeight > aabb.minY && py < aabb.maxY) {
+        const closestX = Math.max(aabb.minX, Math.min(px, aabb.maxX));
+        const closestZ = Math.max(aabb.minZ, Math.min(pz, aabb.maxZ));
+
+        const dx = px - closestX;
+        const dz = pz - closestZ;
+        const distSq = dx * dx + dz * dz;
+
+        if (distSq < mechRadius * mechRadius) {
+          const dist = Math.sqrt(distSq);
+          if (dist > 0) {
+            const pushX = (dx / dist) * (mechRadius - dist);
+            const pushZ = (dz / dist) * (mechRadius - dist);
+            state.position[0] += pushX;
+            state.position[2] += pushZ;
+          } else {
+            state.position[0] += mechRadius;
+          }
+        }
+      }
+    }
+
+    // Apply ground collision for standing on buildings (in addition to floor)
+    if (py <= groundY && state.velocity[1] <= 0) {
+      state.position[1] = groundY;
+      state.velocity[1] = 0;
+      state.isJumping = false;
+      // Regen jump fuel when on buildings too - same rate as floor
+      state.jumpFuel = Math.min(MECH.MAX_JUMP_FUEL, state.jumpFuel + MECH.JUMP_FUEL_REGEN * dt);
     }
   }
 

@@ -10,6 +10,7 @@ import { StateInterpolation } from './StateInterpolation';
 import { ClientPrediction } from './ClientPrediction';
 import { MechEntity } from './MechEntity';
 import type { PlayerInput, MechLoadout, PlayerState } from '@shared/types/NetworkMessages';
+import { computeAABB, type AABB } from '@shared/types/MapDefinition';
 import { markRaw } from 'vue';
 
 export interface MultiplayerBattleSceneConfig extends Omit<BattleSceneConfig, 'enemyMech'> {
@@ -84,6 +85,14 @@ export class MultiplayerBattleScene extends BattleScene {
         this.mapDef.arena.floorY,
         this.mapDef.arena.ceilingY
       );
+
+      // Precompute building AABBs for client-side collision prediction
+      const buildingAABBs: AABB[] = [];
+      for (const geom of this.mapDef.staticGeometry) {
+        const aabb = computeAABB(geom);
+        if (aabb) buildingAABBs.push(aabb);
+      }
+      this.clientPrediction.setBuildingAABBs(buildingAABBs);
     }
 
     // Setup network event handlers

@@ -8,6 +8,15 @@ import { MECH, PHYSICS, ARENA } from '@shared/constants/GameConstants';
 
 
 
+interface AABB {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+  minZ: number;
+  maxZ: number;
+}
+
 interface PendingInput {
   seq: number;
   input: PlayerInput;
@@ -23,12 +32,20 @@ export class ClientPrediction {
   private arenaHalfD = ARENA.DEPTH / 2;
   private floorY = ARENA.FLOOR_Y;
   private ceilingY = ARENA.CEILING_Y;
+  private buildingAABBs: AABB[] = [];
 
   setArenaBounds(width: number, depth: number, floorY?: number, ceilingY?: number) {
     this.arenaHalfW = width / 2;
     this.arenaHalfD = depth / 2;
     if (floorY !== undefined) this.floorY = floorY;
     if (ceilingY !== undefined) this.ceilingY = ceilingY;
+  }
+
+  /**
+   * Set building AABBs for collision detection
+   */
+  setBuildingAABBs(aabbs: AABB[]): void {
+    this.buildingAABBs = aabbs;
   }
 
   constructor(initialState: PlayerState) {
@@ -94,6 +111,9 @@ export class ClientPrediction {
   /**
    * Apply input to state (client-side physics simulation)
    * Should match server-side physics as closely as possible
+   *
+   * NOTE: These values must match PhysicsSystem.updateJumpJets() exactly
+   * to prevent rubber banding during reconciliation
    */
   private applyInput(state: PlayerState, input: PlayerInput, deltaTime: number): void {
     // Calculate movement direction from input
@@ -128,7 +148,7 @@ export class ClientPrediction {
     state.velocity[0] = worldMoveX * speed * dashMultiplier;
     state.velocity[2] = worldMoveZ * speed * dashMultiplier;
 
-    // Apply gravity
+    // Apply gravity - MUST match server MatchInstance.updatePlayerPhysics()
     if (state.position[1] > this.floorY) {
       state.velocity[1] += PHYSICS.GRAVITY * deltaTime;
       state.velocity[1] = Math.max(state.velocity[1], PHYSICS.MAX_FALL_SPEED);
@@ -139,19 +159,19 @@ export class ClientPrediction {
       state.velocity[1] = 0;
       state.isJumping = false;
 
-      // Regen jump fuel on ground
+      // Regen jump fuel on ground - MUST match server MECH.JUMP_FUEL_REGEN (20/s)
       state.jumpFuel = Math.min(MECH.MAX_JUMP_FUEL, state.jumpFuel + MECH.JUMP_FUEL_REGEN * deltaTime);
     }
 
-    // Handle jump
+    // Handle jump - MUST match server MatchInstance exactly
     if (input.jump && !state.isJumping && state.jumpFuel > 0) {
       state.velocity[1] = MECH.JUMP_THRUST;
       state.isJumping = true;
     }
 
-    // Consume jump fuel while jumping
+    // Consume jump fuel while jumping - MUST match server (sustained thrust)
     if (input.jump && state.isJumping && state.jumpFuel > 0) {
-      state.velocity[1] = Math.max(state.velocity[1], 0);
+      state.velocity[1] = Math.max(state.velocity[1], 0); // Maintain upward velocity
       state.velocity[1] += MECH.JUMP_THRUST * 0.5 * deltaTime;
       state.jumpFuel = Math.max(0, state.jumpFuel - MECH.JUMP_FUEL_CONSUMPTION * deltaTime);
     }
@@ -160,6 +180,9 @@ export class ClientPrediction {
     state.position[0] += state.velocity[0] * deltaTime;
     state.position[1] += state.velocity[1] * deltaTime;
     state.position[2] += state.velocity[2] * deltaTime;
+
+    // Check building collisions (both landing on top and horizontal push-out)
+    this.checkBuildingCollisions(state, deltaTime);
 
     // Clamp to arena bounds
     state.position[0] = Math.max(-this.arenaHalfW, Math.min(this.arenaHalfW, state.position[0]));
@@ -184,6 +207,69 @@ export class ClientPrediction {
 
     // Regenerate power
     state.power = Math.min(MECH.MAX_POWER, state.power + MECH.POWER_REGEN * deltaTime);
+  }
+
+  /**
+   * Check building collisions - both landing on top and horizontal push-out
+   * MUST match server MatchInstance.checkBuildingCollisions() behavior
+   */
+  private checkBuildingCollisions(state: PlayerState, deltaTime: number): void {
+    if (this.buildingAABBs.length === 0) return;
+
+    const mechRadius = 2;
+    const mechHeight = 5;
+    const px = state.position[0];
+    const py = state.position[1];
+    const pz = state.position[2];
+
+    // Track highest surface we're standing on
+    let groundY = this.floorY;
+
+    for (const aabb of this.buildingAABBs) {
+      // Check if horizontally within building bounds (with mech radius)
+      const horizontallyAbove = px >= aabb.minX - mechRadius && px <= aabb.maxX + mechRadius &&
+                                 pz >= aabb.minZ - mechRadius && pz <= aabb.maxZ + mechRadius;
+
+      // Check for landing on top of building
+      if (horizontallyAbove && state.velocity[1] <= 0) {
+        const topSurfaceY = aabb.maxY;
+        // Check if falling onto the top surface (within landing range)
+        if (py >= topSurfaceY && py <= topSurfaceY + mechHeight && topSurfaceY > groundY) {
+          groundY = topSurfaceY;
+        }
+      }
+
+      // Horizontal push-out collision (only if inside building vertically)
+      if (py + mechHeight > aabb.minY && py < aabb.maxY) {
+        const closestX = Math.max(aabb.minX, Math.min(px, aabb.maxX));
+        const closestZ = Math.max(aabb.minZ, Math.min(pz, aabb.maxZ));
+
+        const dx = px - closestX;
+        const dz = pz - closestZ;
+        const distSq = dx * dx + dz * dz;
+
+        if (distSq < mechRadius * mechRadius) {
+          const dist = Math.sqrt(distSq);
+          if (dist > 0) {
+            const pushX = (dx / dist) * (mechRadius - dist);
+            const pushZ = (dz / dist) * (mechRadius - dist);
+            state.position[0] += pushX;
+            state.position[2] += pushZ;
+          } else {
+            state.position[0] += mechRadius;
+          }
+        }
+      }
+    }
+
+    // Apply ground collision for standing on buildings (in addition to floor)
+    if (py <= groundY && state.velocity[1] <= 0) {
+      state.position[1] = groundY;
+      state.velocity[1] = 0;
+      state.isJumping = false;
+      // Regen jump fuel when on buildings too - same rate as floor
+      state.jumpFuel = Math.min(MECH.MAX_JUMP_FUEL, state.jumpFuel + MECH.JUMP_FUEL_REGEN * deltaTime);
+    }
   }
 
   /**
