@@ -22,6 +22,8 @@ import {
 } from '../shared/constants/GameConstants';
 import { MechEntity } from '../game/MechEntity';
 import { ProjectileSystem } from '../game/ProjectileSystem';
+import type { MapDefinition, AABB, DynamicElement, HazardZone } from '../shared/types/MapDefinition';
+import { computeAABB, getDynamicElementTransform, isHazardActive, isPointInHazard } from '../shared/types/MapDefinition';
 
 interface PlayerData {
   playerId: string;
@@ -46,9 +48,18 @@ export class MatchInstance {
   private projectileSystem: ProjectileSystem;
   private tickInterval: NodeJS.Timeout | null = null;
   private serverTime: number = Date.now();
+  private matchStartTime: number = Date.now();
   private countdownRemaining: number = 3;
   private onMatchEndCallback: ((matchId: string) => void) | null = null;
   private eventIdCounter = 0;
+
+  // Map data
+  private map: MapDefinition | null = null;
+  private buildingAABBs: AABB[] = [];
+  private arenaHalfW: number;
+  private arenaHalfD: number;
+  private floorY: number;
+  private ceilingY: number;
 
   constructor(
     matchId: string,
@@ -59,15 +70,36 @@ export class MatchInstance {
     player2Id: string,
     player2Name: string,
     player2Loadout: MechLoadout,
-    player2Socket: any
+    player2Socket: any,
+    map?: MapDefinition
   ) {
     this.matchId = matchId;
+
+    // Setup map bounds
+    if (map) {
+      this.map = map;
+      this.arenaHalfW = map.arena.width / 2;
+      this.arenaHalfD = map.arena.depth / 2;
+      this.floorY = map.arena.floorY;
+      this.ceilingY = map.arena.ceilingY;
+
+      // Precompute building AABBs for collision
+      for (const geom of map.staticGeometry) {
+        const aabb = computeAABB(geom);
+        if (aabb) this.buildingAABBs.push(aabb);
+      }
+    } else {
+      this.arenaHalfW = ARENA.WIDTH / 2;
+      this.arenaHalfD = ARENA.DEPTH / 2;
+      this.floorY = ARENA.FLOOR_Y;
+      this.ceilingY = ARENA.CEILING_Y;
+    }
 
     // Initialize projectile system
     this.projectileSystem = new ProjectileSystem();
 
-    // Initialize player 1
-    const spawn1 = this.generateSpawnPosition(0);
+    // Initialize player 1 - use map spawn points if available
+    const spawn1 = map ? [...map.spawnPoints[0].position] as [number, number, number] : this.generateSpawnPosition(0);
     const mech1 = new MechEntity(player1Id, player1Name, player1Loadout, spawn1);
     this.player1 = {
       playerId: player1Id,
@@ -83,7 +115,7 @@ export class MatchInstance {
     };
 
     // Initialize player 2
-    const spawn2 = this.generateSpawnPosition(Math.PI);
+    const spawn2 = map ? [...map.spawnPoints[1].position] as [number, number, number] : this.generateSpawnPosition(Math.PI);
     const mech2 = new MechEntity(player2Id, player2Name, player2Loadout, spawn2);
     this.player2 = {
       playerId: player2Id,
@@ -98,7 +130,7 @@ export class MatchInstance {
       mech: mech2
     };
 
-    console.log(`[Match ${matchId}] Created: ${player1Name} vs ${player2Name}`);
+    console.log(`[Match ${matchId}] Created: ${player1Name} vs ${player2Name} on ${map?.name ?? 'default arena'}`);
   }
 
   /**
@@ -133,6 +165,7 @@ export class MatchInstance {
    * Start the main game loop at 20Hz
    */
   private startGameLoop(): void {
+    this.matchStartTime = Date.now();
     this.tickInterval = setInterval(() => {
       this.tick();
     }, NETWORK.SNAPSHOT_INTERVAL);
@@ -144,10 +177,21 @@ export class MatchInstance {
   private tick(): void {
     this.serverTime = Date.now();
     const deltaTime = NETWORK.SNAPSHOT_INTERVAL / 1000;
+    const matchElapsed = (this.serverTime - this.matchStartTime) / 1000;
 
     // Update player physics based on last input
     this.updatePlayerPhysics(this.player1);
     this.updatePlayerPhysics(this.player2);
+
+    // Check building collisions for both players
+    this.checkBuildingCollisions(this.player1);
+    this.checkBuildingCollisions(this.player2);
+
+    // Process dynamic elements (conveyors, rotating arms, pistons)
+    if (this.map) {
+      this.processDynamicElements(matchElapsed, deltaTime);
+      this.processHazardZones(matchElapsed);
+    }
 
     // Update cooldowns
     this.player1.mech.updateCooldowns(deltaTime);
@@ -214,13 +258,13 @@ export class MatchInstance {
     state.velocity[2] = worldMoveZ * speed * dashMultiplier;
 
     // Apply gravity
-    if (state.position[1] > ARENA.FLOOR_Y) {
+    if (state.position[1] > this.floorY) {
       state.velocity[1] += PHYSICS.GRAVITY * dt;
       state.velocity[1] = Math.max(state.velocity[1], PHYSICS.MAX_FALL_SPEED);
       state.isJumping = true;
     } else {
       // On ground
-      state.position[1] = ARENA.FLOOR_Y;
+      state.position[1] = this.floorY;
       state.velocity[1] = 0;
       state.isJumping = false;
 
@@ -247,10 +291,9 @@ export class MatchInstance {
     state.position[2] += state.velocity[2] * dt;
 
     // Clamp to arena bounds
-    const halfArena = ARENA.WIDTH / 2;
-    state.position[0] = Math.max(-halfArena, Math.min(halfArena, state.position[0]));
-    state.position[2] = Math.max(-halfArena, Math.min(halfArena, state.position[2]));
-    state.position[1] = Math.max(ARENA.FLOOR_Y, Math.min(ARENA.CEILING_Y, state.position[1]));
+    state.position[0] = Math.max(-this.arenaHalfW, Math.min(this.arenaHalfW, state.position[0]));
+    state.position[2] = Math.max(-this.arenaHalfD, Math.min(this.arenaHalfD, state.position[2]));
+    state.position[1] = Math.max(this.floorY, Math.min(this.ceilingY, state.position[1]));
 
     // Update rotation based on aim direction
     if (input.aimDirection) {
@@ -260,6 +303,188 @@ export class MatchInstance {
 
     // Regenerate power
     state.power = Math.min(MECH.MAX_POWER, state.power + MECH.POWER_REGEN * dt);
+  }
+
+  /**
+   * Check building AABB collisions and push mech out
+   */
+  private checkBuildingCollisions(player: PlayerData): void {
+    if (this.buildingAABBs.length === 0) return;
+
+    const state = player.state;
+    const mechRadius = 2;
+    const px = state.position[0];
+    const py = state.position[1];
+    const pz = state.position[2];
+
+    for (const aabb of this.buildingAABBs) {
+      // Check if mech center is near the AABB (with radius)
+      const closestX = Math.max(aabb.minX, Math.min(px, aabb.maxX));
+      const closestZ = Math.max(aabb.minZ, Math.min(pz, aabb.maxZ));
+
+      // Only check Y overlap for buildings mech could be at (not above/below)
+      if (py + 3 < aabb.minY || py > aabb.maxY) continue;
+
+      const dx = px - closestX;
+      const dz = pz - closestZ;
+      const distSq = dx * dx + dz * dz;
+
+      if (distSq < mechRadius * mechRadius) {
+        const dist = Math.sqrt(distSq);
+        if (dist > 0) {
+          const pushX = (dx / dist) * (mechRadius - dist);
+          const pushZ = (dz / dist) * (mechRadius - dist);
+          state.position[0] += pushX;
+          state.position[2] += pushZ;
+        } else {
+          state.position[0] += mechRadius;
+        }
+      }
+    }
+  }
+
+  /**
+   * Process dynamic elements: conveyors push mechs, rotating arms deal damage, pistons slam
+   */
+  private processDynamicElements(matchElapsed: number, deltaTime: number): void {
+    if (!this.map) return;
+
+    for (const elem of this.map.dynamicElements) {
+      const transform = getDynamicElementTransform(elem, matchElapsed);
+
+      switch (elem.type) {
+        case 'conveyor': {
+          // Check if either player is on the conveyor
+          for (const player of [this.player1, this.player2]) {
+            const state = player.state;
+            const [cx, cy, cz] = elem.position;
+            const [sw, sh, sl] = elem.size;
+            // Check if player is within conveyor bounds
+            if (Math.abs(state.position[0] - cx) < sw / 2 + 2 &&
+                Math.abs(state.position[2] - cz) < sl / 2 + 2 &&
+                state.position[1] <= cy + sh + 1) {
+              // Push player
+              state.position[0] += elem.pushDirection[0] * elem.pushSpeed * deltaTime;
+              state.position[2] += elem.pushDirection[2] * elem.pushSpeed * deltaTime;
+            }
+          }
+          break;
+        }
+        case 'rotating': {
+          // Check collision with rotating arm - simplified AABB at current position
+          const [rx, ry, rz] = transform.position;
+          const armLen = elem.size[0] / 2;
+          const angle = transform.rotation[1]; // Y axis rotation
+          // Arm endpoints
+          const endX1 = rx + Math.sin(angle) * armLen;
+          const endZ1 = rz + Math.cos(angle) * armLen;
+          const endX2 = rx - Math.sin(angle) * armLen;
+          const endZ2 = rz - Math.cos(angle) * armLen;
+
+          for (const player of [this.player1, this.player2]) {
+            const state = player.state;
+            // Simple distance-to-line-segment check
+            if (Math.abs(state.position[1] - ry) < elem.size[1] + 3) {
+              const dist = this.pointToSegmentDist(
+                state.position[0], state.position[2],
+                endX1, endZ1, endX2, endZ2
+              );
+              if (dist < 3) {
+                // Deal contact damage and push away
+                const defeated = player.mech.takeDamage(elem.contactDamage * deltaTime);
+                // Push away from arm center
+                const pushX = state.position[0] - rx;
+                const pushZ = state.position[2] - rz;
+                const pushLen = Math.sqrt(pushX * pushX + pushZ * pushZ) || 1;
+                state.position[0] += (pushX / pushLen) * 5 * deltaTime;
+                state.position[2] += (pushZ / pushLen) * 5 * deltaTime;
+                if (defeated) this.handleEnvironmentKill(player);
+              }
+            }
+          }
+          break;
+        }
+        case 'piston': {
+          // Check if piston is in slam phase and player is under it
+          const cycleProgress = (matchElapsed % elem.cycleDuration) / elem.cycleDuration;
+          const isSlamming = cycleProgress > 0.9; // Slam phase
+          const isExtended = cycleProgress < elem.extendedFraction;
+
+          if (isSlamming || isExtended) {
+            const [px, py, pz] = transform.position;
+            for (const player of [this.player1, this.player2]) {
+              const state = player.state;
+              if (Math.abs(state.position[0] - px) < elem.size[0] / 2 + 2 &&
+                  Math.abs(state.position[2] - pz) < elem.size[2] / 2 + 2 &&
+                  Math.abs(state.position[1] - py) < elem.size[1] / 2 + 3) {
+                if (isSlamming) {
+                  const defeated = player.mech.takeDamage(elem.slamDamage);
+                  this.broadcastDamageEvent(player.playerId, 'environment', elem.slamDamage, player.state.health);
+                  if (defeated) this.handleEnvironmentKill(player);
+                }
+                // Push mech out from under piston
+                state.position[1] = py - elem.size[1] / 2 - 3;
+              }
+            }
+          }
+          break;
+        }
+      }
+    }
+  }
+
+  /**
+   * Process hazard zones - check if mechs are in active hazard areas
+   */
+  private processHazardZones(matchElapsed: number): void {
+    if (!this.map) return;
+
+    for (const hazard of this.map.hazardZones) {
+      const state = isHazardActive(hazard, matchElapsed);
+      if (!state.active) continue;
+
+      for (const player of [this.player1, this.player2]) {
+        if (isPointInHazard(hazard, player.state.position)) {
+          const defeated = player.mech.takeDamage(hazard.damage);
+          this.broadcastDamageEvent(player.playerId, 'environment', hazard.damage, player.state.health);
+          if (defeated) this.handleEnvironmentKill(player);
+        }
+      }
+    }
+  }
+
+  /**
+   * Handle a kill caused by environment (hazard/dynamic element)
+   */
+  private handleEnvironmentKill(defeated: PlayerData): void {
+    const victor = defeated === this.player1 ? this.player2 : this.player1;
+    this.handleMechDestroyed(defeated, victor);
+  }
+
+  /**
+   * Broadcast a damage event
+   */
+  private broadcastDamageEvent(targetId: string, attackerId: string, damage: number, newHealth: number): void {
+    const eventId = this.generateEventId();
+    this.broadcast({
+      type: 'event',
+      eventId,
+      eventType: 'damage',
+      data: { targetId, attackerId, damage, newHealth }
+    });
+  }
+
+  /**
+   * Distance from point to line segment (2D)
+   */
+  private pointToSegmentDist(px: number, pz: number, ax: number, az: number, bx: number, bz: number): number {
+    const dx = bx - ax, dz = bz - az;
+    const lenSq = dx * dx + dz * dz;
+    if (lenSq === 0) return Math.sqrt((px - ax) ** 2 + (pz - az) ** 2);
+    let t = ((px - ax) * dx + (pz - az) * dz) / lenSq;
+    t = Math.max(0, Math.min(1, t));
+    const projX = ax + t * dx, projZ = az + t * dz;
+    return Math.sqrt((px - projX) ** 2 + (pz - projZ) ** 2);
   }
 
   /**

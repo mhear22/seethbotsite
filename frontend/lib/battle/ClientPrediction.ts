@@ -19,6 +19,17 @@ export class ClientPrediction {
   private predictedState: PlayerState;
   private lastServerState: PlayerState | null = null;
   private lastProcessedSeq = 0;
+  private arenaHalfW = ARENA.WIDTH / 2;
+  private arenaHalfD = ARENA.DEPTH / 2;
+  private floorY = ARENA.FLOOR_Y;
+  private ceilingY = ARENA.CEILING_Y;
+
+  setArenaBounds(width: number, depth: number, floorY?: number, ceilingY?: number) {
+    this.arenaHalfW = width / 2;
+    this.arenaHalfD = depth / 2;
+    if (floorY !== undefined) this.floorY = floorY;
+    if (ceilingY !== undefined) this.ceilingY = ceilingY;
+  }
 
   constructor(initialState: PlayerState) {
     this.predictedState = this.cloneState(initialState);
@@ -118,13 +129,13 @@ export class ClientPrediction {
     state.velocity[2] = worldMoveZ * speed * dashMultiplier;
 
     // Apply gravity
-    if (state.position[1] > ARENA.FLOOR_Y) {
+    if (state.position[1] > this.floorY) {
       state.velocity[1] += PHYSICS.GRAVITY * deltaTime;
       state.velocity[1] = Math.max(state.velocity[1], PHYSICS.MAX_FALL_SPEED);
       state.isJumping = true;
     } else {
       // On ground
-      state.position[1] = ARENA.FLOOR_Y;
+      state.position[1] = this.floorY;
       state.velocity[1] = 0;
       state.isJumping = false;
 
@@ -151,10 +162,9 @@ export class ClientPrediction {
     state.position[2] += state.velocity[2] * deltaTime;
 
     // Clamp to arena bounds
-    const halfArena = ARENA.WIDTH / 2;
-    state.position[0] = Math.max(-halfArena, Math.min(halfArena, state.position[0]));
-    state.position[2] = Math.max(-halfArena, Math.min(halfArena, state.position[2]));
-    state.position[1] = Math.max(ARENA.FLOOR_Y, Math.min(ARENA.CEILING_Y, state.position[1]));
+    state.position[0] = Math.max(-this.arenaHalfW, Math.min(this.arenaHalfW, state.position[0]));
+    state.position[2] = Math.max(-this.arenaHalfD, Math.min(this.arenaHalfD, state.position[2]));
+    state.position[1] = Math.max(this.floorY, Math.min(this.ceilingY, state.position[1]));
 
     // Update rotation based on aim direction
     if (input.aimDirection) {

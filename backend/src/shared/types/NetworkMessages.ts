@@ -173,6 +173,7 @@ export interface MechDestroyedEvent {
 export interface MatchFoundMessage {
   type: 'match_found';
   matchId: string;
+  mapId: string;
   opponentId: string;
   opponentName: string;
   opponentLoadout: MechLoadout;

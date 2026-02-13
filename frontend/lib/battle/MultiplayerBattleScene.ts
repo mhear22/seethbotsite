@@ -76,6 +76,16 @@ export class MultiplayerBattleScene extends BattleScene {
     };
     this.clientPrediction = markRaw(new ClientPrediction(initialState));
 
+    // If map was loaded, set arena bounds on client prediction
+    if (this.mapDef) {
+      this.clientPrediction.setArenaBounds(
+        this.mapDef.arena.width,
+        this.mapDef.arena.depth,
+        this.mapDef.arena.floorY,
+        this.mapDef.arena.ceilingY
+      );
+    }
+
     // Setup network event handlers
     this.setupNetworkHandlers();
 

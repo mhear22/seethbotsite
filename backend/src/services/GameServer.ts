@@ -15,6 +15,8 @@ import {
   MechLoadout
 } from '../shared/types/NetworkMessages';
 import { ARENA, MATCHMAKING } from '../shared/constants/GameConstants';
+import { getRandomMap } from '../shared/maps';
+import type { MapDefinition } from '../shared/types/MapDefinition';
 
 interface ConnectedPlayer {
   playerId: string;
@@ -67,28 +69,28 @@ export class GameServer {
     const { player1, player2, matchId } = pair;
     console.log(`[GameServer] Match pair: ${player1?.playerName} vs ${player2?.playerName}, matchId: ${matchId}`);
 
-    // Generate arena buildings
-    const buildings = this.generateArenaBuildings();
-    console.log(`[GameServer] Generated ${buildings.length} buildings`);
+    // Select a random map
+    const map = getRandomMap();
+    console.log(`[GameServer] Selected map: ${map.name} (${map.id})`);
 
-    // Get spawn positions
-    const spawn1: [number, number, number] = [
-      Math.sin(0) * ARENA.SPAWN_DISTANCE,
-      ARENA.FLOOR_Y,
-      Math.cos(0) * ARENA.SPAWN_DISTANCE
-    ];
+    // Get spawn positions from map definition
+    const spawn1: [number, number, number] = [...map.spawnPoints[0].position];
+    const spawn2: [number, number, number] = [...map.spawnPoints[1].position];
 
-    const spawn2: [number, number, number] = [
-      Math.sin(Math.PI) * ARENA.SPAWN_DISTANCE,
-      ARENA.FLOOR_Y,
-      Math.cos(Math.PI) * ARENA.SPAWN_DISTANCE
-    ];
+    // Generate arena buildings from map static geometry (for backward compat)
+    const buildings: ArenaBuilding[] = map.staticGeometry
+      .filter(g => g.collision && g.type === 'box')
+      .map(g => ({
+        position: g.position,
+        size: (g as any).size as [number, number, number],
+        type: 'building' as const,
+      }));
 
     // Send match_found to both players
-    
     const match1Message: MatchFoundMessage = {
       type: 'match_found',
       matchId,
+      mapId: map.id,
       opponentId: player2.playerId,
       opponentName: player2.playerName,
       opponentLoadout: player2.loadout,
@@ -101,6 +103,7 @@ export class GameServer {
     const match2Message: MatchFoundMessage = {
       type: 'match_found',
       matchId,
+      mapId: map.id,
       opponentId: player1.playerId,
       opponentName: player1.playerName,
       opponentLoadout: player1.loadout,
@@ -122,7 +125,7 @@ export class GameServer {
       player2.socket.send(JSON.stringify(match2Message));
     }
 
-    // Create match instance
+    // Create match instance with map
     try {
       console.log(`[GameServer] Creating match instance: ${matchId}`);
       const match = new MatchInstance(
@@ -134,7 +137,8 @@ export class GameServer {
         player2.playerId,
         player2.playerName,
         player2.loadout,
-        player2.socket
+        player2.socket,
+        map
       );
 
       // Set match end callback

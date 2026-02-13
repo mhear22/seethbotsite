@@ -6,8 +6,12 @@ import { PhysicsSystem } from './PhysicsSystem'
 import { InputManager, type InputState } from './InputManager'
 import { ParticleSystem } from './ParticleSystem'
 import { EnemyAI } from './EnemyAI'
+import { MapRenderer } from './MapRenderer'
+import { applyWindowShaders, updateWindowShaders } from './WindowShader'
 import { markRaw } from 'vue'
 import { useAudio } from '../../composables/useAudio'
+import { getMapById } from '@shared/maps'
+import type { MapDefinition } from '@shared/types/MapDefinition'
 
 export interface BattleSceneConfig {
   canvas: HTMLCanvasElement
@@ -19,6 +23,7 @@ export interface BattleSceneConfig {
   movementSpeed?: number
   invertMouseX?: boolean
   invertMouseY?: boolean
+  mapId?: string
   keyBindings?: {
     forward: string
     backward: string
@@ -59,6 +64,9 @@ export class BattleScene {
   playerMech: MechEntity
   enemyMech: MechEntity
   private buildings: Building[] = []
+  protected mapRenderer: MapRenderer | null = null
+  protected mapDef: MapDefinition | null = null
+  private windowShaderMaterials: THREE.ShaderMaterial[] = []
 
   private targetingState: TargetingState = {
     isTargeted: false,
@@ -125,15 +133,38 @@ export class BattleScene {
       this.camera.invertMouseY = config.invertMouseY
     }
 
-    // Setup scene
-    this.setupSky()
-    this.setupLighting()
-    this.setupArena()
+    // Setup scene - use MapRenderer if mapId provided, otherwise default setup
+    if (config.mapId) {
+      const mapDef = getMapById(config.mapId)
+      if (mapDef) {
+        this.mapDef = mapDef
+        this.mapRenderer = new MapRenderer(this.scene)
+        this.buildings = this.mapRenderer.loadMap(mapDef)
+        // Update physics bounds to match map
+        this.physicsSystem.setArenaBounds(mapDef.arena.width, mapDef.arena.depth)
+        // Apply window shaders if map has windows (Space Colony)
+        const windowMeshes = this.mapRenderer.getWindowMeshes()
+        if (windowMeshes.length > 0) {
+          this.windowShaderMaterials = applyWindowShaders(windowMeshes)
+        }
+      } else {
+        console.warn(`[BattleScene] Map '${config.mapId}' not found, using default`)
+        this.setupDefaultArena()
+      }
+    } else {
+      this.setupDefaultArena()
+    }
     this.addMechsToScene()
 
     // Handle window resize
     this.handleResizeBound = () => this.handleResize()
     window.addEventListener('resize', this.handleResizeBound)
+  }
+
+  private setupDefaultArena() {
+    this.setupSky()
+    this.setupLighting()
+    this.setupArena()
   }
 
   private setupSky() {
@@ -365,6 +396,15 @@ export class BattleScene {
   }
 
   protected update(deltaTime: number) {
+    // Update map dynamic elements, hazard visuals, and window shaders
+    if (this.mapRenderer) {
+      this.mapRenderer.updateDynamicElements(this.battleTime)
+      this.mapRenderer.updateHazardVisuals(this.battleTime)
+    }
+    if (this.windowShaderMaterials.length > 0) {
+      updateWindowShaders(this.windowShaderMaterials, this.battleTime)
+    }
+
     // Update particles every frame (even during battle ending)
     this.particleSystem.update(deltaTime)
 

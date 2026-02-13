@@ -85,6 +85,7 @@ onMounted(() => {
     invertMouseX: gameSettings.settings.value.invertMouseX,
     invertMouseY: gameSettings.settings.value.invertMouseY,
     keyBindings: gameSettings.settings.value.keyBindings,
+    mapId: props.matchData.mapId,
     authToken: props.authToken,
     matchId: props.matchData.matchId,
     yourPlayerId: props.matchData.yourPlayerId,

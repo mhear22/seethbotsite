@@ -2,11 +2,15 @@ import * as THREE from 'three'
 import type { MechEntity } from './MechEntity'
 import type { InputState } from './InputManager'
 
-const ARENA_SIZE = 300
-const ARENA_HALF = ARENA_SIZE / 2
-
 export class PhysicsSystem {
   public speedMultiplier = 1.0
+  private arenaHalfW = 150
+  private arenaHalfD = 150
+
+  setArenaBounds(width: number, depth: number) {
+    this.arenaHalfW = width / 2
+    this.arenaHalfD = depth / 2
+  }
 
   updateMovement(mech: MechEntity, input: InputState, deltaTime: number) {
     // Get leg type for special handling
@@ -89,8 +93,8 @@ export class PhysicsSystem {
     mech.position.add(mech.velocity.clone().multiplyScalar(deltaTime))
 
     // Clamp to arena bounds
-    mech.position.x = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, mech.position.x))
-    mech.position.z = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, mech.position.z))
+    mech.position.x = Math.max(-this.arenaHalfW, Math.min(this.arenaHalfW, mech.position.x))
+    mech.position.z = Math.max(-this.arenaHalfD, Math.min(this.arenaHalfD, mech.position.z))
   }
 
   updateDash(mech: MechEntity, input: InputState, deltaTime: number) {
