@@ -68,7 +68,7 @@ export class BattleScene {
   protected mapDef: MapDefinition | null = null
   private windowShaderMaterials: THREE.ShaderMaterial[] = []
 
-  private targetingState: TargetingState = {
+  protected targetingState: TargetingState = {
     isTargeted: false,
     screenX: 0,
     screenY: 0,
@@ -657,7 +657,7 @@ export class BattleScene {
     return this.targetingState
   }
 
-  private calculateTargeting(): TargetingState {
+  protected calculateTargeting(): TargetingState {
     // Get camera aim direction from yaw/pitch
     const yaw = this.camera.mouseRotation.x
     const pitch = this.camera.mouseRotation.y

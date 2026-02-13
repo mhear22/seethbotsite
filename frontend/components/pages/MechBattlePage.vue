@@ -177,6 +177,27 @@
           @time-update="handleTimeUpdate"
           @hud-update="handleHudUpdate"
         />
+
+        <BattleHUD
+          :player-health="multiplayerPlayerMech.stats.currentHealth"
+          :player-max-health="multiplayerPlayerMech.stats.maxHealth"
+          :enemy-health="multiplayerOpponentMech.stats.currentHealth"
+          :enemy-max-health="multiplayerOpponentMech.stats.maxHealth"
+          :enemy-name="matchData.opponentName"
+          :player-power="hudData.playerPower"
+          :player-max-power="hudData.playerMaxPower"
+          :jump-fuel="multiplayerPlayerMech.jumpFuel"
+          :has-jump-jets="hasMultiplayerJumpJets"
+          :dash-cooldown="hudData.dashCooldown"
+          :dash-max-cooldown="hudData.dashMaxCooldown"
+          :ability-cooldown="hudData.abilityCooldown"
+          :ability-max-cooldown="hudData.abilityMaxCooldown"
+          :has-rack-ability="hasMultiplayerRackAbility"
+          :ability-name="multiplayerAbilityName"
+          :enemy-radar-x="hudData.enemyRadarX"
+          :enemy-radar-y="hudData.enemyRadarY"
+          :targeting="targetingState"
+        />
       </template>
     </div>
 
@@ -276,7 +297,7 @@ import MultiplayerBattleCanvas from '../mech/MultiplayerBattleCanvas.vue'
 import MultiplayerResultsScreen from '../mech/MultiplayerResultsScreen.vue'
 import { NetworkManager } from '../../lib/battle/NetworkManager'
 import { MechEntity } from '../../lib/battle/MechEntity'
-import type { MechLoadout, MatchFoundMessage, MatchEndMessage } from '@shared/types/NetworkMessages'
+import type { MechLoadout, MatchFoundMessage, MatchEndMessage, WeaponConfig, AbilityConfig } from '@shared/types/NetworkMessages'
 import { SINGLE_PLAYER_MAP_IDS, getAllMaps, getMapById } from '@shared/maps'
 import type { MapDefinition } from '@shared/types/MapDefinition'
 import * as THREE from 'three'
@@ -345,6 +366,21 @@ const hasRackAbility = computed(() => {
 
 const abilityName = computed(() => {
   const rack = battle.battleState.value.player?.loadout.rack
+  if (!rack) return ''
+  // Extract short name from full name
+  return rack.name.replace(/System|Pack|Bay|Feed/gi, '').trim().toUpperCase()
+})
+
+const hasMultiplayerJumpJets = computed(() => {
+  return multiplayerPlayerMech.value?.loadout.rack?.id === 'rack-jump-jets'
+})
+
+const hasMultiplayerRackAbility = computed(() => {
+  return multiplayerPlayerMech.value?.loadout.rack !== null
+})
+
+const multiplayerAbilityName = computed(() => {
+  const rack = multiplayerPlayerMech.value?.loadout.rack
   if (!rack) return ''
   // Extract short name from full name
   return rack.name.replace(/System|Pack|Bay|Feed/gi, '').trim().toUpperCase()
@@ -485,6 +521,141 @@ function getMapIcon(mapId: string): string {
   return icons[mapId] || '🗺️'
 }
 
+// Helper function to convert builder arm part to network weapon config
+function convertArmToWeapon(arm: any, defaultSide: 'left' | 'right'): WeaponConfig {
+  if (!arm) {
+    // Default fallback weapon
+    return {
+      type: 'autocannon',
+      name: `${defaultSide === 'left' ? 'Left' : 'Right'} Weapon`,
+      damage: 20,
+      fireRate: 120,
+      projectileSpeed: 50,
+      energyCost: 10,
+      cooldown: 500
+    }
+  }
+
+  // Map weapon type from builder to network format
+  let weaponType: WeaponConfig['type'] = 'autocannon'
+  if (arm.weaponType === 'ballistic') {
+    // Determine if it's autocannon, missile launcher, or railgun based on part ID
+    if (arm.id.includes('missile')) {
+      weaponType = 'missile_launcher'
+    } else if (arm.id.includes('railgun')) {
+      weaponType = 'railgun'
+    } else {
+      weaponType = 'autocannon'
+    }
+  } else if (arm.weaponType === 'energy') {
+    // Determine if it's laser or plasma cannon based on part ID
+    if (arm.id.includes('flame') || arm.id.includes('plasma')) {
+      weaponType = 'plasma_cannon'
+    } else {
+      weaponType = 'laser'
+    }
+  } else if (arm.weaponType === 'melee') {
+    weaponType = 'railgun' // Melee maps to railgun for high damage single shots
+  } else if (arm.weaponType === 'support') {
+    weaponType = 'laser' // Support weapons default to laser
+  }
+
+  // Convert firepower stat to damage (firepower is the damage stat)
+  const damage = arm.stats?.firepower || 20
+
+  // Convert fireRate from seconds to rounds per minute, then to cooldown in ms
+  // fireRate in builder is seconds between shots
+  // Network format: fireRate = rounds per minute, cooldown = ms between shots
+  const fireRateSeconds = arm.fireRate || 0.5 // default 0.5s between shots
+  const fireRateRPM = Math.round(60 / fireRateSeconds)
+  const cooldownMs = Math.round(fireRateSeconds * 1000)
+
+  // Projectile speed based on weapon type
+  let projectileSpeed = 50
+  if (weaponType === 'railgun') projectileSpeed = 150
+  else if (weaponType === 'laser') projectileSpeed = 100
+  else if (weaponType === 'plasma_cannon') projectileSpeed = 40
+  else if (weaponType === 'missile_launcher') projectileSpeed = 30
+
+  return {
+    type: weaponType,
+    name: arm.name || `${defaultSide === 'left' ? 'Left' : 'Right'} Weapon`,
+    damage,
+    fireRate: fireRateRPM,
+    projectileSpeed,
+    energyCost: arm.powerDraw || 10,
+    cooldown: cooldownMs
+  }
+}
+
+// Helper function to convert builder rack part to network ability config
+function convertRackToAbility(rack: any): AbilityConfig {
+  if (!rack) {
+    // Default fallback ability
+    return {
+      type: 'shield',
+      name: 'Shield',
+      duration: 3000,
+      cooldown: 15000,
+      energyCost: 50
+    }
+  }
+
+  // Map rack to ability type based on ID or name
+  let abilityType: AbilityConfig['type'] = 'shield'
+
+  if (rack.id.includes('smoke') || rack.id.includes('cloak')) {
+    abilityType = 'cloak'
+  } else if (rack.id.includes('repair') || rack.id.includes('drone')) {
+    abilityType = 'repair'
+  } else if (rack.id.includes('jump') || rack.id.includes('speed')) {
+    abilityType = 'speed_boost'
+  } else if (rack.id.includes('emp')) {
+    abilityType = 'emp'
+  }
+
+  // Set ability parameters based on type
+  let duration = 3000
+  let cooldown = 15000
+  let energyCost = 50
+
+  switch (abilityType) {
+    case 'shield':
+      duration = 5000
+      cooldown = 20000
+      energyCost = 40
+      break
+    case 'speed_boost':
+      duration = 4000
+      cooldown = 12000
+      energyCost = 30
+      break
+    case 'emp':
+      duration = 2000
+      cooldown = 25000
+      energyCost = 60
+      break
+    case 'repair':
+      duration = 10000
+      cooldown = 30000
+      energyCost = 50
+      break
+    case 'cloak':
+      duration = 6000
+      cooldown = 18000
+      energyCost = 35
+      break
+  }
+
+  return {
+    type: abilityType,
+    name: rack.name || 'Ability',
+    duration,
+    cooldown,
+    energyCost
+  }
+}
+
 async function selectMultiplayer() {
   battleMode.value = 'multiplayer'
 
@@ -515,34 +686,11 @@ async function selectMultiplayer() {
     console.log('[MechBattle] Connected! Requesting match...')
 
     // Convert builder loadout to network format
-    // TODO: Proper conversion from builder parts to weapon/ability configs
     const loadout: MechLoadout = {
       chassisType: builder.loadout.value.core?.id || 'core-standard',
-      leftWeapon: {
-        type: 'autocannon',
-        name: builder.loadout.value.leftArm?.name || 'Left Weapon',
-        damage: 20,
-        fireRate: 120,
-        projectileSpeed: 50,
-        energyCost: 10,
-        cooldown: 500
-      },
-      rightWeapon: {
-        type: 'laser',
-        name: builder.loadout.value.rightArm?.name || 'Right Weapon',
-        damage: 15,
-        fireRate: 180,
-        projectileSpeed: 100,
-        energyCost: 8,
-        cooldown: 333
-      },
-      ability: {
-        type: 'shield',
-        name: builder.loadout.value.rack?.name || 'Shield',
-        duration: 3000,
-        cooldown: 15000,
-        energyCost: 50
-      }
+      leftWeapon: convertArmToWeapon(builder.loadout.value.leftArm, 'left'),
+      rightWeapon: convertArmToWeapon(builder.loadout.value.rightArm, 'right'),
+      ability: convertRackToAbility(builder.loadout.value.rack)
     }
 
     // Request a match

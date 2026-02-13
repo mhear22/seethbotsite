@@ -378,6 +378,9 @@ export class MultiplayerBattleScene extends BattleScene {
     this.camera.update(deltaTime, input.mouseX, input.mouseY);
     this.inputManager.resetMouseMovement();
 
+    // Update targeting state (inherited from parent BattleScene)
+    this.targetingState = this.calculateTargeting();
+
     // Adjust interpolation delay every ~100 frames instead of randomly
     this.adjustDelayCounter++;
     if (this.adjustDelayCounter >= 100) {
