@@ -201,8 +201,17 @@ export class MatchInstance {
     const speed = state.isJumping ? MECH.AIR_MOVE_SPEED : MECH.MOVE_SPEED;
     const dashMultiplier = state.isDashing ? MECH.DASH_SPEED_MULTIPLIER : 1;
 
-    state.velocity[0] = moveX * speed * dashMultiplier;
-    state.velocity[2] = moveZ * speed * dashMultiplier;
+    // Rotate movement from local space to world space using mech's yaw
+    const yaw = input.aimDirection
+      ? Math.atan2(input.aimDirection.x, input.aimDirection.z)
+      : state.rotation[1];
+    const sinYaw = Math.sin(yaw);
+    const cosYaw = Math.cos(yaw);
+    const worldMoveX = -(moveX * cosYaw + moveZ * sinYaw);
+    const worldMoveZ = -(moveZ * cosYaw - moveX * sinYaw);
+
+    state.velocity[0] = worldMoveX * speed * dashMultiplier;
+    state.velocity[2] = worldMoveZ * speed * dashMultiplier;
 
     // Apply gravity
     if (state.position[1] > ARENA.FLOOR_Y) {

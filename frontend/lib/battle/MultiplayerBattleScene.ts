@@ -171,6 +171,11 @@ export class MultiplayerBattleScene extends BattleScene {
 
     // Add to interpolation buffer - actual state application happens in update()
     this.stateInterpolation.addState(opponentState, snapshot.serverTime);
+
+    // Sync projectiles from server snapshot
+    if (snapshot.projectiles) {
+      this.projectileSystem.syncFromSnapshot(snapshot.projectiles, this.yourPlayerId);
+    }
   }
 
   /**
@@ -239,10 +244,11 @@ export class MultiplayerBattleScene extends BattleScene {
   }
 
   /**
-   * Handle projectile spawned event
+   * Handle projectile spawned event - create visual projectile immediately
    */
   private handleProjectileSpawned(data: any): void {
-    // Server is authoritative for hit detection - visual-only
+    // Visual projectile will be created/synced from state snapshots
+    // This event fires for immediate feedback but snapshot sync handles the rest
   }
 
   private handleProjectileHit(data: any): void {
@@ -255,6 +261,11 @@ export class MultiplayerBattleScene extends BattleScene {
     );
 
     this.particleSystem.spawnHitEffect(impactPos, 'ballistic');
+
+    // Remove the projectile visually
+    if (data.projectileId) {
+      this.projectileSystem.removeById(data.projectileId);
+    }
   }
 
   /**
@@ -333,6 +344,9 @@ export class MultiplayerBattleScene extends BattleScene {
     if (this.connected && this.matchStarted) {
       this.sendInputToServer();
     }
+
+    // Update projectiles (move them based on velocity between server snapshots)
+    this.projectileSystem.update(deltaTime);
 
     // Interpolate opponent position for smooth rendering
     const currentState = this.stateInterpolation.getInterpolatedState(Date.now());

@@ -108,10 +108,10 @@ export const MECH = {
   JUMP_FUEL_REGEN: 20,
 
   /** Ground movement speed (units/s) */
-  MOVE_SPEED: 15,
+  MOVE_SPEED: 40,
 
   /** Air movement speed (units/s) */
-  AIR_MOVE_SPEED: 10,
+  AIR_MOVE_SPEED: 35,
 
   /** Jump thrust force */
   JUMP_THRUST: 40,

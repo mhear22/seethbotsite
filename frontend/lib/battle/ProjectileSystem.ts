@@ -278,4 +278,94 @@ export class ProjectileSystem {
   getProjectiles(): Projectile[] {
     return this.projectiles
   }
+
+  /**
+   * Spawn a projectile from network data (multiplayer)
+   */
+  spawnFromNetwork(
+    id: string,
+    position: [number, number, number],
+    velocity: [number, number, number],
+    type: 'ballistic' | 'energy' | 'missile',
+    ownerId: string,
+    damage: number,
+    isLocalPlayer: boolean
+  ): Projectile {
+    const geometry = this.getProjectileGeometry(type)
+    const material = this.getProjectileMaterial(type, isLocalPlayer)
+    const mesh = markRaw(new THREE.Mesh(geometry, material))
+    const pos = new THREE.Vector3(position[0], position[1], position[2])
+    mesh.position.copy(pos)
+    this.scene.add(mesh)
+
+    const projectile: Projectile = {
+      id,
+      type,
+      position: pos,
+      velocity: new THREE.Vector3(velocity[0], velocity[1], velocity[2]),
+      damage,
+      ownerId,
+      lifetime: 5,
+      mesh
+    }
+
+    this.projectiles.push(projectile)
+    return projectile
+  }
+
+  /**
+   * Sync projectiles from server state snapshot (multiplayer)
+   * Creates new projectiles, updates existing ones, removes stale ones.
+   */
+  syncFromSnapshot(
+    serverProjectiles: Array<{
+      id: string
+      position: [number, number, number]
+      velocity: [number, number, number]
+      ownerId: string
+      type: 'ballistic' | 'energy' | 'missile'
+      damage: number
+    }>,
+    localPlayerId: string
+  ): void {
+    const serverIds = new Set(serverProjectiles.map(p => p.id))
+
+    // Remove projectiles no longer on server
+    const toRemove = this.projectiles.filter(p => !serverIds.has(p.id))
+    for (const proj of toRemove) {
+      this.removeProjectile(proj)
+    }
+
+    // Create or update projectiles from server
+    for (const sp of serverProjectiles) {
+      const existing = this.projectiles.find(p => p.id === sp.id)
+      if (existing) {
+        // Update position and velocity from server
+        existing.position.set(sp.position[0], sp.position[1], sp.position[2])
+        existing.velocity.set(sp.velocity[0], sp.velocity[1], sp.velocity[2])
+        existing.mesh.position.copy(existing.position)
+      } else {
+        // Spawn new projectile
+        this.spawnFromNetwork(
+          sp.id,
+          sp.position,
+          sp.velocity,
+          sp.type,
+          sp.ownerId,
+          sp.damage,
+          sp.ownerId === localPlayerId
+        )
+      }
+    }
+  }
+
+  /**
+   * Remove a projectile by its ID string
+   */
+  removeById(id: string): void {
+    const proj = this.projectiles.find(p => p.id === id)
+    if (proj) {
+      this.removeProjectile(proj)
+    }
+  }
 }
