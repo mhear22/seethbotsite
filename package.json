@@ -1,6 +1,10 @@
 {
-  "dependencies": {
-    "better-sqlite3": "^12.6.2",
-    "dotenv": "^17.2.4"
-  }
+  "name": "seethbotsite-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Monorepo root for seethbotsite",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ]
 }

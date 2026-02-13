@@ -13,9 +13,9 @@ WORKDIR /app/backend
 # Copy backend package files (cached unless package*.json changes)
 COPY backend/package*.json ./
 
-# Install with cache mount
+# Install with cache mount and memory optimization
 RUN --mount=type=cache,target=/root/.npm \
-    npm install --frozen-lockfile
+    npm install --frozen-lockfile --prefer-offline --no-audit
 
 # Copy backend source (separate layer for better caching)
 COPY backend/tsconfig.json ./
@@ -39,9 +39,9 @@ WORKDIR /app/frontend
 # Copy frontend package files
 COPY frontend/package*.json ./
 
-# Install with cache mount
+# Install with cache mount and memory optimization
 RUN --mount=type=cache,target=/root/.npm \
-    npm install --frozen-lockfile
+    npm install --frozen-lockfile --prefer-offline --no-audit
 
 # Copy backend OpenAPI spec for type generation
 COPY --from=backend-builder /app/backend/dist/openapi.json ../backend/dist/openapi.json
@@ -61,9 +61,9 @@ COPY backend/package*.json ./
 COPY backend/prisma.config.ts ./prisma.config.ts
 COPY backend/prisma ./prisma/
 
-# Install ONLY production dependencies
+# Install ONLY production dependencies with memory optimization
 RUN --mount=type=cache,target=/root/.npm \
-    npm install --frozen-lockfile --omit=dev
+    npm install --frozen-lockfile --omit=dev --prefer-offline --no-audit
 
 # Generate Prisma Client for production
 RUN npx prisma generate
