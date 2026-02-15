@@ -7,31 +7,34 @@
 
     <div class="review-layout">
       <div class="mech-visual">
+        <div class="preview-3d-container">
+          <MechPreview3D :loadout="loadout" />
+        </div>
         <div class="mech-diagram">
           <div class="mech-part mech-head">
-            <MechIcons :icon="loadout.head?.icon || 'unknown'" :size="64" />
+            <MechIcons :icon="loadout.head?.icon || 'unknown'" :size="48" />
             <span class="part-label">{{ loadout.head?.name || 'No Head' }}</span>
           </div>
           <div class="mech-part mech-core">
-            <MechIcons :icon="loadout.core?.icon || 'unknown'" :size="80" />
+            <MechIcons :icon="loadout.core?.icon || 'unknown'" :size="64" />
             <span class="part-label">{{ loadout.core?.name || 'No Core' }}</span>
           </div>
           <div class="mech-arms-row">
             <div class="mech-part mech-arm">
-              <MechIcons :icon="loadout.leftArm?.icon || 'unknown'" :size="64" />
+              <MechIcons :icon="loadout.leftArm?.icon || 'unknown'" :size="48" />
               <span class="part-label">{{ loadout.leftArm?.name || 'Empty' }}</span>
             </div>
             <div class="mech-part mech-arm">
-              <MechIcons :icon="loadout.rightArm?.icon || 'unknown'" :size="64" />
+              <MechIcons :icon="loadout.rightArm?.icon || 'unknown'" :size="48" />
               <span class="part-label">{{ loadout.rightArm?.name || 'Empty' }}</span>
             </div>
           </div>
           <div class="mech-part mech-legs">
-            <MechIcons :icon="loadout.legs?.icon || 'unknown'" :size="64" />
+            <MechIcons :icon="loadout.legs?.icon || 'unknown'" :size="48" />
             <span class="part-label">{{ loadout.legs?.name || 'No Legs' }}</span>
           </div>
           <div v-if="loadout.rack" class="mech-part mech-rack">
-            <MechIcons :icon="loadout.rack.icon" :size="48" />
+            <MechIcons :icon="loadout.rack.icon" :size="36" />
             <span class="part-label">{{ loadout.rack.name }}</span>
           </div>
         </div>
@@ -119,6 +122,7 @@
 <script setup lang="ts">
 import type { MechLoadout, MechStats, SynergyEffect } from '../../../../composables/useMechBuilder'
 import MechIcons from '../../../mech/MechIcons.vue'
+import MechPreview3D from '../../../mech/MechPreview3D.vue'
 
 defineProps<{
   loadout: MechLoadout
@@ -148,23 +152,31 @@ defineProps<{
   padding: 24px;
 }
 
+.preview-3d-container {
+  width: 100%;
+  height: 400px;
+  margin-bottom: 24px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
 .mech-diagram {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
 }
 
 .mech-part {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 16px;
+  gap: 6px;
+  padding: 12px;
   background: #f7fafc;
   border: 2px solid #cbd5e0;
   border-radius: 8px;
-  min-width: 150px;
+  min-width: 120px;
 }
 
 .mech-arms-row {

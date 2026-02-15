@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import type { MechLoadout, MechPart, PartType } from '../../shared/types/MechTypes'
+import { getProceduralModel } from './ProceduralModels'
 
 /**
  * Cached model data structure
@@ -129,20 +130,46 @@ export class MechModelLoader {
     ])
 
     // Add each part, using model or fallback
-    group.add(headModel ?? this.createFallbackPart('head', teamColor))
-    group.add(coreModel ?? this.createFallbackPart('core', teamColor))
-    group.add(leftArmModel ?? this.createFallbackPart('leftArm', teamColor))
-    group.add(rightArmModel ?? this.createFallbackPart('rightArm', teamColor))
-    group.add(legsModel ?? this.createFallbackPart('legs', teamColor))
-    group.add(rackModel ?? this.createFallbackPart('rack', teamColor))
+    group.add(headModel ?? this.createFallbackPart('head', teamColor, loadout.head))
+    group.add(coreModel ?? this.createFallbackPart('core', teamColor, loadout.core))
+    group.add(leftArmModel ?? this.createFallbackPart('leftArm', teamColor, loadout.leftArm))
+    group.add(rightArmModel ?? this.createFallbackPart('rightArm', teamColor, loadout.rightArm))
+    group.add(legsModel ?? this.createFallbackPart('legs', teamColor, loadout.legs))
+    group.add(rackModel ?? this.createFallbackPart('rack', teamColor, loadout.rack))
 
     return group
   }
 
   /**
    * Create procedural fallback geometry for a part type
+   * Uses detailed procedural models when available, falls back to simple boxes
    */
-  createFallbackPart(partType: PartType | 'leftArm' | 'rightArm', color: number): THREE.Mesh {
+  createFallbackPart(partType: PartType | 'leftArm' | 'rightArm', color: number, part?: MechPart | null): THREE.Group | THREE.Mesh {
+    // If we have a specific part, try to use its procedural model
+    if (part && part.id) {
+      const proceduralModelFn = getProceduralModel(part.id)
+      if (proceduralModelFn) {
+        const model = proceduralModelFn()
+
+        // Position the model at the correct attachment point
+        const attachPoint = this.getAttachPoint(partType)
+        model.position.copy(attachPoint)
+
+        // Apply team color tint to all meshes in the group
+        model.traverse((child) => {
+          if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
+            // Lightly tint with team color while preserving material identity
+            child.material = child.material.clone()
+            child.material.color.lerp(new THREE.Color(color), 0.2)
+          }
+        })
+
+        model.name = partType
+        return model
+      }
+    }
+
+    // Fall back to simple box geometry if no procedural model exists
     let geometry: THREE.BoxGeometry
     let position: THREE.Vector3
 
@@ -182,6 +209,28 @@ export class MechModelLoader {
     mesh.name = partType
 
     return mesh
+  }
+
+  /**
+   * Get the attachment point for a part type
+   */
+  private getAttachPoint(partType: PartType | 'leftArm' | 'rightArm'): THREE.Vector3 {
+    switch (partType) {
+      case 'head':
+        return MODEL_ATTACH_POINTS.head.clone()
+      case 'core':
+        return MODEL_ATTACH_POINTS.core.clone()
+      case 'leftArm':
+        return MODEL_ATTACH_POINTS.leftArm.clone()
+      case 'rightArm':
+        return MODEL_ATTACH_POINTS.rightArm.clone()
+      case 'legs':
+        return MODEL_ATTACH_POINTS.legs.clone()
+      case 'rack':
+        return MODEL_ATTACH_POINTS.rack.clone()
+      default:
+        return new THREE.Vector3(0, 0, 0)
+    }
   }
 
   /**

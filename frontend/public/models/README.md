@@ -81,4 +81,22 @@ models/
 
 ## Fallback Behavior
 
-If a model file is missing or fails to load, the `MechModelLoader` automatically falls back to procedural box geometry. This ensures the game remains playable even without 3D models.
+If a model file is missing or fails to load, the `MechModelLoader` automatically falls back to procedural geometry. This ensures the game remains playable even without 3D models.
+
+### Procedural Models
+
+The system includes detailed procedural models defined in `/lib/battle/ProceduralModels.ts` that provide:
+
+- **Manufacturer-specific materials**: Each manufacturer (ArmsCore, VoltTech, TitanForge, etc.) has distinct visual styling
+- **Detailed geometry**: Complex shapes with multiple components (barrels, housings, energy effects)
+- **Part-specific designs**: Each of the 20 parts has a unique procedural model
+- **Team color integration**: Procedural models can be tinted with team colors
+- **Energy effects**: Glowing emissive materials for energy weapons and high-tech components
+
+The procedural models follow the same dimensional constraints and attachment point conventions as GLB models.
+
+### Model Priority
+
+1. **GLB/GLTF file** (if available at the specified `modelPath`)
+2. **Procedural model** (detailed Three.js geometry based on part ID)
+3. **Simple box** (fallback if no procedural model exists)
