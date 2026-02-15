@@ -62,6 +62,7 @@ const keysPressed = ref<Set<string>>(new Set())
 
 // Black hole distortion effect
 let blackHoleMaterial: THREE.Material | null = null
+let accretionDiskMaterial: THREE.ShaderMaterial | null = null
 
 // Gravitational lensing render target
 let lensingTarget: THREE.WebGLRenderTarget | null = null
@@ -518,46 +519,130 @@ function createBlackHole() {
   }))
 
   blackHole = markRaw(new THREE.Mesh(blackHoleGeometry, blackHoleMaterial))
-  blackHole.position.set(0, 0, -120) // Position in the background
+  blackHole.position.set(0, 0, -120)
   scene?.add(blackHole)
 
-  // Add enhanced accretion disk with multiple layers
-  const diskGeometry1 = new THREE.RingGeometry(9, 14, 128)
-  const diskMaterial1 = new THREE.MeshBasicMaterial({
-    color: 0xffaa00,
+  // Realistic accretion disk using a custom shader
+  // Single wide ring geometry, tilted to be viewed at a shallow angle
+  const diskGeometry = new THREE.RingGeometry(4.5, 26, 256, 64)
+  accretionDiskMaterial = markRaw(new THREE.ShaderMaterial({
+    uniforms: {
+      time: { value: 0.0 },
+      innerRadius: { value: 4.5 },
+      outerRadius: { value: 26.0 }
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      varying vec3 vPosition;
+      void main() {
+        vUv = uv;
+        vPosition = position;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform float time;
+      uniform float innerRadius;
+      uniform float outerRadius;
+      varying vec2 vUv;
+      varying vec3 vPosition;
+
+      // Hash-based noise
+      float hash(vec2 p) {
+        p = fract(p * vec2(234.34, 435.345));
+        p += dot(p, p + 34.23);
+        return fract(p.x * p.y);
+      }
+
+      float noise(vec2 p) {
+        vec2 i = floor(p);
+        vec2 f = fract(p);
+        f = f * f * (3.0 - 2.0 * f);
+        return mix(
+          mix(hash(i), hash(i + vec2(1,0)), f.x),
+          mix(hash(i + vec2(0,1)), hash(i + vec2(1,1)), f.x),
+          f.y
+        );
+      }
+
+      float fbm(vec2 p) {
+        float v = 0.0;
+        float a = 0.5;
+        for (int i = 0; i < 5; i++) {
+          v += a * noise(p);
+          p = p * 2.1 + vec2(1.3, 0.7);
+          a *= 0.5;
+        }
+        return v;
+      }
+
+      void main() {
+        float r = length(vPosition.xy);
+        float normalizedR = (r - innerRadius) / (outerRadius - innerRadius);
+        normalizedR = clamp(normalizedR, 0.0, 1.0);
+
+        // Angle around the disk
+        float angle = atan(vPosition.y, vPosition.x);
+
+        // Keplerian angular velocity: inner material moves faster
+        float angularSpeed = 0.6 / max(r * 0.18, 0.1);
+        float sweptAngle = angle - time * angularSpeed;
+
+        // Turbulent noise in polar coordinates
+        vec2 polarUv = vec2(sweptAngle / (2.0 * 3.14159) + 0.5, normalizedR);
+        float turbulence = fbm(polarUv * vec2(12.0, 4.0) + vec2(time * 0.05, 0.0));
+        float fineTurb = fbm(polarUv * vec2(30.0, 8.0) - vec2(time * 0.08, 0.0));
+        turbulence = turbulence * 0.7 + fineTurb * 0.3;
+
+        // Relativistic Doppler brightening: approaching side (angle ~ 0) is brighter
+        float doppler = 0.5 + 0.5 * cos(angle);
+        doppler = pow(doppler, 1.5);
+
+        // Temperature gradient: white-hot at inner edge -> orange -> dark red at outer edge
+        vec3 innerColor  = vec3(1.0,  0.98, 0.85); // near-white / pale yellow
+        vec3 midColor    = vec3(1.0,  0.55, 0.08); // bright orange
+        vec3 outerColor  = vec3(0.45, 0.05, 0.0);  // deep dark red
+
+        vec3 color;
+        if (normalizedR < 0.5) {
+          color = mix(innerColor, midColor, normalizedR * 2.0);
+        } else {
+          color = mix(midColor, outerColor, (normalizedR - 0.5) * 2.0);
+        }
+
+        // Modulate brightness by turbulence and Doppler
+        float brightness = turbulence * (1.0 + doppler * 0.6);
+        color *= brightness;
+
+        // Thin bright filaments near inner edge
+        float filament = smoothstep(0.0, 0.15, normalizedR) * (1.0 - smoothstep(0.15, 0.35, normalizedR));
+        color += vec3(1.0, 0.9, 0.6) * filament * fbm(polarUv * vec2(20.0, 2.0) + time * 0.1) * 1.2;
+
+        // Sharp inner edge falloff, soft outer edge
+        float innerEdge = smoothstep(0.0, 0.04, normalizedR);
+        float outerEdge = 1.0 - smoothstep(0.78, 1.0, normalizedR);
+        float alpha = innerEdge * outerEdge;
+
+        // Extra opacity variation for wispy look
+        alpha *= mix(0.5, 1.0, turbulence);
+        alpha = clamp(alpha, 0.0, 1.0);
+
+        gl_FragColor = vec4(color, alpha);
+      }
+    `,
     side: THREE.DoubleSide,
     transparent: true,
-    opacity: 1.0
-  })
-  const accretionDisk1 = markRaw(new THREE.Mesh(diskGeometry1, diskMaterial1))
-  accretionDisk1.rotation.x = Math.PI / 2.3
-  blackHole.add(accretionDisk1)
+    blending: THREE.AdditiveBlending,
+    depthWrite: false
+  }))
 
-  const diskGeometry2 = new THREE.RingGeometry(13, 18, 128)
-  const diskMaterial2 = new THREE.MeshBasicMaterial({
-    color: 0xff6600,
-    side: THREE.DoubleSide,
-    transparent: true,
-    opacity: 0.9
-  })
-  const accretionDisk2 = markRaw(new THREE.Mesh(diskGeometry2, diskMaterial2))
-  accretionDisk2.rotation.x = Math.PI / 2.5
-  blackHole.add(accretionDisk2)
+  const accretionDisk = markRaw(new THREE.Mesh(diskGeometry, accretionDiskMaterial))
+  // Tilt the disk so it's viewed at a shallow angle (like Interstellar's Gargantua)
+  accretionDisk.rotation.x = Math.PI / 2.2
+  blackHole.add(accretionDisk)
 
-  const diskGeometry3 = new THREE.RingGeometry(17, 22, 128)
-  const diskMaterial3 = new THREE.MeshBasicMaterial({
-    color: 0xdd4400,
-    side: THREE.DoubleSide,
-    transparent: true,
-    opacity: 0.8
-  })
-  const accretionDisk3 = markRaw(new THREE.Mesh(diskGeometry3, diskMaterial3))
-  accretionDisk3.rotation.x = Math.PI / 2.7
-  blackHole.add(accretionDisk3)
-
-  // Rotate accretion disks at different speeds
-  blackHole.userData.disks = [accretionDisk1, accretionDisk2, accretionDisk3]
-  blackHole.userData.diskSpeeds = [0.003, 0.002, 0.001]
+  blackHole.userData.disks = []
+  blackHole.userData.diskSpeeds = []
 }
 
 function createStars() {
@@ -671,14 +756,14 @@ function handleKeyUp(event: KeyboardEvent) {
 }
 
 function updateBlackHole(time: number) {
-  // Slowly rotate the black hole
   if (blackHole) {
-    blackHole.rotation.y += 0.001
+    // Very slow y-axis drift for a subtle parallax feel
+    blackHole.rotation.y += 0.0003
 
-    // Rotate accretion disks at different speeds
-    blackHole.userData.disks.forEach((disk: THREE.Mesh, index: number) => {
-      disk.rotation.z += blackHole.userData.diskSpeeds[index]
-    })
+    // Drive the shader time so Keplerian rotation and turbulence animate
+    if (accretionDiskMaterial) {
+      accretionDiskMaterial.uniforms.time.value = time
+    }
   }
 }
 
@@ -799,6 +884,11 @@ function cleanup() {
         child.material.dispose()
       }
     })
+  }
+
+  if (accretionDiskMaterial) {
+    accretionDiskMaterial.dispose()
+    accretionDiskMaterial = null
   }
 
   if (blackHole) {

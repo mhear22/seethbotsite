@@ -1,293 +1,110 @@
-# Mech Battle System - Phase 1 Implementation Summary
+# Mech Battle System - Implementation Summary
 
-## Overview
-Successfully implemented the Phase 1 foundation of the Mech Battle System, adding a fully functional 3D combat arena to the existing Mech Builder application.
+Implemented 2026-02-08. Adds a 3D combat arena to the Mech Builder.
 
-## Implementation Date
-February 8, 2026
+## Architecture
 
-## What Was Built
+**Route:** `/mech-battle` (linked from Mech Builder Review step via "Sortie" button)
 
-### Core Battle Library (`/frontend/lib/battle/`)
+### Frontend Files (`/frontend/`)
 
-1. **InputManager.ts** - Keyboard and mouse input handling
-   - WASD movement controls
-   - Mouse aim with pointer lock
-   - Jump and shoot controls
-   - ESC key support for exiting
+```
+lib/battle/
+├── InputManager.ts          # WASD + mouse input, pointer lock
+├── MechEntity.ts            # Mech 3D representation, stats, damage
+├── ProjectileSystem.ts      # Bullet/missile physics, collision, cleanup
+├── PhysicsSystem.ts         # Movement, jump jets, arena bounds, AI state machine
+├── CameraController.ts      # Third-person follow camera with lerp
+├── BattleScene.ts           # Three.js scene, lighting, animation loop
+├── NetworkManager.ts        # WebSocket client (multiplayer)
+├── ClientPrediction.ts      # Input buffer, server reconciliation
+├── StateInterpolation.ts    # Opponent position smoothing (100ms buffer)
+└── MultiplayerBattleScene.ts # Network-aware scene extension
 
-2. **MechEntity.ts** - Mech representation in 3D space
-   - Box-based placeholder models (blue for player, red for enemy)
-   - Combat stats integration (health, armor, firepower, accuracy, speed, energy)
-   - Damage calculation with armor reduction
-   - Visual damage feedback (red flash)
-   - Position, rotation, and velocity tracking
+composables/
+└── useMechBattle.ts         # Battle phase state, enemy generation, scoring
 
-3. **ProjectileSystem.ts** - Bullet/missile management
-   - Three projectile types: ballistic, energy, missile
-   - Stat-driven damage and accuracy (spread calculation)
-   - Collision detection with mechs
-   - Automatic projectile cleanup
-   - Visual differentiation per weapon type
+components/mech/
+├── BattleHUD.vue            # Health bars, crosshair, jump fuel, controls hint
+├── BattleCanvas.vue         # Three.js renderer lifecycle wrapper
+├── MatchmakingView.vue      # Queue status UI
+├── MultiplayerHUD.vue       # Latency indicator, match timer, opponent name
+└── MultiplayerResultsScreen.vue # Win/loss stats comparison
 
-4. **PhysicsSystem.ts** - Movement and collision physics
-   - Ground-based WASD movement with friction
-   - Jump jet system with fuel consumption/recharge
-   - Arena boundary clamping (50x50 unit arena)
-   - Enemy AI state machine (chase, strafe, shoot)
-   - Optimal range combat behavior
+components/pages/
+└── MechBattlePage.vue       # Mode selection, loading, ready, active, results screens
+```
 
-5. **CameraController.ts** - Third-person camera system
-   - Smooth follow camera with lerp
-   - Mouse-controlled rotation (yaw and pitch)
-   - Distance clamping (5-15 units)
-   - Auto-rotation of player mech to face camera direction
+### Backend Files (`/backend/src/`)
 
-6. **BattleScene.ts** - Main Three.js scene orchestrator
-   - Scene initialization with lighting (ambient, directional, hemisphere)
-   - 50x50 arena with grid floor and boundary walls
-   - Animation loop with delta time
-   - Projectile collision detection and damage application
-   - Battle end detection (victory/defeat)
-   - Performance optimization (60 FPS target)
+```
+controllers/multiplayer.controller.ts  # WebSocket handler, JWT auth
+services/
+├── MatchmakingService.ts    # FIFO queue, 2-min timeout
+├── MatchInstance.ts         # Match state, 20Hz tick loop
+└── GameServer.ts            # Multi-match orchestration
+game/
+├── MechEntity.ts            # Server-side mech (health, cooldowns)
+└── ProjectileSystem.ts      # Server-side hit detection
+```
 
-### State Management
+### Shared Types (`/backend/src/shared/` and `/frontend/shared/`)
 
-7. **useMechBattle.ts** - Vue composable for battle state
-   - Battle phase management (loading, ready, active, victory, defeat)
-   - Player/enemy mech initialization
-   - Enemy generation with difficulty presets (tutorial, easy, medium, hard, boss)
-   - Score calculation (time bonus, damage bonus, health bonus)
-   - Damage tracking
+`NetworkMessages.ts`, `GameConstants.ts`, map definitions (must stay in sync - see `SHARED_FILES_SYNC.md`)
 
-### Vue Components
+## Combat Stats
 
-8. **BattleHUD.vue** - Combat UI overlay
-   - Player and enemy health bars with gradients
-   - Crosshair (green dot with lines)
-   - Jump fuel indicator (for jump jet equipped builds)
-   - Control hints
-   - Responsive design for mobile
-
-9. **BattleCanvas.vue** - Three.js renderer wrapper
-   - Canvas lifecycle management
-   - Event emission (battle-end, damage-dealt, time-update)
-   - ESC key exit handling
-   - Cleanup on unmount
-
-10. **MechBattlePage.vue** - Main battle page
-    - Loading screen with spinner
-    - Ready screen with mech stats preview
-    - Active battle with canvas and HUD
-    - Victory screen with stats and score
-    - Defeat screen with time survived
-    - Build code import from URL query
-
-### Integration
-
-11. **Router Updates** (`/frontend/router/index.ts`)
-    - Added `/mech-battle` route
-    - Imported MechBattlePage component
-
-12. **Mech Builder Updates** (`MechBuilderPage.vue`)
-    - Added "⚔️ Sortie" button on Review step (Step 5)
-    - Button only enabled when build is complete and valid
-    - Exports build code and navigates to battle page
-    - Styled with orange gradient to stand out
-
-## Features Implemented
-
-### Combat Mechanics
-✅ Stat-driven combat system
-- Health determines survivability
-- Armor provides damage reduction (capped at 90%)
-- Firepower affects projectile damage
-- Accuracy affects weapon spread
-- Speed affects movement rate
-- Energy determines jump fuel capacity
-
-✅ Movement system
-- Ground-based WASD movement
-- Jump jets (if rack equipped) with fuel management
-- Smooth camera follow with mouse aim
-- Arena boundary enforcement
-
-✅ Projectile combat
-- Left-click to shoot
-- Visible projectiles with collision detection
-- Different visuals per weapon type (ballistic, energy, missile)
-- Accuracy-based spread
-
-✅ Enemy AI
-- Chase behavior when too far
-- Strafe behavior at optimal range
-- Back up behavior when too close
-- Dynamic shooting based on accuracy stat
-- Face-tracking (always faces player)
-
-### Visual Elements
-✅ 3D arena
-- 50x50 unit flat grid floor
-- Semi-transparent boundary walls
-- Three-point lighting (ambient, directional, hemisphere)
-- Dark sci-fi aesthetic
-
-✅ Mech models
-- Box-based placeholder geometry
-- Color-coded (blue player, red enemy)
-- 5-part structure (core, head, arms, legs)
-- Damage flash effect
-
-✅ HUD
-- Health bars with smooth transitions
-- Crosshair for aiming
-- Jump fuel gauge
-- Control hints
-- Clean monospace font
-
-### Game Flow
-✅ Pre-battle ready screen
-- Display player mech stats
-- Enemy information
-- Launch/Return buttons
-
-✅ Active battle
-- Real-time combat
-- Health tracking
-- Damage feedback
-
-✅ Victory screen
-- Time taken
-- Damage dealt
-- Health remaining
-- Calculated score
-
-✅ Defeat screen
-- Time survived
-- Damage dealt
+| Stat | Effect |
+|------|--------|
+| Health | HP pool |
+| Armor | Damage reduction % (capped at 90%) |
+| Firepower | Damage per projectile (`firepower / 10`) |
+| Accuracy | Weapon spread (`(1 - accuracy/100) * 0.15`) |
+| Speed | Movement rate (`8 * speed/100`) |
+| Energy | Jump fuel capacity |
 
 ## Enemy Presets
 
-Implemented 5 difficulty levels:
+| Name | HP | Armor | Speed | Firepower | Accuracy |
+|------|----|-------|-------|-----------|----------|
+| Tutorial Bot | 150 | 10% | 60 | 25 | 30% |
+| Scout Mech | 200 | 15% | 80 | 30 | 40% |
+| Assault Mech | 300 | 25% | 70 | 45 | 50% |
+| Heavy Mech | 400 | 35% | 60 | 60 | 60% |
+| TITAN Destroyer | 600 | 45% | 70 | 80 | 70% |
 
-1. **Tutorial Bot**
-   - Health: 150
-   - Armor: 10%
-   - Speed: 60
-   - Firepower: 25
-   - Accuracy: 30%
+Only Tutorial Bot active in Phase 1.
 
-2. **Scout Mech** (Easy)
-   - Health: 200
-   - Armor: 15%
-   - Speed: 80
-   - Firepower: 30
-   - Accuracy: 40%
+## Multiplayer Networking
 
-3. **Assault Mech** (Medium)
-   - Health: 300
-   - Armor: 25%
-   - Speed: 70
-   - Firepower: 45
-   - Accuracy: 50%
+- WebSocket endpoint: `/ws/multiplayer` (JWT authenticated)
+- Server tick: 20Hz (state snapshots)
+- Client input rate: ~60Hz
+- Bandwidth: ~13 KB/s per player
+- Client prediction masks up to ~150ms latency
+- State interpolation with 100ms buffer for opponent smoothing
 
-4. **Heavy Mech** (Hard)
-   - Health: 400
-   - Armor: 35%
-   - Speed: 60
-   - Firepower: 60
-   - Accuracy: 60%
+```
+NETWORK constants (GameConstants.ts):
+SERVER_TICK_RATE: 20, SNAPSHOT_INTERVAL: 50ms,
+INTERPOLATION_BUFFER: 100ms, MAX_QUEUE_TIME: 120000ms
+```
 
-5. **TITAN-Class Destroyer** (Boss)
-   - Health: 600
-   - Armor: 45%
-   - Speed: 70
-   - Firepower: 80
-   - Accuracy: 70%
+## Controls
 
-Currently only Tutorial difficulty is active in Phase 1.
-
-## Technical Stack
-
-- **Three.js r182** - 3D rendering
-- **Vue 3 Composition API** - Component architecture
-- **TypeScript** - Type safety
-- **Vue Router** - Navigation
-- **Reactive State** - Combat state management
-
-## Performance
-
-- Target: 60 FPS at 1080p
-- Delta time capped at 100ms to prevent physics issues
-- Automatic projectile cleanup
-- Efficient collision detection
-- Pointer lock for smooth mouse control
-
-## File Statistics
-
-**New Files Created:** 12
-- 6 TypeScript library files (battle logic)
-- 1 TypeScript composable (state management)
-- 3 Vue components (UI)
-- 2 File modifications (router, builder page)
-
-**Total Lines of Code:** ~2,800 lines
-
-## How to Use
-
-1. Build a mech in the Mech Builder (complete all 6 steps)
-2. On the Review step, click the "⚔️ Sortie" button
-3. Review your mech stats on the Ready screen
-4. Click "Launch Battle" to begin combat
-5. Controls:
-   - WASD - Move
-   - Mouse - Aim
-   - Left Click - Shoot
-   - Space - Jump (if equipped with Jump Jets)
-   - ESC - Exit battle
-6. Defeat the enemy to achieve victory
-
-## Future Phases
-
-### Phase 2: Wave System (Not Yet Implemented)
-- 5-wave progression system
-- Wave transitions
-- Progressive difficulty scaling
-- Multiple enemies per wave
-- Boss battle in wave 5
-- Score accumulation across waves
-
-### Phase 3: Testing & Analytics (Not Yet Implemented)
-- Battle simulator (automated testing)
-- Combat log system
-- Analytics dashboard
-- Debug controls
-- Replay system
+| Key | Action |
+|-----|--------|
+| WASD | Move |
+| Space | Jump (requires Jump Jet Pack in Rack slot) |
+| Mouse | Aim/camera |
+| Left Click | Fire right weapon |
+| Right Click | Fire left weapon (multiplayer) |
+| E | Use ability |
+| ESC | Exit battle |
 
 ## Known Limitations (Phase 1)
 
-- Single enemy only (no waves)
+- Single enemy only (no waves yet)
 - Box placeholder models (no detailed meshes)
-- No particle effects
-- No sound effects
-- No special abilities from parts (visual only)
-- Desktop-only (mobile touch controls not implemented)
-- No multiplayer
-
-## Verification
-
-✅ Build successful (no TypeScript errors)
-✅ Three.js import working
-✅ All 12 files created
-✅ Router integration complete
-✅ Build artifacts generated
-
-## Next Steps
-
-To continue to Phase 2:
-1. Implement wave manager system
-2. Add wave transition screens
-3. Create enemy spawning logic
-4. Add difficulty scaling formula
-5. Implement boss mechanics
-6. Add total score tracking
+- No sound effects or particle effects
+- Desktop only (no touch controls)

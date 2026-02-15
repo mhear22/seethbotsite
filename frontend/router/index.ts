@@ -36,6 +36,7 @@ import MechBuilderPage from '../components/pages/MechBuilderPage.vue'
 import MechBattlePage from '../components/pages/MechBattlePage.vue'
 import SearchPage from '../components/pages/SearchPage.vue'
 import OrbitalMechanicsPage from '../components/pages/OrbitalMechanicsPage.vue'
+import HomeLoanPage from '../components/pages/HomeLoanPage.vue'
 
 const routes = [
   {
@@ -230,6 +231,11 @@ const routes = [
     path: '/orbital',
     name: 'orbital',
     component: OrbitalMechanicsPage
+  },
+  {
+    path: '/home-loan',
+    name: 'home-loan',
+    component: HomeLoanPage
   }
 ]
 

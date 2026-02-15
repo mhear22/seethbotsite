@@ -85,7 +85,8 @@ const dropdowns = ref<DropdownData[]>([
       { title: 'Settings', icon: '⚙️', path: '/settings' },
       { title: 'API Docs', icon: '📚', path: '/api-docs' },
       { title: 'Account', icon: '🔐', path: '/auth' },
-      { title: 'Solar Calculator', icon: '☀️', path: '/solar' }
+      { title: 'Solar Calculator', icon: '☀️', path: '/solar' },
+      { title: 'Home Loan Calculator', icon: '🏠', path: '/home-loan' }
     ]
   }
 ])
