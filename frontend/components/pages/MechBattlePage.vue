@@ -44,23 +44,46 @@
         <h1>Select Arena</h1>
         <p class="mode-description">Choose your battleground</p>
 
-        <div class="map-grid">
-          <button
-            v-for="map in availableMaps"
-            :key="map.id"
-            @click="selectMap(map.id)"
-            class="map-btn"
-            :class="{ 'selected': selectedMapId === map.id }"
-          >
-            <div class="map-preview">
+        <div class="map-select-layout">
+          <!-- Map List -->
+          <div class="map-list">
+            <button
+              v-for="map in availableMaps"
+              :key="map.id"
+              @click="selectMap(map.id)"
+              class="map-btn"
+              :class="{ 'selected': selectedMapId === map.id }"
+            >
               <div class="map-icon">{{ getMapIcon(map.id) }}</div>
+              <div class="map-info">
+                <h3>{{ map.name }}</h3>
+                <p class="map-size">{{ map.arena.width }}x{{ map.arena.depth }}</p>
+              </div>
+              <div v-if="selectedMapId === map.id" class="selected-indicator">SELECTED</div>
+            </button>
+          </div>
+
+          <!-- Live Map Preview -->
+          <div class="map-preview-container">
+            <h3 class="preview-title">{{ selectedMap?.name || 'Select a Map' }}</h3>
+            <div class="preview-wrapper">
+              <MapPreview3D v-if="selectedMapId" :map-id="selectedMapId" />
             </div>
-            <div class="map-info">
-              <h3>{{ map.name }}</h3>
-              <p class="map-size">{{ map.arena.width }}x{{ map.arena.depth }}</p>
+            <div class="preview-details" v-if="selectedMap">
+              <div class="detail-row">
+                <span class="detail-label">Dimensions:</span>
+                <span class="detail-value">{{ selectedMap.arena.width }}m x {{ selectedMap.arena.depth }}m</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Obstacles:</span>
+                <span class="detail-value">{{ selectedMap.staticGeometry.length }}</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Spawn Points:</span>
+                <span class="detail-value">{{ selectedMap.spawnPoints.length }}</span>
+              </div>
             </div>
-            <div v-if="selectedMapId === map.id" class="selected-indicator">SELECTED</div>
-          </button>
+          </div>
         </div>
 
         <div class="button-group">
@@ -296,6 +319,7 @@ import { useGameSettings, type AIDifficulty } from '../../composables/useGameSet
 import MatchmakingView from '../mech/MatchmakingView.vue'
 import MultiplayerBattleCanvas from '../mech/MultiplayerBattleCanvas.vue'
 import MultiplayerResultsScreen from '../mech/hud/MultiplayerResultsScreen.vue'
+import MapPreview3D from '../mech/MapPreview3D.vue'
 import { NetworkManager } from '../../lib/battle/NetworkManager'
 import { MechEntity } from '../../lib/battle/MechEntity'
 import type { MechLoadout, MatchFoundMessage, MatchEndMessage, WeaponConfig, AbilityConfig } from '@shared/types/NetworkMessages'
@@ -318,6 +342,8 @@ const countdownRemaining = ref(3)
 // Single player map selection
 const selectedMapId = ref<string>(SINGLE_PLAYER_MAP_IDS[0])
 const availableMaps = getAllMaps()
+
+const selectedMap = computed(() => getMapById(selectedMapId.value))
 
 const route = useRoute()
 const router = useRouter()
@@ -1160,6 +1186,133 @@ function returnToBuilder() {
   text-shadow: 0 0 20px rgba(59, 130, 246, 0.8);
 }
 
+.map-select-layout {
+  display: flex;
+  gap: 30px;
+  margin-bottom: 40px;
+  max-width: 1100px;
+  margin-left: auto;
+  margin-right: auto;
+  align-items: flex-start;
+}
+
+.map-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 260px;
+  max-height: 400px;
+  overflow-y: auto;
+  padding-right: 10px;
+}
+
+.map-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.map-list::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+.map-list::-webkit-scrollbar-thumb {
+  background: rgba(59, 130, 246, 0.5);
+  border-radius: 3px;
+}
+
+.map-btn {
+  background: rgba(0, 0, 0, 0.4);
+  padding: 12px 16px;
+  border-radius: 10px;
+  border: 2px solid rgba(59, 130, 246, 0.3);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+}
+
+.map-btn:hover {
+  border-color: rgba(59, 130, 246, 0.6);
+  background: rgba(59, 130, 246, 0.1);
+  transform: translateX(5px);
+}
+
+.map-btn.selected {
+  border-color: #10b981;
+  background: rgba(16, 185, 129, 0.15);
+  box-shadow: 0 0 15px rgba(16, 185, 129, 0.3);
+}
+
+.map-btn .map-icon {
+  font-size: 2rem;
+  flex-shrink: 0;
+}
+
+.map-btn .map-info h3 {
+  color: #fff;
+  font-size: 1rem;
+  margin-bottom: 2px;
+}
+
+.map-btn .map-size {
+  color: #9ca3af;
+  font-size: 0.8rem;
+}
+
+.map-preview-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 12px;
+  padding: 16px;
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  min-height: 380px;
+}
+
+.preview-title {
+  color: #3b82f6;
+  font-size: 1.2rem;
+  margin: 0;
+  text-align: center;
+}
+
+.preview-wrapper {
+  flex: 1;
+  min-height: 250px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.preview-details {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.detail-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.detail-label {
+  color: #9ca3af;
+  font-size: 0.85rem;
+}
+
+.detail-value {
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
 .map-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -1170,66 +1323,15 @@ function returnToBuilder() {
   margin-right: auto;
 }
 
-.map-btn {
-  background: rgba(0, 0, 0, 0.4);
-  padding: 20px;
-  border-radius: 12px;
-  border: 2px solid rgba(59, 130, 246, 0.3);
-  cursor: pointer;
-  transition: all 0.3s ease;
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.map-btn:hover {
-  border-color: rgba(59, 130, 246, 0.6);
-  background: rgba(59, 130, 246, 0.1);
-  transform: translateY(-5px);
-  box-shadow: 0 10px 30px rgba(59, 130, 246, 0.3);
-}
-
-.map-btn.selected {
-  border-color: #10b981;
-  background: rgba(16, 185, 129, 0.15);
-  box-shadow: 0 0 20px rgba(16, 185, 129, 0.4);
-}
-
-.map-preview {
-  width: 80px;
-  height: 80px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 15px;
-}
-
-.map-icon {
-  font-size: 3rem;
-}
-
-.map-info h3 {
-  color: #fff;
-  font-size: 1.1rem;
-  margin-bottom: 5px;
-  text-align: center;
-}
-
-.map-size {
-  color: #9ca3af;
-  font-size: 0.85rem;
-}
-
 .selected-indicator {
   position: absolute;
-  top: 10px;
-  right: 10px;
+  top: 8px;
+  right: 8px;
   background: linear-gradient(135deg, #10b981, #059669);
   color: #fff;
-  padding: 4px 8px;
-  border-radius: 8px;
-  font-size: 0.7rem;
+  padding: 3px 6px;
+  border-radius: 6px;
+  font-size: 0.65rem;
   font-weight: bold;
 }
 
@@ -1359,6 +1461,35 @@ function returnToBuilder() {
 
   .mode-options {
     grid-template-columns: 1fr;
+  }
+
+  .map-select-layout {
+    flex-direction: column;
+  }
+
+  .map-list {
+    flex-direction: row;
+    flex-wrap: wrap;
+    max-height: none;
+    min-width: auto;
+  }
+
+  .map-btn {
+    flex: 1 1 calc(50% - 6px);
+    min-width: 140px;
+  }
+
+  .map-preview-container {
+    min-height: 280px;
+  }
+
+  .preview-wrapper {
+    min-height: 180px;
+  }
+
+  .preview-details {
+    flex-wrap: wrap;
+    gap: 10px;
   }
 }
 </style>
