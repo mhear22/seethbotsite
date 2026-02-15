@@ -9,14 +9,45 @@ interface MonthlyData {
   extra: number
 }
 
+interface DRMonthlyData {
+  month: number
+  homeLoanBalance: number
+  investmentLoanBalance: number
+  portfolioValue: number
+  dividends: number
+  taxSaving: number
+  netWealth: number
+}
+
+const disclaimerDismissed = ref(false)
+
 const loanAmount = ref(500000)
 const interestRate = ref(6.5)
 const loanTermYears = ref(30)
 const extraRepayment = ref(0)
 const extraFrequency = ref<'monthly' | 'fortnightly' | 'weekly'>('monthly')
 
+// Debt recycling
+const drEnabled = ref(false)
+const drIncome = ref(120000)
+const drTotalReturn = ref(9)
+const drDividendYield = ref(4)
+
 const formatCurrency = (val: number) =>
   new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD', maximumFractionDigits: 0 }).format(val)
+
+// ATO 2025-26 tax brackets (including 2% Medicare levy)
+const getMarginalRate = (income: number): number => {
+  // Medicare levy threshold: $26,000 (low income)
+  // We calculate effective marginal rate at the margin
+  if (income <= 18200) return 0
+  if (income <= 45000) return 0.19 + 0.02
+  if (income <= 120000) return 0.325 + 0.02
+  if (income <= 180000) return 0.37 + 0.02
+  return 0.45 + 0.02
+}
+
+const marginalRate = computed(() => getMarginalRate(drIncome.value))
 
 const extraMonthly = computed(() => {
   if (extraFrequency.value === 'fortnightly') return extraRepayment.value * 26 / 12
@@ -36,7 +67,6 @@ const schedule = computed((): MonthlyData[] => {
   let balance = principal
   const result: MonthlyData[] = []
 
-  // Calculate base monthly payment
   let payment: number
   if (annualRate === 0) {
     payment = principal / months
@@ -47,7 +77,6 @@ const schedule = computed((): MonthlyData[] => {
   for (let m = 1; m <= months; m++) {
     if (balance <= 0) break
     const interestCharge = balance * monthlyRate
-    const principalCharge = Math.min(payment - interestCharge + extra, balance)
     const totalPrincipal = Math.min(payment - interestCharge + extra, balance)
 
     result.push({
@@ -101,6 +130,77 @@ const baseSchedule = computed((): MonthlyData[] => {
   return result
 })
 
+// Debt recycling schedule
+const drSchedule = computed((): DRMonthlyData[] => {
+  if (!drEnabled.value) return []
+
+  const principal = loanAmount.value
+  const annualRate = interestRate.value / 100
+  const months = loanTermYears.value * 12
+  const monthlyRate = annualRate / 12
+  const extra = extraMonthly.value
+  const capitalGrowthRate = (drTotalReturn.value - drDividendYield.value) / 100 / 12
+  const dividendRate = drDividendYield.value / 100 / 12
+  const taxRate = marginalRate.value
+
+  if (principal <= 0 || months <= 0) return []
+
+  let payment: number
+  if (annualRate === 0) {
+    payment = principal / months
+  } else {
+    payment = principal * (monthlyRate * Math.pow(1 + monthlyRate, months)) / (Math.pow(1 + monthlyRate, months) - 1)
+  }
+
+  let homeLoanBalance = principal
+  let investmentLoanBalance = 0
+  let portfolioValue = 0
+  const result: DRMonthlyData[] = []
+
+  for (let m = 1; m <= months; m++) {
+    if (homeLoanBalance <= 0) break
+
+    // 1. Pay P&I on the non-deductible home loan portion
+    const homeInterest = homeLoanBalance * monthlyRate
+    const homePrincipal = Math.min(payment - homeInterest + extra, homeLoanBalance)
+
+    // 2. Recycle: redraw the principal paid and invest it
+    const recycled = Math.max(0, homePrincipal)
+    investmentLoanBalance += recycled
+    portfolioValue += recycled
+
+    // 3. Portfolio grows (capital gains — dividends paid out separately)
+    portfolioValue *= (1 + capitalGrowthRate)
+
+    // 4. Dividends received (applied directly to home loan)
+    const dividends = portfolioValue * dividendRate
+
+    // 5. Tax saving on investment loan interest (deductible)
+    const investmentInterest = investmentLoanBalance * monthlyRate
+    const taxSaving = investmentInterest * taxRate
+
+    // 6. Apply dividends + tax savings as extra payment on home loan
+    const extraFromDR = dividends + taxSaving
+
+    // 7. Update home loan balance
+    homeLoanBalance = Math.max(0, homeLoanBalance - homePrincipal - extraFromDR)
+
+    const netWealth = portfolioValue - investmentLoanBalance
+
+    result.push({
+      month: m,
+      homeLoanBalance,
+      investmentLoanBalance,
+      portfolioValue,
+      dividends,
+      taxSaving,
+      netWealth
+    })
+  }
+
+  return result
+})
+
 const totalInterestPaid = computed(() => schedule.value.reduce((s, r) => s + r.interest, 0))
 const totalPaid = computed(() => schedule.value.reduce((s, r) => s + r.principal + r.interest, 0))
 const baseMonthlyPayment = computed(() => {
@@ -118,6 +218,15 @@ const interestSaved = computed(() => {
   return baseTotal - totalInterestPaid.value
 })
 
+// DR summary stats
+const drLoanLength = computed(() => drSchedule.value.length)
+const drYearsEarlier = computed(() => Math.max(0, actualLoanLength.value - drLoanLength.value) / 12)
+const drFinalPortfolio = computed(() => drSchedule.value.at(-1)?.portfolioValue ?? 0)
+const drFinalInvestmentLoan = computed(() => drSchedule.value.at(-1)?.investmentLoanBalance ?? 0)
+const drNetWealth = computed(() => drFinalPortfolio.value - drFinalInvestmentLoan.value)
+const drTotalDividends = computed(() => drSchedule.value.reduce((s, r) => s + r.dividends, 0))
+const drTotalTaxSavings = computed(() => drSchedule.value.reduce((s, r) => s + r.taxSaving, 0))
+
 // SVG chart data
 const SVG_W = 800
 const SVG_H = 320
@@ -127,7 +236,6 @@ const chartData = computed(() => {
   const data = schedule.value
   if (!data.length) return { bars: [], months: 0, maxVal: 0 }
 
-  // Sample to at most 120 data points for legibility
   const step = Math.ceil(data.length / 120)
   const sampled = data.filter((_, i) => i % step === 0)
 
@@ -190,11 +298,78 @@ const balanceLine = computed(() => {
     return `${i === 0 ? 'M' : 'L'}${x},${y}`
   }).join(' ')
 })
+
+// DR comparison chart (portfolio value vs investment loan vs home loan balance)
+const DR_SVG_W = 800
+const DR_SVG_H = 300
+const DR_PAD = { top: 20, right: 20, bottom: 40, left: 80 }
+
+const drChartData = computed(() => {
+  const data = drSchedule.value
+  if (!data.length) return { maxVal: 0, portfolioLine: '', investLoanLine: '', homeLoanLine: '', xLabels: [] }
+
+  const step = Math.ceil(data.length / 120)
+  const sampled = data.filter((_, i) => i % step === 0)
+
+  const maxVal = Math.max(
+    loanAmount.value,
+    ...sampled.map(d => d.portfolioValue),
+    ...sampled.map(d => d.investmentLoanBalance)
+  )
+  const innerW = DR_SVG_W - DR_PAD.left - DR_PAD.right
+  const innerH = DR_SVG_H - DR_PAD.top - DR_PAD.bottom
+
+  const toPath = (vals: { x: number; y: number }[]) =>
+    vals.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ')
+
+  const points = sampled.map((d, i) => {
+    const x = DR_PAD.left + i * (innerW / sampled.length) + (innerW / sampled.length) / 2
+    return {
+      x,
+      portfolio: DR_PAD.top + innerH - (d.portfolioValue / maxVal) * innerH,
+      investLoan: DR_PAD.top + innerH - (d.investmentLoanBalance / maxVal) * innerH,
+      homeLoan: DR_PAD.top + innerH - (d.homeLoanBalance / maxVal) * innerH,
+      month: d.month
+    }
+  })
+
+  const xLabelStep = Math.ceil(points.length / 6)
+  const xLabels = points
+    .filter((_, i) => i % xLabelStep === 0 || i === points.length - 1)
+    .map(p => ({ x: p.x, label: `Yr ${Math.ceil(p.month / 12)}` }))
+
+  const drYLabels = [0, 0.25, 0.5, 0.75, 1].map(frac => ({
+    val: formatCurrency(maxVal * frac),
+    y: DR_PAD.top + innerH - frac * innerH
+  }))
+
+  return {
+    maxVal,
+    portfolioLine: toPath(points.map(p => ({ x: p.x, y: p.portfolio }))),
+    investLoanLine: toPath(points.map(p => ({ x: p.x, y: p.investLoan }))),
+    homeLoanLine: toPath(points.map(p => ({ x: p.x, y: p.homeLoan }))),
+    xLabels,
+    yLabels: drYLabels
+  }
+})
 </script>
 
 <template>
   <div class="loan-page">
     <h1 class="page-title">Home Loan Calculator</h1>
+
+    <Teleport to="body">
+      <div v-if="!disclaimerDismissed" class="modal-backdrop" @click.self="disclaimerDismissed = true">
+        <div class="modal">
+          <div class="modal-icon">⚠️</div>
+          <h2 class="modal-title">Heads up</h2>
+          <p class="modal-body">
+            This is a shitpost and AI generated slop. Proceed understanding that it's unlikely to even be remotely close.
+          </p>
+          <button class="modal-btn" @click="disclaimerDismissed = true">I understand, show me the slop</button>
+        </div>
+      </div>
+    </Teleport>
 
     <div class="layout">
       <!-- Inputs -->
@@ -309,42 +484,29 @@ const balanceLine = computed(() => {
       </div>
       <div class="chart-scroll">
         <svg :viewBox="`0 0 ${SVG_W} ${SVG_H}`" class="chart-svg" preserveAspectRatio="none">
-          <!-- Y grid lines -->
           <g v-for="label in yLabels" :key="label.val">
             <line :x1="PAD.left" :y1="label.y" :x2="SVG_W - PAD.right" :y2="label.y" class="grid-line" />
             <text :x="PAD.left - 6" :y="label.y + 4" class="axis-label" text-anchor="end">{{ label.val }}</text>
           </g>
 
-          <!-- Bars -->
           <g v-for="bar in chartData.bars" :key="bar.month">
-            <rect
-              :x="bar.x" :y="bar.principalY"
-              :width="bar.barW" :height="bar.principalH"
-              class="bar-principal"
-            />
-            <rect
-              :x="bar.x" :y="bar.interestY"
-              :width="bar.barW" :height="bar.interestH"
-              class="bar-interest"
-            />
+            <rect :x="bar.x" :y="bar.principalY" :width="bar.barW" :height="bar.principalH" class="bar-principal" />
+            <rect :x="bar.x" :y="bar.interestY" :width="bar.barW" :height="bar.interestH" class="bar-interest" />
           </g>
 
-          <!-- Balance line -->
           <path :d="balanceLine" class="balance-path" fill="none" />
 
-          <!-- X axis labels -->
           <g v-for="xl in xLabels" :key="xl.x">
             <text :x="xl.x" :y="SVG_H - PAD.bottom + 16" class="axis-label" text-anchor="middle">{{ xl.label }}</text>
           </g>
 
-          <!-- Axes -->
           <line :x1="PAD.left" :y1="PAD.top" :x2="PAD.left" :y2="SVG_H - PAD.bottom" class="axis-line" />
           <line :x1="PAD.left" :y1="SVG_H - PAD.bottom" :x2="SVG_W - PAD.right" :y2="SVG_H - PAD.bottom" class="axis-line" />
         </svg>
       </div>
     </div>
 
-    <!-- Year-by-year table (collapsed by default) -->
+    <!-- Year-by-year table -->
     <div class="panel table-panel" v-if="schedule.length">
       <details>
         <summary>Year-by-Year Breakdown</summary>
@@ -371,6 +533,158 @@ const balanceLine = computed(() => {
           </table>
         </div>
       </details>
+    </div>
+
+    <!-- ── Debt Recycling Section ── -->
+    <div class="panel dr-toggle-panel">
+      <div class="dr-header">
+        <div>
+          <h2 style="margin:0 0 0.25rem">Debt Recycling</h2>
+          <p class="dr-subtitle">Convert non-deductible home loan debt into tax-deductible investment debt over time.</p>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" v-model="drEnabled" />
+          <span class="toggle-track"><span class="toggle-thumb"></span></span>
+        </label>
+      </div>
+
+      <template v-if="drEnabled">
+        <div class="dr-inputs">
+          <div class="field">
+            <label>Annual Taxable Income <span class="hint">(ATO 2025–26 brackets)</span></label>
+            <div class="input-row">
+              <span class="prefix">$</span>
+              <input type="number" v-model.number="drIncome" min="0" max="5000000" step="5000" />
+            </div>
+            <input type="range" v-model.number="drIncome" min="0" max="500000" step="5000" class="slider" />
+            <div class="dr-tax-note">
+              Marginal rate: <strong>{{ (marginalRate * 100).toFixed(0) }}%</strong>
+              <span class="hint"> (incl. 2% Medicare levy)</span>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Expected Total Investment Return <span class="hint">(dividends + capital growth)</span></label>
+            <div class="input-row">
+              <input type="number" v-model.number="drTotalReturn" min="0" max="50" step="0.5" />
+              <span class="suffix">% p.a.</span>
+            </div>
+            <input type="range" v-model.number="drTotalReturn" min="0" max="30" step="0.5" class="slider" />
+          </div>
+
+          <div class="field">
+            <label>Dividend Yield <span class="hint">(cash income applied to loan)</span></label>
+            <div class="input-row">
+              <input type="number" v-model.number="drDividendYield" min="0" :max="drTotalReturn" step="0.5" />
+              <span class="suffix">% p.a.</span>
+            </div>
+            <input type="range" v-model.number="drDividendYield" min="0" :max="drTotalReturn" step="0.5" class="slider" />
+            <div class="extra-note">Capital growth: {{ (drTotalReturn - drDividendYield).toFixed(1) }}% p.a.</div>
+          </div>
+        </div>
+
+        <!-- DR Results -->
+        <div v-if="drSchedule.length" class="dr-results">
+          <h3 class="dr-results-title">Debt Recycling Outcome</h3>
+
+          <div class="stat-grid">
+            <div class="stat highlight-green">
+              <div class="stat-label">Home Loan Paid Off</div>
+              <div class="stat-value green">{{ (drLoanLength / 12).toFixed(1) }} years</div>
+            </div>
+            <div class="stat highlight-green" v-if="drYearsEarlier > 0">
+              <div class="stat-label">Paid Off Earlier</div>
+              <div class="stat-value green">{{ drYearsEarlier.toFixed(1) }} years sooner</div>
+            </div>
+            <div class="stat">
+              <div class="stat-label">Final Portfolio Value</div>
+              <div class="stat-value">{{ formatCurrency(drFinalPortfolio) }}</div>
+            </div>
+            <div class="stat">
+              <div class="stat-label">Investment Loan Remaining</div>
+              <div class="stat-value interest">{{ formatCurrency(drFinalInvestmentLoan) }}</div>
+            </div>
+            <div class="stat highlight-gold">
+              <div class="stat-label">Net Wealth Gain</div>
+              <div class="stat-value gold">{{ formatCurrency(drNetWealth) }}</div>
+            </div>
+            <div class="stat">
+              <div class="stat-label">Total Dividends Received</div>
+              <div class="stat-value">{{ formatCurrency(drTotalDividends) }}</div>
+            </div>
+            <div class="stat">
+              <div class="stat-label">Total Tax Savings</div>
+              <div class="stat-value green">{{ formatCurrency(drTotalTaxSavings) }}</div>
+            </div>
+          </div>
+
+          <div class="dr-disclaimer">
+            <strong>Note:</strong> This is a simplified model. Dividends and tax savings are applied monthly. Franking credits,
+            CGT on sale, transaction costs, and income tax on dividends are not modelled. Debt recycling carries investment risk —
+            consider professional financial advice.
+          </div>
+
+          <!-- DR Chart -->
+          <div class="dr-chart-wrap">
+            <h3 class="dr-results-title">Portfolio vs Loan Balances Over Time</h3>
+            <div class="legend">
+              <span class="legend-item"><span class="legend-line" style="background:#a78bfa"></span> Portfolio Value</span>
+              <span class="legend-item"><span class="legend-line" style="background:#ff7755"></span> Investment Loan</span>
+              <span class="legend-item"><span class="legend-line" style="background:#55dd88"></span> Home Loan (non-deductible)</span>
+            </div>
+            <div class="chart-scroll">
+              <svg :viewBox="`0 0 ${DR_SVG_W} ${DR_SVG_H}`" class="chart-svg" preserveAspectRatio="none">
+                <g v-for="label in drChartData.yLabels" :key="label.val">
+                  <line :x1="DR_PAD.left" :y1="label.y" :x2="DR_SVG_W - DR_PAD.right" :y2="label.y" class="grid-line" />
+                  <text :x="DR_PAD.left - 6" :y="label.y + 4" class="axis-label" text-anchor="end">{{ label.val }}</text>
+                </g>
+
+                <path :d="drChartData.portfolioLine" fill="none" class="dr-portfolio-path" />
+                <path :d="drChartData.investLoanLine" fill="none" class="dr-investloan-path" />
+                <path :d="drChartData.homeLoanLine" fill="none" class="dr-homeloan-path" />
+
+                <g v-for="xl in drChartData.xLabels" :key="xl.x">
+                  <text :x="xl.x" :y="DR_SVG_H - DR_PAD.bottom + 16" class="axis-label" text-anchor="middle">{{ xl.label }}</text>
+                </g>
+
+                <line :x1="DR_PAD.left" :y1="DR_PAD.top" :x2="DR_PAD.left" :y2="DR_SVG_H - DR_PAD.bottom" class="axis-line" />
+                <line :x1="DR_PAD.left" :y1="DR_SVG_H - DR_PAD.bottom" :x2="DR_SVG_W - DR_PAD.right" :y2="DR_SVG_H - DR_PAD.bottom" class="axis-line" />
+              </svg>
+            </div>
+          </div>
+
+          <!-- DR Year-by-Year Table -->
+          <details class="dr-table-details">
+            <summary>Year-by-Year Debt Recycling Breakdown</summary>
+            <div class="table-scroll" style="margin-top:1rem">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Year</th>
+                    <th>Home Loan Balance</th>
+                    <th>Investment Loan</th>
+                    <th>Portfolio Value</th>
+                    <th>Dividends</th>
+                    <th>Tax Savings</th>
+                    <th>Net Wealth</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="yr in Math.ceil(drSchedule.length / 12)" :key="yr">
+                    <td>{{ yr }}</td>
+                    <td>{{ formatCurrency(drSchedule[Math.min(yr * 12 - 1, drSchedule.length - 1)].homeLoanBalance) }}</td>
+                    <td class="interest-cell">{{ formatCurrency(drSchedule[Math.min(yr * 12 - 1, drSchedule.length - 1)].investmentLoanBalance) }}</td>
+                    <td class="portfolio-cell">{{ formatCurrency(drSchedule[Math.min(yr * 12 - 1, drSchedule.length - 1)].portfolioValue) }}</td>
+                    <td>{{ formatCurrency(drSchedule.slice((yr - 1) * 12, yr * 12).reduce((s, r) => s + r.dividends, 0)) }}</td>
+                    <td class="savings-cell">{{ formatCurrency(drSchedule.slice((yr - 1) * 12, yr * 12).reduce((s, r) => s + r.taxSaving, 0)) }}</td>
+                    <td class="net-wealth-cell">{{ formatCurrency(drSchedule[Math.min(yr * 12 - 1, drSchedule.length - 1)].netWealth) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </details>
+        </div>
+      </template>
     </div>
   </div>
 </template>
@@ -416,7 +730,7 @@ const balanceLine = computed(() => {
   letter-spacing: 0.05em;
 }
 
-.chart-panel, .table-panel, .summary-panel {
+.chart-panel, .table-panel, .summary-panel, .dr-toggle-panel {
   margin-bottom: 1rem;
 }
 
@@ -515,6 +829,14 @@ const balanceLine = computed(() => {
   border: 1px solid #44aa66;
 }
 
+.stat.highlight-green {
+  border: 1px solid #44aa66;
+}
+
+.stat.highlight-gold {
+  border: 1px solid #ccaa44;
+}
+
 .stat-label {
   font-size: 0.75rem;
   color: #888;
@@ -531,8 +853,13 @@ const balanceLine = computed(() => {
   color: #ff7755;
 }
 
-.stat.highlight .stat-value {
+.stat.highlight .stat-value,
+.stat-value.green {
   color: #55dd88;
+}
+
+.stat-value.gold {
+  color: #ffcc55;
 }
 
 /* Ratio bar */
@@ -621,6 +948,11 @@ const balanceLine = computed(() => {
 .axis-line { stroke: #444; stroke-width: 1.5; }
 .axis-label { fill: #666; font-size: 11px; }
 
+/* DR SVG paths */
+.dr-portfolio-path { stroke: #a78bfa; stroke-width: 2.5; }
+.dr-investloan-path { stroke: #ff7755; stroke-width: 2; stroke-dasharray: 5 3; }
+.dr-homeloan-path { stroke: #55dd88; stroke-width: 2; }
+
 /* Table */
 details summary {
   cursor: pointer;
@@ -661,6 +993,184 @@ th:first-child, td:first-child { text-align: left; }
 td { color: #ccc; }
 
 .interest-cell { color: #ff7755; }
+.portfolio-cell { color: #a78bfa; }
+.savings-cell { color: #55dd88; }
+.net-wealth-cell { color: #ffcc55; font-weight: 600; }
 
 tr:hover td { background: #1e1e3a; }
+
+/* Modal */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(3px);
+}
+
+.modal {
+  background: #1a1a2e;
+  border: 1px solid #aa6600;
+  border-radius: 14px;
+  padding: 2rem 2.25rem;
+  max-width: 420px;
+  width: 90%;
+  text-align: center;
+}
+
+.modal-icon {
+  font-size: 2.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.modal-title {
+  font-size: 1.3rem;
+  color: #ffaa44;
+  margin: 0 0 0.75rem;
+}
+
+.modal-body {
+  color: #bbb;
+  font-size: 0.92rem;
+  line-height: 1.6;
+  margin: 0 0 1.5rem;
+}
+
+.modal-btn {
+  background: #aa6600;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.6rem 1.4rem;
+  font-size: 0.92rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.modal-btn:hover {
+  background: #cc8800;
+}
+
+/* ── Debt Recycling ── */
+.dr-toggle-panel {
+  border-color: #3a2a5a;
+}
+
+.dr-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.dr-subtitle {
+  font-size: 0.82rem;
+  color: #888;
+  margin: 0;
+}
+
+/* Toggle switch */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+.toggle-track {
+  display: block;
+  width: 44px;
+  height: 24px;
+  background: #2a2a4a;
+  border-radius: 12px;
+  transition: background 0.2s;
+  position: relative;
+}
+
+.toggle-switch input:checked + .toggle-track {
+  background: #7755dd;
+}
+
+.toggle-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.2s;
+}
+
+.toggle-switch input:checked + .toggle-track .toggle-thumb {
+  transform: translateX(20px);
+}
+
+.dr-inputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 1.5rem;
+  padding: 1.25rem;
+  background: #12121f;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  border: 1px solid #2a1a4a;
+}
+
+@media (max-width: 700px) {
+  .dr-inputs { grid-template-columns: 1fr; }
+}
+
+.dr-tax-note {
+  font-size: 0.8rem;
+  color: #a78bfa;
+  margin-top: 0.3rem;
+}
+
+.dr-results-title {
+  font-size: 0.95rem;
+  color: #aaa;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0 0 1rem;
+}
+
+.dr-results {
+  border-top: 1px solid #2a2a4a;
+  padding-top: 1.5rem;
+}
+
+.dr-chart-wrap {
+  margin-top: 1.5rem;
+}
+
+.dr-disclaimer {
+  font-size: 0.78rem;
+  color: #666;
+  background: #0d0d1a;
+  border: 1px solid #222;
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  margin-top: 1rem;
+  line-height: 1.5;
+}
+
+.dr-disclaimer strong {
+  color: #888;
+}
+
+.dr-table-details {
+  margin-top: 1.5rem;
+}
 </style>

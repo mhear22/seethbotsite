@@ -15,6 +15,9 @@
       <div class="action">
         <span class="key">↑</span> <span class="key">↓</span> or <span class="key">W</span> <span class="key">S</span> Vertical
       </div>
+      <div class="action">
+        <span class="key">Scroll</span> or <span class="key">Q</span> <span class="key">E</span> Zoom
+      </div>
     </div>
     <div class="info-panel">
       <div class="info-item">
@@ -60,9 +63,16 @@ let cameraVertical = 30
 const manualControl = ref(false)
 const keysPressed = ref<Set<string>>(new Set())
 
+// Nebulae
+let nebulaMeshes: THREE.Mesh[] = []
+let nebulaMaterials: THREE.ShaderMaterial[] = []
+
 // Black hole distortion effect
 let blackHoleMaterial: THREE.Material | null = null
 let accretionDiskMaterial: THREE.ShaderMaterial | null = null
+
+// Zoom
+let zoomVelocity = 0
 
 // Gravitational lensing render target
 let lensingTarget: THREE.WebGLRenderTarget | null = null
@@ -80,6 +90,7 @@ onMounted(() => {
   window.addEventListener('resize', handleResize)
   window.addEventListener('keydown', handleKeyDown)
   window.addEventListener('keyup', handleKeyUp)
+  window.addEventListener('wheel', handleWheel, { passive: true })
 })
 
 onUnmounted(() => {
@@ -89,6 +100,7 @@ onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
   window.removeEventListener('keydown', handleKeyDown)
   window.removeEventListener('keyup', handleKeyUp)
+  window.removeEventListener('wheel', handleWheel)
   cleanup()
 })
 
@@ -425,6 +437,9 @@ function initScene() {
   // Add stars
   createStars()
 
+  // Add distant nebulae
+  createNebulae()
+
   // Initial camera position
   updateCamera()
 }
@@ -693,6 +708,149 @@ function createStars() {
   scene?.add(stars)
 }
 
+function createNebulae() {
+  const loader = new THREE.TextureLoader()
+
+  // Real Hubble/ESA images + placement config
+  // aspect: approximate w/h of the source image so the plane isn't stretched
+  const nebulaConfigs = [
+    {
+      tex: '/images/nebula-orion.jpg',
+      pos: new THREE.Vector3( 1400,  320, -1100),
+      size: 900, aspect: 1.33,
+      rx: 0.12, ry:  0.28, rz:  0.4,
+      brightness: 0.7,
+    },
+    {
+      tex: '/images/nebula-carina.jpg',
+      pos: new THREE.Vector3(-1200, -150, -1300),
+      size: 850, aspect: 1.78,
+      rx: -0.18, ry: -0.22, rz: 1.2,
+      brightness: 0.75,
+    },
+    {
+      tex: '/images/nebula-pillars.jpg',
+      pos: new THREE.Vector3( 250, -700, -1500),
+      size: 750, aspect: 0.72,
+      rx:  0.28, ry:  0.08, rz: 2.6,
+      brightness: 0.8,
+    },
+    {
+      tex: '/images/nebula-horsehead.jpg',
+      pos: new THREE.Vector3(-800, 800, -1200),
+      size: 700, aspect: 1.25,
+      rx: -0.08, ry:  0.32, rz: 0.9,
+      brightness: 0.65,
+    },
+    {
+      tex: '/images/nebula-eagle.jpg',
+      pos: new THREE.Vector3( 1000, -900, -1400),
+      size: 800, aspect: 1.5,
+      rx:  0.18, ry: -0.14, rz: 3.8,
+      brightness: 0.72,
+    },
+  ]
+
+  // Vertex shader — passes UVs through
+  const nebulaVert = `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `
+
+  // Fragment shader — samples the Hubble texture, softens edges, adds shimmer
+  const nebulaFrag = `
+    uniform sampler2D nebulaMap;
+    uniform float     time;
+    uniform float     brightness;
+    varying vec2 vUv;
+
+    float hash(vec2 p) {
+      p = fract(p * vec2(127.1, 311.7));
+      p += dot(p, p + 74.27);
+      return fract(p.x * p.y);
+    }
+    float noise(vec2 p) {
+      vec2 i = floor(p); vec2 f = fract(p);
+      f = f * f * (3.0 - 2.0 * f);
+      return mix(mix(hash(i), hash(i+vec2(1,0)), f.x),
+                 mix(hash(i+vec2(0,1)), hash(i+vec2(1,1)), f.x), f.y);
+    }
+    float fbm(vec2 p) {
+      float v = 0.0, a = 0.5;
+      for (int i = 0; i < 5; i++) { v += a * noise(p); p = p * 2.1 + vec2(1.7, 0.9); a *= 0.5; }
+      return v;
+    }
+
+    void main() {
+      vec2 uv = vUv;
+
+      // Very subtle domain-warp shimmer so the nebula breathes slightly
+      vec2 warp = vec2(
+        fbm(uv * 3.0 + vec2(time * 0.004, 0.0)),
+        fbm(uv * 3.0 + vec2(0.0, time * 0.003))
+      ) * 0.006;
+      vec2 sampledUv = clamp(uv + warp, 0.0, 1.0);
+
+      vec3 col = texture2D(nebulaMap, sampledUv).rgb;
+
+      // Boost gamma so dim regions pop — real nebula photos are often dark
+      col = pow(col, vec3(0.72));
+
+      // Saturate: push colours away from grey
+      float lum = dot(col, vec3(0.2126, 0.7152, 0.0722));
+      col = mix(vec3(lum), col, 1.55);
+
+      // Overall brightness scalar set per-nebula
+      col *= brightness;
+
+      // Soft radial vignette — fades to transparent at edges so it blends into space
+      vec2 centered = uv - 0.5;
+      float r = length(centered);
+      float vignette = 1.0 - smoothstep(0.32, 0.52, r);
+
+      // Also use the image's own luminance as an alpha mask
+      // (bright nebula regions = opaque; black space inside the photo = transparent)
+      float lumAlpha = dot(texture2D(nebulaMap, sampledUv).rgb, vec3(0.299, 0.587, 0.114));
+      // Lift a little so mid-grey ISM regions are still visible
+      float alpha = vignette * clamp(lumAlpha * 1.6 + 0.0, 0.0, 1.0);
+
+      gl_FragColor = vec4(col, alpha);
+    }
+  `
+
+  nebulaConfigs.forEach((cfg) => {
+    const tex = loader.load(cfg.tex)
+    tex.colorSpace = THREE.SRGBColorSpace
+
+    const mat = markRaw(new THREE.ShaderMaterial({
+      uniforms: {
+        nebulaMap:  { value: tex },
+        time:       { value: 0 },
+        brightness: { value: cfg.brightness },
+      },
+      vertexShader:   nebulaVert,
+      fragmentShader: nebulaFrag,
+      transparent: true,
+      blending:    THREE.AdditiveBlending,
+      depthWrite:  false,
+      side: THREE.DoubleSide,
+    }))
+
+    // Use aspect ratio to avoid stretching (size = height, width = size * aspect)
+    const geo  = new THREE.PlaneGeometry(cfg.size * cfg.aspect, cfg.size)
+    const mesh = markRaw(new THREE.Mesh(geo, mat))
+    mesh.position.copy(cfg.pos)
+    mesh.rotation.set(cfg.rx, cfg.ry, cfg.rz)
+
+    scene?.add(mesh)
+    nebulaMeshes.push(mesh)
+    nebulaMaterials.push(mat)
+  })
+}
+
 function updateCamera() {
   if (!camera) return
 
@@ -704,7 +862,9 @@ function updateCamera() {
                         keysPressed.value.has('KeyA') ||
                         keysPressed.value.has('KeyD') ||
                         keysPressed.value.has('KeyW') ||
-                        keysPressed.value.has('KeyS')
+                        keysPressed.value.has('KeyS') ||
+                        keysPressed.value.has('KeyQ') ||
+                        keysPressed.value.has('KeyE')
 
   if (hasManualInput) {
     manualControl.value = true
@@ -732,12 +892,21 @@ function updateCamera() {
       cameraVertical = Math.max(cameraVertical - verticalSpeed, -20)
     }
 
-    // Zoom (Q/E or +/- could be added later)
-    // Keeping radius fixed for now
+    // Zoom in/out (Q = zoom in, E = zoom out)
+    if (keysPressed.value.has('KeyQ')) {
+      zoomVelocity -= 0.8
+    }
+    if (keysPressed.value.has('KeyE')) {
+      zoomVelocity += 0.8
+    }
   } else {
     // Auto-rotate camera (disabled when using manual control)
     cameraAngle += 0.0005 // Very slow rotation
   }
+
+  // Apply zoom velocity with smooth damping
+  cameraRadius = Math.max(20, Math.min(250, cameraRadius + zoomVelocity))
+  zoomVelocity *= 0.88 // friction
 
   const x = Math.cos(cameraAngle) * cameraRadius
   const z = Math.sin(cameraAngle) * cameraRadius
@@ -753,6 +922,14 @@ function handleKeyDown(event: KeyboardEvent) {
 
 function handleKeyUp(event: KeyboardEvent) {
   keysPressed.value.delete(event.code)
+}
+
+function handleWheel(event: WheelEvent) {
+  manualControl.value = true
+  // deltaY > 0 → scroll down → zoom out; < 0 → zoom in
+  zoomVelocity += event.deltaY * 0.04
+  // Clamp impulse so a fast scroll doesn't teleport the camera
+  zoomVelocity = Math.max(-12, Math.min(12, zoomVelocity))
 }
 
 function updateBlackHole(time: number) {
@@ -802,6 +979,11 @@ function animate() {
   if (sun && sun.material.uniforms) {
     sun.material.uniforms.time.value = time * 0.001
   }
+
+  // Animate nebula shaders
+  nebulaMaterials.forEach((mat) => {
+    mat.uniforms.time.value = time * 0.001
+  })
 
   // Update camera
   updateCamera()
@@ -885,6 +1067,18 @@ function cleanup() {
       }
     })
   }
+
+  nebulaMeshes.forEach((m) => {
+    m.geometry.dispose()
+  })
+  nebulaMaterials.forEach((m) => {
+    if (m.uniforms.nebulaMap?.value) {
+      m.uniforms.nebulaMap.value.dispose()
+    }
+    m.dispose()
+  })
+  nebulaMeshes = []
+  nebulaMaterials = []
 
   if (accretionDiskMaterial) {
     accretionDiskMaterial.dispose()
