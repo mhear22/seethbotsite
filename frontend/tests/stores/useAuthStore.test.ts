@@ -113,7 +113,7 @@ describe('useAuthStore', () => {
         ok: false,
         json: async () => ({
           success: false,
-          message: 'Email already exists'
+          error: 'Email already exists'
         })
       })
 
@@ -175,7 +175,7 @@ describe('useAuthStore', () => {
         ok: false,
         json: async () => ({
           success: false,
-          message: 'Invalid credentials'
+          error: 'Invalid credentials'
         })
       })
 

@@ -9,14 +9,23 @@ import { execSync } from 'child_process';
 process.env.NODE_ENV = 'test';
 process.env.PORT = '3002'; // Use different port for tests
 
+// Default test database URL if not provided - matches docker-compose.yml postgres service
+if (!process.env.DATABASE_URL) {
+  process.env.DATABASE_URL = 'postgresql://seethbot:seethbot_secret_change_me@localhost:5432/seethbot?schema=public';
+}
+
 export const setupTestDB = () => {
   // Run Prisma migrations for test database
   console.log('Setting up test database...');
   try {
-    execSync('npx prisma migrate deploy', { stdio: 'inherit' });
+    execSync('npx prisma migrate deploy', {
+      stdio: 'inherit',
+      env: { ...process.env }
+    });
     console.log('Test database setup complete.');
   } catch (error) {
     console.error('Failed to setup test database:', error);
+    console.error('Make sure PostgreSQL is running. You can start it with: docker-compose up -d postgres');
     throw error;
   }
 };
