@@ -26,6 +26,11 @@ COPY backend/scripts ./scripts/
 COPY backend/prisma ./prisma/
 COPY backend/src ./src/
 
+# Copy shared files and validation script for prebuild validation
+COPY scripts/validate-shared-files.js ../scripts/validate-shared-files.js
+COPY backend/src/shared ../backend/src/shared
+COPY frontend/shared ../frontend/shared
+
 # Generate Prisma Client
 RUN npx prisma generate
 
@@ -50,6 +55,11 @@ COPY --from=backend-builder /app/backend/dist/openapi.json ../backend/dist/opena
 
 # Copy all frontend source in one layer (relies on .dockerignore to exclude node_modules/dist)
 COPY frontend/ ./
+
+# Copy shared files and validation script for prebuild validation
+COPY scripts/validate-shared-files.js ../scripts/validate-shared-files.js
+COPY backend/src/shared ../backend/src/shared
+COPY frontend/shared ../frontend/shared
 
 # Build frontend
 RUN npm run build

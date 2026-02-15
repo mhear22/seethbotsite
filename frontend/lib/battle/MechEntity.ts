@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import type { MechLoadout } from '../../composables/useMechBuilder'
 import { markRaw } from 'vue'
+import { getMechModelLoader, MODEL_ATTACH_POINTS } from './MechModelLoader'
 
 export interface CombatStats {
   maxHealth: number
@@ -55,6 +56,9 @@ export class MechEntity {
   aiStrafeDirTimer: number = 0
   lastShotTime: number = 0
 
+  // Model loading state
+  private modelLoadPromise: Promise<void> | null = null
+
   constructor(
     id: string,
     name: string,
@@ -74,7 +78,61 @@ export class MechEntity {
     this.rotation = new THREE.Euler(0, 0, 0)
     this.velocity = new THREE.Vector3(0, 0, 0)
 
+    // Create immediate procedural mesh (fast, always available)
     this.mesh = markRaw(this.createMeshGroup())
+
+    // Start async model loading in background
+    this.modelLoadPromise = this.loadAndApplyModels()
+  }
+
+  /**
+   * Load 3D models asynchronously and replace procedural geometry
+   * Falls back silently if models aren't available
+   */
+  private async loadAndApplyModels(): Promise<void> {
+    try {
+      const loader = getMechModelLoader()
+      const teamColor = this.isPlayer ? 0x3b82f6 : 0xef4444
+
+      const modelGroup = await loader.assembleMech(this.loadout, teamColor)
+
+      // Transfer position and rotation from old mesh
+      modelGroup.position.copy(this.position)
+      modelGroup.rotation.copy(this.rotation)
+
+      // Dispose old procedural geometry
+      this.disposeMeshGroup()
+
+      // Replace with loaded model
+      this.mesh = markRaw(modelGroup)
+    } catch (error) {
+      // Silently keep procedural geometry on error
+      console.debug('Model loading failed, using procedural geometry:', error)
+    }
+  }
+
+  /**
+   * Wait for model loading to complete
+   * Useful for loading screens
+   */
+  async waitForModelLoad(): Promise<void> {
+    if (this.modelLoadPromise) {
+      await this.modelLoadPromise
+    }
+  }
+
+  /**
+   * Dispose all geometry and materials in the mesh group
+   */
+  private disposeMeshGroup(): void {
+    this.mesh.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        child.geometry.dispose()
+        if (child.material instanceof THREE.Material) {
+          child.material.dispose()
+        }
+      }
+    })
   }
 
   private createMeshGroup(): THREE.Group {
@@ -87,7 +145,7 @@ export class MechEntity {
     const coreGeometry = new THREE.BoxGeometry(2, 3, 2)
     const coreMaterial = new THREE.MeshStandardMaterial({ color })
     const core = new THREE.Mesh(coreGeometry, coreMaterial)
-    core.position.y = 1.5
+    core.position.copy(MODEL_ATTACH_POINTS.core)
     group.add(core)
 
     // Head (1x1x1)
@@ -96,7 +154,7 @@ export class MechEntity {
       color: this.isPlayer ? 0x60a5fa : 0xfca5a5
     })
     const head = new THREE.Mesh(headGeometry, headMaterial)
-    head.position.y = 3.5
+    head.position.copy(MODEL_ATTACH_POINTS.head)
     group.add(head)
 
     // Left arm
@@ -105,12 +163,12 @@ export class MechEntity {
       color: this.isPlayer ? 0x2563eb : 0xdc2626
     })
     const leftArm = new THREE.Mesh(armGeometry, armMaterial)
-    leftArm.position.set(-1.4, 2, 0)
+    leftArm.position.copy(MODEL_ATTACH_POINTS.leftArm)
     group.add(leftArm)
 
     // Right arm
     const rightArm = new THREE.Mesh(armGeometry, armMaterial)
-    rightArm.position.set(1.4, 2, 0)
+    rightArm.position.copy(MODEL_ATTACH_POINTS.rightArm)
     group.add(rightArm)
 
     // Legs (combined as one box for simplicity)
@@ -119,7 +177,7 @@ export class MechEntity {
       color: this.isPlayer ? 0x1e40af : 0x991b1b
     })
     const legs = new THREE.Mesh(legsGeometry, legsMaterial)
-    legs.position.y = 0.75
+    legs.position.copy(MODEL_ATTACH_POINTS.legs)
     group.add(legs)
 
     // Set initial position
@@ -326,13 +384,6 @@ export class MechEntity {
   }
 
   cleanup() {
-    this.mesh.traverse((child) => {
-      if (child instanceof THREE.Mesh) {
-        child.geometry.dispose()
-        if (child.material instanceof THREE.Material) {
-          child.material.dispose()
-        }
-      }
-    })
+    this.disposeMeshGroup()
   }
 }

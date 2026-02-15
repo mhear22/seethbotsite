@@ -5,11 +5,14 @@
 
 import { ref, watch } from 'vue'
 
+export type AIDifficulty = 'tutorial' | 'easy' | 'medium' | 'hard' | 'boss'
+
 export interface GameSettings {
   mouseSensitivity: number
   movementSpeed: number
   invertMouseX: boolean
   invertMouseY: boolean
+  aiDifficulty: AIDifficulty
   keyBindings: {
     forward: string
     backward: string
@@ -25,6 +28,7 @@ const DEFAULT_SETTINGS: GameSettings = {
   movementSpeed: 10.0, // Multiplier for movement speed (10.0 = default, slower)
   invertMouseX: false,
   invertMouseY: false,
+  aiDifficulty: 'medium',
   keyBindings: {
     forward: 'KeyW',
     backward: 'KeyS',
@@ -48,6 +52,7 @@ function loadSettings(): GameSettings {
         movementSpeed: parsed.movementSpeed ?? DEFAULT_SETTINGS.movementSpeed,
         invertMouseX: parsed.invertMouseX ?? DEFAULT_SETTINGS.invertMouseX,
         invertMouseY: parsed.invertMouseY ?? DEFAULT_SETTINGS.invertMouseY,
+        aiDifficulty: parsed.aiDifficulty ?? DEFAULT_SETTINGS.aiDifficulty,
         keyBindings: parsed.keyBindings ?? DEFAULT_SETTINGS.keyBindings,
       }
     }

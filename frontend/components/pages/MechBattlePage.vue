@@ -114,7 +114,7 @@
 
           <h3 style="margin-top: 30px">Enemy: {{ enemyName }}</h3>
           <div class="enemy-info">
-            <p>Difficulty: <span class="difficulty-badge">Tutorial</span></p>
+            <p>Difficulty: <span class="difficulty-badge" :class="difficultyClass">{{ difficultyLabel }}</span></p>
             <p>Prepare for combat!</p>
           </div>
         </div>
@@ -290,11 +290,12 @@ import { useMechBattle } from '../../composables/useMechBattle'
 import { useKeyboardShortcuts } from '../../composables/useKeyboardShortcuts'
 import { useAuth } from '../../composables/useAuth'
 import BattleCanvas from '../mech/BattleCanvas.vue'
-import BattleHUD from '../mech/BattleHUD.vue'
+import BattleHUD from '../mech/hud/BattleHUD.vue'
 import GameSettingsModal from '../mech/GameSettingsModal.vue'
+import { useGameSettings, type AIDifficulty } from '../../composables/useGameSettings'
 import MatchmakingView from '../mech/MatchmakingView.vue'
 import MultiplayerBattleCanvas from '../mech/MultiplayerBattleCanvas.vue'
-import MultiplayerResultsScreen from '../mech/MultiplayerResultsScreen.vue'
+import MultiplayerResultsScreen from '../mech/hud/MultiplayerResultsScreen.vue'
 import { NetworkManager } from '../../lib/battle/NetworkManager'
 import { MechEntity } from '../../lib/battle/MechEntity'
 import type { MechLoadout, MatchFoundMessage, MatchEndMessage, WeaponConfig, AbilityConfig } from '@shared/types/NetworkMessages'
@@ -324,6 +325,7 @@ const builder = useMechBuilder()
 const battle = useMechBattle()
 const keyboardShortcuts = useKeyboardShortcuts()
 const auth = useAuth()
+const gameSettings = useGameSettings()
 
 const battlePhase = computed(() => battle.battleState.value.phase)
 const battleTime = ref(0)
@@ -384,6 +386,22 @@ const multiplayerAbilityName = computed(() => {
   if (!rack) return ''
   // Extract short name from full name
   return rack.name.replace(/System|Pack|Bay|Feed/gi, '').trim().toUpperCase()
+})
+
+// Difficulty display helpers
+const difficultyLabel = computed(() => {
+  const labels: Record<AIDifficulty, string> = {
+    'tutorial': 'Tutorial',
+    'easy': 'Easy',
+    'medium': 'Medium',
+    'hard': 'Hard',
+    'boss': 'Boss'
+  }
+  return labels[gameSettings.settings.value.aiDifficulty]
+})
+
+const difficultyClass = computed(() => {
+  return `difficulty-${gameSettings.settings.value.aiDifficulty}`
 })
 
 onMounted(() => {
@@ -502,8 +520,8 @@ function confirmMapSelection() {
     playerSpawn
   )
 
-  // Generate enemy mech at map spawn position
-  battle.generateEnemy('tutorial', enemySpawn)
+  // Generate enemy mech at map spawn position using selected difficulty
+  battle.generateEnemy(gameSettings.settings.value.aiDifficulty, enemySpawn)
 }
 
 function returnToModeSelect() {
@@ -969,6 +987,26 @@ function returnToBuilder() {
   border-radius: 12px;
   font-weight: bold;
   font-size: 0.9rem;
+}
+
+.difficulty-badge.difficulty-tutorial {
+  background: #6b7280;
+}
+
+.difficulty-badge.difficulty-easy {
+  background: #10b981;
+}
+
+.difficulty-badge.difficulty-medium {
+  background: #3b82f6;
+}
+
+.difficulty-badge.difficulty-hard {
+  background: #f59e0b;
+}
+
+.difficulty-badge.difficulty-boss {
+  background: #ef4444;
 }
 
 /* Buttons */

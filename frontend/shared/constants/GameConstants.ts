@@ -216,7 +216,7 @@ export const MATCHMAKING = {
   MATCH_COUNTDOWN: 3,
 
   /** Match time limit (ms) - null for no limit */
-  MATCH_TIME_LIMIT: null,
+  MATCH_TIME_LIMIT: null as number | null,
 
   /** Grace period for reconnection (ms) */
   RECONNECT_GRACE_PERIOD: 10000,

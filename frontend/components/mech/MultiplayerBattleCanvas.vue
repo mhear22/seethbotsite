@@ -17,7 +17,7 @@ import { ref, onMounted, onUnmounted, markRaw } from 'vue'
 import { MultiplayerBattleScene } from '../../lib/battle/MultiplayerBattleScene'
 import type { MechEntity } from '../../lib/battle/MechEntity'
 import { useGameSettings } from '../../composables/useGameSettings'
-import MultiplayerHUD from './MultiplayerHUD.vue'
+import MultiplayerHUD from './hud/MultiplayerHUD.vue'
 import type { MatchFoundMessage, MatchEndMessage } from '@shared/types/NetworkMessages'
 
 const props = defineProps<{

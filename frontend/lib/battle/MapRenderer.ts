@@ -14,6 +14,7 @@ import type {
   LightDef,
 } from '@shared/types/MapDefinition';
 import { getDynamicElementTransform, isHazardActive } from '@shared/types/MapDefinition';
+import { createRingWorldSky, updateRingWorldSky } from './RingWorldSky';
 
 interface DynamicMeshEntry {
   element: DynamicElement;
@@ -33,6 +34,7 @@ export class MapRenderer {
   private hazardVisuals: HazardVisualEntry[] = [];
   private windowMeshes: THREE.Mesh[] = [];
   private mapDef: MapDefinition | null = null;
+  private ringWorldSkyMaterial: THREE.ShaderMaterial | null = null;
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
@@ -73,6 +75,8 @@ export class MapRenderer {
     // Sky
     if (env.skyType === 'procedural_stars') {
       this.createProceduralStarSky();
+    } else if (env.skyType === 'ring_world') {
+      this.createRingWorldSky();
     } else if (env.skyType === 'solid_color' && env.skyColor) {
       this.scene.background = new THREE.Color(env.skyColor);
     }
@@ -178,6 +182,16 @@ export class MapRenderer {
       `,
     });
     const sky = new THREE.Mesh(skyGeometry, skyMaterial);
+    this.scene.add(sky);
+  }
+
+  /**
+   * Create the ring world sky (Halo-like O'Neill cylinder interior)
+   */
+  private createRingWorldSky(): void {
+    const sky = createRingWorldSky();
+    const material = sky.material as THREE.ShaderMaterial;
+    this.ringWorldSkyMaterial = material;
     this.scene.add(sky);
   }
 
@@ -428,6 +442,11 @@ export class MapRenderer {
       const transform = getDynamicElementTransform(element, elapsedTime);
       mesh.position.set(transform.position[0], transform.position[1], transform.position[2]);
       mesh.rotation.set(transform.rotation[0], transform.rotation[1], transform.rotation[2]);
+    }
+
+    // Update ring world sky rotation
+    if (this.ringWorldSkyMaterial) {
+      updateRingWorldSky(this.ringWorldSkyMaterial, elapsedTime);
     }
   }
 

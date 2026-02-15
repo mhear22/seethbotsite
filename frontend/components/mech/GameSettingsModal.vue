@@ -7,6 +7,18 @@
       </div>
 
       <div class="modal-body">
+        <!-- AI Difficulty -->
+        <div class="setting-group">
+          <label class="setting-label">AI Difficulty</label>
+          <select v-model="settings.aiDifficulty" class="difficulty-select">
+            <option value="tutorial">Tutorial - Learn the basics</option>
+            <option value="easy">Easy - For beginners</option>
+            <option value="medium">Medium - Balanced challenge</option>
+            <option value="hard">Hard - For experienced pilots</option>
+            <option value="boss">Boss - Ultimate challenge</option>
+          </select>
+        </div>
+
         <!-- Mouse Sensitivity -->
         <div class="setting-group">
           <label class="setting-label">
@@ -356,6 +368,39 @@ function captureKey(event: KeyboardEvent, action: 'forward' | 'backward' | 'left
   height: 20px;
   cursor: pointer;
   accent-color: #3b82f6;
+}
+
+.difficulty-select {
+  width: 100%;
+  padding: 12px 16px;
+  background: rgba(59, 130, 246, 0.1);
+  border: 2px solid rgba(59, 130, 246, 0.3);
+  border-radius: 8px;
+  color: #fff;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%239ca3af' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10l-5 5z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+}
+
+.difficulty-select:hover {
+  border-color: rgba(59, 130, 246, 0.5);
+  background-color: rgba(59, 130, 246, 0.15);
+}
+
+.difficulty-select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.3);
+}
+
+.difficulty-select option {
+  background: #1e293b;
+  color: #fff;
+  padding: 12px;
 }
 
 .keybind-grid {

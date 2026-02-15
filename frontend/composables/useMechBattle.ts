@@ -134,10 +134,35 @@ export function useMechBattle() {
 
     const config = enemyConfigs[difficulty]
 
-    // Create empty loadout for enemy (visuals only)
+    // Create a default weapon loadout for enemy AI
+    // This gives the enemy a basic weapon so they can actually fire
+    const enemyWeapon = {
+      id: 'enemy-autocannon',
+      name: 'Enemy Autocannon',
+      type: 'arm' as const,
+      weaponType: 'ballistic' as const,
+      icon: '🔫',
+      description: 'Standard enemy weapon',
+      stats: {
+        health: 0,
+        armor: 0,
+        speed: 0,
+        firepower: 0,
+        accuracy: 0,
+        energy: 0
+      },
+      weight: 0,
+      pros: [],
+      cons: [],
+      rarity: 'common' as const,
+      powerDraw: 5,
+      fireRate: 0.3,
+      projectileCount: 1
+    }
+
     const enemyLoadout: MechLoadout = {
-      leftArm: null,
-      rightArm: null,
+      leftArm: enemyWeapon,
+      rightArm: enemyWeapon,
       core: null,
       legs: null,
       head: null,
