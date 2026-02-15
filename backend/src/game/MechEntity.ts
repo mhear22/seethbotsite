@@ -107,15 +107,24 @@ export class MechEntity {
 
   /**
    * Check if position is within hitbox
+   * Uses a cylinder-shaped hitbox to better match the mech's tall, narrow shape
+   * - Cylinder check for horizontal distance (XZ plane)
+   * - Height check for vertical bounds (Y axis)
    */
   public isHit(position: [number, number, number], radius: number): boolean {
     const dx = position[0] - this.state.position[0];
     const dy = position[1] - this.state.position[1];
     const dz = position[2] - this.state.position[2];
 
-    const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    // Horizontal distance (XZ plane) - cylinder radius check
+    const horizontalDist = Math.sqrt(dx * dx + dz * dz);
     const hitboxRadius = Math.max(MECH.DIMENSIONS.WIDTH, MECH.DIMENSIONS.DEPTH) / 2;
 
-    return distance <= (hitboxRadius + radius);
+    // Vertical bounds check - mech is tall (from ground to ~5 units high)
+    const mechHalfHeight = MECH.DIMENSIONS.HEIGHT / 2;
+    const mechCenterY = this.state.position[1] + mechHalfHeight;
+    const withinHeight = Math.abs(dy) <= (mechHalfHeight + radius);
+
+    return horizontalDist <= (hitboxRadius + radius) && withinHeight;
   }
 }

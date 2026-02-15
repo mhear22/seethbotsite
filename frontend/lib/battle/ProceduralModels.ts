@@ -203,38 +203,94 @@ export function createAutocannon(): THREE.Group {
 export function createRailgun(): THREE.Group {
   const group = new THREE.Group()
 
-  // Main rail (long and slender)
-  const railGeom = new THREE.BoxGeometry(0.15, 0.15, 2.3)
-  const railMat = MATERIALS.voltTech.clone()
-  const rail1 = new THREE.Mesh(railGeom, railMat)
-  rail1.position.set(-0.15, 0, 1.15)
-  group.add(rail1)
+  // Shoulder mount joint
+  const mountGeom = new THREE.CylinderGeometry(0.28, 0.3, 0.35, 12)
+  const mount = new THREE.Mesh(mountGeom, MATERIALS.voltTech)
+  mount.rotation.z = Math.PI / 2
+  mount.position.set(0, 0, -0.2)
+  group.add(mount)
 
-  const rail2 = rail1.clone()
-  rail2.position.set(0.15, 0, 1.15)
-  group.add(rail2)
+  // Main capacitor housing
+  const housingGeom = new THREE.BoxGeometry(0.85, 0.7, 0.7)
+  const housing = new THREE.Mesh(housingGeom, MATERIALS.voltTech)
+  housing.position.set(0, 0, 0.15)
+  group.add(housing)
 
-  // Power coils along the rails
-  for (let i = 0; i < 8; i++) {
-    const coil = new THREE.Mesh(
-      new THREE.TorusGeometry(0.25, 0.03, 8, 12),
-      createEnergyMaterial(0x00aaff)
-    )
-    coil.position.set(0, 0, i * 0.25 + 0.3)
+  // Central power core (glowing)
+  const coreGeom = new THREE.SphereGeometry(0.2, 12, 12)
+  const core = new THREE.Mesh(coreGeom, createEnergyMaterial(0x00ffff))
+  core.position.set(0, 0, 0.15)
+  group.add(core)
+
+  // Top capacitor bank
+  const capGeom = new THREE.BoxGeometry(0.7, 0.2, 0.5)
+  const cap = new THREE.Mesh(capGeom, MATERIALS.voltTech)
+  cap.position.set(0, 0.45, 0.15)
+  group.add(cap)
+
+  // Main rails (dual parallel rails)
+  for (let side of [-1, 1]) {
+    const railGeom = new THREE.BoxGeometry(0.12, 0.12, 2.2)
+    const railMat = MATERIALS.voltTech.clone()
+    const rail = new THREE.Mesh(railGeom, railMat)
+    rail.position.set(side * 0.18, 0, 1.4)
+    group.add(rail)
+
+    // Rail detail strips
+    const stripGeom = new THREE.BoxGeometry(0.04, 0.14, 2.0)
+    const strip = new THREE.Mesh(stripGeom, new THREE.MeshStandardMaterial({
+      color: 0x888888,
+      metalness: 0.9,
+    }))
+    strip.position.set(side * 0.18, 0, 1.35)
+    group.add(strip)
+  }
+
+  // Power coils along rails
+  for (let i = 0; i < 7; i++) {
+    const coilGeom = new THREE.TorusGeometry(0.28, 0.035, 8, 12)
+    const coil = new THREE.Mesh(coilGeom, createEnergyMaterial(0x00aaff))
+    coil.position.set(0, 0, i * 0.32 + 0.4)
     group.add(coil)
   }
 
-  // Housing/capacitor bank
-  const housingGeom = new THREE.BoxGeometry(0.8, 0.6, 0.6)
-  const housing = new THREE.Mesh(housingGeom, MATERIALS.voltTech)
-  housing.position.set(0, 0, -0.3)
-  group.add(housing)
+  // Barrel frame (top and bottom)
+  for (let pos of [0.15, -0.15]) {
+    const frameGeom = new THREE.BoxGeometry(0.08, 0.08, 2.0)
+    const frame = new THREE.Mesh(frameGeom, MATERIALS.voltTech)
+    frame.position.set(0, pos, 1.35)
+    group.add(frame)
+  }
 
-  // Energy glow
-  const glowGeom = new THREE.SphereGeometry(0.15, 12, 12)
-  const glow = new THREE.Mesh(glowGeom, createEnergyMaterial(0x00ffff))
-  glow.position.set(0, 0, -0.3)
-  group.add(glow)
+  // Muzzle brake
+  const muzzleGeom = new THREE.BoxGeometry(0.5, 0.4, 0.15)
+  const muzzle = new THREE.Mesh(muzzleGeom, MATERIALS.voltTech)
+  muzzle.position.set(0, 0, 2.55)
+  group.add(muzzle)
+
+  // Side vents
+  for (let side of [-1, 1]) {
+    for (let i = 0; i < 3; i++) {
+      const ventGeom = new THREE.BoxGeometry(0.1, 0.15, 0.05)
+      const vent = new THREE.Mesh(ventGeom, new THREE.MeshStandardMaterial({
+        color: 0x222222,
+      }))
+      vent.position.set(side * 0.45, 0.2 - i * 0.15, 0.15)
+      group.add(vent)
+    }
+  }
+
+  // Energy conduit cables
+  for (let side of [-1, 1]) {
+    const cableGeom = new THREE.CylinderGeometry(0.03, 0.03, 0.6, 6)
+    const cable = new THREE.Mesh(cableGeom, new THREE.MeshStandardMaterial({
+      color: 0x333333,
+      metalness: 0.6,
+    }))
+    cable.position.set(side * 0.35, 0.3, -0.05)
+    cable.rotation.z = side * 0.4
+    group.add(cable)
+  }
 
   return group
 }

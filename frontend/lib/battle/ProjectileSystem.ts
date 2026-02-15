@@ -229,21 +229,25 @@ export class ProjectileSystem {
         // Skip if mech is already destroyed
         if (mech.isDestroyed) continue
 
-        // Box collision detection - more accurate for tall mechs
-        // Mech dimensions: 2 wide, 4 tall (core 3 + head 1), 2 deep
-        // Check as a box around the mech's center
+        // Cylinder collision detection - matches mech shape better
+        // Mech dimensions based on procedural models:
+        // - Width/Depth: ~2.5 units (body + arm reach)
+        // - Height: ~5 units (legs + torso + head)
         const mechCenter = mech.position.clone()
-        mechCenter.y += 2 // Center of mech vertically
+        mechCenter.y += 2.5 // Center of mech vertically
 
-        const dx = Math.abs(proj.position.x - mechCenter.x)
-        const dy = Math.abs(proj.position.y - mechCenter.y)
-        const dz = Math.abs(proj.position.z - mechCenter.z)
+        const dx = proj.position.x - mechCenter.x
+        const dy = proj.position.y - mechCenter.y
+        const dz = proj.position.z - mechCenter.z
 
-        // Hit box: 1.5 units radius in X/Z (generous), 2.5 units in Y (tall)
-        const hitRadiusXZ = 1.5
-        const hitRadiusY = 2.5
+        // Horizontal distance (XZ plane) - cylinder radius
+        const horizontalDist = Math.sqrt(dx * dx + dz * dz)
 
-        if (dx < hitRadiusXZ && dy < hitRadiusY && dz < hitRadiusXZ) {
+        // Hit box dimensions match procedural model bounds
+        const hitRadiusXZ = 1.25 // Cylinder radius (generous for arm reach)
+        const hitRadiusY = 2.5    // Half-height (total height ~5 units)
+
+        if (horizontalDist < hitRadiusXZ && Math.abs(dy) < hitRadiusY) {
           hits.push({ projectile: proj, target: mech })
         }
       }

@@ -131,11 +131,11 @@ export const MECH = {
   /** Turn speed (radians/s) */
   TURN_SPEED: Math.PI,
 
-  /** Mech bounding box dimensions */
+  /** Mech bounding box dimensions - matches procedural model geometry */
   DIMENSIONS: {
-    WIDTH: 4,
-    HEIGHT: 6,
-    DEPTH: 4,
+    WIDTH: 2.5,   // Body width + arm reach
+    HEIGHT: 5,    // Legs + torso + head total height
+    DEPTH: 2.5,   // Body depth
   },
 } as const;
 
