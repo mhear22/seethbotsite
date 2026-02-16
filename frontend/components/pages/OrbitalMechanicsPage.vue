@@ -123,7 +123,7 @@ function initScene() {
   orthoCamera = markRaw(new THREE.OrthographicCamera(
     -1, 1,
     1, -1,
-    0.1, 10
+    0.1, 1000
   ))
   orthoCamera.position.z = 1
 
