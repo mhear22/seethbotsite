@@ -6,6 +6,15 @@
 import { ref, watch } from 'vue'
 
 export type AIDifficulty = 'tutorial' | 'easy' | 'medium' | 'hard' | 'boss'
+export type ShadowQuality = 'off' | 'low' | 'medium' | 'high'
+export type RenderScale = 0.5 | 0.75 | 1.0
+
+export interface GraphicsSettings {
+  shadowQuality: ShadowQuality
+  antialias: boolean
+  renderScale: RenderScale
+  showFPS: boolean
+}
 
 export interface GameSettings {
   mouseSensitivity: number
@@ -13,6 +22,7 @@ export interface GameSettings {
   invertMouseX: boolean
   invertMouseY: boolean
   aiDifficulty: AIDifficulty
+  graphics: GraphicsSettings
   keyBindings: {
     forward: string
     backward: string
@@ -29,6 +39,12 @@ const DEFAULT_SETTINGS: GameSettings = {
   invertMouseX: false,
   invertMouseY: false,
   aiDifficulty: 'medium',
+  graphics: {
+    shadowQuality: 'medium',
+    antialias: true,
+    renderScale: 1.0,
+    showFPS: false,
+  },
   keyBindings: {
     forward: 'KeyW',
     backward: 'KeyS',
@@ -53,6 +69,12 @@ function loadSettings(): GameSettings {
         invertMouseX: parsed.invertMouseX ?? DEFAULT_SETTINGS.invertMouseX,
         invertMouseY: parsed.invertMouseY ?? DEFAULT_SETTINGS.invertMouseY,
         aiDifficulty: parsed.aiDifficulty ?? DEFAULT_SETTINGS.aiDifficulty,
+        graphics: {
+          shadowQuality: parsed.graphics?.shadowQuality ?? DEFAULT_SETTINGS.graphics.shadowQuality,
+          antialias: parsed.graphics?.antialias ?? DEFAULT_SETTINGS.graphics.antialias,
+          renderScale: parsed.graphics?.renderScale ?? DEFAULT_SETTINGS.graphics.renderScale,
+          showFPS: parsed.graphics?.showFPS ?? DEFAULT_SETTINGS.graphics.showFPS,
+        },
         keyBindings: parsed.keyBindings ?? DEFAULT_SETTINGS.keyBindings,
       }
     }

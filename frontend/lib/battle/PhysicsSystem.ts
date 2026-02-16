@@ -13,14 +13,15 @@ export class PhysicsSystem {
     this.arenaHalfD = depth / 2
   }
 
-  updateMovement(mech: MechEntity, input: InputState, deltaTime: number) {
+  updateMovement(mech: MechEntity, input: InputState, deltaTime: number): boolean {
     // Get leg type for special handling
     const legType = mech.loadout.legs?.mobilityType || 'bipedal'
 
     // Calculate base speed with weight penalty
     const speedStat = Math.max(10, mech.stats.speed) / 100
     const weightFactor = mech.weightPenalty // 0.5 to 1.0
-    const targetSpeed = 8 * this.speedMultiplier * speedStat * weightFactor
+    const baseSpeed = 8 * this.speedMultiplier * speedStat * weightFactor
+    const targetSpeed = input.useAbility ? baseSpeed * 3 : baseSpeed
 
     // Acceleration rate (units/s²) - how fast we reach target speed
     const accelRate = 60 * weightFactor
@@ -74,8 +75,19 @@ export class PhysicsSystem {
     if (input.left) moveDir.add(right)
     if (input.right) moveDir.sub(right)
 
+    let counterBoostImpact = false
+
     if (moveDir.lengthSq() > 0) {
       moveDir.normalize()
+
+      // Detect counter-boost: boosting in opposite direction to current velocity
+      if (input.useAbility) {
+        const currentHorizVel = new THREE.Vector3(mech.velocity.x, 0, mech.velocity.z)
+        if (currentHorizVel.length() > 2 && moveDir.dot(currentHorizVel.normalize()) < -0.5) {
+          counterBoostImpact = true
+        }
+      }
+
       // Accelerate toward target velocity (frame-rate independent)
       const targetVel = moveDir.multiplyScalar(targetSpeed)
       const diffX = targetVel.x - mech.velocity.x
@@ -96,21 +108,29 @@ export class PhysicsSystem {
     // Clamp to arena bounds
     mech.position.x = Math.max(-this.arenaHalfW, Math.min(this.arenaHalfW, mech.position.x))
     mech.position.z = Math.max(-this.arenaHalfD, Math.min(this.arenaHalfD, mech.position.z))
+
+    return counterBoostImpact
   }
 
-  updateDash(mech: MechEntity, input: InputState, deltaTime: number) {
+  // Returns true if a new dash was just initiated this frame
+  updateDash(mech: MechEntity, input: InputState, deltaTime: number): boolean {
     // Tick cooldown
     if (mech.dashCooldown > 0) {
       mech.dashCooldown -= deltaTime
     }
 
-    // Currently dashing — count down timer
+    // Currently dashing — count down timer and apply dash velocity to position
     if (mech.isDashing) {
       mech.dashTimer -= deltaTime
       if (mech.dashTimer <= 0) {
         mech.isDashing = false
+      } else {
+        // Apply velocity and clamp bounds during active dash
+        mech.position.add(mech.velocity.clone().multiplyScalar(deltaTime))
+        mech.position.x = Math.max(-this.arenaHalfW, Math.min(this.arenaHalfW, mech.position.x))
+        mech.position.z = Math.max(-this.arenaHalfD, Math.min(this.arenaHalfD, mech.position.z))
       }
-      return // Skip normal movement during dash
+      return false
     }
 
     // Initiate dash
@@ -138,7 +158,10 @@ export class PhysicsSystem {
       mech.isDashing = true
       mech.dashTimer = mech.DASH_DURATION
       mech.dashCooldown = dashCooldown
+      return true // Signal that dash just started
     }
+
+    return false
   }
 
   updateJumpJets(mech: MechEntity, input: InputState, deltaTime: number) {

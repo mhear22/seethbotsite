@@ -350,9 +350,16 @@ export class MultiplayerBattleScene extends BattleScene {
     const input = this.inputManager.getInputState();
 
     // Update player mech physics (local prediction)
-    this.physicsSystem.updateDash(this.playerMech, input, deltaTime);
+    const dashStarted = this.physicsSystem.updateDash(this.playerMech, input, deltaTime);
+    if (dashStarted) {
+      this.camera.triggerShake(0.25);
+      this.particleSystem.spawnExplosion(this.playerMech.position.clone());
+    }
     if (!this.playerMech.isDashing) {
-      this.physicsSystem.updateMovement(this.playerMech, input, deltaTime);
+      const counterBoost = this.physicsSystem.updateMovement(this.playerMech, input, deltaTime);
+      if (counterBoost) {
+        this.camera.triggerShake(0.5);
+      }
     }
     this.physicsSystem.updateJumpJets(this.playerMech, input, deltaTime);
     // Skip building collisions for player in multiplayer - server is authoritative

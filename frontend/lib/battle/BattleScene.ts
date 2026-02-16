@@ -12,6 +12,7 @@ import { markRaw } from 'vue'
 import { useAudio } from '../../composables/useAudio'
 import { getMapById } from '@shared/maps'
 import type { MapDefinition } from '@shared/types/MapDefinition'
+import type { GraphicsSettings } from '../../composables/useGameSettings'
 
 export interface BattleSceneConfig {
   canvas: HTMLCanvasElement
@@ -24,6 +25,7 @@ export interface BattleSceneConfig {
   invertMouseX?: boolean
   invertMouseY?: boolean
   mapId?: string
+  graphics?: GraphicsSettings
   keyBindings?: {
     forward: string
     backward: string
@@ -80,6 +82,13 @@ export class BattleScene {
   private lastTime: number = 0
   private battleTime: number = 0
   private handleResizeBound: () => void
+
+  // FPS tracking
+  private fpsFrameTimes: number[] = []
+  private currentFPS: number = 0
+
+  // Graphics config
+  protected _shadowMapSize: number = 1024
   protected onBattleEnd: (result: 'victory' | 'defeat') => void
   private onDamageDealt: (amount: number) => void
 
@@ -102,13 +111,23 @@ export class BattleScene {
     this.scene = markRaw(new THREE.Scene())
 
     // Initialize renderer
+    const gfx = config.graphics
     this.renderer = markRaw(new THREE.WebGLRenderer({
       canvas: config.canvas,
-      antialias: true
+      antialias: gfx?.antialias ?? true
     }))
     this.renderer.setSize(window.innerWidth, window.innerHeight)
-    this.renderer.setPixelRatio(window.devicePixelRatio)
-    this.renderer.shadowMap.enabled = true
+    this.renderer.setPixelRatio(window.devicePixelRatio * (gfx?.renderScale ?? 1.0))
+
+    // Apply shadow quality
+    const shadowQuality = gfx?.shadowQuality ?? 'medium'
+    if (shadowQuality === 'off') {
+      this.renderer.shadowMap.enabled = false
+    } else {
+      this.renderer.shadowMap.enabled = true
+      const shadowMapSizes: Record<string, number> = { low: 512, medium: 1024, high: 2048 }
+      this._shadowMapSize = shadowMapSizes[shadowQuality] ?? 1024
+    }
 
     // Initialize systems
     this.inputManager = new InputManager(config.canvas, config.keyBindings)
@@ -244,8 +263,8 @@ export class BattleScene {
     directionalLight.shadow.camera.right = 200
     directionalLight.shadow.camera.top = 200
     directionalLight.shadow.camera.bottom = -200
-    directionalLight.shadow.mapSize.width = 2048
-    directionalLight.shadow.mapSize.height = 2048
+    directionalLight.shadow.mapSize.width = this._shadowMapSize
+    directionalLight.shadow.mapSize.height = this._shadowMapSize
     this.scene.add(directionalLight)
 
     // Hemisphere light for better ambient
@@ -392,6 +411,16 @@ export class BattleScene {
     this.lastTime = currentTime
     this.battleTime += deltaTime
 
+    // Track FPS using a rolling 60-frame window
+    this.fpsFrameTimes.push(currentTime)
+    if (this.fpsFrameTimes.length > 60) {
+      this.fpsFrameTimes.shift()
+    }
+    if (this.fpsFrameTimes.length >= 2) {
+      const elapsed = (currentTime - this.fpsFrameTimes[0]) / 1000
+      this.currentFPS = Math.round((this.fpsFrameTimes.length - 1) / elapsed)
+    }
+
     this.update(deltaTime)
     this.render()
   }
@@ -430,9 +459,16 @@ export class BattleScene {
     const input = this.inputManager.getInputState()
 
     // Update player mech
-    this.physicsSystem.updateDash(this.playerMech, input, deltaTime)
+    const dashStarted = this.physicsSystem.updateDash(this.playerMech, input, deltaTime)
+    if (dashStarted) {
+      this.camera.triggerShake(0.25)
+      this.particleSystem.spawnExplosion(this.playerMech.position.clone())
+    }
     if (!this.playerMech.isDashing) {
-      this.physicsSystem.updateMovement(this.playerMech, input, deltaTime)
+      const counterBoost = this.physicsSystem.updateMovement(this.playerMech, input, deltaTime)
+      if (counterBoost) {
+        this.camera.triggerShake(0.5)
+      }
     }
     this.physicsSystem.updateJumpJets(this.playerMech, input, deltaTime)
     this.checkMechBuildingCollisions(this.playerMech)
@@ -452,7 +488,7 @@ export class BattleScene {
     // Dual weapon firing with separate cooldowns
     // When locked, compute per-arm aim from each arm's spawn position to target center
     const targetPoint = this.targetingState.isTargeted
-      ? this.enemyMech.position.clone().setY(this.enemyMech.position.y + 2)
+      ? this.enemyMech.getCorePosition()
       : null
 
     const getAimDirection = (arm: 'left' | 'right'): THREE.Vector3 => {
@@ -625,6 +661,10 @@ export class BattleScene {
 
   getBattleTime(): number {
     return this.battleTime
+  }
+
+  getFPS(): number {
+    return this.currentFPS
   }
 
   getPlayerPosition(): THREE.Vector3 {

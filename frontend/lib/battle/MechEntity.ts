@@ -308,6 +308,17 @@ export class MechEntity {
     return null
   }
 
+  /** Returns the world-space position of the mech's core, falling back to MODEL_ATTACH_POINTS. */
+  getCorePosition(): THREE.Vector3 {
+    const coreMesh = this.findChildByName(this.mesh, 'core')
+    if (coreMesh) {
+      const worldPos = new THREE.Vector3()
+      coreMesh.getWorldPosition(worldPos)
+      return worldPos
+    }
+    return this.position.clone().setY(this.position.y + MODEL_ATTACH_POINTS.core.y)
+  }
+
   takeDamage(damage: number): boolean {
     // Apply armor reduction (armor is %)
     const armorReduction = Math.min(0.9, this.stats.armor / 100) // Cap at 90%

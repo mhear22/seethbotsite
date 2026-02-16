@@ -1,9 +1,12 @@
 <template>
-  <canvas ref="canvasRef" class="battle-canvas"></canvas>
+  <div class="battle-canvas-wrapper">
+    <canvas ref="canvasRef" class="battle-canvas"></canvas>
+    <div v-if="showFPS" class="fps-counter">{{ fps }} FPS</div>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, markRaw } from 'vue'
+import { ref, computed, onMounted, onUnmounted, markRaw } from 'vue'
 import { BattleScene } from '../../lib/battle/BattleScene'
 import type { MechEntity } from '../../lib/battle/MechEntity'
 import { useGameSettings } from '../../composables/useGameSettings'
@@ -40,6 +43,8 @@ const emit = defineEmits<{
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 let battleScene: BattleScene | null = null
 const gameSettings = useGameSettings()
+const fps = ref(0)
+const showFPS = computed(() => gameSettings.settings.value.graphics.showFPS)
 
 onMounted(() => {
   if (!canvasRef.value) return
@@ -60,6 +65,7 @@ onMounted(() => {
     invertMouseX: gameSettings.settings.value.invertMouseX,
     invertMouseY: gameSettings.settings.value.invertMouseY,
     keyBindings: gameSettings.settings.value.keyBindings,
+    graphics: gameSettings.settings.value.graphics,
   }))
 
   battleScene.start()
@@ -67,6 +73,7 @@ onMounted(() => {
   // Emit time + HUD updates periodically
   const timeInterval = setInterval(() => {
     if (battleScene) {
+      fps.value = battleScene.getFPS()
       emit('time-update', battleScene.getBattleTime())
 
       // Compute radar-relative enemy position rotated by player yaw
@@ -130,10 +137,30 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.battle-canvas-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
 .battle-canvas {
   display: block;
   width: 100%;
   height: 100%;
   cursor: crosshair;
+}
+
+.fps-counter {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  font-family: monospace;
+  font-size: 14px;
+  font-weight: bold;
+  color: #00ff88;
+  text-shadow: 0 0 6px rgba(0, 255, 136, 0.6);
+  pointer-events: none;
+  user-select: none;
+  z-index: 10;
 }
 </style>

@@ -6,7 +6,21 @@
         <button @click="close" class="close-btn">&times;</button>
       </div>
 
+      <div class="modal-tabs">
+        <button
+          :class="['tab-btn', { active: activeTab === 'controls' }]"
+          @click="activeTab = 'controls'"
+        >Controls</button>
+        <button
+          :class="['tab-btn', { active: activeTab === 'graphics' }]"
+          @click="activeTab = 'graphics'"
+        >Graphics</button>
+      </div>
+
       <div class="modal-body">
+        <!-- ===== CONTROLS TAB ===== -->
+        <template v-if="activeTab === 'controls'">
+
         <!-- AI Difficulty -->
         <div class="setting-group">
           <label class="setting-label">AI Difficulty</label>
@@ -151,6 +165,63 @@
         <div class="settings-info">
           <p>Adjust controls to your preference. Settings are saved automatically.</p>
         </div>
+
+        </template>
+
+        <!-- ===== GRAPHICS TAB ===== -->
+        <template v-if="activeTab === 'graphics'">
+
+        <!-- FPS Counter -->
+        <div class="setting-group">
+          <label class="setting-label">Performance</label>
+          <div class="checkbox-group">
+            <label class="checkbox-label">
+              <input type="checkbox" v-model="settings.graphics.showFPS" />
+              <span>Show FPS Counter</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Shadow Quality -->
+        <div class="setting-group">
+          <label class="setting-label">Shadow Quality</label>
+          <select v-model="settings.graphics.shadowQuality" class="difficulty-select">
+            <option value="off">Off - Best performance</option>
+            <option value="low">Low - 512px shadow map</option>
+            <option value="medium">Medium - 1024px shadow map</option>
+            <option value="high">High - 2048px shadow map</option>
+          </select>
+        </div>
+
+        <!-- Render Scale -->
+        <div class="setting-group">
+          <label class="setting-label">
+            Render Scale
+            <span class="setting-value">{{ Math.round(settings.graphics.renderScale * 100) }}%</span>
+          </label>
+          <select v-model.number="settings.graphics.renderScale" class="difficulty-select">
+            <option :value="0.5">50% - Best performance</option>
+            <option :value="0.75">75% - Balanced</option>
+            <option :value="1.0">100% - Native resolution</option>
+          </select>
+        </div>
+
+        <!-- Antialiasing -->
+        <div class="setting-group">
+          <label class="setting-label">Antialiasing</label>
+          <div class="checkbox-group">
+            <label class="checkbox-label">
+              <input type="checkbox" v-model="settings.graphics.antialias" />
+              <span>Enable Antialiasing (requires restart)</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="settings-info">
+          <p>Graphics settings apply when starting a new battle. Shadow quality and render scale affect performance significantly.</p>
+        </div>
+
+        </template>
       </div>
 
       <div class="modal-footer">
@@ -162,6 +233,7 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useGameSettings } from '../../composables/useGameSettings'
 
 const props = defineProps<{
@@ -174,6 +246,7 @@ const emit = defineEmits<{
 
 const gameSettings = useGameSettings()
 const { settings, resetToDefaults } = gameSettings
+const activeTab = ref<'controls' | 'graphics'>('controls')
 
 function close() {
   emit('close')
@@ -272,6 +345,34 @@ function captureKey(event: KeyboardEvent, action: 'forward' | 'backward' | 'left
 
 .close-btn:hover {
   color: #fff;
+}
+
+.modal-tabs {
+  display: flex;
+  border-bottom: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 12px 20px;
+  background: none;
+  border: none;
+  color: #9ca3af;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+
+.tab-btn:hover {
+  color: #e5e7eb;
+}
+
+.tab-btn.active {
+  color: #3b82f6;
+  border-bottom-color: #3b82f6;
 }
 
 .modal-body {

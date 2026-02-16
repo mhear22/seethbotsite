@@ -228,8 +228,7 @@ export class ProjectileSystem {
         if (proj.homingDelay <= 0 && mechs) {
           const target = mechs.find(m => m.id === proj.targetId && !m.isDestroyed)
           if (target) {
-            const targetPos = target.position.clone()
-            targetPos.y += 2.5 // aim at mech center
+            const targetPos = target.getCorePosition()
             const toTarget = targetPos.sub(proj.position).normalize()
             const speed = proj.velocity.length()
             // Smoothly steer toward target (turn rate: ~180 deg/s)
