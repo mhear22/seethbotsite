@@ -52,10 +52,7 @@ export class ProjectileSystem {
       baseDamage *= 2.5 // Melee deals 2.5x damage
 
       // Very short range spawn position
-      const spawnPosition = mech.position.clone().add(
-        mech.getForwardDirection().multiplyScalar(2)
-      )
-      spawnPosition.y += 2
+      const spawnPosition = mech.getArmPosition(arm)
 
       // Create melee projectile (short-lived, slow)
       const geometry = new THREE.BoxGeometry(1, 1, 1)
@@ -116,12 +113,7 @@ export class ProjectileSystem {
         direction.applyAxisAngle(new THREE.Vector3(0, 1, 0), spreadAngle)
       }
 
-      // Adjust spawn position based on arm (-1.4 for left, +1.4 for right)
-      const armOffset = arm === 'left' ? -1.4 : 1.4
-      const spawnPosition = mech.position.clone()
-        .add(mech.getForwardDirection().multiplyScalar(2))
-        .add(mech.getRightDirection().multiplyScalar(armOffset))
-      spawnPosition.y += 2
+      const spawnPosition = mech.getArmPosition(arm)
 
       // Create projectile mesh
       const geometry = this.getProjectileGeometry(weaponType)

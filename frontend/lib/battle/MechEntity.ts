@@ -308,6 +308,22 @@ export class MechEntity {
     return null
   }
 
+  /** Returns the world-space position of the mech's arm weapon spawn, falling back to MODEL_ATTACH_POINTS. */
+  getArmPosition(arm: 'left' | 'right'): THREE.Vector3 {
+    const childName = arm === 'left' ? 'leftArm' : 'rightArm'
+    const attachPoint = arm === 'left' ? MODEL_ATTACH_POINTS.leftArm : MODEL_ATTACH_POINTS.rightArm
+    const armMesh = this.findChildByName(this.mesh, childName)
+    if (armMesh) {
+      const worldPos = new THREE.Vector3()
+      armMesh.getWorldPosition(worldPos)
+      return worldPos
+    }
+    return this.position.clone()
+      .add(this.getForwardDirection().multiplyScalar(2))
+      .add(this.getRightDirection().multiplyScalar(arm === 'left' ? -1.4 : 1.4))
+      .setY(this.position.y + attachPoint.y)
+  }
+
   /** Returns the world-space position of the mech's core, falling back to MODEL_ATTACH_POINTS. */
   getCorePosition(): THREE.Vector3 {
     const coreMesh = this.findChildByName(this.mesh, 'core')

@@ -8,6 +8,10 @@ import { ParticleSystem } from './ParticleSystem'
 import { EnemyAI } from './EnemyAI'
 import { MapRenderer } from './MapRenderer'
 import { applyWindowShaders, updateWindowShaders } from './WindowShader'
+import { createDamageShaderPass, decayDamageIntensity } from './DamageShader'
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
+import type { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js'
 import { markRaw } from 'vue'
 import { useAudio } from '../../composables/useAudio'
 import { getMapById } from '@shared/maps'
@@ -69,6 +73,11 @@ export class BattleScene {
   protected mapRenderer: MapRenderer | null = null
   protected mapDef: MapDefinition | null = null
   private windowShaderMaterials: THREE.ShaderMaterial[] = []
+
+  // Post-processing
+  private composer: EffectComposer | null = null
+  private damagePass: ShaderPass | null = null
+  private damageIntensity: number = 0
 
   protected targetingState: TargetingState = {
     isTargeted: false,
@@ -174,6 +183,13 @@ export class BattleScene {
     } else {
       this.setupDefaultArena()
     }
+    // Post-processing composer (used when map has no lensing)
+    this.composer = markRaw(new EffectComposer(this.renderer))
+    this.composer.addPass(new RenderPass(this.scene, this.camera.camera))
+    this.damagePass = markRaw(createDamageShaderPass())
+    this.damagePass.renderToScreen = true
+    this.composer.addPass(this.damagePass)
+
     this.addMechsToScene()
 
     // Handle window resize
@@ -396,6 +412,7 @@ export class BattleScene {
   private handleResize() {
     this.camera.handleResize(window.innerWidth, window.innerHeight)
     this.renderer.setSize(window.innerWidth, window.innerHeight)
+    this.composer?.setSize(window.innerWidth, window.innerHeight)
   }
 
   start() {
@@ -433,6 +450,13 @@ export class BattleScene {
     }
     if (this.windowShaderMaterials.length > 0) {
       updateWindowShaders(this.windowShaderMaterials, this.battleTime)
+    }
+
+    // Decay damage shader intensity
+    if (this.damagePass && this.damageIntensity > 0) {
+      this.damageIntensity = decayDamageIntensity(this.damageIntensity, deltaTime)
+      this.damagePass.uniforms.intensity.value = this.damageIntensity
+      this.damagePass.uniforms.time.value = this.battleTime
     }
 
     // Update particles every frame (even during battle ending)
@@ -495,12 +519,7 @@ export class BattleScene {
       if (!targetPoint) {
         return this.playerMech.getForwardDirection()
       }
-      // Calculate from actual arm spawn position (mirrors ProjectileSystem offset)
-      const armOffset = arm === 'left' ? -1.4 : 1.4
-      const armSpawn = this.playerMech.position.clone()
-        .add(this.playerMech.getForwardDirection().multiplyScalar(2))
-        .add(this.playerMech.getRightDirection().multiplyScalar(armOffset))
-      armSpawn.y += 2
+      const armSpawn = this.playerMech.getArmPosition(arm)
       const dir = targetPoint.clone().sub(armSpawn).normalize()
       // Slight spread
       const spread = 0.02
@@ -554,10 +573,8 @@ export class BattleScene {
     this.enemyMech.updatePower(deltaTime)
 
     if (shouldEnemyFire) {
-      const enemyTarget = this.playerMech.position.clone()
-      enemyTarget.y += 2 // Aim at mech center
-      const enemyAimDirection = enemyTarget
-        .sub(this.enemyMech.position)
+      const enemyAimDirection = this.playerMech.getCorePosition()
+        .sub(this.enemyMech.getArmPosition('right'))
         .normalize()
       // Enemy fires from right arm by default
       this.projectileSystem.fireWeapon(this.enemyMech, enemyAimDirection, 'right', this.playerMech)
@@ -596,9 +613,10 @@ export class BattleScene {
         this.onDamageDealt(hit.projectile.damage)
       }
 
-      // Screen shake when player takes damage
+      // Screen shake + pixel sort shader when player takes damage
       if (hit.target === this.playerMech) {
         this.camera.triggerShake(0.4)
+        this.triggerDamageEffect(1.0)
       }
 
       this.projectileSystem.removeProjectile(hit.projectile)
@@ -624,7 +642,10 @@ export class BattleScene {
 
   private render() {
     if (this.mapRenderer?.hasLensing()) {
+      // Lensing maps handle their own render pipeline; damage shader not applied here
       this.mapRenderer.renderWithLensing(this.renderer, this.scene, this.camera.camera)
+    } else if (this.composer) {
+      this.composer.render()
     } else {
       this.renderer.render(this.scene, this.camera.camera)
     }
@@ -634,6 +655,13 @@ export class BattleScene {
     if (this.animationId !== null) {
       cancelAnimationFrame(this.animationId)
       this.animationId = null
+    }
+  }
+
+  triggerDamageEffect(intensity: number = 1.0) {
+    this.damageIntensity = Math.min(1.0, this.damageIntensity + intensity)
+    if (this.damagePass) {
+      this.damagePass.uniforms.intensity.value = this.damageIntensity
     }
   }
 
@@ -656,6 +684,7 @@ export class BattleScene {
       }
     })
 
+    this.composer?.dispose()
     this.renderer.dispose()
   }
 
