@@ -98,6 +98,53 @@ export const ruinedHighway: MapDefinition = {
     // Mid-field cover
     { id: 'pb5', type: 'box', position: [50, 3, -60], size: [7, 6, 7], collision: true, castShadow: true, material: BUILDING_MAT },
     { id: 'pb6', type: 'box', position: [-60, 3, 50], size: [7, 6, 7], collision: true, castShadow: true, material: BUILDING_MAT },
+
+    // === STREETLIGHT FIXTURES along the highway ===
+    // Poles embedded in highway (tall thin cylinder) with emissive lamp head (disc)
+    // SW stretch
+    { id: 'sl_pole1', type: 'cylinder', position: [-88, 38, -88], radiusTop: 0.4, radiusBottom: 0.5, height: 14,
+      collision: false, castShadow: false, material: { color: '#6b7280', roughness: 0.6, metalness: 0.5 } },
+    { id: 'sl_head1', type: 'cylinder', position: [-88, 45.5, -88], radiusTop: 2.0, radiusBottom: 2.0, height: 0.8, segments: 12,
+      collision: false, castShadow: false,
+      material: { color: '#ffe566', roughness: 0.1, metalness: 0.4, emissive: '#ffbb00', emissiveIntensity: 4.0 } },
+    { id: 'sl_pole2', type: 'cylinder', position: [-44, 38, -44], radiusTop: 0.4, radiusBottom: 0.5, height: 14,
+      collision: false, castShadow: false, material: { color: '#6b7280', roughness: 0.6, metalness: 0.5 } },
+    { id: 'sl_head2', type: 'cylinder', position: [-44, 45.5, -44], radiusTop: 2.0, radiusBottom: 2.0, height: 0.8, segments: 12,
+      collision: false, castShadow: false,
+      material: { color: '#ffe566', roughness: 0.1, metalness: 0.4, emissive: '#ffbb00', emissiveIntensity: 4.0 } },
+    // NE stretch
+    { id: 'sl_pole3', type: 'cylinder', position: [56, 38, 56], radiusTop: 0.4, radiusBottom: 0.5, height: 14,
+      collision: false, castShadow: false, material: { color: '#6b7280', roughness: 0.6, metalness: 0.5 } },
+    { id: 'sl_head3', type: 'cylinder', position: [56, 45.5, 56], radiusTop: 2.0, radiusBottom: 2.0, height: 0.8, segments: 12,
+      collision: false, castShadow: false,
+      material: { color: '#ffe566', roughness: 0.1, metalness: 0.4, emissive: '#ffbb00', emissiveIntensity: 4.0 } },
+    { id: 'sl_pole4', type: 'cylinder', position: [100, 38, 100], radiusTop: 0.4, radiusBottom: 0.5, height: 14,
+      collision: false, castShadow: false, material: { color: '#6b7280', roughness: 0.6, metalness: 0.5 } },
+    { id: 'sl_head4', type: 'cylinder', position: [100, 45.5, 100], radiusTop: 2.0, radiusBottom: 2.0, height: 0.8, segments: 12,
+      collision: false, castShadow: false,
+      material: { color: '#ffe566', roughness: 0.1, metalness: 0.4, emissive: '#ffbb00', emissiveIntensity: 4.0 } },
+
+    // === NEON SIGNS on perimeter buildings ===
+    // SE building neon strip (electric blue horizontal bar)
+    { id: 'neon_se', type: 'box', position: [100, 12, -90], size: [8, 0.8, 0.3],
+      collision: false, castShadow: false,
+      material: { color: '#00ccff', roughness: 0.1, metalness: 0.3, emissive: '#00aaff', emissiveIntensity: 5.0 } },
+    // NW building neon strip (magenta)
+    { id: 'neon_nw1', type: 'box', position: [-110, 10, 80], size: [10, 0.8, 0.3],
+      collision: false, castShadow: false,
+      material: { color: '#ff44cc', roughness: 0.1, metalness: 0.3, emissive: '#ff00aa', emissiveIntensity: 5.0 } },
+    { id: 'neon_nw2', type: 'box', position: [-110, 8, 80], size: [6, 0.6, 0.3],
+      collision: false, castShadow: false,
+      material: { color: '#ff44cc', roughness: 0.1, metalness: 0.3, emissive: '#ff00aa', emissiveIntensity: 3.0 } },
+
+    // === UNDER-HIGHWAY RED DANGER LIGHTS (at collapse zone) ===
+    // Warning lights under the broken gap section
+    { id: 'danger_light1', type: 'cylinder', position: [-8, 22, 0], radiusTop: 1.0, radiusBottom: 1.0, height: 0.5, segments: 12,
+      collision: false, castShadow: false,
+      material: { color: '#ff2200', roughness: 0.1, metalness: 0.5, emissive: '#ff1100', emissiveIntensity: 6.0 } },
+    { id: 'danger_light2', type: 'cylinder', position: [5, 22, -8], radiusTop: 1.0, radiusBottom: 1.0, height: 0.5, segments: 12,
+      collision: false, castShadow: false,
+      material: { color: '#ff2200', roughness: 0.1, metalness: 0.5, emissive: '#ff1100', emissiveIntensity: 6.0 } },
   ],
   dynamicElements: [],
   hazardZones: [],
@@ -108,6 +155,16 @@ export const ruinedHighway: MapDefinition = {
     lights: [
       { type: 'directional', color: '#ffe4b5', intensity: 0.6, position: [80, 60, 40], castShadow: true },
       { type: 'hemisphere', color: '#4a5568', intensity: 0.3, groundColor: '#1a1a2e' },
+      // Streetlight point lights along highway (amber)
+      { type: 'point', color: '#ffbb00', intensity: 3.0, position: [-88, 44, -88], distance: 70, decay: 2 },
+      { type: 'point', color: '#ffbb00', intensity: 3.0, position: [-44, 44, -44], distance: 70, decay: 2 },
+      { type: 'point', color: '#ffbb00', intensity: 3.0, position: [56, 44, 56], distance: 70, decay: 2 },
+      { type: 'point', color: '#ffbb00', intensity: 3.0, position: [100, 44, 100], distance: 70, decay: 2 },
+      // Neon sign glows (blue SE, magenta NW)
+      { type: 'point', color: '#00aaff', intensity: 1.5, position: [100, 12, -90], distance: 40, decay: 2 },
+      { type: 'point', color: '#ff00aa', intensity: 1.5, position: [-110, 10, 80], distance: 40, decay: 2 },
+      // Collapse zone danger lights (red)
+      { type: 'point', color: '#ff1100', intensity: 2.0, position: [-2, 22, -4], distance: 35, decay: 2 },
     ],
     floorMaterial: { color: '#1f2937', roughness: 0.9, metalness: 0.05, edgeColor: '#374151' },
     fog: { color: '#1a1a2e', near: 100, far: 350 },

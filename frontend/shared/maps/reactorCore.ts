@@ -82,6 +82,43 @@ export const reactorCore: MapDefinition = {
 
     // Outer scattered cover
     ...generateOuterRing(),
+
+    // === REACTOR GLOW RINGS (emissive torus-like stacked discs around reactor base) ===
+    { id: 'rglow1', type: 'cylinder', position: [0, 5, 0], radiusTop: 22, radiusBottom: 22, height: 0.4, segments: 48,
+      collision: false, castShadow: false,
+      material: { color: '#10b981', roughness: 0.1, metalness: 0.3, emissive: '#10b981', emissiveIntensity: 2.5, transparent: true, opacity: 0.9 } },
+    { id: 'rglow2', type: 'cylinder', position: [0, 12, 0], radiusTop: 19, radiusBottom: 19, height: 0.4, segments: 48,
+      collision: false, castShadow: false,
+      material: { color: '#34d399', roughness: 0.1, metalness: 0.3, emissive: '#34d399', emissiveIntensity: 2.0, transparent: true, opacity: 0.8 } },
+    { id: 'rglow3', type: 'cylinder', position: [0, 22, 0], radiusTop: 16.5, radiusBottom: 16.5, height: 0.4, segments: 48,
+      collision: false, castShadow: false,
+      material: { color: '#6ee7b7', roughness: 0.1, metalness: 0.3, emissive: '#6ee7b7', emissiveIntensity: 1.5, transparent: true, opacity: 0.7 } },
+
+    // === OUTER LIGHT TOWERS (4 cardinal points) - tall poles with emissive head ===
+    // North tower
+    { id: 'lt_n_pole', type: 'cylinder', position: [0, 35, -100], radiusTop: 1, radiusBottom: 1.5, height: 70,
+      collision: true, material: { color: '#374151', roughness: 0.6, metalness: 0.5 } },
+    { id: 'lt_n_head', type: 'box', position: [0, 71, -100], size: [6, 2, 6],
+      collision: false, castShadow: false,
+      material: { color: '#4ade80', roughness: 0.1, metalness: 0.5, emissive: '#10b981', emissiveIntensity: 5.0 } },
+    // South tower
+    { id: 'lt_s_pole', type: 'cylinder', position: [0, 35, 100], radiusTop: 1, radiusBottom: 1.5, height: 70,
+      collision: true, material: { color: '#374151', roughness: 0.6, metalness: 0.5 } },
+    { id: 'lt_s_head', type: 'box', position: [0, 71, 100], size: [6, 2, 6],
+      collision: false, castShadow: false,
+      material: { color: '#4ade80', roughness: 0.1, metalness: 0.5, emissive: '#10b981', emissiveIntensity: 5.0 } },
+    // East tower
+    { id: 'lt_e_pole', type: 'cylinder', position: [100, 35, 0], radiusTop: 1, radiusBottom: 1.5, height: 70,
+      collision: true, material: { color: '#374151', roughness: 0.6, metalness: 0.5 } },
+    { id: 'lt_e_head', type: 'box', position: [100, 71, 0], size: [6, 2, 6],
+      collision: false, castShadow: false,
+      material: { color: '#4ade80', roughness: 0.1, metalness: 0.5, emissive: '#10b981', emissiveIntensity: 5.0 } },
+    // West tower
+    { id: 'lt_w_pole', type: 'cylinder', position: [-100, 35, 0], radiusTop: 1, radiusBottom: 1.5, height: 70,
+      collision: true, material: { color: '#374151', roughness: 0.6, metalness: 0.5 } },
+    { id: 'lt_w_head', type: 'box', position: [-100, 71, 0], size: [6, 2, 6],
+      collision: false, castShadow: false,
+      material: { color: '#4ade80', roughness: 0.1, metalness: 0.5, emissive: '#10b981', emissiveIntensity: 5.0 } },
   ],
   dynamicElements: [],
   hazardZones: [
@@ -108,6 +145,14 @@ export const reactorCore: MapDefinition = {
       { type: 'point', color: '#10b981', intensity: 0.8, position: [0, 5, 0], distance: 60 },
       { type: 'directional', color: '#6ee7b7', intensity: 0.3, position: [40, 60, 30], castShadow: true },
       { type: 'hemisphere', color: '#134e4a', intensity: 0.2, groundColor: '#0a0f0a' },
+      // Reactor glow ring fills (illuminate inward corridor)
+      { type: 'point', color: '#10b981', intensity: 2.5, position: [0, 5, 0], distance: 35, decay: 2 },
+      { type: 'point', color: '#34d399', intensity: 2.0, position: [0, 12, 0], distance: 30, decay: 2 },
+      // Light tower floods (illuminate outer ring cover)
+      { type: 'point', color: '#10b981', intensity: 4.0, position: [0, 70, -100], distance: 100, decay: 2 },
+      { type: 'point', color: '#10b981', intensity: 4.0, position: [0, 70, 100], distance: 100, decay: 2 },
+      { type: 'point', color: '#10b981', intensity: 4.0, position: [100, 70, 0], distance: 100, decay: 2 },
+      { type: 'point', color: '#10b981', intensity: 4.0, position: [-100, 70, 0], distance: 100, decay: 2 },
     ],
     floorMaterial: { color: '#1f2937', roughness: 0.4, metalness: 0.6, edgeColor: '#10b981' },
     fog: { color: '#0a1f0a', near: 50, far: 200 },

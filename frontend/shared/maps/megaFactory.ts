@@ -66,6 +66,51 @@ export const megaFactory: MapDefinition = {
       collision: true, material: { color: '#44403c', roughness: 0.5, metalness: 0.6, edgeColor: '#ef4444' } },
     { id: 'pil_p2', type: 'cylinder', position: [50, 30, -70], radiusTop: 2, radiusBottom: 2, height: 60,
       collision: true, material: { color: '#44403c', roughness: 0.5, metalness: 0.6, edgeColor: '#ef4444' } },
+
+    // === CEILING FLOODLIGHT FIXTURES ===
+    // Industrial orange-white floods hanging from ceiling (Y=58)
+    { id: 'flood_nw', type: 'box', position: [-80, 58, -60], size: [6, 2, 3],
+      collision: false, castShadow: false,
+      material: { color: '#ffddaa', roughness: 0.2, metalness: 0.7, emissive: '#ff8800', emissiveIntensity: 3.0 } },
+    { id: 'flood_ne', type: 'box', position: [80, 58, -40], size: [6, 2, 3],
+      collision: false, castShadow: false,
+      material: { color: '#ffddaa', roughness: 0.2, metalness: 0.7, emissive: '#ff8800', emissiveIntensity: 3.0 } },
+    { id: 'flood_sw', type: 'box', position: [-60, 58, 70], size: [6, 2, 3],
+      collision: false, castShadow: false,
+      material: { color: '#ffddaa', roughness: 0.2, metalness: 0.7, emissive: '#ff8800', emissiveIntensity: 3.0 } },
+    { id: 'flood_se', type: 'box', position: [70, 58, 80], size: [6, 2, 3],
+      collision: false, castShadow: false,
+      material: { color: '#ffddaa', roughness: 0.2, metalness: 0.7, emissive: '#ff8800', emissiveIntensity: 3.0 } },
+    { id: 'flood_center', type: 'box', position: [0, 58, 0], size: [8, 2, 4],
+      collision: false, castShadow: false,
+      material: { color: '#fff5cc', roughness: 0.2, metalness: 0.7, emissive: '#ffcc44', emissiveIntensity: 3.5 } },
+
+    // === PISTON WARNING BEACONS (red rotating lights on top of piston pillars) ===
+    { id: 'warn_p1', type: 'cylinder', position: [-40, 61.5, 40], radiusTop: 1.5, radiusBottom: 1.5, height: 2, segments: 10,
+      collision: false, castShadow: false,
+      material: { color: '#ff2200', roughness: 0.1, metalness: 0.5, emissive: '#ff1100', emissiveIntensity: 6.0 } },
+    { id: 'warn_p2', type: 'cylinder', position: [50, 61.5, -70], radiusTop: 1.5, radiusBottom: 1.5, height: 2, segments: 10,
+      collision: false, castShadow: false,
+      material: { color: '#ff2200', roughness: 0.1, metalness: 0.5, emissive: '#ff1100', emissiveIntensity: 6.0 } },
+
+    // === CATWALK STRIP LIGHTS (orange neon strips under catwalk edges) ===
+    { id: 'strip_low1', type: 'box', position: [-40, 14.5, 0], size: [80, 0.3, 0.5],
+      collision: false, castShadow: false,
+      material: { color: '#ff7700', roughness: 0.1, metalness: 0.3, emissive: '#ff5500', emissiveIntensity: 3.0 } },
+    { id: 'strip_hi1', type: 'box', position: [0, 29.5, -80], size: [120, 0.3, 0.5],
+      collision: false, castShadow: false,
+      material: { color: '#ffaa00', roughness: 0.1, metalness: 0.3, emissive: '#ff8800', emissiveIntensity: 3.0 } },
+
+    // === MACHINERY INDICATOR LIGHTS (green status lights on big machines) ===
+    { id: 'ind_mach1', type: 'box', position: [-80, 21, -60], size: [1.5, 1.5, 0.4],
+      collision: false, castShadow: false,
+      material: { color: '#00ff88', roughness: 0.1, metalness: 0.5, emissive: '#00cc66', emissiveIntensity: 5.0 } },
+    { id: 'ind_mach2', type: 'box', position: [80, 25.5, -40], size: [1.5, 1.5, 0.4],
+      collision: false, castShadow: false,
+      material: { color: '#00ff88', roughness: 0.1, metalness: 0.5, emissive: '#00cc66', emissiveIntensity: 5.0 } },
+    { id: 'ind_mach3', type: 'box', position: [-60, 31, 70], size: [0.4, 1.5, 1.5],
+      collision: false, castShadow: false,
+      material: { color: '#00ff88', roughness: 0.1, metalness: 0.5, emissive: '#00cc66', emissiveIntensity: 5.0 } },
   ],
   dynamicElements: [
     // === CONVEYOR BELTS ===
@@ -151,6 +196,18 @@ export const megaFactory: MapDefinition = {
       { type: 'point', color: '#ef4444', intensity: 0.8, position: [-40, 35, 40], distance: 40 },
       { type: 'point', color: '#ef4444', intensity: 0.8, position: [50, 35, -70], distance: 40 },
       { type: 'directional', color: '#fed7aa', intensity: 0.2, position: [0, 58, 0], castShadow: true },
+      // Ceiling floodlight fills
+      { type: 'point', color: '#ff8800', intensity: 3.0, position: [-80, 55, -60], distance: 90, decay: 2 },
+      { type: 'point', color: '#ff8800', intensity: 3.0, position: [80, 55, -40], distance: 90, decay: 2 },
+      { type: 'point', color: '#ff8800', intensity: 3.0, position: [-60, 55, 70], distance: 90, decay: 2 },
+      { type: 'point', color: '#ff8800', intensity: 3.0, position: [70, 55, 80], distance: 90, decay: 2 },
+      { type: 'point', color: '#ffcc44', intensity: 3.5, position: [0, 55, 0], distance: 100, decay: 2 },
+      // Piston beacon glows
+      { type: 'point', color: '#ff1100', intensity: 2.0, position: [-40, 62, 40], distance: 30, decay: 2 },
+      { type: 'point', color: '#ff1100', intensity: 2.0, position: [50, 62, -70], distance: 30, decay: 2 },
+      // Catwalk strip fills
+      { type: 'point', color: '#ff5500', intensity: 1.0, position: [-40, 14, 0], distance: 50, decay: 2 },
+      { type: 'point', color: '#ff8800', intensity: 1.0, position: [0, 29, -80], distance: 60, decay: 2 },
     ],
     floorMaterial: { color: '#3f3731', roughness: 0.9, metalness: 0.1, edgeColor: '#78716c' },
     fog: { color: '#292018', near: 30, far: 200 },

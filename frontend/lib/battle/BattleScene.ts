@@ -138,10 +138,11 @@ export class BattleScene {
       const mapDef = getMapById(config.mapId)
       if (mapDef) {
         this.mapDef = mapDef
-        this.mapRenderer = new MapRenderer(this.scene)
+        this.mapRenderer = new MapRenderer(this.scene, this.renderer)
         this.buildings = this.mapRenderer.loadMap(mapDef)
         // Update physics bounds to match map
         this.physicsSystem.setArenaBounds(mapDef.arena.width, mapDef.arena.depth)
+        this.enemyAI.setArenaBounds(mapDef.arena.width / 2, mapDef.arena.depth / 2)
         // Apply window shaders if map has windows (Space Colony)
         const windowMeshes = this.mapRenderer.getWindowMeshes()
         if (windowMeshes.length > 0) {
@@ -398,7 +399,7 @@ export class BattleScene {
   protected update(deltaTime: number) {
     // Update map dynamic elements, hazard visuals, and window shaders
     if (this.mapRenderer) {
-      this.mapRenderer.updateDynamicElements(this.battleTime)
+      this.mapRenderer.updateDynamicElements(this.battleTime, this.camera.camera)
       this.mapRenderer.updateHazardVisuals(this.battleTime)
     }
     if (this.windowShaderMaterials.length > 0) {
@@ -449,16 +450,28 @@ export class BattleScene {
     }
 
     // Dual weapon firing with separate cooldowns
-    // Auto-aim at locked targets, otherwise use camera direction
-    let aimDirection: THREE.Vector3
-    if (this.targetingState.isTargeted) {
-      // Aim at locked enemy
-      aimDirection = this.enemyMech.position.clone()
-        .sub(this.playerMech.position)
-        .normalize()
-    } else {
-      // Use camera aim direction
-      aimDirection = this.playerMech.getForwardDirection()
+    // When locked, compute per-arm aim from each arm's spawn position to target center
+    const targetPoint = this.targetingState.isTargeted
+      ? this.enemyMech.position.clone().setY(this.enemyMech.position.y + 2)
+      : null
+
+    const getAimDirection = (arm: 'left' | 'right'): THREE.Vector3 => {
+      if (!targetPoint) {
+        return this.playerMech.getForwardDirection()
+      }
+      // Calculate from actual arm spawn position (mirrors ProjectileSystem offset)
+      const armOffset = arm === 'left' ? -1.4 : 1.4
+      const armSpawn = this.playerMech.position.clone()
+        .add(this.playerMech.getForwardDirection().multiplyScalar(2))
+        .add(this.playerMech.getRightDirection().multiplyScalar(armOffset))
+      armSpawn.y += 2
+      const dir = targetPoint.clone().sub(armSpawn).normalize()
+      // Slight spread
+      const spread = 0.02
+      dir.x += (Math.random() - 0.5) * spread
+      dir.y += (Math.random() - 0.5) * spread
+      dir.z += (Math.random() - 0.5) * spread
+      return dir.normalize()
     }
 
     // Determine fire rate (affected by melee weapons and rack abilities)
@@ -481,7 +494,7 @@ export class BattleScene {
     // Left arm (right mouse button)
     if (input.shootLeft && this.battleTime - this.lastLeftArmShot > leftFireRate) {
       if (this.playerMech.loadout.leftArm) {
-        this.projectileSystem.fireWeapon(this.playerMech, aimDirection, 'left')
+        this.projectileSystem.fireWeapon(this.playerMech, getAimDirection('left'), 'left', this.enemyMech)
         this.lastLeftArmShot = this.battleTime
       }
     }
@@ -489,7 +502,7 @@ export class BattleScene {
     // Right arm (left mouse button)
     if (input.shootRight && this.battleTime - this.lastRightArmShot > rightFireRate) {
       if (this.playerMech.loadout.rightArm) {
-        this.projectileSystem.fireWeapon(this.playerMech, aimDirection, 'right')
+        this.projectileSystem.fireWeapon(this.playerMech, getAimDirection('right'), 'right', this.enemyMech)
         this.lastRightArmShot = this.battleTime
       }
     }
@@ -505,18 +518,20 @@ export class BattleScene {
     this.enemyMech.updatePower(deltaTime)
 
     if (shouldEnemyFire) {
-      const enemyAimDirection = this.playerMech.position.clone()
+      const enemyTarget = this.playerMech.position.clone()
+      enemyTarget.y += 2 // Aim at mech center
+      const enemyAimDirection = enemyTarget
         .sub(this.enemyMech.position)
         .normalize()
       // Enemy fires from right arm by default
-      this.projectileSystem.fireWeapon(this.enemyMech, enemyAimDirection, 'right')
+      this.projectileSystem.fireWeapon(this.enemyMech, enemyAimDirection, 'right', this.playerMech)
     }
 
     this.checkMechBuildingCollisions(this.enemyMech)
     this.enemyMech.update(deltaTime)
 
     // Update projectiles
-    this.projectileSystem.update(deltaTime)
+    this.projectileSystem.update(deltaTime, [this.playerMech, this.enemyMech])
 
     // Check projectile-building collisions
     this.checkProjectileBuildingCollisions()
@@ -572,7 +587,11 @@ export class BattleScene {
   }
 
   private render() {
-    this.renderer.render(this.scene, this.camera.camera)
+    if (this.mapRenderer?.hasLensing()) {
+      this.mapRenderer.renderWithLensing(this.renderer, this.scene, this.camera.camera)
+    } else {
+      this.renderer.render(this.scene, this.camera.camera)
+    }
   }
 
   stop() {
@@ -745,7 +764,9 @@ export class BattleScene {
     const mechRadius = 2 // Collision radius for mechs
 
     for (const building of this.buildings) {
-      // Calculate closest point on building to mech
+      const buildingTop = building.position.y + building.height / 2
+
+      // Calculate closest point on building to mech in XZ plane
       const closestX = Math.max(
         building.position.x - building.width / 2,
         Math.min(mech.position.x, building.position.x + building.width / 2)
@@ -755,16 +776,27 @@ export class BattleScene {
         Math.min(mech.position.z, building.position.z + building.depth / 2)
       )
 
-      // Calculate distance from mech to closest point
       const dx = mech.position.x - closestX
       const dz = mech.position.z - closestZ
       const distanceSquared = dx * dx + dz * dz
+      const withinXZ = distanceSquared < mechRadius * mechRadius
 
-      // If mech is colliding with building, push it out
-      if (distanceSquared < mechRadius * mechRadius) {
+      if (!withinXZ) continue
+
+      // Mech is within the XZ footprint of the building.
+      // If the mech is falling and has reached or passed the building top, land on it.
+      if (mech.velocity.y < 0 && mech.position.y <= buildingTop) {
+        mech.position.y = buildingTop
+        mech.velocity.y = 0
+        mech.isJumping = false
+        continue
+      }
+
+      // Mech is colliding with the side of the building — push it out horizontally.
+      // Only apply if mech is below the building top (not already on top).
+      if (mech.position.y < buildingTop) {
         const distance = Math.sqrt(distanceSquared)
         if (distance > 0) {
-          // Push mech away from building
           const pushX = (dx / distance) * (mechRadius - distance)
           const pushZ = (dz / distance) * (mechRadius - distance)
           mech.position.x += pushX

@@ -48,8 +48,8 @@ models/
 | Part Type | Max Dimensions (W x H x D) |
 |-----------|----------------------------|
 | Arms      | 1.0 x 2.5 x 1.0 units      |
-| Core      | 2.5 x 3.5 x 2.5 units      |
-| Legs      | 2.0 x 2.0 x 2.0 units      |
+| Core      | 2.2 x 2.0 x 1.8 units      |
+| Legs      | 2.5 x 3.0 x 2.0 units      |
 | Head      | 1.5 x 1.5 x 1.5 units      |
 | Rack      | 1.0 x 1.0 x 0.5 units      |
 

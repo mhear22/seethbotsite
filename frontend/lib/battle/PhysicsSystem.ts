@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import type { MechEntity } from './MechEntity'
 import type { InputState } from './InputManager'
+import { JUMP_VELOCITY_BASE, JUMP_VELOCITY_JETS } from './constants'
 
 export class PhysicsSystem {
   public speedMultiplier = 1.0
@@ -149,10 +150,9 @@ export class PhysicsSystem {
       input = { ...input, jump: false }
     }
 
-    // Jump jet activation - initial velocity reduced by weight
-    // Ultra-high jump for extreme vertical mobility
-    if (input.jump && mech.jumpFuel > 0 && !mech.isJumping && hasJumpJets) {
-      const jumpVelocity = 200 * mech.weightPenalty
+    // Basic jump for all mechs (no jets required)
+    if (input.jump && !mech.isJumping) {
+      const jumpVelocity = hasJumpJets ? JUMP_VELOCITY_JETS * mech.weightPenalty : JUMP_VELOCITY_BASE * mech.weightPenalty
       mech.velocity.y = jumpVelocity
       mech.isJumping = true
     }
@@ -162,8 +162,8 @@ export class PhysicsSystem {
       mech.velocity.y -= 50 * deltaTime // Stronger gravity for faster falling
       mech.position.y += mech.velocity.y * deltaTime
 
-      // Consume jump fuel while airborne and ascending (increased by weight)
-      if (mech.isJumping && mech.velocity.y > 0) {
+      // Consume jump fuel while airborne and ascending (jump jets only)
+      if (hasJumpJets && mech.isJumping && mech.velocity.y > 0) {
         const fuelConsumption = 30 * (2.0 - mech.weightPenalty) // Heavy = 45/s, Light = 30/s
         mech.jumpFuel -= deltaTime * fuelConsumption
         if (mech.jumpFuel < 0) {
@@ -177,11 +177,11 @@ export class PhysicsSystem {
       mech.position.y = 0
       mech.velocity.y = 0
       mech.isJumping = false
+    }
 
-      // Recharge fuel on ground
-      if (hasJumpJets) {
-        mech.jumpFuel = Math.min(mech.stats.energy, mech.jumpFuel + deltaTime * 15)
-      }
+    // Recharge fuel whenever grounded (y=0 or landed on building top last frame)
+    if (!mech.isJumping && hasJumpJets) {
+      mech.jumpFuel = Math.min(mech.stats.energy, mech.jumpFuel + deltaTime * 15)
     }
   }
 

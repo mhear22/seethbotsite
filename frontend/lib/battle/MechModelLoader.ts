@@ -15,12 +15,12 @@ interface CachedModel {
  * Model attachment points for assembling mech parts
  */
 export const MODEL_ATTACH_POINTS = {
-  head: new THREE.Vector3(0, 3.5, 0),
-  core: new THREE.Vector3(0, 1.5, 0),
-  leftArm: new THREE.Vector3(-1.4, 2, 0),
-  rightArm: new THREE.Vector3(1.4, 2, 0),
-  legs: new THREE.Vector3(0, 0.75, 0),
-  rack: new THREE.Vector3(0, 2.5, -0.5),
+  head: new THREE.Vector3(0, 4.8, 0),
+  core: new THREE.Vector3(0, 2.8, 0),
+  leftArm: new THREE.Vector3(-1.3, 3.8, 0),
+  rightArm: new THREE.Vector3(1.3, 3.8, 0),
+  legs: new THREE.Vector3(0, 0, 0),
+  rack: new THREE.Vector3(0, 4.2, -0.5),
 } as const
 
 /**
@@ -179,7 +179,7 @@ export class MechModelLoader {
         position = MODEL_ATTACH_POINTS.head.clone()
         break
       case 'core':
-        geometry = new THREE.BoxGeometry(2, 3, 2)
+        geometry = new THREE.BoxGeometry(2, 2, 1.5)
         position = MODEL_ATTACH_POINTS.core.clone()
         break
       case 'leftArm':
@@ -191,7 +191,7 @@ export class MechModelLoader {
         position = MODEL_ATTACH_POINTS.rightArm.clone()
         break
       case 'legs':
-        geometry = new THREE.BoxGeometry(1.5, 1.5, 1.5)
+        geometry = new THREE.BoxGeometry(1.8, 2.8, 1.5)
         position = MODEL_ATTACH_POINTS.legs.clone()
         break
       case 'rack':

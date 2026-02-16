@@ -11,6 +11,11 @@ export interface Projectile {
   ownerId: string
   lifetime: number
   mesh: THREE.Mesh
+  light?: THREE.PointLight
+  glow?: THREE.Sprite
+  // Homing missile fields
+  targetId?: string
+  homingDelay?: number // seconds before homing kicks in
 }
 
 export class ProjectileSystem {
@@ -22,7 +27,7 @@ export class ProjectileSystem {
     this.scene = scene
   }
 
-  fireWeapon(mech: MechEntity, targetDirection: THREE.Vector3, arm: 'left' | 'right' = 'left'): Projectile | null {
+  fireWeapon(mech: MechEntity, targetDirection: THREE.Vector3, arm: 'left' | 'right' = 'left', target?: MechEntity): Projectile | null {
     // Get correct weapon
     const armPart = arm === 'left' ? mech.loadout.leftArm : mech.loadout.rightArm
     if (!armPart) return null
@@ -125,6 +130,27 @@ export class ProjectileSystem {
       mesh.position.copy(spawnPosition)
       this.scene.add(mesh)
 
+      let missileLight: THREE.PointLight | undefined
+      let missileGlow: THREE.Sprite | undefined
+      if (weaponType === 'missile') {
+        missileLight = new THREE.PointLight(0xff6600, 40, 60)
+        missileLight.position.copy(spawnPosition)
+        this.scene.add(missileLight)
+
+        // Billboard glow sprite - always faces camera, visible from any distance
+        const glowMat = markRaw(new THREE.SpriteMaterial({
+          color: 0xff8800,
+          transparent: true,
+          opacity: 0.9,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending
+        }))
+        missileGlow = markRaw(new THREE.Sprite(glowMat))
+        missileGlow.scale.set(6, 6, 1)
+        missileGlow.position.copy(spawnPosition)
+        this.scene.add(missileGlow)
+      }
+
       const projectile: Projectile = {
         id: `proj_${this.nextId++}`,
         type: weaponType,
@@ -133,7 +159,13 @@ export class ProjectileSystem {
         damage: baseDamage,
         ownerId: mech.id,
         lifetime: 3, // 3 seconds
-        mesh
+        mesh,
+        light: missileLight,
+        glow: missileGlow,
+        ...(weaponType === 'missile' && target ? {
+          targetId: target.id,
+          homingDelay: 0.4 // start homing after 0.4 seconds
+        } : {})
       }
 
       this.projectiles.push(projectile)
@@ -152,7 +184,7 @@ export class ProjectileSystem {
       case 'energy':
         return new THREE.SphereGeometry(0.3, 8, 8)
       case 'missile':
-        return new THREE.CylinderGeometry(0.2, 0.2, 0.8, 8)
+        return new THREE.CylinderGeometry(0.3, 0.15, 1.2, 8)
       default: // ballistic
         return new THREE.SphereGeometry(0.2, 6, 6)
     }
@@ -169,11 +201,7 @@ export class ProjectileSystem {
           emissiveIntensity: 0.8
         })
       case 'missile':
-        return new THREE.MeshStandardMaterial({
-          color: 0x888888,
-          emissive: 0xff4400,
-          emissiveIntensity: 0.5
-        })
+        return new THREE.MeshBasicMaterial({ color: 0xff6600 })
       default: // ballistic
         return new THREE.MeshStandardMaterial({ color: playerColor })
     }
@@ -190,13 +218,44 @@ export class ProjectileSystem {
     }
   }
 
-  update(deltaTime: number): Projectile[] {
+  update(deltaTime: number, mechs?: MechEntity[]): Projectile[] {
     const activeProjectiles: Projectile[] = []
 
     for (const proj of this.projectiles) {
+      // Homing logic for missiles
+      if (proj.type === 'missile' && proj.targetId && proj.homingDelay !== undefined) {
+        proj.homingDelay -= deltaTime
+        if (proj.homingDelay <= 0 && mechs) {
+          const target = mechs.find(m => m.id === proj.targetId && !m.isDestroyed)
+          if (target) {
+            const targetPos = target.position.clone()
+            targetPos.y += 2.5 // aim at mech center
+            const toTarget = targetPos.sub(proj.position).normalize()
+            const speed = proj.velocity.length()
+            // Smoothly steer toward target (turn rate: ~180 deg/s)
+            const turnRate = Math.PI * deltaTime
+            proj.velocity.normalize().lerp(toTarget, Math.min(1, turnRate)).normalize().multiplyScalar(speed)
+          }
+        }
+      }
+
       // Update position
       proj.position.add(proj.velocity.clone().multiplyScalar(deltaTime))
       proj.mesh.position.copy(proj.position)
+
+      // Rotate missile to face direction of travel and update light
+      if (proj.type === 'missile') {
+        proj.mesh.quaternion.setFromUnitVectors(
+          new THREE.Vector3(0, 1, 0),
+          proj.velocity.clone().normalize()
+        )
+        if (proj.light) {
+          proj.light.position.copy(proj.position)
+        }
+        if (proj.glow) {
+          proj.glow.position.copy(proj.position)
+        }
+      }
 
       // Update lifetime
       proj.lifetime -= deltaTime
@@ -210,6 +269,13 @@ export class ProjectileSystem {
         proj.mesh.geometry.dispose()
         if (proj.mesh.material instanceof THREE.Material) {
           proj.mesh.material.dispose()
+        }
+        if (proj.light) {
+          this.scene.remove(proj.light)
+        }
+        if (proj.glow) {
+          this.scene.remove(proj.glow)
+          ;(proj.glow.material as THREE.SpriteMaterial).dispose()
         }
       }
     }
@@ -265,6 +331,13 @@ export class ProjectileSystem {
       if (projectile.mesh.material instanceof THREE.Material) {
         projectile.mesh.material.dispose()
       }
+      if (projectile.light) {
+        this.scene.remove(projectile.light)
+      }
+      if (projectile.glow) {
+        this.scene.remove(projectile.glow)
+        ;(projectile.glow.material as THREE.SpriteMaterial).dispose()
+      }
     }
   }
 
@@ -274,6 +347,13 @@ export class ProjectileSystem {
       proj.mesh.geometry.dispose()
       if (proj.mesh.material instanceof THREE.Material) {
         proj.mesh.material.dispose()
+      }
+      if (proj.light) {
+        this.scene.remove(proj.light)
+      }
+      if (proj.glow) {
+        this.scene.remove(proj.glow)
+        ;(proj.glow.material as THREE.SpriteMaterial).dispose()
       }
     }
     this.projectiles = []

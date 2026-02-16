@@ -76,10 +76,10 @@ function createProceduralPreview(): THREE.Group {
     // Fallback to simple boxes
     const fallbacks: Record<string, { size: [number, number, number]; pos: THREE.Vector3 }> = {
       head: { size: [1, 1, 1], pos: MODEL_ATTACH_POINTS.head.clone() },
-      core: { size: [2, 3, 2], pos: MODEL_ATTACH_POINTS.core.clone() },
+      core: { size: [2, 2, 1.5], pos: MODEL_ATTACH_POINTS.core.clone() },
       leftArm: { size: [0.8, 2, 0.8], pos: MODEL_ATTACH_POINTS.leftArm.clone() },
       rightArm: { size: [0.8, 2, 0.8], pos: MODEL_ATTACH_POINTS.rightArm.clone() },
-      legs: { size: [1.5, 1.5, 1.5], pos: MODEL_ATTACH_POINTS.legs.clone() },
+      legs: { size: [1.8, 2.8, 1.5], pos: MODEL_ATTACH_POINTS.legs.clone() },
       rack: { size: [0.5, 0.5, 0.3], pos: MODEL_ATTACH_POINTS.rack.clone() },
     }
 

@@ -78,6 +78,35 @@ export const defaultArena: MapDefinition = {
       material: { color: '#3b4252', roughness: 0.9, metalness: 0.1, edgeColor: '#5e81ac' } },
     { id: 'obs4', type: 'box', position: [70, 2.5, -30], size: [7, 5, 7], collision: true, castShadow: true, receiveShadow: true,
       material: { color: '#3b4252', roughness: 0.9, metalness: 0.1, edgeColor: '#5e81ac' } },
+
+    // === LAMP POSTS - corner pillars get a floodlight head ===
+    // Corner lamp heads (emissive disc sitting atop each corner pillar)
+    { id: 'lamp_nw', type: 'cylinder', position: [-120, 16.5, -120], radiusTop: 2.5, radiusBottom: 2.5, height: 1, segments: 16,
+      collision: false, castShadow: false,
+      material: { color: '#b0c8ff', roughness: 0.1, metalness: 0.6, emissive: '#88aaff', emissiveIntensity: 3.0 } },
+    { id: 'lamp_ne', type: 'cylinder', position: [120, 16.5, -120], radiusTop: 2.5, radiusBottom: 2.5, height: 1, segments: 16,
+      collision: false, castShadow: false,
+      material: { color: '#b0c8ff', roughness: 0.1, metalness: 0.6, emissive: '#88aaff', emissiveIntensity: 3.0 } },
+    { id: 'lamp_sw', type: 'cylinder', position: [-120, 16.5, 120], radiusTop: 2.5, radiusBottom: 2.5, height: 1, segments: 16,
+      collision: false, castShadow: false,
+      material: { color: '#b0c8ff', roughness: 0.1, metalness: 0.6, emissive: '#88aaff', emissiveIntensity: 3.0 } },
+    { id: 'lamp_se', type: 'cylinder', position: [120, 16.5, 120], radiusTop: 2.5, radiusBottom: 2.5, height: 1, segments: 16,
+      collision: false, castShadow: false,
+      material: { color: '#b0c8ff', roughness: 0.1, metalness: 0.6, emissive: '#88aaff', emissiveIntensity: 3.0 } },
+
+    // Mid-building beacon lights (small glowing box on top of each mid building)
+    { id: 'beacon_mw', type: 'box', position: [-50, 11.5, 0], size: [2, 1.5, 2],
+      collision: false, castShadow: false,
+      material: { color: '#ffffff', roughness: 0.1, metalness: 0.5, emissive: '#aaccff', emissiveIntensity: 4.0 } },
+    { id: 'beacon_me', type: 'box', position: [50, 11.5, 0], size: [2, 1.5, 2],
+      collision: false, castShadow: false,
+      material: { color: '#ffffff', roughness: 0.1, metalness: 0.5, emissive: '#aaccff', emissiveIntensity: 4.0 } },
+    { id: 'beacon_mn', type: 'box', position: [0, 11.5, -50], size: [2, 1.5, 2],
+      collision: false, castShadow: false,
+      material: { color: '#ffffff', roughness: 0.1, metalness: 0.5, emissive: '#aaccff', emissiveIntensity: 4.0 } },
+    { id: 'beacon_ms', type: 'box', position: [0, 11.5, 50], size: [2, 1.5, 2],
+      collision: false, castShadow: false,
+      material: { color: '#ffffff', roughness: 0.1, metalness: 0.5, emissive: '#aaccff', emissiveIntensity: 4.0 } },
   ],
   dynamicElements: [],
   hazardZones: [],
@@ -88,6 +117,16 @@ export const defaultArena: MapDefinition = {
     lights: [
       { type: 'directional', color: '#ffffff', intensity: 0.8, position: [50, 80, 50], castShadow: true },
       { type: 'hemisphere', color: '#87ceeb', intensity: 0.3, groundColor: '#2d3748' },
+      // Corner lamp floods - illuminate the cluster corners
+      { type: 'point', color: '#88aaff', intensity: 2.5, position: [-120, 16, -120], distance: 80, decay: 2 },
+      { type: 'point', color: '#88aaff', intensity: 2.5, position: [120, 16, -120], distance: 80, decay: 2 },
+      { type: 'point', color: '#88aaff', intensity: 2.5, position: [-120, 16, 120], distance: 80, decay: 2 },
+      { type: 'point', color: '#88aaff', intensity: 2.5, position: [120, 16, 120], distance: 80, decay: 2 },
+      // Mid beacon fills
+      { type: 'point', color: '#aaccff', intensity: 1.5, position: [-50, 11, 0], distance: 50, decay: 2 },
+      { type: 'point', color: '#aaccff', intensity: 1.5, position: [50, 11, 0], distance: 50, decay: 2 },
+      { type: 'point', color: '#aaccff', intensity: 1.5, position: [0, 11, -50], distance: 50, decay: 2 },
+      { type: 'point', color: '#aaccff', intensity: 1.5, position: [0, 11, 50], distance: 50, decay: 2 },
     ],
     floorMaterial: { color: '#2d3748', roughness: 0.8, metalness: 0.2 },
     showGrid: true,

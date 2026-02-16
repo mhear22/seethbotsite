@@ -2,6 +2,7 @@ import { ref, computed } from 'vue'
 import * as THREE from 'three'
 import { MechEntity, type CombatStats } from '../lib/battle/MechEntity'
 import type { MechLoadout, MechStats } from './useMechBuilder'
+import { ARM_PARTS, CORE_PARTS, LEGS_PARTS, HEAD_PARTS, RACK_PARTS } from '../shared/data/MechParts'
 
 export interface SpawnPosition {
   position: [number, number, number]
@@ -134,39 +135,24 @@ export function useMechBattle() {
 
     const config = enemyConfigs[difficulty]
 
-    // Create a default weapon loadout for enemy AI
-    // This gives the enemy a basic weapon so they can actually fire
-    const enemyWeapon = {
-      id: 'enemy-autocannon',
-      name: 'Enemy Autocannon',
-      type: 'arm' as const,
-      weaponType: 'ballistic' as const,
-      icon: '🔫',
-      description: 'Standard enemy weapon',
-      stats: {
-        health: 0,
-        armor: 0,
-        speed: 0,
-        firepower: 0,
-        accuracy: 0,
-        energy: 0
-      },
-      weight: 0,
-      pros: [],
-      cons: [],
-      rarity: 'common' as const,
-      powerDraw: 5,
-      fireRate: 0.3,
-      projectileCount: 1
+    // Select parts based on difficulty
+    const enemyLoadouts: Record<string, { arm: number; core: number; legs: number; head: number; rack: number }> = {
+      tutorial: { arm: 0, core: 0, legs: 0, head: 0, rack: 0 },       // autocannon, diesel, bipedal, standard optics, smoke
+      easy:    { arm: 0, core: 2, legs: 0, head: 3, rack: 2 },        // autocannon, gas turbine, bipedal, scout, jump jets
+      medium:  { arm: 1, core: 0, legs: 1, head: 1, rack: 1 },        // railgun, diesel, tracked, targeting array, ammo feed
+      hard:    { arm: 3, core: 1, legs: 3, head: 2, rack: 3 },        // missile pod, fusion, quad, reinforced, repair drone
+      boss:    { arm: 1, core: 1, legs: 1, head: 1, rack: 2 },        // railgun, fusion, tracked, targeting array, jump jets
     }
 
+    const indices = enemyLoadouts[difficulty] ?? enemyLoadouts.tutorial
+
     const enemyLoadout: MechLoadout = {
-      leftArm: enemyWeapon,
-      rightArm: enemyWeapon,
-      core: null,
-      legs: null,
-      head: null,
-      rack: null
+      leftArm: ARM_PARTS[indices.arm] ?? ARM_PARTS[0],
+      rightArm: ARM_PARTS[indices.arm] ?? ARM_PARTS[0],
+      core: CORE_PARTS[indices.core] ?? CORE_PARTS[0],
+      legs: LEGS_PARTS[indices.legs] ?? LEGS_PARTS[0],
+      head: HEAD_PARTS[indices.head] ?? HEAD_PARTS[0],
+      rack: RACK_PARTS[indices.rack] ?? RACK_PARTS[0],
     }
 
     const spawnPos = enemySpawn

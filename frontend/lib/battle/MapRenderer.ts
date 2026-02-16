@@ -15,6 +15,8 @@ import type {
 } from '@shared/types/MapDefinition';
 import { getDynamicElementTransform, isHazardActive } from '@shared/types/MapDefinition';
 import { createRingWorldSky, updateRingWorldSky } from './RingWorldSky';
+import { createEndOfUniverseSky, updateEndOfUniverseSky, type LensingSetup } from './EndOfUniverseSky';
+import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
 
 interface DynamicMeshEntry {
   element: DynamicElement;
@@ -35,9 +37,13 @@ export class MapRenderer {
   private windowMeshes: THREE.Mesh[] = [];
   private mapDef: MapDefinition | null = null;
   private ringWorldSkyMaterial: THREE.ShaderMaterial | null = null;
+  private endOfUniverseDiskMaterials: THREE.ShaderMaterial[] = [];
+  private endOfUniverseLensing: LensingSetup | null = null;
+  private renderer: THREE.WebGLRenderer | null = null;
 
-  constructor(scene: THREE.Scene) {
+  constructor(scene: THREE.Scene, renderer?: THREE.WebGLRenderer) {
     this.scene = scene;
+    this.renderer = renderer ?? null;
   }
 
   /**
@@ -77,6 +83,8 @@ export class MapRenderer {
       this.createProceduralStarSky();
     } else if (env.skyType === 'ring_world') {
       this.createRingWorldSky();
+    } else if (env.skyType === 'end_of_universe') {
+      this.createEndOfUniverseSky();
     } else if (env.skyType === 'solid_color' && env.skyColor) {
       this.scene.background = new THREE.Color(env.skyColor);
     }
@@ -92,12 +100,24 @@ export class MapRenderer {
     }
 
     // Floor
-    const floorGeo = new THREE.PlaneGeometry(arenaWidth, arenaDepth);
-    const floorMat = this.createMaterial(env.floorMaterial);
-    const floor = new THREE.Mesh(floorGeo, floorMat);
-    floor.rotation.x = -Math.PI / 2;
-    floor.receiveShadow = true;
-    this.scene.add(floor);
+    if (env.reflectiveFloor) {
+      // Real mirror reflection via Reflector (secondary camera render)
+      const reflector = new Reflector(new THREE.PlaneGeometry(arenaWidth, arenaDepth), {
+        color: new THREE.Color(env.floorMaterial.color),
+        textureWidth: 1024,
+        textureHeight: 1024,
+      });
+      reflector.rotation.x = -Math.PI / 2;
+      reflector.receiveShadow = true;
+      this.scene.add(reflector);
+    } else {
+      const floorGeo = new THREE.PlaneGeometry(arenaWidth, arenaDepth);
+      const floorMat = this.createMaterial(env.floorMaterial);
+      const floor = new THREE.Mesh(floorGeo, floorMat);
+      floor.rotation.x = -Math.PI / 2;
+      floor.receiveShadow = true;
+      this.scene.add(floor);
+    }
 
     // Grid
     if (env.showGrid) {
@@ -193,6 +213,43 @@ export class MapRenderer {
     const material = sky.material as THREE.ShaderMaterial;
     this.ringWorldSkyMaterial = material;
     this.scene.add(sky);
+  }
+
+  /**
+   * Create the end of universe sky (two black holes with accretion disks + lensing)
+   */
+  private createEndOfUniverseSky(): void {
+    const size = this.renderer
+      ? { width: this.renderer.domElement.width, height: this.renderer.domElement.height }
+      : { width: window.innerWidth, height: window.innerHeight };
+    const { group, diskMaterials, lensing } = createEndOfUniverseSky(this.scene, size);
+    this.endOfUniverseDiskMaterials = diskMaterials;
+    this.endOfUniverseLensing = lensing;
+    // group holds no meshes itself (all added directly to scene), but store reference
+    void group;
+  }
+
+  /** Returns true when this map uses gravitational lensing post-processing */
+  hasLensing(): boolean {
+    return this.endOfUniverseLensing !== null;
+  }
+
+  /**
+   * Two-pass render: scene → offscreen target → lensing quad → screen.
+   * Call instead of renderer.render() when hasLensing() is true.
+   */
+  renderWithLensing(
+    renderer: THREE.WebGLRenderer,
+    scene: THREE.Scene,
+    camera: THREE.Camera,
+  ): void {
+    const lensing = this.endOfUniverseLensing!;
+    // Pass 1: render scene to offscreen target
+    renderer.setRenderTarget(lensing.target);
+    renderer.render(scene, camera);
+    // Pass 2: apply lensing shader to screen
+    renderer.setRenderTarget(null);
+    renderer.render(lensing.quadScene, lensing.quadCamera);
   }
 
   /**
@@ -437,7 +494,7 @@ export class MapRenderer {
   /**
    * Update dynamic element transforms each frame
    */
-  updateDynamicElements(elapsedTime: number): void {
+  updateDynamicElements(elapsedTime: number, camera?: THREE.Camera): void {
     for (const { element, mesh } of this.dynamicMeshes) {
       const transform = getDynamicElementTransform(element, elapsedTime);
       mesh.position.set(transform.position[0], transform.position[1], transform.position[2]);
@@ -447,6 +504,16 @@ export class MapRenderer {
     // Update ring world sky rotation
     if (this.ringWorldSkyMaterial) {
       updateRingWorldSky(this.ringWorldSkyMaterial, elapsedTime);
+    }
+
+    // Update end of universe sky
+    if (this.endOfUniverseDiskMaterials.length > 0 && this.endOfUniverseLensing) {
+      updateEndOfUniverseSky(
+        this.endOfUniverseDiskMaterials,
+        this.endOfUniverseLensing,
+        camera ?? new THREE.PerspectiveCamera(),
+        elapsedTime,
+      );
     }
   }
 

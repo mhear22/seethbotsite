@@ -140,7 +140,7 @@ export interface HazardZone {
 // ============================================================================
 
 export interface EnvironmentDef {
-  skyType: 'procedural_stars' | 'solid_color' | 'ring_world' | 'none';
+  skyType: 'procedural_stars' | 'solid_color' | 'ring_world' | 'end_of_universe' | 'none';
   skyColor?: string; // hex color for solid_color sky
   ambientLightColor: string;
   ambientLightIntensity: number;
@@ -150,6 +150,7 @@ export interface EnvironmentDef {
   showGrid: boolean;
   gridSize?: number;
   showBoundaryWalls: boolean;
+  reflectiveFloor?: boolean;
 }
 
 export type LightDef = DirectionalLightDef | PointLightDef | HemisphereLightDef;

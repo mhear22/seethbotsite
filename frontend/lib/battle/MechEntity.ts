@@ -31,6 +31,9 @@ export class MechEntity {
   isPlayer: boolean
   isDestroyed: boolean = false
 
+  // Walk animation
+  private walkCycle: number = 0
+
   // Power system
   currentPower: number = 100
   maxPower: number = 100
@@ -141,11 +144,12 @@ export class MechEntity {
     // Color based on team
     const color = this.isPlayer ? 0x3b82f6 : 0xef4444 // Blue vs Red
 
-    // Core body (2x3x2)
-    const coreGeometry = new THREE.BoxGeometry(2, 3, 2)
+    // Core body (compact torso)
+    const coreGeometry = new THREE.BoxGeometry(1.6, 1.6, 1.3)
     const coreMaterial = new THREE.MeshStandardMaterial({ color })
     const core = new THREE.Mesh(coreGeometry, coreMaterial)
     core.position.copy(MODEL_ATTACH_POINTS.core)
+    core.position.y += 0.8
     group.add(core)
 
     // Head (1x1x1)
@@ -171,13 +175,14 @@ export class MechEntity {
     rightArm.position.copy(MODEL_ATTACH_POINTS.rightArm)
     group.add(rightArm)
 
-    // Legs (combined as one box for simplicity)
-    const legsGeometry = new THREE.BoxGeometry(1.5, 1.5, 1.5)
+    // Legs (taller bipedal legs)
+    const legsGeometry = new THREE.BoxGeometry(1.8, 2.8, 1.5)
     const legsMaterial = new THREE.MeshStandardMaterial({
       color: this.isPlayer ? 0x1e40af : 0x991b1b
     })
     const legs = new THREE.Mesh(legsGeometry, legsMaterial)
     legs.position.copy(MODEL_ATTACH_POINTS.legs)
+    legs.position.y += 1.4
     group.add(legs)
 
     // Set initial position
@@ -190,6 +195,117 @@ export class MechEntity {
     // Update mesh position and rotation
     this.mesh.position.copy(this.position)
     this.mesh.rotation.copy(this.rotation)
+
+    // Walk animation
+    if (!this.isDestroyed) {
+      this.animateWalk(deltaTime)
+    }
+  }
+
+  private animateWalk(deltaTime: number) {
+    const speed = Math.sqrt(this.velocity.x ** 2 + this.velocity.z ** 2)
+    const isMoving = speed > 0.5
+
+    if (isMoving) {
+      // Advance walk cycle based on movement speed
+      this.walkCycle += deltaTime * speed * 0.8
+    } else {
+      // Smoothly return to neutral when stopped
+      this.walkCycle *= 0.9
+      if (Math.abs(this.walkCycle) < 0.01) this.walkCycle = 0
+    }
+
+    const swing = Math.sin(this.walkCycle)
+    const legsGroup = this.findChildByName(this.mesh, 'legs')
+    if (!legsGroup) return
+
+    // Bipedal legs — swing left/right legs in opposition
+    const legLeft = this.findChildByName(legsGroup, 'leg-left')
+    const legRight = this.findChildByName(legsGroup, 'leg-right')
+    if (legLeft && legRight) {
+      const angle = swing * 0.3 // max ~17 degrees
+      legLeft.rotation.x = angle
+      legRight.rotation.x = -angle
+      // Subtle body bob on the upper parts
+      this.applyBodyBob(swing, isMoving)
+      return
+    }
+
+    // Quadrupedal — diagonal pairs move together (trot gait)
+    const legLF = this.findChildByName(legsGroup, 'leg-lf')
+    const legRB = this.findChildByName(legsGroup, 'leg-rb')
+    const legRF = this.findChildByName(legsGroup, 'leg-rf')
+    const legLB = this.findChildByName(legsGroup, 'leg-lb')
+    if (legLF && legRB && legRF && legLB) {
+      const angle = swing * 0.25
+      // Diagonal pair 1
+      legLF.rotation.x = angle
+      legRB.rotation.x = angle
+      // Diagonal pair 2 (opposite)
+      legRF.rotation.x = -angle
+      legLB.rotation.x = -angle
+      return
+    }
+
+    // Tracked — spin wheels based on speed
+    const trackLeft = this.findChildByName(legsGroup, 'track-left')
+    const trackRight = this.findChildByName(legsGroup, 'track-right')
+    if (trackLeft || trackRight) {
+      const spinRate = speed * deltaTime * 3
+      const spinWheels = (parent: THREE.Object3D) => {
+        parent.traverse((child) => {
+          if (child.name.startsWith('wheel-') || child.name.startsWith('sprocket-') || child.name.startsWith('idler-')) {
+            child.rotation.x += spinRate
+          }
+        })
+      }
+      if (trackLeft) spinWheels(trackLeft)
+      if (trackRight) spinWheels(trackRight)
+      return
+    }
+
+    // Hover — constant bob + thrust glow pulse
+    const thruster = this.findChildByName(legsGroup, 'thruster-lf')
+    if (thruster) {
+      // Hover always bobs (use raw time via walkCycle advancing)
+      this.walkCycle += deltaTime * 4 // override: constant advance for hover
+      const bobAmount = isMoving ? 0.1 : 0.05
+      const bob = Math.sin(this.walkCycle) * bobAmount
+      if (legsGroup.userData.baseY === undefined) {
+        legsGroup.userData.baseY = legsGroup.position.y
+      }
+      legsGroup.position.y = (legsGroup.userData.baseY as number) + bob
+      // Pulse thrust glow
+      legsGroup.traverse((child) => {
+        if (child.name === 'thrust-glow' && child instanceof THREE.Mesh) {
+          const mat = child.material as THREE.MeshStandardMaterial
+          mat.emissiveIntensity = isMoving ? 0.8 + Math.sin(this.walkCycle * 3) * 0.3 : 0.5
+        }
+      })
+      return
+    }
+  }
+
+  private applyBodyBob(swing: number, isMoving: boolean) {
+    // Subtle vertical bob based on walk cycle
+    // Uses the attach points as base, so we set absolute Y offset
+    const bobY = isMoving ? Math.abs(swing) * 0.06 : 0
+    for (const name of ['core', 'head', 'leftArm', 'rightArm', 'rack'] as const) {
+      const part = this.findChildByName(this.mesh, name)
+      if (part && part.userData.baseY === undefined) {
+        part.userData.baseY = part.position.y
+      }
+      if (part && part.userData.baseY !== undefined) {
+        part.position.y = part.userData.baseY + bobY
+      }
+    }
+  }
+
+  private findChildByName(parent: THREE.Object3D, name: string): THREE.Object3D | null {
+    for (const child of parent.children) {
+      if (child.name === name) return child
+    }
+    return null
   }
 
   takeDamage(damage: number): boolean {

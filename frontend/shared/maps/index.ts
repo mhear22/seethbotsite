@@ -7,6 +7,7 @@ import { ruinedHighway } from './ruinedHighway';
 import { reactorCore } from './reactorCore';
 import { spaceColony } from './spaceColony';
 import { megaFactory } from './megaFactory';
+import { endOfUniverse } from './endOfUniverse';
 
 export const MAP_REGISTRY: Map<string, MapDefinition> = new Map([
   [defaultArena.id, defaultArena],
@@ -14,6 +15,7 @@ export const MAP_REGISTRY: Map<string, MapDefinition> = new Map([
   [reactorCore.id, reactorCore],
   [spaceColony.id, spaceColony],
   [megaFactory.id, megaFactory],
+  [endOfUniverse.id, endOfUniverse],
 ]);
 
 /** All multiplayer map IDs (excludes default arena which is for single-player/fallback) */
@@ -22,6 +24,7 @@ export const MULTIPLAYER_MAP_IDS = [
   reactorCore.id,
   spaceColony.id,
   megaFactory.id,
+  endOfUniverse.id,
 ];
 
 /** All single-player map IDs (includes all maps for variety) */
@@ -31,6 +34,7 @@ export const SINGLE_PLAYER_MAP_IDS = [
   reactorCore.id,
   spaceColony.id,
   megaFactory.id,
+  endOfUniverse.id,
 ];
 
 export function getMapById(id: string): MapDefinition | undefined {
@@ -46,4 +50,4 @@ export function getAllMaps(): MapDefinition[] {
   return Array.from(MAP_REGISTRY.values());
 }
 
-export { defaultArena, ruinedHighway, reactorCore, spaceColony, megaFactory };
+export { defaultArena, ruinedHighway, reactorCore, spaceColony, megaFactory, endOfUniverse };
