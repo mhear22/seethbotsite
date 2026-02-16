@@ -8,13 +8,10 @@
  */
 
 const http = require('http');
-const Database = require('better-sqlite3');
 const path = require('path');
-const fs = require('fs');
 
 // Configuration
 const API_BASE = process.env.API_BASE || 'http://localhost:8081';
-const DB_PATH = path.join(__dirname, 'backend/data/tickets.db');
 
 // Colors for terminal output
 const colors = {
@@ -62,38 +59,30 @@ function apiRequest(method, path, data = null) {
   });
 }
 
-// Helper: Get tickets from database
-function getTicketsFromDB(filters = {}) {
-  const db = new Database(DB_PATH, { readonly: true });
+// Helper: Get tickets from API
+async function getTicketsFromAPI(filters = {}) {
+  try {
+    const result = await apiRequest('GET', '/api/tickets');
+    let tickets = result.tickets || [];
 
-  let query = 'SELECT id, title, status, priority, created_at, updated_at FROM tickets';
-  const conditions = [];
-  const params = [];
+    // Apply filters
+    if (filters.status) {
+      const statusArray = Array.isArray(filters.status) ? filters.status : [filters.status];
+      tickets = tickets.filter(t => statusArray.includes(t.status));
+    }
 
-  if (filters.status) {
-    // Handle both string and array status
-    const statusArray = Array.isArray(filters.status) ? filters.status : [filters.status];
-    const placeholders = statusArray.map(() => '?').join(',');
-    conditions.push(`status IN (${placeholders})`);
-    params.push(...statusArray);
+    if (filters.id) {
+      tickets = tickets.filter(t => t.id === parseInt(filters.id));
+    }
+
+    // Sort by id descending
+    tickets.sort((a, b) => b.id - a.id);
+
+    return tickets;
+  } catch (error) {
+    console.error(colorize(`Error fetching tickets: ${error.message}`, 'red'));
+    return [];
   }
-
-  if (filters.id) {
-    conditions.push('id = ?');
-    params.push(filters.id);
-  }
-
-  if (conditions.length > 0) {
-    query += ' WHERE ' + conditions.join(' AND ');
-  }
-
-  query += ' ORDER BY id DESC';
-
-  const stmt = db.prepare(query);
-  const tickets = stmt.all(...params);
-
-  db.close();
-  return tickets;
 }
 
 // ============================================================================
@@ -102,10 +91,10 @@ function getTicketsFromDB(filters = {}) {
 
 // Command: ticket list
 async function cmdTicketList(args) {
-  const statusFilter = args.status ? args.status.split(',') : ['pending', 'needs-info'];
+  const statusFilter = args.status ? args.status.split(',') : ['pending', 'needs-info', 'in-progress'];
   const limit = args.limit ? parseInt(args.limit) : null;
 
-  const tickets = getTicketsFromDB({ status: statusFilter });
+  const tickets = await getTicketsFromAPI({ status: statusFilter });
 
   console.log(colorize('\n=== Tickets ===', 'cyan'));
   console.log(`Filter: ${statusFilter.join(', ')}`);
@@ -121,13 +110,18 @@ async function cmdTicketList(args) {
     const statusIcon = ticket.status === 'completed' ? '✅' :
                       ticket.status === 'pending' ? '⏳' :
                       ticket.status === 'needs-info' ? '🔄' :
+                      ticket.status === 'in-progress' ? '🔧' :
                       ticket.status === 'declined' ? '❌' : '❓';
     const priorityColor = ticket.priority === 'high' ? 'red' :
                          ticket.priority === 'medium' ? 'yellow' : 'green';
 
     console.log(`\n${statusIcon} ${colorize(`#${ticket.id}`, 'bright')} ${ticket.title}`);
-    console.log(`   Status: ${ticket.status} | Priority: ${colorize(ticket.priority, priorityColor)}`);
-    console.log(`   Created: ${ticket.created_at}`);
+    console.log(`   Status: ${ticket.status} | Priority: ${colorize(ticket.priority, priorityColor)} | Type: ${ticket.type || 'N/A'}`);
+    console.log(`   Created: ${new Date(ticket.created_at).toLocaleString()}`);
+    if (ticket.description) {
+      const desc = ticket.description.length > 100 ? ticket.description.substring(0, 100) + '...' : ticket.description;
+      console.log(`   Description: ${desc}`);
+    }
   });
 
   console.log(colorize(`\nTotal: ${displayTickets.length}/${tickets.length} tickets\n`, 'cyan'));
@@ -140,7 +134,7 @@ async function cmdTicketShow(args) {
     process.exit(1);
   }
 
-  const tickets = getTicketsFromDB({ id: args.id });
+  const tickets = await getTicketsFromAPI({ id: args.id });
 
   if (tickets.length === 0) {
     console.error(colorize(`Ticket #${args.id} not found`, 'red'));
@@ -152,8 +146,19 @@ async function cmdTicketShow(args) {
   console.log(`Title: ${ticket.title}`);
   console.log(`Status: ${ticket.status}`);
   console.log(`Priority: ${ticket.priority}`);
-  console.log(`Created: ${ticket.created_at}`);
-  console.log(`Updated: ${ticket.updated_at}`);
+  console.log(`Type: ${ticket.type || 'N/A'}`);
+  console.log(`Created: ${new Date(ticket.created_at).toLocaleString()}`);
+  console.log(`Updated: ${new Date(ticket.updated_at).toLocaleString()}`);
+  if (ticket.description) {
+    console.log(`\nDescription:\n${ticket.description}`);
+  }
+  if (ticket.response) {
+    console.log(`\nResponse:\n${ticket.response}`);
+  }
+  if (ticket.dependencies && ticket.dependencies.length > 0) {
+    console.log(`\nDependencies: ${ticket.dependencies.join(', ')}`);
+  }
+  console.log();
 }
 
 // Command: ticket complete
@@ -220,14 +225,16 @@ async function cmdStatus() {
     console.log(colorize('❌ API', 'red'), ': Down');
   }
 
-  // Check database
+  // Check tickets via API
   try {
-    const db = new Database(DB_PATH, { readonly: true });
-    const ticketCount = db.prepare('SELECT COUNT(*) as count FROM tickets').get();
-    console.log(colorize('✅ Database', 'green'), `: ${ticketCount.count} tickets`);
-    db.close();
+    const result = await apiRequest('GET', '/api/tickets');
+    const tickets = result.tickets || [];
+    const pending = tickets.filter(t => t.status === 'pending').length;
+    const inProgress = tickets.filter(t => t.status === 'in-progress').length;
+    const completed = tickets.filter(t => t.status === 'completed').length;
+    console.log(colorize('✅ Tickets', 'green'), `: ${tickets.length} total (${pending} pending, ${inProgress} in-progress, ${completed} completed)`);
   } catch (error) {
-    console.log(colorize('❌ Database', 'red'), `: ${error.message}`);
+    console.log(colorize('❌ Tickets API', 'red'), `: ${error.message}`);
   }
 
   console.log();
@@ -255,9 +262,9 @@ function cmdHelp() {
 
   console.log(colorize('\nExamples:', 'cyan'));
   console.log('  node cli.js ticket list');
-  console.log('  node cli.js ticket list --status pending,needs-info');
-  console.log('  node cli.js ticket show --id 128');
-  console.log('  node cli.js ticket complete --id 128 --response "Fixed the issue"');
+  console.log('  node cli.js ticket list --status pending,needs-info,in-progress');
+  console.log('  node cli.js ticket show --id 2');
+  console.log('  node cli.js ticket complete --id 2 --response "Fixed the issue"');
   console.log('  node cli.js status');
 
   console.log();
@@ -335,4 +342,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { apiRequest, getTicketsFromDB };
+module.exports = { apiRequest, getTicketsFromAPI };
