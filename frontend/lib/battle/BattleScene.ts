@@ -11,6 +11,7 @@ import { applyWindowShaders, updateWindowShaders } from './WindowShader'
 import { createDamageShaderPass, decayDamageIntensity } from './DamageShader'
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
 import type { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js'
 import { markRaw } from 'vue'
 import { useAudio } from '../../composables/useAudio'
@@ -127,6 +128,14 @@ export class BattleScene {
     }))
     this.renderer.setSize(window.innerWidth, window.innerHeight)
     this.renderer.setPixelRatio(window.devicePixelRatio * (gfx?.renderScale ?? 1.0))
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping
+    this.renderer.toneMappingExposure = 1.0
+
+    // Set up environment map for PBR material ambient lighting
+    const pmremGenerator = new THREE.PMREMGenerator(this.renderer)
+    pmremGenerator.compileEquirectangularShader()
+    this.scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture
+    pmremGenerator.dispose()
 
     // Apply shadow quality
     const shadowQuality = gfx?.shadowQuality ?? 'medium'

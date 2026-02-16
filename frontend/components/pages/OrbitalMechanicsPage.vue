@@ -400,7 +400,7 @@ function initScene() {
   const canvas = document.createElement('canvas')
   canvas.width = 256
   canvas.height = 256
-  const ctx = canvas.getContext('2d')
+  const ctx = canvas.getContext('2d')!
   
   // Create radial gradient for corona
   const gradient = ctx.createRadialGradient(128, 128, 0, 128, 128, 128)
@@ -716,36 +716,36 @@ function createNebulae() {
   const nebulaConfigs = [
     {
       tex: '/images/nebula-orion.jpg',
-      pos: new THREE.Vector3( 1400,  320, -1100),
-      size: 900, aspect: 1.33,
+      pos: new THREE.Vector3( 140,  32, -110),
+      size: 90, aspect: 1.33,
       rx: 0.12, ry:  0.28, rz:  0.4,
       brightness: 0.7,
     },
     {
       tex: '/images/nebula-carina.jpg',
-      pos: new THREE.Vector3(-1200, -150, -1300),
-      size: 850, aspect: 1.78,
-      rx: -0.18, ry: -0.22, rz: 1.2,
+      pos: new THREE.Vector3(-120, -15, 130),
+      size: 85, aspect: 1.78,
+      rx: -0.18, ry: -0.92, rz: 1.2,
       brightness: 0.75,
     },
     {
       tex: '/images/nebula-pillars.jpg',
-      pos: new THREE.Vector3( 250, -700, -1500),
-      size: 750, aspect: 0.72,
+      pos: new THREE.Vector3( 25, -70, -150),
+      size: 75, aspect: 0.72,
       rx:  0.28, ry:  0.08, rz: 2.6,
       brightness: 0.8,
     },
     {
       tex: '/images/nebula-horsehead.jpg',
-      pos: new THREE.Vector3(-800, 800, -1200),
-      size: 700, aspect: 1.25,
+      pos: new THREE.Vector3(-80, 80, -120),
+      size: 70, aspect: 1.25,
       rx: -0.08, ry:  0.32, rz: 0.9,
       brightness: 0.65,
     },
     {
       tex: '/images/nebula-eagle.jpg',
-      pos: new THREE.Vector3( 1000, -900, -1400),
-      size: 800, aspect: 1.5,
+      pos: new THREE.Vector3( 100, -90, -140),
+      size: 80, aspect: 1.5,
       rx:  0.18, ry: -0.14, rz: 3.8,
       brightness: 0.72,
     },

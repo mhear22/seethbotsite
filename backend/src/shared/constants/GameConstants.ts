@@ -173,7 +173,7 @@ export const COMBAT = {
     missile_launcher: {
       damage: 20,
       fireRate: 60,
-      projectileSpeed: 50,
+      projectileSpeed: 25,
       energyCost: 15,
       cooldown: 1000,
       projectileType: 'missile' as const,

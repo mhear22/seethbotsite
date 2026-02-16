@@ -20,6 +20,7 @@
 import { ref, onMounted, onUnmounted, watch, markRaw } from 'vue'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 import type { MapDefinition } from '@shared/types/MapDefinition'
 
 const props = defineProps<{
@@ -226,6 +227,14 @@ async function initScene() {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
   renderer.shadowMap.enabled = true
   renderer.shadowMap.type = THREE.PCFSoftShadowMap
+  renderer.toneMapping = THREE.ACESFilmicToneMapping
+  renderer.toneMappingExposure = 1.0
+
+  // Environment map for PBR ambient lighting
+  const pmremGenerator = new THREE.PMREMGenerator(renderer)
+  pmremGenerator.compileEquirectangularShader()
+  scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture
+  pmremGenerator.dispose()
 
   // Lighting
   const ambientLight = new THREE.AmbientLight(0xffffff, 0.4)
