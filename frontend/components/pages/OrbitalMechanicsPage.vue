@@ -116,7 +116,7 @@ function initScene() {
     75,
     window.innerWidth / window.innerHeight,
     0.1,
-    10
+    1200
   ))
 
   // Orthographic camera for full-screen quad
