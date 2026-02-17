@@ -1,49 +1,4 @@
-import Database from 'better-sqlite3';
-import path from 'path';
-
-const DB_PATH = path.join(__dirname, '..', '..', 'data', 'users.db');
-
-/**
- * Initialize the reactions database tables
- */
-export function initReactionsDB(): Database.Database {
-  const db = new Database(DB_PATH);
-
-  // Create reactions table if it doesn't exist
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS reactions (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER NOT NULL,
-      target_type TEXT NOT NULL CHECK(target_type IN ('message', 'post', 'comment')),
-      target_id INTEGER NOT NULL,
-      emoji TEXT NOT NULL,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-      UNIQUE(user_id, target_type, target_id, emoji)
-    )
-  `);
-
-  // Create indexes for performance
-  db.exec(`
-    CREATE INDEX IF NOT EXISTS idx_reactions_target ON reactions(target_type, target_id);
-    CREATE INDEX IF NOT EXISTS idx_reactions_user_id ON reactions(user_id);
-    CREATE INDEX IF NOT EXISTS idx_reactions_emoji ON reactions(emoji);
-  `);
-
-  return db;
-}
-
-let dbInstance: Database.Database | null = null;
-
-/**
- * Get the reactions database instance
- */
-export function getReactionsDB(): Database.Database {
-  if (!dbInstance) {
-    dbInstance = initReactionsDB();
-  }
-  return dbInstance;
-}
+import { prisma } from '../lib/prisma';
 
 /**
  * Reaction interface
@@ -51,10 +6,10 @@ export function getReactionsDB(): Database.Database {
 export interface Reaction {
   id: number;
   user_id: number;
-  target_type: 'message' | 'post' | 'comment';
-  target_id: number;
+  target_type: string;
+  target_id: string;
   emoji: string;
-  created_at: string;
+  created_at: Date;
 }
 
 /**
@@ -68,33 +23,41 @@ export interface ReactionCount {
 
 /**
  * Add or remove a reaction
- * If the user already reacted with this emoji, it removes the reaction (toggle)
+ * If user already reacted with this emoji, it removes the reaction (toggle)
  * Otherwise, it adds the reaction
  */
-export function toggleReaction(
+export async function toggleReaction(
   userId: number,
   targetType: 'message' | 'post' | 'comment',
-  targetId: number,
+  targetId: string,
   emoji: string
-): { added: boolean; removed: boolean } {
-  const db = getReactionsDB();
-
+): Promise<{ added: boolean; removed: boolean }> {
   // Check if reaction already exists
-  const existingReaction = db.prepare(
-    'SELECT id FROM reactions WHERE user_id = ? AND target_type = ? AND target_id = ? AND emoji = ?'
-  ).get(userId, targetType, targetId, emoji) as { id: number } | undefined;
+  const existingReaction = await prisma.reaction.findFirst({
+    where: {
+      user_id: userId,
+      target_type: targetType,
+      target_id: targetId,
+      emoji: emoji
+    }
+  });
 
   if (existingReaction) {
-    // Remove the reaction (toggle off)
-    db.prepare(
-      'DELETE FROM reactions WHERE id = ?'
-    ).run(existingReaction.id);
+    // Remove reaction (toggle off)
+    await prisma.reaction.delete({
+      where: { id: existingReaction.id }
+    });
     return { added: false, removed: true };
   } else {
-    // Add the reaction
-    db.prepare(
-      'INSERT INTO reactions (user_id, target_type, target_id, emoji) VALUES (?, ?, ?, ?)'
-    ).run(userId, targetType, targetId, emoji);
+    // Add reaction
+    await prisma.reaction.create({
+      data: {
+        user_id: userId,
+        target_type: targetType,
+        target_id: targetId,
+        emoji: emoji
+      }
+    });
     return { added: true, removed: false };
   }
 }
@@ -102,24 +65,21 @@ export function toggleReaction(
 /**
  * Add a reaction (force add, don't toggle)
  */
-export function addReaction(
+export async function addReaction(
   userId: number,
   targetType: 'message' | 'post' | 'comment',
-  targetId: number,
+  targetId: string,
   emoji: string
-): Reaction | null {
-  const db = getReactionsDB();
-
+): Promise<Reaction | null> {
   try {
-    const result = db.prepare(
-      'INSERT INTO reactions (user_id, target_type, target_id, emoji) VALUES (?, ?, ?, ?)'
-    ).run(userId, targetType, targetId, emoji);
-
-    const reaction = db.prepare(
-      'SELECT * FROM reactions WHERE id = ?'
-    ).get(result.lastInsertRowid) as Reaction;
-
-    return reaction;
+    return prisma.reaction.create({
+      data: {
+        user_id: userId,
+        target_type: targetType,
+        target_id: targetId,
+        emoji: emoji
+      }
+    });
   } catch (error) {
     // Reaction already exists (UNIQUE constraint)
     return null;
@@ -129,105 +89,131 @@ export function addReaction(
 /**
  * Remove a specific reaction by ID
  */
-export function removeReactionById(reactionId: number, userId: number): boolean {
-  const db = getReactionsDB();
+export async function removeReactionById(reactionId: number, userId: number): Promise<boolean> {
+  const reaction = await prisma.reaction.findUnique({
+    where: { id: reactionId }
+  });
 
-  const result = db.prepare(
-    'DELETE FROM reactions WHERE id = ? AND user_id = ?'
-  ).run(reactionId, userId);
+  if (!reaction || reaction.user_id !== userId) {
+    return false;
+  }
 
-  return result.changes > 0;
+  await prisma.reaction.delete({
+    where: { id: reactionId }
+  });
+
+  return true;
 }
 
 /**
  * Remove a reaction by user, target, and emoji
  */
-export function removeReaction(
+export async function removeReaction(
   userId: number,
   targetType: 'message' | 'post' | 'comment',
-  targetId: number,
+  targetId: string,
   emoji: string
-): boolean {
-  const db = getReactionsDB();
+): Promise<boolean> {
+  const result = await prisma.reaction.deleteMany({
+    where: {
+      user_id: userId,
+      target_type: targetType,
+      target_id: targetId,
+      emoji: emoji
+    }
+  });
 
-  const result = db.prepare(
-    'DELETE FROM reactions WHERE user_id = ? AND target_type = ? AND target_id = ? AND emoji = ?'
-  ).run(userId, targetType, targetId, emoji);
-
-  return result.changes > 0;
+  return result.count > 0;
 }
 
 /**
  * Get all reactions for a target
  */
-export function getReactionsForTarget(
+export async function getReactionsForTarget(
   targetType: 'message' | 'post' | 'comment',
-  targetId: number
-): Reaction[] {
-  const db = getReactionsDB();
-
-  const reactions = db.prepare(
-    'SELECT * FROM reactions WHERE target_type = ? AND target_id = ? ORDER BY created_at ASC'
-  ).all(targetType, targetId) as Reaction[];
-
-  return reactions;
+  targetId: string
+): Promise<Reaction[]> {
+  return prisma.reaction.findMany({
+    where: {
+      target_type: targetType,
+      target_id: targetId
+    },
+    orderBy: { created_at: 'asc' }
+  });
 }
 
 /**
  * Get aggregated reaction counts for a target
  * Returns array of { emoji, count, user_ids }
  */
-export function getReactionCountsForTarget(
+export async function getReactionCountsForTarget(
   targetType: 'message' | 'post' | 'comment',
-  targetId: number
-): ReactionCount[] {
-  const db = getReactionsDB();
+  targetId: string
+): Promise<ReactionCount[]> {
+  const reactions = await prisma.reaction.findMany({
+    where: {
+      target_type: targetType,
+      target_id: targetId
+    },
+    select: {
+      emoji: true,
+      user_id: true
+    }
+  });
 
-  const counts = db.prepare(`
-    SELECT
+  // Aggregate by emoji
+  const counts = new Map<string, { count: number; user_ids: number[] }>();
+
+  for (const reaction of reactions) {
+    const existing = counts.get(reaction.emoji);
+    if (existing) {
+      existing.count++;
+      existing.user_ids.push(reaction.user_id);
+    } else {
+      counts.set(reaction.emoji, {
+        count: 1,
+        user_ids: [reaction.user_id]
+      });
+    }
+  }
+
+  // Convert to array and sort by count
+  return Array.from(counts.entries())
+    .map(([emoji, data]) => ({
       emoji,
-      COUNT(*) as count,
-      GROUP_CONCAT(user_id) as user_ids
-    FROM reactions
-    WHERE target_type = ? AND target_id = ?
-    GROUP BY emoji
-    ORDER BY count DESC
-  `).all(targetType, targetId) as any[];
-
-  return counts.map(c => ({
-    emoji: c.emoji,
-    count: c.count,
-    user_ids: c.user_ids ? c.user_ids.split(',').map((id: string) => parseInt(id)) : []
-  }));
+      count: data.count,
+      user_ids: data.user_ids
+    }))
+    .sort((a, b) => b.count - a.count);
 }
 
 /**
  * Check if a user has reacted to a target with a specific emoji
  */
-export function hasUserReacted(
+export async function hasUserReacted(
   userId: number,
   targetType: 'message' | 'post' | 'comment',
-  targetId: number,
+  targetId: string,
   emoji: string
-): boolean {
-  const db = getReactionsDB();
+): Promise<boolean> {
+  const count = await prisma.reaction.count({
+    where: {
+      user_id: userId,
+      target_type: targetType,
+      target_id: targetId,
+      emoji: emoji
+    }
+  });
 
-  const result = db.prepare(
-    'SELECT COUNT(*) as count FROM reactions WHERE user_id = ? AND target_type = ? AND target_id = ? AND emoji = ?'
-  ).get(userId, targetType, targetId, emoji) as { count: number };
-
-  return result.count > 0;
+  return count > 0;
 }
 
 /**
  * Get all reactions by a user
  */
-export function getReactionsByUser(userId: number): Reaction[] {
-  const db = getReactionsDB();
-
-  const reactions = db.prepare(
-    'SELECT * FROM reactions WHERE user_id = ? ORDER BY created_at DESC'
-  ).all(userId) as Reaction[];
-
-  return reactions;
+export async function getReactionsByUser(userId: number): Promise<Reaction[]> {
+  return prisma.reaction.findMany({
+    where: { user_id: userId },
+    orderBy: { created_at: 'desc' }
+  });
 }

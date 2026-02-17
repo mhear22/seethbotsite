@@ -109,7 +109,7 @@ router.post('/', async (req: Request, res: Response) => {
     });
   }
 
-  const result = toggleReaction(userId, targetType as 'message' | 'post' | 'comment', targetId, emoji);
+  const result = await toggleReaction(userId, targetType as 'message' | 'post' | 'comment', targetId, emoji);
 
   res.json({
     success: true,
@@ -323,7 +323,7 @@ router.get('/:targetType/:targetId', async (req: Request, res: Response) => {
 
   if (detailed === 'true') {
     // Return individual reactions
-    const reactions = getReactionsForTarget(targetType as 'message' | 'post' | 'comment', numericTargetId);
+    const reactions = await getReactionsForTarget(targetType as 'message' | 'post' | 'comment', targetId as string);
 
     // If user is authenticated, mark which reactions belong to them
     const userId = await getUserIdFromToken(req);
@@ -339,16 +339,16 @@ router.get('/:targetType/:targetId', async (req: Request, res: Response) => {
     });
   } else {
     // Return aggregated counts
-    const reactionCounts = getReactionCountsForTarget(targetType as 'message' | 'post' | 'comment', numericTargetId);
+    const reactionCounts = await getReactionCountsForTarget(targetType as 'message' | 'post' | 'comment', targetId as string);
 
     // If user is authenticated, mark which reactions they've made
     const userId = await getUserIdFromToken(req);
 
     if (userId) {
-      const enrichedCounts = reactionCounts.map(rc => ({
+      const enrichedCounts = await Promise.all(reactionCounts.map(async (rc) => ({
         ...rc,
-        has_reacted: hasUserReacted(userId, targetType as 'message' | 'post' | 'comment', numericTargetId, rc.emoji)
-      }));
+        has_reacted: await hasUserReacted(userId, targetType as 'message' | 'post' | 'comment', targetId as string, rc.emoji)
+      })));
 
       res.json({
         success: true,
@@ -428,10 +428,10 @@ router.get('/check', async (req: Request, res: Response) => {
     });
   }
 
-  const hasReacted = hasUserReacted(
+  const hasReacted = await hasUserReacted(
     userId,
     targetType as 'message' | 'post' | 'comment',
-    parseInt(targetId as string),
+    targetId as string,
     emoji as string
   );
 
@@ -464,7 +464,7 @@ router.get('/user', async (req: Request, res: Response) => {
     });
   }
 
-  const reactions = getReactionsByUser(userId);
+  const reactions = await getReactionsByUser(userId);
 
   res.json({
     success: true,

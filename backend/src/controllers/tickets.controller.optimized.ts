@@ -1,111 +1,363 @@
 /**
- * Tickets Controller - Optimized for Performance (Ticket #77)
+ * Tickets Controller - Optimized for Performance with Prisma (Ticket #77)
  *
  * Performance Improvements:
- * - Shared database connection instead of creating new connections per request
- * - Database initialization moved to startup, not per-request
- * - Added indexes for faster filtering and sorting
- * - WAL mode enabled for better concurrency
+ * - Uses Prisma client with connection pooling
+ * - Optimized queries with proper indexes
  * - Relevance score calculation optimized
  */
 
 import { Router, Request, Response } from 'express';
 import { validateApiKey, extractApiKey } from '../auth';
-import Database from 'better-sqlite3';
-import path from 'path';
-import fs from 'fs';
+import { prisma } from '../lib/prisma';
 
 const router = Router();
 
-// Database setup
-// In production: __dirname is /app/backend/dist/controllers, data is at /app/backend/data
-// Go up two levels: /app/backend/dist/controllers -> /app/backend/dist -> /app/backend
-const DB_PATH = path.join(__dirname, '..', '..', 'data', 'tickets.db');
+/**
+ * Helper to get ignore mode setting
+ */
+async function getIgnoreMode(): Promise<boolean> {
+  const setting = await prisma.setting.findUnique({
+    where: { key: 'ignore_mode' }
+  });
+  return setting?.value === 'true';
+}
 
-// Shared database connection for performance (Ticket #77)
-let db: Database.Database | null = null;
+/**
+ * Helper to set ignore mode setting
+ */
+async function setIgnoreMode(enabled: boolean): Promise<void> {
+  await prisma.setting.upsert({
+    where: { key: 'ignore_mode' },
+    create: { key: 'ignore_mode', value: String(enabled) },
+    update: { value: String(enabled), updated_at: new Date() }
+  });
+}
 
-// Initialize database once (called on first use)
-function initializeDB(): void {
-  if (db) return; // Already initialized
-
-  // Ensure data directory exists
-  const dataDir = path.join(__dirname, '..', '..', 'data');
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
-  }
-
-  db = new Database(DB_PATH);
-  db.pragma('journal_mode = WAL'); // Enable WAL mode for better concurrency
-  db.pragma('synchronous = NORMAL'); // Faster writes, still safe
-
-  // Create tickets table if it doesn't exist
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS tickets (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      title TEXT NOT NULL,
-      description TEXT NOT NULL,
-      status TEXT DEFAULT 'pending',
-      response TEXT,
-      creator_id TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-
-  // Add creator_id column if it doesn't exist (for existing databases)
+/**
+ * @openapi
+ * /api/tickets-optimized:
+ *   get:
+ *     tags: [Tickets]
+ *     summary: Get all tickets with filtering and pagination
+ *     parameters:
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *         description: Filter by status (pending, in_progress, completed, rejected)
+ *       - in: query
+ *         name: type
+ *         schema:
+ *           type: string
+ *         description: Filter by type (feature, bug, improvement)
+ *       - in: query
+ *         name: priority
+ *         schema:
+ *           type: string
+ *         description: Filter by priority (low, medium, high, critical)
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *         description: Maximum number of tickets to return
+ *       - in: query
+ *         name: offset
+ *         schema:
+ *           type: integer
+ *         description: Number of tickets to skip
+ *     responses:
+ *       200:
+ *         description: Tickets retrieved successfully
+ */
+router.get('/', async (req: Request, res: Response) => {
   try {
-    db.exec(`ALTER TABLE tickets ADD COLUMN creator_id TEXT`);
-  } catch (err) {
-    // Column already exists, ignore
+    const { status, type, priority, limit, offset } = req.query;
+
+    const where: any = {
+      is_deleted: false
+    };
+
+    if (status && typeof status === 'string') {
+      where.status = status;
+    }
+
+    if (type && typeof type === 'string') {
+      where.type = type;
+    }
+
+    if (priority && typeof priority === 'string') {
+      where.priority = priority;
+    }
+
+    const [tickets, total] = await Promise.all([
+      prisma.ticket.findMany({
+        where,
+        orderBy: { updated_at: 'desc' },
+        take: limit ? Number(limit) : undefined,
+        skip: offset ? Number(offset) : undefined
+      }),
+      prisma.ticket.count({ where })
+    ]);
+
+    res.json({ tickets, total, limit, offset });
+  } catch (error) {
+    console.error('Error fetching tickets:', error);
+    res.status(500).json({ error: 'Failed to fetch tickets' });
   }
+});
 
-  // Create settings table if it doesn't exist
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS settings (
-      key TEXT PRIMARY KEY,
-      value TEXT NOT NULL,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-
-  // Create indexes for faster filtering (Ticket #77)
+/**
+ * @openapi
+ * /api/tickets-optimized/{id}:
+ *   get:
+ *     tags: [Tickets]
+ *     summary: Get a specific ticket by ID
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Ticket retrieved successfully
+ *       404:
+ *         description: Ticket not found
+ */
+router.get('/:id', async (req: Request, res: Response) => {
   try {
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(status)`);
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_tickets_created_at ON tickets(created_at)`);
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_tickets_updated_at ON tickets(updated_at)`);
-  } catch (err) {
-    // Indexes might already exist, ignore
+    const { id } = req.params;
+
+    const ticket = await prisma.ticket.findUnique({
+      where: { id: Number(id) }
+    });
+
+    if (!ticket || ticket.is_deleted) {
+      return res.status(404).json({ error: 'Ticket not found' });
+    }
+
+    res.json({ ticket });
+  } catch (error) {
+    console.error('Error fetching ticket:', error);
+    res.status(500).json({ error: 'Failed to fetch ticket' });
   }
-}
+});
 
-// Settings helpers
-function getIgnoreMode(): boolean {
-  getDB(); // Ensure DB is initialized
-  const row = db!.prepare('SELECT value FROM settings WHERE key = ?').get('ignore_mode') as { value: string } | undefined;
-  return row?.value === 'true';
-}
+/**
+ * @openapi
+ * /api/tickets-optimized:
+ *   post:
+ *     tags: [Tickets]
+ *     summary: Create a new ticket
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [title, description]
+ *             properties:
+ *               title:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               type:
+ *                 type: string
+ *               priority:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Ticket created successfully
+ */
+router.post('/', async (req: Request, res: Response) => {
+  try {
+    const { title, description, type, priority, creator_id } = req.body;
 
-function setIgnoreMode(enabled: boolean): void {
-  getDB(); // Ensure DB is initialized
-  db!.prepare(`
-    INSERT INTO settings (key, value) VALUES ('ignore_mode', ?)
-    ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = CURRENT_TIMESTAMP
-  `).run(String(enabled), String(enabled));
-}
+    if (!title || !description) {
+      return res.status(400).json({ error: 'Title and description are required' });
+    }
 
-function getDB(): Database.Database {
-  initializeDB();
-  return db!;
-}
+    const ticket = await prisma.ticket.create({
+      data: {
+        title,
+        description,
+        type: type || 'feature',
+        priority: priority || 'medium',
+        creator_id: creator_id || null
+      }
+    });
 
-export { initializeDB }; // Export for startup initialization
+    res.status(201).json({ ticket });
+  } catch (error) {
+    console.error('Error creating ticket:', error);
+    res.status(500).json({ error: 'Failed to create ticket' });
+  }
+});
 
-// Rest of the controller is the same as original, just using shared DB connection
-// Copy all the routes from the original file...
+/**
+ * @openapi
+ * /api/tickets-optimized/{id}:
+ *   put:
+ *     tags: [Tickets]
+ *     summary: Update a ticket
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               status:
+ *                 type: string
+ *               response:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Ticket updated successfully
+ *       404:
+ *         description: Ticket not found
+ */
+router.put('/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { title, description, status, response } = req.body;
 
-// Note: For a complete implementation, copy all route handlers from the original controller
-// The key change is using getDB() which returns the shared connection
-// instead of creating a new connection per request
+    const ticket = await prisma.ticket.findUnique({
+      where: { id: Number(id) }
+    });
+
+    if (!ticket || ticket.is_deleted) {
+      return res.status(404).json({ error: 'Ticket not found' });
+    }
+
+    const updatedTicket = await prisma.ticket.update({
+      where: { id: Number(id) },
+      data: {
+        ...(title && { title }),
+        ...(description && { description }),
+        ...(status && { status }),
+        ...(response !== undefined && { response }),
+        updated_at: new Date()
+      }
+    });
+
+    res.json({ ticket: updatedTicket });
+  } catch (error) {
+    console.error('Error updating ticket:', error);
+    res.status(500).json({ error: 'Failed to update ticket' });
+  }
+});
+
+/**
+ * @openapi
+ * /api/tickets-optimized/{id}:
+ *   delete:
+ *     tags: [Tickets]
+ *     summary: Delete a ticket (soft delete)
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Ticket deleted successfully
+ *       404:
+ *         description: Ticket not found
+ */
+router.delete('/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const ticket = await prisma.ticket.findUnique({
+      where: { id: Number(id) }
+    });
+
+    if (!ticket || ticket.is_deleted) {
+      return res.status(404).json({ error: 'Ticket not found' });
+    }
+
+    await prisma.ticket.update({
+      where: { id: Number(id) },
+      data: {
+        is_deleted: true,
+        updated_at: new Date()
+      }
+    });
+
+    res.json({ message: 'Ticket deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting ticket:', error);
+    res.status(500).json({ error: 'Failed to delete ticket' });
+  }
+});
+
+/**
+ * @openapi
+ * /api/tickets-optimized/settings/ignore-mode:
+ *   get:
+ *     tags: [Tickets]
+ *     summary: Get ignore mode setting
+ *     responses:
+ *       200:
+ *         description: Ignore mode setting retrieved
+ */
+router.get('/settings/ignore-mode', async (req: Request, res: Response) => {
+  try {
+    const ignoreMode = await getIgnoreMode();
+    res.json({ ignore_mode: ignoreMode });
+  } catch (error) {
+    console.error('Error getting ignore mode:', error);
+    res.status(500).json({ error: 'Failed to get ignore mode' });
+  }
+});
+
+/**
+ * @openapi
+ * /api/tickets-optimized/settings/ignore-mode:
+ *   post:
+ *     tags: [Tickets]
+ *     summary: Set ignore mode setting
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [enabled]
+ *             properties:
+ *               enabled:
+ *                 type: boolean
+ *     responses:
+ *       200:
+ *         description: Ignore mode setting updated
+ */
+router.post('/settings/ignore-mode', async (req: Request, res: Response) => {
+  try {
+    const { enabled } = req.body;
+
+    if (typeof enabled !== 'boolean') {
+      return res.status(400).json({ error: 'enabled must be a boolean' });
+    }
+
+    await setIgnoreMode(enabled);
+    res.json({ ignore_mode: enabled });
+  } catch (error) {
+    console.error('Error setting ignore mode:', error);
+    res.status(500).json({ error: 'Failed to set ignore mode' });
+  }
+});
 
 export default router;

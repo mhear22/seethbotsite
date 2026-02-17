@@ -1,44 +1,7 @@
 import { Router, Request, Response } from 'express';
-import Database from 'better-sqlite3';
-import path from 'path';
-import fs from 'fs';
+import { prisma } from '../lib/prisma';
 
 const router = Router();
-
-// Database setup
-const DB_PATH = path.join(__dirname, '..', '..', 'data', 'characters.db');
-
-function getDB(): Database.Database {
-  const dataDir = path.join(__dirname, '..', '..', 'data');
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
-  }
-
-  const db = new Database(DB_PATH);
-
-  // Create characters table if it doesn't exist
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS characters (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      image_url TEXT,
-      elo_rating INTEGER DEFAULT 1200,
-      wins INTEGER DEFAULT 0,
-      losses INTEGER DEFAULT 0,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-
-  // Add is_deleted column if it doesn't exist (for soft deletes)
-  try {
-    db.exec(`ALTER TABLE characters ADD COLUMN is_deleted BOOLEAN DEFAULT 0`);
-  } catch (err) {
-    // Column already exists, ignore the error
-  }
-
-  return db;
-}
 
 /**
  * @openapi
@@ -52,12 +15,10 @@ function getDB(): Database.Database {
  */
 router.get('/characters', async (req: Request, res: Response) => {
   try {
-    const db = getDB();
-    const characters = db.prepare(`
-      SELECT * FROM characters
-      WHERE is_deleted = 0
-      ORDER BY elo_rating DESC
-    `).all();
+    const characters = await prisma.character.findMany({
+      where: { is_deleted: false },
+      orderBy: { elo_rating: 'desc' }
+    });
 
     res.json({ characters });
   } catch (error) {
@@ -78,10 +39,11 @@ router.get('/characters', async (req: Request, res: Response) => {
  */
 router.get('/characters/random-pair', async (req: Request, res: Response) => {
   try {
-    const db = getDB();
-
     // Get all character IDs
-    const allIds = db.prepare('SELECT id FROM characters WHERE is_deleted = 0').all() as { id: number }[];
+    const allIds = await prisma.character.findMany({
+      where: { is_deleted: false },
+      select: { id: true }
+    });
 
     if (allIds.length < 2) {
       return res.json({ characters: [] });
@@ -92,10 +54,12 @@ router.get('/characters/random-pair', async (req: Request, res: Response) => {
     const pairIds = [shuffled[0].id, shuffled[1].id];
 
     // Fetch the two characters
-    const characters = db.prepare(`
-      SELECT * FROM characters
-      WHERE id IN (?, ?) AND is_deleted = 0
-    `).all(pairIds[0], pairIds[1]);
+    const characters = await prisma.character.findMany({
+      where: {
+        id: { in: pairIds },
+        is_deleted: false
+      }
+    });
 
     res.json({ characters });
   } catch (error) {
@@ -134,14 +98,12 @@ router.post('/characters', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Name is required' });
     }
 
-    const db = getDB();
-    const stmt = db.prepare(`
-      INSERT INTO characters (name, image_url, elo_rating, wins, losses, created_at, updated_at)
-      VALUES (?, ?, 1200, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-    `);
-    const result = stmt.run(name.trim(), image_url || null);
-
-    const newCharacter = db.prepare('SELECT * FROM characters WHERE id = ? AND is_deleted = 0').get(result.lastInsertRowid);
+    const newCharacter = await prisma.character.create({
+      data: {
+        name: name.trim(),
+        image_url: image_url || null
+      }
+    });
 
     res.status(201).json({ character: newCharacter });
   } catch (error) {
@@ -184,11 +146,13 @@ router.post('/characters/vote', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Winner and loser must be different characters' });
     }
 
-    const db = getDB();
-
     // Get current ELO ratings
-    const winner = db.prepare('SELECT * FROM characters WHERE id = ? AND is_deleted = 0').get(winner_id) as any;
-    const loser = db.prepare('SELECT * FROM characters WHERE id = ? AND is_deleted = 0').get(loser_id) as any;
+    const winner = await prisma.character.findFirst({
+      where: { id: Number(winner_id), is_deleted: false }
+    });
+    const loser = await prisma.character.findFirst({
+      where: { id: Number(loser_id), is_deleted: false }
+    });
 
     if (!winner || !loser) {
       return res.status(404).json({ error: 'One or both characters not found' });
@@ -202,23 +166,35 @@ router.post('/characters/vote', async (req: Request, res: Response) => {
     const newWinnerElo = Math.round(winner.elo_rating + K * (1 - expectedWinner));
     const newLoserElo = Math.round(loser.elo_rating + K * (0 - expectedLoser));
 
-    // Update winner
-    db.prepare(`
-      UPDATE characters
-      SET elo_rating = ?, wins = wins + 1, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).run(newWinnerElo, winner_id);
+    // Update both characters
+    const [updatedWinner, updatedLoser] = await prisma.$transaction([
+      prisma.character.update({
+        where: { id: winner.id },
+        data: {
+          elo_rating: newWinnerElo,
+          wins: { increment: 1 },
+          updated_at: new Date()
+        }
+      }),
+      prisma.character.update({
+        where: { id: loser.id },
+        data: {
+          elo_rating: newLoserElo,
+          losses: { increment: 1 },
+          updated_at: new Date()
+        }
+      })
+    ]);
 
-    // Update loser
-    db.prepare(`
-      UPDATE characters
-      SET elo_rating = ?, losses = losses + 1, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).run(newLoserElo, loser_id);
-
-    // Fetch updated characters
-    const updatedWinner = db.prepare('SELECT * FROM characters WHERE id = ? AND is_deleted = 0').get(winner_id);
-    const updatedLoser = db.prepare('SELECT * FROM characters WHERE id = ? AND is_deleted = 0').get(loser_id);
+    // Record the match
+    await prisma.characterMatch.create({
+      data: {
+        character_id: winner.id,
+        opponent_id: loser.id,
+        winner_id: winner.id,
+        voter_id: req.body.voter_id || 0
+      }
+    });
 
     res.json({
       winner: updatedWinner,
@@ -251,10 +227,14 @@ router.post('/characters/vote', async (req: Request, res: Response) => {
 router.delete('/characters/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const db = getDB();
 
-    const stmt = db.prepare('UPDATE characters SET is_deleted = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?');
-    stmt.run(id);
+    await prisma.character.update({
+      where: { id: Number(id) },
+      data: {
+        is_deleted: true,
+        updated_at: new Date()
+      }
+    });
 
     res.json({ message: 'Character deleted successfully' });
   } catch (error) {

@@ -135,7 +135,7 @@ router.post('/record', async (req: Request, res: Response) => {
       userId: userId || 'anonymous',
       volume: volume || 0.5,
       parameters: parameters || {},
-      timestamp: new Date().toISOString()
+      timestamp: new Date()
     });
     
     res.json(result);

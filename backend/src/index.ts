@@ -42,9 +42,6 @@ import themesController from './controllers/themes.controller';
 import discordController from './controllers/discord.controller';
 import { setupWebSocketServer } from './controllers/presence.controller';
 import { setupMultiplayerWebSocket, getGameStats } from './controllers/multiplayer.controller';
-import { initProfilesDB } from './services/profile.service';
-import { initFavoritesDB } from './services/favorites.service';
-import { initThemeDB } from './services/theme.service';
 import { createServer } from 'http';
 
 const app: Express = express();
@@ -185,20 +182,7 @@ setupWebSocketServer(server);
 // Setup multiplayer WebSocket server
 setupMultiplayerWebSocket(server);
 
-// Initialize profiles database
-initProfilesDB().catch((err) => {
-  console.error('Failed to initialize profiles database:', err);
-});
-
-// Initialize favorites database
-initFavoritesDB().catch((err) => {
-  console.error('Failed to initialize favorites database:', err);
-});
-
-// Initialize theme database
-initThemeDB().catch((err: any) => {
-  console.error('Failed to initialize theme database:', err);
-});
+// Note: Prisma client is initialized automatically, no need for separate DB initialization
 
 server.listen(PORT, () => {
   console.log(`🌸 Server running on http://localhost:${PORT}`);

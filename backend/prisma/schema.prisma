@@ -46,6 +46,7 @@ model User {
   reactions             Reaction[]
   theme                  Theme?
   characterMatches       CharacterMatch[] @relation("Voter")
+  userDevices           UserDevice[]
 
   @@index([email])
 }
@@ -366,6 +367,8 @@ model ShopItem {
   description String
   price       Int
   category    String
+  icon        String?
+  effect      String?
   image_url   String?
   is_active   Boolean  @default(true)
   created_at  DateTime @default(now())
@@ -389,22 +392,34 @@ model PurchasedItem {
 }
 
 model Profile {
-  id               Int     @id @default(autoincrement())
-  user_id          Int     @unique
+  id                 Int     @id @default(autoincrement())
+  user_id            Int     @unique
+  display_name       String?
+  bio                String?
+  avatar_url         String?
+  profile_banner_url  String?
+  status_message     String?
+  location           String?
+  website            String?
+  social_links       String?
+  is_public          Boolean @default(true)
   theme_preferences String?
-  custom_colors    String?
-  created_at       DateTime @default(now())
-  updated_at       DateTime @default(now())
+  custom_colors      String?
+  created_at         DateTime @default(now())
+  updated_at         DateTime @default(now())
 
   user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
 }
 
 model Favorite {
-  id        Int      @id @default(autoincrement())
-  user_id   Int
-  item_type String
-  item_id   String
-  created_at DateTime @default(now())
+  id           Int      @id @default(autoincrement())
+  user_id      Int
+  item_type    String
+  item_id      String
+  display_name String?
+  order_index  Int      @default(0)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @default(now())
 
   user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
@@ -437,4 +452,43 @@ model Theme {
   updated_at       DateTime @default(now())
 
   user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+// ============================================================================
+// Sync
+// ============================================================================
+
+model UserDevice {
+  id          Int      @id @default(autoincrement())
+  user_id     Int
+  device_id   String   @unique
+  device_name String?
+  device_type String?
+  platform    String?
+  last_sync   DateTime?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([device_id])
+}
+
+model SyncLog {
+  id                  Int      @id @default(autoincrement())
+  user_id             Int
+  device_id           String
+  sync_type           String   // 'upload' | 'download'
+  status              String   // 'success' | 'partial' | 'failed'
+  items_synced        Int      @default(0)
+  conflicts_found     Int      @default(0)
+  conflicts_resolved  Int      @default(0)
+  error_message        String?
+  started_at          DateTime @default(now())
+  completed_at        DateTime?
+
+  @@index([user_id])
+  @@index([device_id])
+  @@index([started_at])
 }

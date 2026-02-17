@@ -1,6 +1,5 @@
 import * as movies from '../movies';
-import Database from 'better-sqlite3';
-import path from 'path';
+import { prisma } from '../lib/prisma';
 
 export interface SearchResult {
   type: 'movie' | 'shop_item' | 'quote' | 'advice';
@@ -10,8 +9,6 @@ export interface SearchResult {
   relevance: number;
   metadata?: Record<string, any>;
 }
-
-const POINTS_DB_PATH = path.join(__dirname, '..', '..', 'data', 'tickets.db');
 
 // Northernlion quotes collection
 const northernlionQuotes = [
@@ -38,7 +35,7 @@ const northernlionQuotes = [
   "It's chaotic energy, but it's energy.",
   "You know what they say about plans.",
   "We're making progress... in a direction.",
-  "This is the content the people want.",
+  "This is the content people want.",
   "Let's just pretend that didn't happen.",
   "I'm basically a genius.",
   "That's not how this works.",
@@ -55,7 +52,7 @@ const northernlionQuotes = [
   "Actually, maybe I'm the problem.",
   "Time to pivot.",
   "Strategy is for people with plans.",
-  "Let's throw caution to the the wind.",
+  "Let's throw caution to the wind.",
   "I'm in too deep now.",
   "This is the way.",
   "Trust your gut.",
@@ -161,65 +158,37 @@ function searchMovies(query: string): SearchResult[] {
 /**
  * Search shop items
  */
-function searchShopItems(query: string): SearchResult[] {
-  try {
-    const db = new Database(POINTS_DB_PATH);
+async function searchShopItems(query: string): Promise<SearchResult[]> {
+  const items = await prisma.shopItem.findMany({
+    where: { is_active: true }
+  });
 
-    // Create shop items table if it doesn't exist
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS shop_items (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        description TEXT NOT NULL,
-        cost INTEGER NOT NULL,
-        icon TEXT NOT NULL,
-        category TEXT NOT NULL,
-        effect TEXT
-      )
-    `);
+  const results: SearchResult[] = [];
 
-    const items = db.prepare('SELECT * FROM shop_items').all() as Array<{
-      id: number;
-      name: string;
-      description: string;
-      cost: number;
-      icon: string;
-      category: string;
-      effect?: string;
-    }>;
+  for (const item of items) {
+    const nameScore = calculateRelevance(query, item.name);
+    const descScore = calculateRelevance(query, item.description);
+    const categoryScore = calculateRelevance(query, item.category);
+    const maxScore = Math.max(nameScore, descScore, categoryScore);
 
-    db.close();
-
-    const results: SearchResult[] = [];
-
-    for (const item of items) {
-      const nameScore = calculateRelevance(query, item.name);
-      const descScore = calculateRelevance(query, item.description);
-      const categoryScore = calculateRelevance(query, item.category);
-      const maxScore = Math.max(nameScore, descScore, categoryScore);
-
-      if (maxScore > 0) {
-        results.push({
-          type: 'shop_item',
-          id: item.id.toString(),
-          title: item.name,
-          description: item.description,
-          relevance: maxScore,
-          metadata: {
-            cost: item.cost,
-            icon: item.icon,
-            category: item.category,
-            effect: item.effect
-          }
-        });
-      }
+    if (maxScore > 0) {
+      results.push({
+        type: 'shop_item',
+        id: item.id.toString(),
+        title: item.name,
+        description: item.description,
+        relevance: maxScore,
+        metadata: {
+          cost: item.price,
+          icon: item.icon,
+          category: item.category,
+          effect: item.effect
+        }
+      });
     }
-
-    return results.sort((a, b) => b.relevance - a.relevance);
-  } catch (error) {
-    console.error('Error searching shop items:', error);
-    return [];
   }
+
+  return results.sort((a, b) => b.relevance - a.relevance);
 }
 
 /**
@@ -275,7 +244,7 @@ function searchAdvice(query: string): SearchResult[] {
 /**
  * Main search function - searches across all content types
  */
-export function search(query: string, types?: string[]): SearchResult[] {
+export async function search(query: string, types?: string[]): Promise<SearchResult[]> {
   if (!query || query.trim().length === 0) {
     return [];
   }
@@ -295,7 +264,7 @@ export function search(query: string, types?: string[]): SearchResult[] {
         results.push(...searchMovies(trimmedQuery));
         break;
       case 'shop_item':
-        results.push(...searchShopItems(trimmedQuery));
+        results.push(...await searchShopItems(trimmedQuery));
         break;
       case 'quote':
         results.push(...searchQuotes(trimmedQuery));

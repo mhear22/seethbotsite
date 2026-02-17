@@ -4,72 +4,7 @@
  * for account synchronization across multiple devices.
  */
 
-import Database from 'better-sqlite3';
-import path from 'path';
-
-// Use the users.db database for sync tables (shares with auth tables)
-const DB_PATH = path.join(__dirname, '..', '..', 'data', 'users.db');
-
-/**
- * Initialize the sync database
- */
-export function initSyncDB(): Database.Database {
-  const db = new Database(DB_PATH);
-
-  // Create user_devices table
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS user_devices (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER NOT NULL,
-      device_id TEXT UNIQUE NOT NULL,
-      device_name TEXT,
-      device_type TEXT,
-      platform TEXT,
-      last_sync DATETIME,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-    )
-  `);
-
-  // Create sync_log table
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS sync_log (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER NOT NULL,
-      device_id TEXT NOT NULL,
-      sync_type TEXT NOT NULL,
-      status TEXT NOT NULL,
-      items_synced INTEGER DEFAULT 0,
-      conflicts_found INTEGER DEFAULT 0,
-      conflicts_resolved INTEGER DEFAULT 0,
-      error_message TEXT,
-      started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      completed_at DATETIME,
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-    )
-  `);
-
-  // Create indexes
-  db.exec(`
-    CREATE INDEX IF NOT EXISTS idx_user_devices_user_id ON user_devices(user_id);
-    CREATE INDEX IF NOT EXISTS idx_user_devices_device_id ON user_devices(device_id);
-    CREATE INDEX IF NOT EXISTS idx_sync_log_user_id ON sync_log(user_id);
-    CREATE INDEX IF NOT EXISTS idx_sync_log_device_id ON sync_log(device_id);
-    CREATE INDEX IF NOT EXISTS idx_sync_log_started_at ON sync_log(started_at);
-  `);
-
-  return db;
-}
-
-let dbInstance: Database.Database | null = null;
-
-export function getSyncDB(): Database.Database {
-  if (!dbInstance) {
-    dbInstance = initSyncDB();
-  }
-  return dbInstance;
-}
+import { prisma } from '../lib/prisma';
 
 /**
  * Device interface
@@ -81,9 +16,9 @@ export interface UserDevice {
   device_name: string | null;
   device_type: string | null;
   platform: string | null;
-  last_sync: string | null;
-  created_at: string;
-  updated_at: string;
+  last_sync: Date | null;
+  created_at: Date;
+  updated_at: Date;
 }
 
 /**
@@ -93,14 +28,14 @@ export interface SyncLog {
   id: number;
   user_id: number;
   device_id: string;
-  sync_type: 'upload' | 'download';
-  status: 'success' | 'partial' | 'failed';
+  sync_type: string;
+  status: string;
   items_synced: number;
   conflicts_found: number;
   conflicts_resolved: number;
   error_message: string | null;
-  started_at: string;
-  completed_at: string | null;
+  started_at: Date;
+  completed_at: Date | null;
 }
 
 /**
@@ -142,153 +77,159 @@ export interface Conflict {
 /**
  * Register or update a device
  */
-export function registerOrUpdateDevice(
+export async function registerOrUpdateDevice(
   userId: number,
   deviceId: string,
   deviceName?: string,
   deviceType?: string,
   platform?: string
-): UserDevice {
-  const db = getSyncDB();
-  const now = new Date().toISOString();
+): Promise<UserDevice> {
+  const now = new Date();
 
   // Check if device exists
-  const existing = db.prepare(
-    'SELECT * FROM user_devices WHERE device_id = ? AND user_id = ?'
-  ).get(deviceId, userId) as UserDevice | undefined;
+  const existing = await prisma.userDevice.findFirst({
+    where: {
+      user_id: userId,
+      device_id: deviceId
+    }
+  });
 
   if (existing) {
-    // Update device
-    db.prepare(`
-      UPDATE user_devices
-      SET device_name = COALESCE(?, device_name),
-          device_type = COALESCE(?, device_type),
-          platform = COALESCE(?, platform),
-          updated_at = ?
-      WHERE id = ?
-    `).run(
-      deviceName || null,
-      deviceType || null,
-      platform || null,
-      now,
-      existing.id
-    );
-    return { ...existing, updated_at: now };
+    return prisma.userDevice.update({
+      where: { id: existing.id },
+      data: {
+        device_name: deviceName ?? existing.device_name,
+        device_type: deviceType ?? existing.device_type,
+        platform: platform ?? existing.platform,
+        updated_at: now
+      }
+    });
   } else {
-    // Insert new device
-    const result = db.prepare(`
-      INSERT INTO user_devices (user_id, device_id, device_name, device_type, platform, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(userId, deviceId, deviceName || null, deviceType || null, platform || null, now, now);
-
-    return db.prepare('SELECT * FROM user_devices WHERE id = ?').get(result.lastInsertRowid) as UserDevice;
+    return prisma.userDevice.create({
+      data: {
+        user_id: userId,
+        device_id: deviceId,
+        device_name: deviceName ?? null,
+        device_type: deviceType ?? null,
+        platform: platform ?? null,
+        created_at: now,
+        updated_at: now
+      }
+    });
   }
 }
 
 /**
  * Get all devices for a user
  */
-export function getUserDevices(userId: number): UserDevice[] {
-  const db = getSyncDB();
-  return db.prepare('SELECT * FROM user_devices WHERE user_id = ? ORDER BY last_sync DESC').all(userId) as UserDevice[];
+export async function getUserDevices(userId: number): Promise<UserDevice[]> {
+  return prisma.userDevice.findMany({
+    where: { user_id: userId },
+    orderBy: { last_sync: 'desc' }
+  });
 }
 
 /**
  * Update last sync time for a device
  */
-export function updateDeviceLastSync(userId: number, deviceId: string): void {
-  const db = getSyncDB();
-  const now = new Date().toISOString();
-  db.prepare(`
-    UPDATE user_devices
-    SET last_sync = ?, updated_at = ?
-    WHERE device_id = ? AND user_id = ?
-  `).run(now, now, deviceId, userId);
+export async function updateDeviceLastSync(userId: number, deviceId: string): Promise<void> {
+  const now = new Date();
+  await prisma.userDevice.updateMany({
+    where: {
+      user_id: userId,
+      device_id: deviceId
+    },
+    data: {
+      last_sync: now,
+      updated_at: now
+    }
+  });
 }
 
 /**
  * Start a sync log entry
  */
-export function startSyncLog(
+export async function startSyncLog(
   userId: number,
   deviceId: string,
   syncType: 'upload' | 'download'
-): number {
-  const db = getSyncDB();
-  const result = db.prepare(`
-    INSERT INTO sync_log (user_id, device_id, sync_type, status, started_at)
-    VALUES (?, ?, ?, 'partial', ?)
-  `).run(userId, deviceId, syncType, new Date().toISOString());
-  return Number(result.lastInsertRowid);
+): Promise<number> {
+  const syncLog = await prisma.syncLog.create({
+    data: {
+      user_id: userId,
+      device_id: deviceId,
+      sync_type: syncType,
+      status: 'partial',
+      started_at: new Date()
+    }
+  });
+  return syncLog.id;
 }
 
 /**
  * Complete a sync log entry
  */
-export function completeSyncLog(
+export async function completeSyncLog(
   logId: number,
   status: 'success' | 'partial' | 'failed',
   itemsSynced: number = 0,
   conflictsFound: number = 0,
   conflictsResolved: number = 0,
   errorMessage: string | null = null
-): void {
-  const db = getSyncDB();
-  db.prepare(`
-    UPDATE sync_log
-    SET status = ?, items_synced = ?, conflicts_found = ?, conflicts_resolved = ?, error_message = ?, completed_at = ?
-    WHERE id = ?
-  `).run(
-    status,
-    itemsSynced,
-    conflictsFound,
-    conflictsResolved,
-    errorMessage,
-    new Date().toISOString(),
-    logId
-  );
+): Promise<void> {
+  await prisma.syncLog.update({
+    where: { id: logId },
+    data: {
+      status: status,
+      items_synced: itemsSynced,
+      conflicts_found: conflictsFound,
+      conflicts_resolved: conflictsResolved,
+      error_message: errorMessage,
+      completed_at: new Date()
+    }
+  });
 }
 
 /**
  * Get recent sync logs for a user
  */
-export function getRecentSyncLogs(userId: number, limit: number = 10): SyncLog[] {
-  const db = getSyncDB();
-  return db.prepare(`
-    SELECT * FROM sync_log
-    WHERE user_id = ?
-    ORDER BY started_at DESC
-    LIMIT ?
-  `).all(userId, limit) as SyncLog[];
+export async function getRecentSyncLogs(userId: number, limit: number = 10): Promise<SyncLog[]> {
+  return prisma.syncLog.findMany({
+    where: { user_id: userId },
+    orderBy: { started_at: 'desc' },
+    take: limit
+  });
 }
 
 /**
  * Get sync status for a user
  */
-export function getSyncStatus(userId: number): SyncStatus {
-  const db = getSyncDB();
-  const devices = getUserDevices(userId);
-  const recentSyncs = getRecentSyncLogs(userId, 5);
+export async function getSyncStatus(userId: number): Promise<SyncStatus> {
+  const devices = await getUserDevices(userId);
+  const recentSyncs = await getRecentSyncLogs(userId, 5);
 
   // Get last sync time from any device
   let lastSyncTime: string | null = null;
   for (const device of devices) {
     if (device.last_sync && (!lastSyncTime || new Date(device.last_sync) > new Date(lastSyncTime))) {
-      lastSyncTime = device.last_sync;
+      lastSyncTime = device.last_sync.toISOString();
     }
   }
 
   // Count pending conflicts (syncs with conflicts that haven't been resolved)
-  const conflictsPending = db.prepare(`
-    SELECT COUNT(*) as count FROM sync_log
-    WHERE user_id = ? AND status = 'partial' AND conflicts_found > conflicts_resolved
-  `).get(userId) as { count: number };
+  const conflictsPending = await prisma.syncLog.count({
+    where: {
+      user_id: userId,
+      status: 'partial',
+      conflicts_found: { gt: 0 }
+    }
+  });
 
   return {
     last_sync_time: lastSyncTime,
     total_devices: devices.length,
     recent_syncs: recentSyncs,
-    conflicts_pending: conflictsPending.count
+    conflicts_pending: conflictsPending
   };
 }
 
@@ -407,96 +348,39 @@ export function resolveConflicts(
 /**
  * Get syncable data from tickets database
  */
-export function getSyncableData(userId?: number): SyncData {
-  const db = getTicketsDB();
-
+export async function getSyncableData(userId?: number): Promise<SyncData> {
   // Get tickets (optionally filtered by user)
-  let tickets: any[] = [];
-  try {
-    if (userId) {
-      tickets = db.prepare(`
-        SELECT id, title, description, status, response, creator_id,
-               created_at, updated_at, type, priority, tags, category, version
-        FROM tickets
-        WHERE creator_id = ? AND is_deleted = 0
-        ORDER BY updated_at DESC
-      `).all(userId);
-    } else {
-      tickets = db.prepare(`
-        SELECT id, title, description, status, response, creator_id,
-               created_at, updated_at, type, priority, tags, category, version
-        FROM tickets
-        WHERE is_deleted = 0
-        ORDER BY updated_at DESC
-      `).all();
+  const tickets = await prisma.ticket.findMany({
+    where: {
+      is_deleted: false,
+      ...(userId && { creator_id: userId.toString() })
+    },
+    orderBy: { updated_at: 'desc' },
+    select: {
+      id: true,
+      title: true,
+      description: true,
+      status: true,
+      response: true,
+      creator_id: true,
+      created_at: true,
+      updated_at: true,
+      type: true,
+      priority: true,
+      tags: true,
+      category: true
     }
-  } catch (err) {
-    // If version column doesn't exist yet, select without it
-    if (userId) {
-      tickets = db.prepare(`
-        SELECT id, title, description, status, response, creator_id,
-               created_at, updated_at, type, priority, tags, category
-        FROM tickets
-        WHERE creator_id = ? AND is_deleted = 0
-        ORDER BY updated_at DESC
-      `).all(userId);
-    } else {
-      tickets = db.prepare(`
-        SELECT id, title, description, status, response, creator_id,
-               created_at, updated_at, type, priority, tags, category
-        FROM tickets
-        WHERE is_deleted = 0
-        ORDER BY updated_at DESC
-      `).all();
-    }
-  }
+  });
 
   // Get settings
-  let settings: any[] = [];
-  try {
-    settings = db.prepare(`
-      SELECT key, value, updated_at, version
-      FROM settings
-      ORDER BY key
-    `).all();
-  } catch (err) {
-    // If version column doesn't exist yet, select without it
-    settings = db.prepare(`
-      SELECT key, value, updated_at
-      FROM settings
-      ORDER BY key
-    `).all();
-  }
+  const settings = await prisma.setting.findMany({
+    orderBy: { key: 'asc' }
+  });
 
   return {
-    tickets,
-    settings,
+    tickets: tickets.map(t => ({ ...t, version: 1 })),
+    settings: settings.map(s => ({ ...s, version: 1 })),
     version: 1,
     timestamp: new Date().toISOString()
   };
-}
-
-/**
- * Get tickets database for updates
- * Also ensures version columns exist for sync
- */
-export function getTicketsDB(): Database.Database {
-  const { getDB } = require('../services/tickets-db');
-  const db = getDB();
-
-  // Ensure version column exists in tickets table
-  try {
-    db.exec(`ALTER TABLE tickets ADD COLUMN version INTEGER DEFAULT 1`);
-  } catch (err) {
-    // Column already exists, ignore
-  }
-
-  // Ensure version column exists in settings table
-  try {
-    db.exec(`ALTER TABLE settings ADD COLUMN version INTEGER DEFAULT 1`);
-  } catch (err) {
-    // Column already exists, ignore
-  }
-
-  return db;
 }
