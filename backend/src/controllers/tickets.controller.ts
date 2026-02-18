@@ -348,9 +348,9 @@ router.patch('/tickets/:id', async (req: Request, res: Response) => {
 
     if (message === 'Ticket not found') {
       res.status(404).json({ error: message });
-    } else if (message.includes('Cannot edit') || message.includes('Invalid status')) {
+    } else if (message.includes('Cannot edit')) {
       res.status(403).json({ error: message });
-    } else if (message.includes('Title') || message.includes('Description')) {
+    } else if (message.includes('Invalid status') || message.includes('Title') || message.includes('Description') || message.includes('At least one field')) {
       res.status(400).json({ error: message });
     } else {
       res.status(500).json({ error: message || 'Failed to update ticket' });
