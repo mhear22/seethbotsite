@@ -1,8 +1,8 @@
 import { Router, Request, Response } from 'express';
+import { prisma } from '../lib/prisma';
 import {
   getIgnoreMode,
-  setIgnoreMode,
-  getDB
+  setIgnoreMode
 } from '../services/tickets-db';
 import {
   ticketsService,
@@ -129,40 +129,40 @@ router.patch('/tickets/settings/ignore-mode', async (req: Request, res: Response
  */
 router.get('/tickets/next-task', async (req: Request, res: Response) => {
   try {
-    const db = getDB();
+    const now = new Date();
 
     // Update last collection timestamp
-    const now = new Date().toISOString();
-    db.prepare(`
-      INSERT INTO settings (key, value) VALUES ('last_collection', ?)
-      ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = CURRENT_TIMESTAMP
-    `).run(now, now);
+    await prisma.setting.upsert({
+      where: { key: 'last_collection' },
+      create: { key: 'last_collection', value: now.toISOString() },
+      update: { value: now.toISOString(), updated_at: now }
+    });
 
     // First, check if there's already a ticket in progress (needs-info status)
-    let ticket = db.prepare(`
-      SELECT * FROM tickets
-      WHERE status = 'needs-info'
-        AND is_deleted = 0
-        AND (title NOT LIKE '%weiner%' AND title NOT LIKE '%fire%')
-      ORDER BY created_at ASC
-      LIMIT 1
-    `).get() as any || null;
+    let ticket = await prisma.ticket.findFirst({
+      where: {
+        status: 'needs-info',
+        is_deleted: false,
+        NOT: { OR: [{ title: { contains: 'weiner' } }, { title: { contains: 'fire' } }] }
+      },
+      orderBy: { created_at: 'asc' }
+    });
 
     // If no in-progress ticket, get the next pending ticket
     if (!ticket) {
-      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-      ticket = db.prepare(`
-        SELECT * FROM tickets
-        WHERE status = 'pending'
-          AND is_deleted = 0
-          AND (updated_at < ? OR updated_at IS NULL)
-          AND (title NOT LIKE '%weiner%' AND title NOT LIKE '%fire%')
-        ORDER BY id ASC
-        LIMIT 1
-      `).get(oneHourAgo) || null;
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+      ticket = await prisma.ticket.findFirst({
+        where: {
+          status: 'pending',
+          is_deleted: false,
+          updated_at: { lt: oneHourAgo },
+          NOT: { OR: [{ title: { contains: 'weiner' } }, { title: { contains: 'fire' } }] }
+        },
+        orderBy: { id: 'asc' }
+      });
     }
 
-    res.json({ ticket, lastCollection: now });
+    res.json({ ticket, lastCollection: now.toISOString() });
   } catch (error) {
     console.error('Error fetching next task:', error);
     res.status(500).json({ error: 'Failed to fetch next task' });
@@ -191,10 +191,8 @@ router.get('/tickets/next-task', async (req: Request, res: Response) => {
  */
 router.get('/tickets/settings/last-collection', async (req: Request, res: Response) => {
   try {
-    const db = getDB();
-    const row = db.prepare('SELECT value FROM settings WHERE key = ?').get('last_collection') as { value: string } | undefined;
-    const lastCollection = row?.value || null;
-    res.json({ lastCollection });
+    const row = await prisma.setting.findUnique({ where: { key: 'last_collection' } });
+    res.json({ lastCollection: row?.value || null });
   } catch (error) {
     console.error('Error fetching last collection:', error);
     res.status(500).json({ error: 'Failed to fetch last collection' });
@@ -226,13 +224,11 @@ router.get('/tickets/settings/last-collection', async (req: Request, res: Respon
 router.patch('/tickets/settings/last-collection', async (req: Request, res: Response) => {
   try {
     const { lastCollection } = req.body;
-    const db = getDB();
-
-    db.prepare(`
-      INSERT INTO settings (key, value) VALUES ('last_collection', ?)
-      ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = CURRENT_TIMESTAMP
-    `).run(lastCollection, lastCollection);
-
+    await prisma.setting.upsert({
+      where: { key: 'last_collection' },
+      create: { key: 'last_collection', value: lastCollection },
+      update: { value: lastCollection, updated_at: new Date() }
+    });
     res.json({ lastCollection });
   } catch (error) {
     console.error('Error updating last collection:', error);
@@ -450,7 +446,7 @@ router.delete('/tickets/:id', async (req: Request, res: Response) => {
  */
 router.get('/tickets/estimated-wait-time', async (req: Request, res: Response) => {
   try {
-    const result = ticketsStatsService.getEstimatedWaitTime();
+    const result = await ticketsStatsService.getEstimatedWaitTime();
     res.json(result);
   } catch (error) {
     console.error('Error calculating estimated wait time:', error);
@@ -519,249 +515,11 @@ router.get('/tickets/estimated-wait-time', async (req: Request, res: Response) =
  */
 router.get('/tickets/stats', async (req: Request, res: Response) => {
   try {
-    const stats = ticketsStatsService.getDashboardStats();
+    const stats = await ticketsStatsService.getDashboardStats();
     res.json(stats);
   } catch (error) {
     console.error('Error fetching ticket stats:', error);
     res.status(500).json({ error: 'Failed to fetch ticket stats' });
-  }
-});
-
-/**
- * @openapi
- * /api/tickets/{id}/appeal:
- *   post:
- *     tags: [Tickets]
- *     summary: Appeal a ticket
- *     description: Submit an appeal for a ticket, explaining why it should be reopened. Useful for joke tickets that were mistakenly closed.
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *         description: The ID of ticket to appeal
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [reason, creator_id]
- *             properties:
- *               reason:
- *                 type: string
- *                 description: The reason for appeal
- *               creator_id:
- *                 type: string
- *                 description: The user ID submitting appeal
- *     responses:
- *       200:
- *         description: Appeal submitted successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                 appeal:
- *                   type: object
- *       400:
- *         description: Bad request - missing required fields or invalid ticket status
- *       404:
- *         description: Ticket not found
- */
-router.post('/tickets/:id/appeal', async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const { reason, creator_id } = req.body;
-
-    if (!reason || !creator_id) {
-      return res.status(400).json({ error: 'Reason and creator_id are required' });
-    }
-
-    const db = getDB();
-
-    // Check if ticket exists (exclude soft-deleted)
-    const ticket = db.prepare('SELECT * FROM tickets WHERE id = ? AND is_deleted = 0').get(id) as any;
-    if (!ticket) {
-      return res.status(404).json({ error: 'Ticket not found' });
-    }
-
-    // Only allow appeals for completed or declined tickets
-    if (!['completed', 'declined'].includes(ticket.status)) {
-      return res.status(400).json({ error: 'Only completed or declined tickets can be appealed' });
-    }
-
-    // Create appeal
-    const stmt = db.prepare(`
-      INSERT INTO ticket_appeals (ticket_id, reason, creator_id, status, created_at)
-      VALUES (?, ?, ?, 'pending', CURRENT_TIMESTAMP)
-    `);
-    const result = stmt.run(id, reason, creator_id);
-
-    const newAppeal = db.prepare('SELECT * FROM ticket_appeals WHERE id = ?').get(result.lastInsertRowid);
-
-    res.json({
-      message: 'Appeal submitted successfully',
-      appeal: newAppeal
-    });
-  } catch (error) {
-    console.error('Error submitting appeal:', error);
-    res.status(500).json({ error: 'Failed to submit appeal' });
-  }
-});
-
-/**
- * @openapi
- * /api/tickets/appeals:
- *   get:
- *     tags: [Tickets]
- *     summary: Get all ticket appeals
- *     description: Returns all ticket appeals. No authentication required.
- *     parameters:
- *       - in: query
- *         name: status
- *         schema:
- *           type: string
- *           enum: [all, pending, approved, rejected]
- *           default: all
- *         description: Filter appeals by status
- *     responses:
- *       200:
- *         description: Appeals retrieved successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 appeals:
- *                   type: array
- *                   items:
- *                     type: object
- *       401:
- *         description: Unauthorized - invalid API key
- */
-router.get('/tickets/appeals', async (req: Request, res: Response) => {
-  try {
-    const { status = 'all' } = req.query;
-    const db = getDB();
-
-    let query = 'SELECT * FROM ticket_appeals WHERE 1=1';
-    const params: any[] = [];
-
-    if (status !== 'all') {
-      query += ' AND status = ?';
-      params.push(status);
-    }
-
-    query += ' ORDER BY created_at DESC';
-
-    const appeals = db.prepare(query).all(...params);
-
-    res.json({ appeals });
-  } catch (error) {
-    console.error('Error fetching appeals:', error);
-    res.status(500).json({ error: 'Failed to fetch appeals' });
-  }
-});
-
-/**
- * @openapi
- * /api/tickets/appeals/{id}/review:
- *   patch:
- *     tags: [Tickets]
- *     summary: Review a ticket appeal
- *     description: Approve or reject a ticket appeal. No authentication required.
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *         description: The appeal ID
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [decision, reviewer_id]
- *             properties:
- *               decision:
- *                 type: string
- *                 enum: [approved, rejected]
- *                 description: The appeal decision
- *               reviewer_id:
- *                 type: string
- *                 description: The ID of admin reviewing appeal
- *               response:
- *                 type: string
- *                 description: Optional response from reviewer
- *     responses:
- *       200:
- *         description: Appeal reviewed successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                 appeal:
- *                   type: object
- *       404:
- *         description: Appeal not found
- */
-router.patch('/tickets/appeals/:id/review', async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const { decision, reviewer_id } = req.body;
-
-    if (!decision || !['approved', 'rejected'].includes(decision)) {
-      return res.status(400).json({ error: 'Decision must be "approved" or "rejected"' });
-    }
-
-    if (!reviewer_id) {
-      return res.status(400).json({ error: 'Reviewer ID is required' });
-    }
-
-    const db = getDB();
-
-    // Check if appeal exists
-    const appeal = db.prepare('SELECT * FROM ticket_appeals WHERE id = ?').get(id) as any;
-    if (!appeal) {
-      return res.status(404).json({ error: 'Appeal not found' });
-    }
-
-    // Update appeal
-    const stmt = db.prepare(`
-      UPDATE ticket_appeals
-      SET status = ?, reviewed_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `);
-    stmt.run(decision, id);
-
-    // If approved, reopen ticket
-    if (decision === 'approved') {
-      db.prepare(`
-        UPDATE tickets
-        SET status = 'pending', updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-      `).run(appeal.ticket_id);
-    }
-
-    const updatedAppeal = db.prepare('SELECT * FROM ticket_appeals WHERE id = ?').get(id);
-
-    res.json({
-      message: `Appeal ${decision} successfully`,
-      appeal: updatedAppeal,
-      ticketReopened: decision === 'approved'
-    });
-  } catch (error) {
-    console.error('Error reviewing appeal:', error);
-    res.status(500).json({ error: 'Failed to review appeal' });
   }
 });
 
@@ -794,7 +552,7 @@ router.patch('/tickets/appeals/:id/review', async (req: Request, res: Response) 
  */
 router.get('/tickets/tags', async (req: Request, res: Response) => {
   try {
-    const tags = ticketsStatsService.getAllTags();
+    const tags = await ticketsStatsService.getAllTags();
     res.json({ tags });
   } catch (error) {
     console.error('Error fetching tags:', error);
@@ -831,7 +589,7 @@ router.get('/tickets/tags', async (req: Request, res: Response) => {
  */
 router.get('/tickets/categories', async (req: Request, res: Response) => {
   try {
-    const categories = ticketsStatsService.getAllCategories();
+    const categories = await ticketsStatsService.getAllCategories();
     res.json({ categories });
   } catch (error) {
     console.error('Error fetching categories:', error);
