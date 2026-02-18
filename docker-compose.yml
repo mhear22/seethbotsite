@@ -5,8 +5,9 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        GIT_HASH: ${GIT_HASH:-$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")}
-        GIT_BRANCH: ${GIT_BRANCH:-$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")}
+        GIT_HASH: ${GIT_HASH:-unknown}
+        GIT_BRANCH: ${GIT_BRANCH:-unknown}
+        BUILD_COUNT: ${BUILD_NUMBER:-1}
     image: seethbotsite-server:latest
     container_name: seethbot-server
     restart: unless-stopped

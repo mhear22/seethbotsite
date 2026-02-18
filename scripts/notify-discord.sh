@@ -48,8 +48,16 @@ esac
 # Get build info if available
 if [ -f "backend/build-info.json" ]; then
   BUILD_INFO=$(cat backend/build-info.json)
-  BUILD_TIME=$(echo "$BUILD_INFO" | python3 -c "import sys, json; print(json.load(sys.stdin).get('buildTime', '$BUILD_TIME'))" 2>/dev/null || echo "$BUILD_TIME")
-  BUILD_NUMBER=$(echo "$BUILD_INFO" | python3 -c "import sys, json; print(json.load(sys.stdin).get('buildCount', '$BUILD_NUMBER'))" 2>/dev/null || echo "$BUILD_NUMBER")
+  FILE_BUILD_TIME=$(echo "$BUILD_INFO" | python3 -c "import sys, json; print(json.load(sys.stdin).get('buildTime', '$BUILD_TIME'))" 2>/dev/null || echo "$BUILD_TIME")
+  FILE_BUILD_NUMBER=$(echo "$BUILD_INFO" | python3 -c "import sys, json; print(json.load(sys.stdin).get('buildCount', '$BUILD_NUMBER'))" 2>/dev/null || echo "$BUILD_NUMBER")
+
+  if [ -z "$BUILD_TIME" ] || [ "$BUILD_TIME" = "unknown" ]; then
+    BUILD_TIME="$FILE_BUILD_TIME"
+  fi
+
+  if [ -z "$BUILD_NUMBER" ] || [ "$BUILD_NUMBER" = "unknown" ]; then
+    BUILD_NUMBER="$FILE_BUILD_NUMBER"
+  fi
 fi
 
 # Create Discord webhook payload

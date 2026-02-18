@@ -1,14 +1,17 @@
 const fs = require('fs');
 const path = require('path');
 
-// Read existing build info to preserve build count
 const outputPath = path.join(__dirname, '..', 'build-info.json');
-let buildCount = 1;
+const envBuildCount = Number.parseInt(
+  process.env.BUILD_COUNT || process.env.BUILD_NUMBER || '',
+  10
+);
+let buildCount = Number.isInteger(envBuildCount) && envBuildCount > 0 ? envBuildCount : 1;
 
-if (fs.existsSync(outputPath)) {
+// Fallback for local/non-Docker builds where BUILD_COUNT is not provided.
+if (buildCount === 1 && fs.existsSync(outputPath)) {
   try {
     const existingInfo = JSON.parse(fs.readFileSync(outputPath, 'utf-8'));
-    // Preserve the build count from the existing file (set by update-build-info.sh)
     buildCount = existingInfo.buildCount || 1;
   } catch (err) {
     console.warn('Could not read existing build-info.json, starting count from 1');
