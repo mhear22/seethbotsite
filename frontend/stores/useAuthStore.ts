@@ -25,6 +25,10 @@ interface Session {
   last_used_at: string
 }
 
+interface AuthSessionPayload {
+  expires_at?: string
+}
+
 export const useAuthStore = defineStore('auth', () => {
   // State
   const user = ref<User | null>(null)
@@ -43,6 +47,12 @@ export const useAuthStore = defineStore('auth', () => {
   // Getters
   const isAuthenticated = computed(() => !!token.value && !!user.value)
   const isInitialized = computed(() => initialized)
+
+  const maybeStartTokenRefresh = (session?: AuthSessionPayload) => {
+    if (session?.expires_at) {
+      startTokenRefresh(session.expires_at)
+    }
+  }
 
   /**
    * Initialize auth state from localStorage
@@ -96,7 +106,7 @@ export const useAuthStore = defineStore('auth', () => {
         user.value = data.user
 
         // Start automatic token refresh
-        startTokenRefresh(data.session.expires_at)
+        maybeStartTokenRefresh(data.session)
 
         // Load user settings
         await loadSettings()
@@ -166,7 +176,7 @@ export const useAuthStore = defineStore('auth', () => {
         user.value = data.user
 
         // Restart refresh timer
-        startTokenRefresh(data.session.expires_at)
+        maybeStartTokenRefresh(data.session)
 
         console.log('Token refreshed successfully')
         return true

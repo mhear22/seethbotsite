@@ -354,7 +354,12 @@ describe('useAuth', () => {
       localStorage.setItem('auth_token', 'sessions-token')
       mockFetch.mockResolvedValue({
         ok: true,
-        json: async () => ({ id: 1, email: 'test@example.com', display_name: 'Test' })
+        json: async () => ({
+          user: { id: 1, email: 'test@example.com', display_name: 'Test' },
+          session: {
+            expires_at: new Date(Date.now() + 86400000).toISOString()
+          }
+        })
       })
 
       const auth = loadUseAuth()

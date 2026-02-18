@@ -351,7 +351,8 @@ describe('useAuthStore', () => {
 
   describe('logoutSession', () => {
     it('should send DELETE to /auth/sessions/:id', async () => {
-      mockFetch.mockResolvedValue({ ok: true })
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ success: true }) })
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ sessions: [] }) })
 
       const store = useAuthStore()
       store.token = 'session-token'
