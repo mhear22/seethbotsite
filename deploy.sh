@@ -29,6 +29,10 @@ export GIT_BRANCH
 echo "📝 Updating build info..."
 ./scripts/update-build-info.sh
 
+# Prevent deployments when frontend typing is broken
+echo "🔍 Running frontend typecheck..."
+npm --prefix frontend run typecheck
+
 # Notify Discord that build started
 ./scripts/notify-discord.sh "started" "$BUILD_NUMBER" "$GIT_HASH" "$GIT_BRANCH"
 

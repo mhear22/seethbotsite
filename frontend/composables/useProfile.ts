@@ -96,12 +96,12 @@ export const useProfile = (token: () => string | null) => {
         return { success: true, user: data.user }
       } else {
         error.value = data.message || 'Update failed'
-        return { success: false, error: error.value }
+        return { success: false, error: error.value || 'Update failed' }
       }
     } catch (err) {
       console.error('Update failed:', err)
       error.value = 'Update failed. Please try again.'
-      return { success: false, error: error.value }
+      return { success: false, error: error.value || 'Update failed. Please try again.' }
     } finally {
       loading.value = false
     }
