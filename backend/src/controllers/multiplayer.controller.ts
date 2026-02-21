@@ -10,6 +10,7 @@ import { ClientMessage } from '../shared/types/NetworkMessages';
 import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.SEETHBOT_JWT_SECRET || 'change-this-in-production-secret-key';
+const MULTIPLAYER_WS_PATHS = ['/ws/mech/multiplayer', '/ws/multiplayer'] as const;
 
 /**
  * Setup multiplayer WebSocket server
@@ -19,9 +20,9 @@ export function setupMultiplayerWebSocket(server: any) {
 
   // Handle WebSocket upgrade requests
   server.on('upgrade', (request: IncomingMessage, socket: any, head: Buffer) => {
-    // Only handle /ws/multiplayer path
+    // Only handle supported multiplayer WebSocket paths.
     const pathname = new URL(request.url || '', `http://${request.headers.host}`).pathname;
-    if (pathname !== '/ws/multiplayer') {
+    if (!MULTIPLAYER_WS_PATHS.includes(pathname as typeof MULTIPLAYER_WS_PATHS[number])) {
       return; // Let other handlers deal with it
     }
 
@@ -113,7 +114,7 @@ export function setupMultiplayerWebSocket(server: any) {
     });
   });
 
-  console.log('[Multiplayer] WebSocket server initialized for /ws/multiplayer');
+  console.log(`[Multiplayer] WebSocket server initialized for ${MULTIPLAYER_WS_PATHS.join(' and ')}`);
 
   return wss;
 }

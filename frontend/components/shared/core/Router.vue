@@ -3,6 +3,7 @@ import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '../../../stores/useAppStore'
 import { useKeyboardShortcuts } from '../../../composables/useKeyboardShortcuts'
+import { mechNavRoutes } from '../../../features/mech/navigation'
 import KeyboardShortcutsHelp from '../../shared/ui/KeyboardShortcutsHelp.vue'
 import PageTicker from '../../shared/ui/PageTicker.vue'
 
@@ -52,8 +53,7 @@ const dropdowns = ref<DropdownData[]>([
       { title: 'Cats', icon: '🐱', path: '/cats' },
       { title: 'Keanu', icon: '🥋', path: '/keanu' },
       { title: 'Orbital Mechanics', icon: '🌌', path: '/orbital' },
-      { title: 'Mech Builder', icon: '🤖', path: '/mech-builder' },
-      { title: 'Mech Battle', icon: '⚔️', path: '/mech-battle' },
+      ...mechNavRoutes,
       { title: 'Stock Market', icon: '📈', path: '/stocks' },
       { title: 'Shop', icon: '🛍️', path: '/shop' },
       { title: 'Music', icon: '🎵', path: '/music' }

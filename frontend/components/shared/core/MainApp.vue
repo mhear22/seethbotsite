@@ -100,7 +100,7 @@ const onRouteChange = (routeName: string) => {
 
 // Check if we're on a full-screen route (like mech battle)
 const isFullScreenRoute = computed(() => {
-  return route.name === 'mech-battle'
+  return route.name === 'mech-builder' || route.name === 'mech-battle'
 })
 
 const goToGirlMode = () => {

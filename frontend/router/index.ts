@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { mechRoutes } from '../features/mech/routes'
 
 const routes = [
   {
@@ -174,16 +175,7 @@ const routes = [
     name: 'solar-battery',
     component: () => import('../components/pages/BatteryCalculatorPage.vue')
   },
-  {
-    path: '/mech-builder',
-    name: 'mech-builder',
-    component: () => import('../components/pages/MechBuilderPage.vue')
-  },
-  {
-    path: '/mech-battle',
-    name: 'mech-battle',
-    component: () => import('../components/pages/MechBattlePage.vue')
-  },
+  ...mechRoutes,
   {
     path: '/search',
     name: 'search',

@@ -38,6 +38,10 @@ export default defineConfig({
         ws: true,
         changeOrigin: true,
       },
+      '/mech': {
+        target: 'http://localhost:3002',
+        changeOrigin: true,
+      },
     },
   },
   build: {

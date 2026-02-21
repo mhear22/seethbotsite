@@ -81,7 +81,21 @@ RUN --mount=type=cache,target=/root/.npm \
 # Generate Prisma Client for production
 RUN npx prisma generate
 
-# Stage 4: Production image (minimal)
+# Stage 4: Build mech frontend app
+FROM builder-base AS mech-frontend-builder
+
+WORKDIR /app/apps/mech/frontend
+
+COPY apps/mech/frontend/package*.json ./
+
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --prefer-offline --no-audit
+
+COPY apps/mech/frontend/ ./
+
+RUN npm run build
+
+# Stage 5: Production image (minimal)
 FROM node:24-slim
 
 RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
@@ -104,6 +118,7 @@ RUN chmod +x ./scripts/start.sh
 
 # Copy frontend build
 COPY --from=frontend-builder /app/frontend/dist ./webdist
+COPY --from=mech-frontend-builder /app/backend/mech-webdist ./mech-webdist
 
 # Create data directory for SQLite database
 RUN mkdir -p /app/backend/data

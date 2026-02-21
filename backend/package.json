@@ -6,8 +6,10 @@
   "scripts": {
     "prebuild": "node ../scripts/validate-shared-files.js",
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "dev:mech": "ts-node-dev --respawn --transpile-only src/mech-server.ts",
     "build": "node scripts/generate-build-info.js && tsc && node scripts/generate-openapi.js",
     "start": "node dist/index.js",
+    "start:mech": "node dist/mech-server.js",
     "start:migrate": "sh scripts/start.sh",
     "watch": "tsc -w",
     "test": "jest",
