@@ -1,0 +1,24 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
+  },
+  "include": [
+    "env.d.ts",
+    "vite-env.d.ts",
+    "stores/useAuthStore.ts",
+    "composables/useAuth.ts",
+    "composables/useProfile.ts",
+    "composables/useSettingsPersistence.ts",
+    "components/shared/ui/Modal.vue",
+    "components/panels/CatPanel.vue",
+    "components/mech/MapPreview3D.vue",
+    "shared/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "tests"
+  ]
+}

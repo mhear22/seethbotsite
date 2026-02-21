@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "generate:types": "openapi-typescript ../backend/dist/openapi.json -o ./src/types/openapi.ts",
     "generate:images": "node scripts/generate-image-sizes.js",
+    "typecheck": "vue-tsc --noEmit -p tsconfig.typecheck.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
@@ -37,7 +38,7 @@
     "typescript": "^5.7.2",
     "vite": "^5.0.0",
     "vitest": "^3.0.0",
-    "vue-tsc": "^1.8.0"
+    "vue-tsc": "^3.2.5"
   },
   "repository": {
     "type": "git",

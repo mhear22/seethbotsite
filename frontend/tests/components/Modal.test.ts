@@ -197,4 +197,19 @@ describe('Modal', () => {
     const closeButton = document.body.querySelector('.modal-close-btn')
     expect(closeButton?.getAttribute('aria-label')).toBe('Close modal')
   })
+
+  it('links dialog aria-labelledby to modal title id', () => {
+    wrapper = mount(Modal, {
+      props: {
+        isOpen: true,
+        title: 'Test Modal',
+      },
+    })
+
+    const overlay = document.body.querySelector('.modal-overlay')
+    const title = document.body.querySelector('#modal-title')
+
+    expect(overlay?.getAttribute('aria-labelledby')).toBe('modal-title')
+    expect(title?.textContent).toBe('Test Modal')
+  })
 })

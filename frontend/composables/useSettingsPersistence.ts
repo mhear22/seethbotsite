@@ -90,7 +90,7 @@ export const useSettingsPersistence = () => {
       return parseInt(value) as Settings[K]
     }
 
-    return value as Settings[K]
+    return value as unknown as Settings[K]
   }
 
   /**
@@ -100,9 +100,10 @@ export const useSettingsPersistence = () => {
     const loadedSettings: Partial<Settings> = {}
 
     Object.keys(settings.value).forEach((key) => {
-      const value = loadSetting(key as SettingsKey)
+      const typedKey = key as SettingsKey
+      const value = loadSetting(typedKey)
       if (value !== null) {
-        loadedSettings[key as SettingsKey] = value
+        ;(loadedSettings as Record<SettingsKey, Settings[SettingsKey]>)[typedKey] = value as Settings[SettingsKey]
       }
     })
 
@@ -220,7 +221,6 @@ export const useSettingsPersistence = () => {
       settings,
       (newSettings) => {
         Object.entries(newSettings).forEach(([key, value]) => {
-          const typedKey = key as SettingsKey
           const currentValue = localStorage.getItem(key)
 
           let serializedValue: string

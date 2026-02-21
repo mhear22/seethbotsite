@@ -17,11 +17,23 @@ const mockRoute = {
 
 vi.mock('vue-router', () => ({
   useRoute: () => mockRoute,
-  RouterLink: { template: '<a><slot /></a>', props: ['to'] },
 }))
 
 import { mount } from '@vue/test-utils'
 import BreadcrumbNav from '../../components/shared/ui/BreadcrumbNav.vue'
+
+const mountBreadcrumb = () => {
+  return mount(BreadcrumbNav, {
+    global: {
+      stubs: {
+        RouterLink: {
+          template: '<a class="breadcrumb-link"><slot /></a>',
+          props: ['to'],
+        },
+      },
+    },
+  })
+}
 
 describe('BreadcrumbNav', () => {
   beforeEach(() => {
@@ -30,7 +42,7 @@ describe('BreadcrumbNav', () => {
   })
 
   it('shows only Home breadcrumb on home page', () => {
-    const wrapper = mount(BreadcrumbNav)
+    const wrapper = mountBreadcrumb()
 
     const items = wrapper.findAll('.breadcrumb-item')
     expect(items).toHaveLength(1)
@@ -41,7 +53,7 @@ describe('BreadcrumbNav', () => {
     mockRoute.path = '/fishing'
     mockRoute.fullPath = '/fishing'
 
-    const wrapper = mount(BreadcrumbNav)
+    const wrapper = mountBreadcrumb()
 
     const items = wrapper.findAll('.breadcrumb-item')
     const lastItem = items[items.length - 1]
@@ -52,7 +64,7 @@ describe('BreadcrumbNav', () => {
     mockRoute.path = '/fishing'
     mockRoute.fullPath = '/fishing'
 
-    const wrapper = mount(BreadcrumbNav)
+    const wrapper = mountBreadcrumb()
 
     const items = wrapper.findAll('.breadcrumb-item')
     // Home > Fun & Games > Fishing
@@ -65,7 +77,7 @@ describe('BreadcrumbNav', () => {
     mockRoute.path = '/stats'
     mockRoute.fullPath = '/stats'
 
-    const wrapper = mount(BreadcrumbNav)
+    const wrapper = mountBreadcrumb()
 
     const items = wrapper.findAll('.breadcrumb-item')
     // Home > Statistics (no category)
@@ -78,7 +90,7 @@ describe('BreadcrumbNav', () => {
     mockRoute.path = '/fishing'
     mockRoute.fullPath = '/fishing'
 
-    const wrapper = mount(BreadcrumbNav)
+    const wrapper = mountBreadcrumb()
 
     const items = wrapper.findAll('.breadcrumb-item')
     const lastItem = items[items.length - 1]
@@ -92,7 +104,7 @@ describe('BreadcrumbNav', () => {
     mockRoute.path = '/fishing'
     mockRoute.fullPath = '/fishing'
 
-    const wrapper = mount(BreadcrumbNav)
+    const wrapper = mountBreadcrumb()
 
     const items = wrapper.findAll('.breadcrumb-item')
 

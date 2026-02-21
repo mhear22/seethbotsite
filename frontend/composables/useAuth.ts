@@ -43,4 +43,5 @@ export function useAuth() {
 }
 
 // Re-export types for convenience
-export type { User, Session } from '../stores/useAuthStore'
+export type { Session } from '../stores/useAuthStore'
+export type { User } from './useProfile'

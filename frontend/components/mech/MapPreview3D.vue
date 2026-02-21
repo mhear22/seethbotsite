@@ -21,6 +21,7 @@ import { ref, onMounted, onUnmounted, watch, markRaw } from 'vue'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
+import { getMapById } from '@shared/maps'
 import type { MapDefinition } from '@shared/types/MapDefinition'
 
 const props = defineProps<{
@@ -50,13 +51,7 @@ const materials: THREE.Material[] = []
 const geometries: THREE.BufferGeometry[] = []
 
 async function loadMapDefinition(mapId: string): Promise<MapDefinition | null> {
-  try {
-    const maps = await import('@shared/maps')
-    return maps.getMapById(mapId) ?? null
-  } catch (error) {
-    console.error('Failed to load map definition:', error)
-    return null
-  }
+  return getMapById(mapId) ?? null
 }
 
 function createMaterial(def: { color: string; roughness?: number; metalness?: number; emissive?: string; emissiveIntensity?: number }) {
