@@ -8,6 +8,10 @@ services:
         GIT_HASH: ${GIT_HASH:-unknown}
         GIT_BRANCH: ${GIT_BRANCH:-unknown}
         BUILD_COUNT: ${BUILD_NUMBER:-1}
+      cache_from:
+        - type=local,src=/tmp/buildkit-cache
+      cache_to:
+        - type=local,dest=/tmp/buildkit-cache,mode=max
     image: seethbotsite-server:latest
     container_name: seethbot-server
     restart: unless-stopped

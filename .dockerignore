@@ -1,16 +1,44 @@
 node_modules
 dist
+build
 .git
 .gitignore
 *.md
 .env*
+.env.local
 .vscode
 .idea
 **/.DS_Store
 **/npm-debug.log*
+**/yarn-debug.log*
+**/yarn-error.log*
+**/pnpm-debug.log*
+**/*.log
+**/.cache
+**/.vite
+**/coverage
+**/.nyc_output
+**/*.tsbuildinfo
+**/build-info.json
 !**/package-lock.json
-frontend/node_modules
-frontend/dist
-backend/node_modules
+!**/yarn.lock
+!**/pnpm-lock.yaml
+
+# Generated assets
+frontend/public/assets/images/resized/*
+frontend/locales/*
+backend/mech-webdist
+backend/dist
+
+# Development files
+frontend/src/types/openapi.ts
 backend/dist
 backend/data
+backend/.cache
+
+# Test files
+**/*.spec.ts
+**/*.test.ts
+**/__tests__/**
+**/coverage/**
+**/vitest.config.ts.timestamp-*

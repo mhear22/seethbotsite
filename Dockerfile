@@ -1,5 +1,11 @@
 # Multi-stage build for full-stack application
 
+# Multi-stage build for full-stack application
+# Build arguments for version tracking
+ARG GIT_HASH=dev
+ARG GIT_BRANCH=main
+ARG BUILD_COUNT=1
+
 # Shared build base with native compilation tools
 # Using Debian-slim for better native module compatibility (libsql)
 FROM node:24-slim AS builder-base
@@ -13,30 +19,23 @@ WORKDIR /app/backend
 # Copy backend package files (cached unless package*.json changes)
 COPY backend/package*.json ./
 
-# Install with cache mount and memory optimization
-# Note: Using npm install to handle optional dependencies across platforms
-RUN --mount=type=cache,target=/root/.npm \
-    npm install --no-audit
+# Install with cache mount - use ci for faster, reproducible installs
+RUN --mount=type=cache,target=/root/.npm,sharing=locked \
+    npm ci --prefer-offline --no-audit
 
-# Copy backend source (separate layer for better caching)
-COPY backend/tsconfig.json ./
-COPY backend/prisma.config.ts ./prisma.config.ts
-COPY backend/scripts ./scripts/
-COPY backend/prisma ./prisma/
-COPY backend/src ./src/
+# Copy backend source in combined layer for better caching
+COPY backend/tsconfig.json backend/prisma.config.ts backend/scripts backend/prisma backend/src ./
 
 # Copy shared files and validation script for prebuild validation
 COPY scripts/validate-shared-files.js ../scripts/validate-shared-files.js
 COPY backend/src/shared ../backend/src/shared
 COPY frontend/shared ../frontend/shared
 
-# Generate Prisma Client
-RUN npx prisma generate
+# Generate Prisma Client with cache
+RUN --mount=type=cache,target=/tmp/prisma,sharing=locked \
+    npx prisma generate
 
 # Build backend (generates dist/openapi.json)
-ARG GIT_HASH=dev
-ARG GIT_BRANCH=main
-ARG BUILD_COUNT=1
 RUN GIT_HASH="${GIT_HASH}" GIT_BRANCH="${GIT_BRANCH}" BUILD_COUNT="${BUILD_COUNT}" npm run build
 
 # Stage 2: Build frontend (Vite) - depends on backend's OpenAPI spec
@@ -47,15 +46,14 @@ WORKDIR /app/frontend
 # Copy frontend package files
 COPY frontend/package*.json ./
 
-# Install with cache mount and memory optimization
-# Note: Using npm install to handle optional dependencies across platforms
-RUN --mount=type=cache,target=/root/.npm \
-    npm install --no-audit
+# Install with cache mount - use ci for faster, reproducible installs
+RUN --mount=type=cache,target=/root/.npm,sharing=locked \
+    npm ci --prefer-offline --no-audit
 
 # Copy backend OpenAPI spec for type generation
 COPY --from=backend-builder /app/backend/dist/openapi.json ../backend/dist/openapi.json
 
-# Copy all frontend source in one layer (relies on .dockerignore to exclude node_modules/dist)
+# Copy all frontend source (relies on .dockerignore to exclude node_modules/dist)
 COPY frontend/ ./
 
 # Copy shared files and validation script for prebuild validation
@@ -72,16 +70,15 @@ FROM builder-base AS prod-deps
 WORKDIR /app/backend
 
 COPY backend/package*.json ./
-COPY backend/prisma.config.ts ./prisma.config.ts
-COPY backend/prisma ./prisma/
+COPY backend/prisma.config.ts backend/prisma ./
 
-# Install ONLY production dependencies with memory optimization
-# Note: Using npm install to handle optional dependencies across platforms
-RUN --mount=type=cache,target=/root/.npm \
-    npm install --omit=dev --no-audit
+# Install ONLY production dependencies with cache mount
+RUN --mount=type=cache,target=/root/.npm,sharing=locked \
+    npm ci --omit=dev --prefer-offline --no-audit
 
-# Generate Prisma Client for production
-RUN npx prisma generate
+# Generate Prisma Client for production with cache
+RUN --mount=type=cache,target=/tmp/prisma,sharing=locked \
+    npx prisma generate
 
 # Stage 4: Build mech frontend app
 FROM builder-base AS mech-frontend-builder
@@ -90,7 +87,7 @@ WORKDIR /app/apps/mech/frontend
 
 COPY apps/mech/frontend/package*.json ./
 
-RUN --mount=type=cache,target=/root/.npm \
+RUN --mount=type=cache,target=/root/.npm,sharing=locked \
     npm ci --prefer-offline --no-audit
 
 COPY apps/mech/frontend/ ./
@@ -104,21 +101,17 @@ RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app/backend
 
-# Copy production dependencies
-COPY --from=prod-deps /app/backend/node_modules ./node_modules
-COPY --from=prod-deps /app/backend/package.json ./package.json
+# Copy production dependencies and package.json together
+COPY --from=prod-deps /app/backend/node_modules /app/backend/package.json ./
 
-# Copy backend built files
-COPY --from=backend-builder /app/backend/dist ./dist
-COPY --from=backend-builder /app/backend/build-info.json ./build-info.json
-COPY --from=backend-builder /app/backend/prisma ./prisma
-COPY --from=backend-builder /app/backend/prisma.config.ts ./prisma.config.ts
+# Copy backend built files in combined layer
+COPY --from=backend-builder /app/backend/dist /app/backend/build-info.json /app/backend/prisma /app/backend/prisma.config.ts ./
 
-# Copy startup script
-COPY backend/scripts/start.sh ./scripts/start.sh
+# Copy startup script with permissions
+COPY --from=backend-builder /app/backend/scripts/start.sh ./scripts/start.sh
 RUN chmod +x ./scripts/start.sh
 
-# Copy frontend build
+# Copy frontend builds
 COPY --from=frontend-builder /app/frontend/dist ./webdist
 COPY --from=mech-frontend-builder /app/backend/mech-webdist ./mech-webdist
 
@@ -126,8 +119,6 @@ COPY --from=mech-frontend-builder /app/backend/mech-webdist ./mech-webdist
 RUN mkdir -p /app/backend/data
 
 # Set git hash as environment variable
-ARG GIT_HASH=unknown
-ARG GIT_BRANCH=unknown
 ENV GIT_HASH=${GIT_HASH}
 ENV GIT_BRANCH=${GIT_BRANCH}
 ENV PORT=3000

@@ -21,6 +21,11 @@ if [ "$CONTAINER_CMD" = "docker" ]; then
   export DOCKER_BUILDKIT=1
   export COMPOSE_DOCKER_CLI_BUILD=1
   echo "⚡ Docker BuildKit enabled"
+
+  # Set up persistent build cache
+  CACHE_DIR="/tmp/buildkit-cache"
+  mkdir -p "$CACHE_DIR"
+  echo "💾 Build cache: $CACHE_DIR"
 fi
 
 # Get build info
