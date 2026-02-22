@@ -14,13 +14,12 @@ WORKDIR /app/backend
 COPY backend/package*.json ./
 
 # Install with cache mount and memory optimization
-# Note: Using npm ci for faster, reliable builds with lower memory usage
+# Note: Using npm install to handle optional dependencies across platforms
 RUN --mount=type=cache,target=/root/.npm \
-    npm ci --prefer-offline --no-audit
+    npm install --no-audit
 
 # Copy backend source (separate layer for better caching)
 COPY backend/tsconfig.json ./
-COPY backend/build-info.json ./build-info.json
 COPY backend/prisma.config.ts ./prisma.config.ts
 COPY backend/scripts ./scripts/
 COPY backend/prisma ./prisma/
@@ -35,7 +34,10 @@ COPY frontend/shared ../frontend/shared
 RUN npx prisma generate
 
 # Build backend (generates dist/openapi.json)
-RUN npm run build
+ARG GIT_HASH=dev
+ARG GIT_BRANCH=main
+ARG BUILD_COUNT=1
+RUN GIT_HASH="${GIT_HASH}" GIT_BRANCH="${GIT_BRANCH}" BUILD_COUNT="${BUILD_COUNT}" npm run build
 
 # Stage 2: Build frontend (Vite) - depends on backend's OpenAPI spec
 FROM builder-base AS frontend-builder
@@ -46,9 +48,9 @@ WORKDIR /app/frontend
 COPY frontend/package*.json ./
 
 # Install with cache mount and memory optimization
-# Note: Using npm ci for faster, reliable builds with lower memory usage
+# Note: Using npm install to handle optional dependencies across platforms
 RUN --mount=type=cache,target=/root/.npm \
-    npm ci --prefer-offline --no-audit
+    npm install --no-audit
 
 # Copy backend OpenAPI spec for type generation
 COPY --from=backend-builder /app/backend/dist/openapi.json ../backend/dist/openapi.json
@@ -74,9 +76,9 @@ COPY backend/prisma.config.ts ./prisma.config.ts
 COPY backend/prisma ./prisma/
 
 # Install ONLY production dependencies with memory optimization
-# Note: Using npm ci for faster, reliable builds with lower memory usage
+# Note: Using npm install to handle optional dependencies across platforms
 RUN --mount=type=cache,target=/root/.npm \
-    npm ci --omit=dev --prefer-offline --no-audit
+    npm install --omit=dev --no-audit
 
 # Generate Prisma Client for production
 RUN npx prisma generate

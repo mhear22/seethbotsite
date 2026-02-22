@@ -14,15 +14,41 @@ if (!process.env.DATABASE_URL) {
   process.env.DATABASE_URL = 'postgresql://seethbot:seethbot_secret_change_me@localhost:5432/seethbot?schema=public';
 }
 
+// Silence noisy console output during tests (console.error kept for real failures)
+const originalConsoleLog = console.log;
+const originalConsoleWarn = console.warn;
+console.log = (...args: any[]) => {
+  // Only suppress known noisy prefixes; pass through unexpected logs
+  const msg = args[0]?.toString?.() ?? '';
+  if (
+    msg.startsWith('[GameServer]') ||
+    msg.startsWith('[Match ') ||
+    msg.startsWith('[Matchmaking]') ||
+    msg.startsWith('[Auth]') ||
+    msg.startsWith('prisma:') ||
+    msg.startsWith('Setting up test database') ||
+    msg.startsWith('Test database setup') ||
+    msg.startsWith('Test cleanup')
+  ) return;
+  originalConsoleLog(...args);
+};
+console.warn = (...args: any[]) => {
+  const msg = args[0]?.toString?.() ?? '';
+  if (
+    msg.startsWith('[GameServer]') ||
+    msg.startsWith('[Match ') ||
+    msg.startsWith('[Auth]')
+  ) return;
+  originalConsoleWarn(...args);
+};
+
 export const setupTestDB = () => {
   // Run Prisma migrations for test database
-  console.log('Setting up test database...');
   try {
     execSync('npx prisma migrate deploy', {
       stdio: 'inherit',
       env: { ...process.env }
     });
-    console.log('Test database setup complete.');
   } catch (error) {
     console.error('Failed to setup test database:', error);
     console.error('Make sure PostgreSQL is running. You can start it with: docker-compose up -d postgres');
@@ -33,7 +59,6 @@ export const setupTestDB = () => {
 export const cleanupTestDB = () => {
   // For PostgreSQL, we typically don't drop the database between tests
   // Instead, transactions are rolled back or data is truncated
-  console.log('Test cleanup complete.');
 };
 
 // Setup before all tests

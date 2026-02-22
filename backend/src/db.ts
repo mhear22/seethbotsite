@@ -2,7 +2,7 @@ import { prisma } from './lib/prisma';
 
 // Click counter operations
 export async function getClickCount(): Promise<number> {
-  const click = await prisma.click.findFirst();
+  const click = await prisma.click.findUnique({ where: { id: 1 } });
   return click?.count ?? 0;
 }
 

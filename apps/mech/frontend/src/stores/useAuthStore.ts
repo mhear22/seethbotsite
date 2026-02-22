@@ -140,7 +140,7 @@ export const useAuthStore = defineStore('auth', () => {
     const timeUntilExpiry = expiryDate.getTime() - now.getTime()
 
     // Refresh 30 seconds before expiry
-    const refreshDelay = 
+    const refreshDelay =
     Math.min(2147483646, Math.max(1000, timeUntilExpiry - 30000))
 
     refreshTimer = setTimeout(async () => {

@@ -58,6 +58,7 @@ describe('useQuote', () => {
   })
 
   it('should handle errors gracefully', async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     mockGetQuote.mockRejectedValue(new Error('API error'))
     mockFetch.mockRejectedValue(new Error('Network error'))
 
@@ -68,6 +69,8 @@ describe('useQuote', () => {
     expect(loading.value).toBe(false)
     expect(error.value).toBe('Failed to load quote')
     expect(currentQuote.value).toBe('Stay curious, keep asking questions.')
+
+    consoleErrorSpy.mockRestore()
   })
 
   it('should handle missing advice', async () => {

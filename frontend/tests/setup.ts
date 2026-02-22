@@ -68,3 +68,35 @@ const sessionStorageMock = (() => {
 Object.defineProperty(window, 'sessionStorage', {
   value: sessionStorageMock,
 })
+
+// Default fetch mock for tests that don't explicitly mock fetch.
+if (!vi.isMockFunction(globalThis.fetch)) {
+  const defaultFetch = vi.fn(async (input: RequestInfo | URL) => {
+    const url = typeof input === 'string'
+      ? input
+      : input instanceof URL
+        ? input.toString()
+        : input.url
+
+    if (url.includes('thecatapi.com')) {
+      return {
+        ok: true,
+        json: async () => [{ url: 'https://cdn2.thecatapi.com/images/test.jpg' }],
+      } as Response
+    }
+
+    if (url.includes('api.adviceslip.com')) {
+      return {
+        ok: true,
+        json: async () => ({ slip: { advice: 'Default advice' } }),
+      } as Response
+    }
+
+    return {
+      ok: true,
+      json: async () => ({}),
+    } as Response
+  })
+
+  globalThis.fetch = defaultFetch as typeof fetch
+}

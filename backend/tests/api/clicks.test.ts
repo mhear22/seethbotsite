@@ -28,9 +28,9 @@ describe('Clicks API', () => {
     app = createTestApp();
   });
 
-  beforeEach(() => {
+  beforeEach(async () => {
     // Reset click count before each test
-    resetClick();
+    await resetClick();
   });
 
   describe('GET /api/clicks', () => {
@@ -61,9 +61,9 @@ describe('Clicks API', () => {
 
     it('should return updated count after incrementing', async () => {
       // Increment a few times
-      incrementClick();
-      incrementClick();
-      incrementClick();
+      await incrementClick();
+      await incrementClick();
+      await incrementClick();
 
       const response = await request(app).get('/api/clicks');
 
@@ -100,7 +100,7 @@ describe('Clicks API', () => {
     });
 
     it('should increment multiple times correctly', async () => {
-      resetClick();
+      await resetClick();
 
       for (let i = 1; i <= 5; i++) {
         const response = await request(app).post('/api/clicks/increment');
@@ -131,7 +131,7 @@ describe('Clicks API', () => {
     });
 
     it('should handle reset when count is already 0', async () => {
-      resetClick();
+      await resetClick();
 
       const response = await request(app).post('/api/clicks/reset');
 
@@ -168,7 +168,7 @@ describe('Clicks API', () => {
     });
 
     it('should handle concurrent increments (basic test)', async () => {
-      resetClick();
+      await resetClick();
 
       // Make multiple increment requests
       const promises = [];

@@ -1,7 +1,7 @@
 #!/bin/bash
 # Build and deploy the full-stack application using Docker Compose or Podman Compose
 
-set -e
+set -euo pipefail
 
 # Detect container runtime
 if command -v podman &>/dev/null; then
@@ -17,17 +17,21 @@ fi
 
 echo "🔧 Using: $CONTAINER_CMD"
 
+if [ "$CONTAINER_CMD" = "docker" ]; then
+  export DOCKER_BUILDKIT=1
+  export COMPOSE_DOCKER_CLI_BUILD=1
+  echo "⚡ Docker BuildKit enabled"
+fi
+
 # Get build info
 GIT_HASH=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
-BUILD_NUMBER=$(cat backend/build-info.json 2>/dev/null | python3 -c "import sys, json; print(json.load(sys.stdin).get('buildCount', 'unknown'))" 2>/dev/null || echo "unknown")
+BUILD_NUMBER=$(git rev-list --count HEAD 2>/dev/null || echo "1")
 
-# Export build info for compose
+# Export build info for compose/build args
 export GIT_HASH
 export GIT_BRANCH
-
-echo "📝 Updating build info..."
-./scripts/update-build-info.sh
+export BUILD_NUMBER
 
 # Prevent deployments when frontend typing is broken
 echo "🔍 Running frontend typecheck..."
@@ -46,7 +50,7 @@ echo ""
 ./scripts/notify-discord.sh "success" "$BUILD_NUMBER" "$GIT_HASH" "$GIT_BRANCH"
 
 echo "🔄 Restarting services with $COMPOSE_CMD..."
-$COMPOSE_CMD up -d --force-recreate
+$COMPOSE_CMD up -d
 
 echo "⏳ Waiting for services to be healthy..."
 # Wait for PostgreSQL to be healthy

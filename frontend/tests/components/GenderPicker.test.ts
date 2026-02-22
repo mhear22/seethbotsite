@@ -91,6 +91,7 @@ describe('GenderPicker', () => {
   })
 
   it('shows error message on API failure', async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     mockDetectGender.mockRejectedValue(new Error('Network error'))
 
     const wrapper = mount(GenderPicker)
@@ -102,6 +103,8 @@ describe('GenderPicker', () => {
     const errorDiv = wrapper.find('.gender-error')
     expect(errorDiv.exists()).toBe(true)
     expect(errorDiv.text()).toContain('Error detecting gender')
+
+    consoleErrorSpy.mockRestore()
   })
 
   it('emits back event when back button is clicked', async () => {

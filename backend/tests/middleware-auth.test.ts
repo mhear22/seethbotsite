@@ -60,7 +60,7 @@ describe('requireAuth middleware', () => {
     };
 
     // Call middleware
-    requireAuth(mockRequest as Request, mockResponse as Response, mockNext);
+    await requireAuth(mockRequest as Request, mockResponse as Response, mockNext);
 
     // Verify user and session are attached
     expect(mockRequest.user).toBeDefined();
@@ -72,8 +72,8 @@ describe('requireAuth middleware', () => {
     expect(nextCalled).toBe(true);
   });
 
-  it('should return 401 when no Authorization header is provided', () => {
-    requireAuth(mockRequest as Request, mockResponse as Response, mockNext);
+  it('should return 401 when no Authorization header is provided', async () => {
+    await requireAuth(mockRequest as Request, mockResponse as Response, mockNext);
 
     expect(responseStatus).toBe(401);
     expect(nextCalled).toBe(false);
@@ -81,24 +81,24 @@ describe('requireAuth middleware', () => {
     expect(responseJson).toHaveProperty('message');
   });
 
-  it('should return 401 when Authorization header does not start with "Bearer "', () => {
+  it('should return 401 when Authorization header does not start with "Bearer "', async () => {
     mockRequest.headers = {
       authorization: 'InvalidFormat token123',
     };
 
-    requireAuth(mockRequest as Request, mockResponse as Response, mockNext);
+    await requireAuth(mockRequest as Request, mockResponse as Response, mockNext);
 
     expect(responseStatus).toBe(401);
     expect(nextCalled).toBe(false);
     expect(responseJson).toHaveProperty('error', 'Authentication required');
   });
 
-  it('should return 401 when invalid token is provided', () => {
+  it('should return 401 when invalid token is provided', async () => {
     mockRequest.headers = {
       authorization: 'Bearer invalidtoken123',
     };
 
-    requireAuth(mockRequest as Request, mockResponse as Response, mockNext);
+    await requireAuth(mockRequest as Request, mockResponse as Response, mockNext);
 
     expect(responseStatus).toBe(401);
     expect(nextCalled).toBe(false);
@@ -122,7 +122,7 @@ describe('requireAuth middleware', () => {
     // Delete the session to make the token invalid
     const { deleteSession } = await import('../src/users');
     if (sessionData) {
-      deleteSession(sessionData.session.id, loginResult.user.id);
+      await deleteSession(sessionData.session.id, loginResult.user.id);
     }
 
     // Set up request with now-invalid token
@@ -131,7 +131,7 @@ describe('requireAuth middleware', () => {
     };
 
     // Call middleware
-    requireAuth(mockRequest as Request, mockResponse as Response, mockNext);
+    await requireAuth(mockRequest as Request, mockResponse as Response, mockNext);
 
     // Verify 401 is returned
     expect(responseStatus).toBe(401);
@@ -157,7 +157,7 @@ describe('optionalAuth middleware', () => {
     };
 
     // Call middleware
-    optionalAuth(mockRequest as Request, mockResponse as Response, mockNext);
+    await optionalAuth(mockRequest as Request, mockResponse as Response, mockNext);
 
     // Verify user and session are attached
     expect(mockRequest.user).toBeDefined();
@@ -167,32 +167,32 @@ describe('optionalAuth middleware', () => {
     expect(nextCalled).toBe(true);
   });
 
-  it('should call next() without user when no Authorization header is provided', () => {
-    optionalAuth(mockRequest as Request, mockResponse as Response, mockNext);
+  it('should call next() without user when no Authorization header is provided', async () => {
+    await optionalAuth(mockRequest as Request, mockResponse as Response, mockNext);
 
     expect(mockRequest.user).toBeUndefined();
     expect(mockRequest.session).toBeUndefined();
     expect(nextCalled).toBe(true);
   });
 
-  it('should call next() without user when invalid token is provided', () => {
+  it('should call next() without user when invalid token is provided', async () => {
     mockRequest.headers = {
       authorization: 'Bearer invalidtoken123',
     };
 
-    optionalAuth(mockRequest as Request, mockResponse as Response, mockNext);
+    await optionalAuth(mockRequest as Request, mockResponse as Response, mockNext);
 
     expect(mockRequest.user).toBeUndefined();
     expect(mockRequest.session).toBeUndefined();
     expect(nextCalled).toBe(true);
   });
 
-  it('should continue without error on malformed token', () => {
+  it('should continue without error on malformed token', async () => {
     mockRequest.headers = {
       authorization: 'InvalidFormat',
     };
 
-    optionalAuth(mockRequest as Request, mockResponse as Response, mockNext);
+    await optionalAuth(mockRequest as Request, mockResponse as Response, mockNext);
 
     expect(mockRequest.user).toBeUndefined();
     expect(nextCalled).toBe(true);
