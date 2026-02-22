@@ -7,18 +7,16 @@
     <div class="canvas-container">
       <canvas ref="canvasRef" class="orbit-canvas"></canvas>
     </div>
-    <div class="scene-selector">
-      <div class="selector-title">Scene Type</div>
-      <button 
-        v-for="scene in sceneOptions" 
-        :key="scene.id"
-        class="scene-btn"
-        :class="{ active: currentScene === scene.id }"
-        @click="switchScene(scene.id)"
-        :title="scene.description"
+    <div class="scene-switcher">
+      <button
+        v-for="sceneOption in sceneOptions"
+        :key="sceneOption.id"
+        type="button"
+        class="scene-button"
+        :class="{ active: activeScene === sceneOption.id }"
+        @click="switchScene(sceneOption.id)"
       >
-        <span class="scene-icon">{{ scene.icon }}</span>
-        <span class="scene-name">{{ scene.name }}</span>
+        {{ sceneOption.label }}
       </button>
     </div>
     <div class="controls-hint">
@@ -32,19 +30,22 @@
       <div class="action">
         <span class="key">Scroll</span> or <span class="key">Q</span> <span class="key">E</span> Zoom
       </div>
+      <div class="action">
+        <span class="key">1</span> <span class="key">2</span> <span class="key">3</span> Scenes
+      </div>
     </div>
     <div class="info-panel">
-      <div class="info-item">
-        <span class="label">Scene:</span>
-        <span class="value">{{ sceneOptions.find((s: any) => s.id === currentScene)?.name }}</span>
-      </div>
       <div class="info-item">
         <span class="label">Celestial Bodies:</span>
         <span class="value">{{ bodies.length }}</span>
       </div>
       <div class="info-item">
         <span class="label">Black Hole:</span>
-        <span class="value" :class="{ active: currentScene === 'solar' || currentScene === 'blackhole-sun' }">{{ currentScene === 'solar' || currentScene === 'blackhole-sun' ? 'Visible' : 'Hidden' }}</span>
+        <span class="value" :class="{ active: blackHoleVisible }">{{ blackHoleVisible ? 'Visible' : 'Hidden' }}</span>
+      </div>
+      <div class="info-item">
+        <span class="label">Scene:</span>
+        <span class="value active">{{ activeSceneLabel }}</span>
       </div>
       <div class="info-item">
         <span class="label">Camera:</span>
@@ -55,8 +56,68 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, markRaw } from 'vue'
+import { ref, onMounted, onUnmounted, markRaw, computed } from 'vue'
 import * as THREE from 'three'
+
+type OrbitalSceneId = 'orbital-system' | 'black-hole-vs-star' | 'binary-star-system'
+
+interface ScenePreset {
+  id: OrbitalSceneId
+  label: string
+  cameraRadius: number
+  cameraVertical: number
+  cameraAngle: number
+  cameraTarget: THREE.Vector3
+  showPlanets: boolean
+  showBlackHole: boolean
+  showCompanionStar: boolean
+  showNebulae: boolean
+  lensingStrength: number
+}
+
+const scenePresets: ScenePreset[] = [
+  {
+    id: 'orbital-system',
+    label: 'Orbital System',
+    cameraRadius: 80,
+    cameraVertical: 30,
+    cameraAngle: 0,
+    cameraTarget: new THREE.Vector3(0, 0, 0),
+    showPlanets: true,
+    showBlackHole: false,
+    showCompanionStar: false,
+    showNebulae: false,
+    lensingStrength: 0
+  },
+  {
+    id: 'black-hole-vs-star',
+    label: 'Black Hole vs Star',
+    cameraRadius: 90,
+    cameraVertical: 18,
+    cameraAngle: Math.PI * 1.6,
+    cameraTarget: new THREE.Vector3(0, 0, 0),
+    showPlanets: false,
+    showBlackHole: true,
+    showCompanionStar: false,
+    showNebulae: true,
+    lensingStrength: 1
+  },
+  {
+    id: 'binary-star-system',
+    label: 'Binary Star System',
+    cameraRadius: 95,
+    cameraVertical: 24,
+    cameraAngle: Math.PI * 1.65,
+    cameraTarget: new THREE.Vector3(0, 0, 0),
+    showPlanets: false,
+    showBlackHole: false,
+    showCompanionStar: true,
+    showNebulae: true,
+    lensingStrength: 0
+  }
+]
+
+const sceneOptions = scenePresets.map((preset) => ({ id: preset.id, label: preset.label }))
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 let scene: THREE.Scene | null = null
@@ -65,26 +126,25 @@ let renderer: THREE.WebGLRenderer | null = null
 let animationId: number | null = null
 
 const bodies = ref<Array<{ name: string; distance: number; speed: number; angle: number }>>([])
-
-// Scene options
-const currentScene = ref<'solar' | 'blackhole-sun' | 'binary'>('solar')
-
-const sceneOptions = [
-  { id: 'solar', name: 'Solar System', icon: '🌍', description: 'Classic solar system with orbiting planets' },
-  { id: 'blackhole-sun', name: 'Sun vs Black Hole', icon: '☀️🕳️', description: 'A sun being consumed by a black hole' },
-  { id: 'binary', name: 'Binary System', icon: '⭐⭐', description: 'Two stars with planets in orbit' }
-]
+const activeScene = ref<OrbitalSceneId>('orbital-system')
+const activeSceneLabel = computed(() => getScenePreset(activeScene.value).label)
+const blackHoleVisible = computed(() => getScenePreset(activeScene.value).showBlackHole)
 
 // Scene objects
 let sun: THREE.Mesh | null = null
+let companionStar: THREE.Mesh | null = null
 let blackHole: THREE.Mesh | null = null
 let celestialBodies: THREE.Mesh[] = []
 let orbitLines: THREE.Line[] = []
+let solarSystemObjects: THREE.Object3D[] = []
+let blackHoleObjects: THREE.Object3D[] = []
+let nebulaObjects: THREE.Object3D[] = []
 
 // Camera movement
 let cameraAngle = 0
 let cameraRadius = 80
 let cameraVertical = 30
+const cameraTarget = new THREE.Vector3(0, 0, 0)
 
 // Camera control state
 const manualControl = ref(false)
@@ -107,8 +167,6 @@ let lensingMaterial: THREE.ShaderMaterial | null = null
 let lensingQuad: THREE.Mesh | null = null
 let orthoCamera: THREE.OrthographicCamera | null = null
 
-// Black hole world position for lensing
-const blackHolePosition = new THREE.Vector3(0, 0, -120)
 const tempV = new THREE.Vector3()
 
 onMounted(() => {
@@ -131,55 +189,46 @@ onUnmounted(() => {
   cleanup()
 })
 
-function switchScene(sceneType: 'solar' | 'blackhole-sun' | 'binary') {
-  currentScene.value = sceneType
-  
-  // Remove existing celestial bodies
-  celestialBodies.forEach((body) => {
-    scene?.remove(body)
-    body.geometry.dispose()
-    if (Array.isArray(body.material)) {
-      body.material.forEach((m) => m.dispose())
-    } else {
-      body.material.dispose()
-    }
-  })
-  celestialBodies = []
-  bodies.value = []
+function getScenePreset(sceneId: OrbitalSceneId): ScenePreset {
+  return scenePresets.find((preset) => preset.id === sceneId) ?? scenePresets[0]
+}
 
-  // Remove orbit lines
-  orbitLines.forEach((line) => {
-    scene?.remove(line)
-    line.geometry.dispose()
-    if (Array.isArray(line.material)) {
-      line.material.forEach((m) => m.dispose())
-    } else {
-      line.material.dispose()
-    }
-  })
-  orbitLines = []
+function applyScenePreset(sceneId: OrbitalSceneId) {
+  activeScene.value = sceneId
+  manualControl.value = false
+  keysPressed.value.clear()
 
-  // Remove black hole if switching away from black hole scenes
-  if (sceneType !== 'blackhole-sun' && blackHole) {
-    scene?.remove(blackHole)
-    if (blackHoleMaterial) {
-      if (Array.isArray(blackHoleMaterial)) {
-        blackHoleMaterial.forEach((m) => m.dispose())
-      } else {
-        blackHoleMaterial.dispose()
-      }
-    }
-    blackHole = null
+  const preset = getScenePreset(sceneId)
+  cameraRadius = preset.cameraRadius
+  cameraVertical = preset.cameraVertical
+  cameraAngle = preset.cameraAngle
+  cameraTarget.copy(preset.cameraTarget)
+
+  if (sun) {
+    sun.visible = true
+  }
+  if (companionStar) {
+    companionStar.visible = preset.showCompanionStar
   }
 
-  // Re-initialize scene based on type
-  if (sceneType === 'solar') {
-    setupSolarScene()
-  } else if (sceneType === 'blackhole-sun') {
-    setupBlackholeSunScene()
-  } else if (sceneType === 'binary') {
-    setupBinaryScene()
+  solarSystemObjects.forEach((obj) => {
+    obj.visible = preset.showPlanets
+  })
+  blackHoleObjects.forEach((obj) => {
+    obj.visible = preset.showBlackHole
+  })
+  nebulaObjects.forEach((obj) => {
+    obj.visible = preset.showNebulae
+  })
+
+  if (lensingMaterial) {
+    lensingMaterial.uniforms.lensingStrength.value = preset.lensingStrength
   }
+}
+
+function switchScene(sceneId: OrbitalSceneId) {
+  if (activeScene.value === sceneId) return
+  applyScenePreset(sceneId)
 }
 
 function initScene() {
@@ -194,7 +243,7 @@ function initScene() {
     75,
     window.innerWidth / window.innerHeight,
     0.1,
-    10
+    1200
   ))
 
   // Orthographic camera for full-screen quad
@@ -503,200 +552,9 @@ function initScene() {
   corona.scale.set(0.7, 0.4, 2)
   sun.add(corona)
 
-  // Setup the default scene
-  setupSolarScene()
+  // Secondary star used by the binary-star scene
+  createCompanionStar()
 
-  // Initial camera position
-  updateCamera()
-}
-
-function createBinaryStars() {
-  // Create two stars orbiting each other
-  const star1Data = {
-    size: 2.5,
-    color: 0xffddaa,
-    glowColor: 0xffaa55
-  }
-
-  const star2Data = {
-    size: 2.0,
-    color: 0xaaddff,
-    glowColor: 0x55aaff
-  }
-
-  // Create star 1
-  const star1Geometry = new THREE.SphereGeometry(star1Data.size, 32, 32)
-  const star1Material = new THREE.ShaderMaterial({
-    uniforms: {
-      time: { value: 0 },
-      coreColor: { value: new THREE.Color(star1Data.color) }
-    },
-    vertexShader: `
-      varying vec3 vNormal;
-      varying vec3 vWorldPosition;
-      void main() {
-        vNormal = normal;
-        vWorldPosition = (modelMatrix * vec4(position, 1.0)).xyz;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-      }
-    `,
-    fragmentShader: `
-      uniform float time;
-      uniform vec3 coreColor;
-      varying vec3 vNormal;
-      varying vec3 vWorldPosition;
-      
-      void main() {
-        vec3 viewDir = normalize(cameraPosition - vWorldPosition);
-        float fresnel = 1.0 - max(0.0, dot(viewDir, vNormal));
-        fresnel = pow(fresnel, 3.0);
-        
-        gl_FragColor = vec4(coreColor, 1.0);
-      }
-    `
-  })
-
-  const star1 = markRaw(new THREE.Mesh(star1Geometry, star1Material))
-  star1.userData.isStar = true
-  star1.userData.starIndex = 1
-  star1.userData.orbitRadius = 15
-  star1.userData.orbitAngle = 0
-  scene?.add(star1)
-  celestialBodies.push(star1)
-
-  // Create star 2
-  const star2Geometry = new THREE.SphereGeometry(star2Data.size, 32, 32)
-  const star2Material = new THREE.ShaderMaterial({
-    uniforms: {
-      time: { value: 0 },
-      coreColor: { value: new THREE.Color(star2Data.color) }
-    },
-    vertexShader: `
-      varying vec3 vNormal;
-      varying vec3 vWorldPosition;
-      void main() {
-        vNormal = normal;
-        vWorldPosition = (modelMatrix * vec4(position, 1.0)).xyz;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-      }
-    `,
-    fragmentShader: `
-      uniform float time;
-      uniform vec3 coreColor;
-      varying vec3 vNormal;
-      varying vec3 vWorldPosition;
-      
-      void main() {
-        vec3 viewDir = normalize(cameraPosition - vWorldPosition);
-        float fresnel = 1.0 - max(0.0, dot(viewDir, vNormal));
-        fresnel = pow(fresnel, 3.0);
-        
-        gl_FragColor = vec4(coreColor, 1.0);
-      }
-    `
-  })
-
-  const star2 = markRaw(new THREE.Mesh(star2Geometry, star2Material))
-  star2.userData.isStar = true
-  star2.userData.starIndex = 2
-  star2.userData.orbitRadius = 15
-  star2.userData.orbitAngle = Math.PI
-  scene?.add(star2)
-  celestialBodies.push(star2)
-
-  // Add point lights for the stars
-  const star1Light = new THREE.PointLight(star1Data.glowColor, 3000, 100)
-  star1Light.position.set(0, 0, 0)
-  star1.add(star1Light)
-  scene?.add(star1Light)
-
-  const star2Light = new THREE.PointLight(star2Data.glowColor, 2500, 100)
-  star2Light.position.set(0, 0, 0)
-  star2.add(star2Light)
-  scene?.add(star2Light)
-}
-
-function createBinaryPlanets() {
-  // Planets orbiting the binary star system
-  const binaryPlanetData = [
-    { name: 'Alpha', distance: 25, size: 0.9, color: 0x44aaff, speed: 1.2 },
-    { name: 'Beta', distance: 35, size: 0.7, color: 0xff44aa, speed: 0.8 },
-    { name: 'Gamma', distance: 50, size: 1.1, color: 0xaaff44, speed: 0.5 }
-  ]
-
-  binaryPlanetData.forEach((planet) => {
-    const geometry = new THREE.SphereGeometry(planet.size, 32, 32)
-    const material = new THREE.MeshStandardMaterial({
-      color: planet.color,
-      roughness: 0.6,
-      metalness: 0.1
-    })
-
-    const mesh = markRaw(new THREE.Mesh(geometry, material))
-    mesh.castShadow = true
-    mesh.receiveShadow = true
-    mesh.userData = {
-      distance: planet.distance,
-      speed: planet.speed,
-      angle: Math.random() * Math.PI * 2,
-      name: planet.name
-    }
-
-    scene?.add(mesh)
-    celestialBodies.push(mesh)
-    bodies.value.push({
-      name: planet.name,
-      distance: planet.distance,
-      speed: planet.speed,
-      angle: mesh.userData.angle
-    })
-  })
-
-  // Create orbit lines for binary planets
-  binaryPlanetData.forEach((planet) => {
-    const distance = planet.distance
-    const points: THREE.Vector3[] = []
-
-    for (let i = 0; i <= 64; i++) {
-      const angle = (i / 64) * Math.PI * 2
-      points.push(new THREE.Vector3(
-        Math.cos(angle) * distance,
-        0,
-        Math.sin(angle) * distance
-      ))
-    }
-
-    const geometry = new THREE.BufferGeometry().setFromPoints(points)
-    const material = new THREE.LineBasicMaterial({
-      color: 0x44aaff,
-      transparent: true,
-      opacity: 0.4
-    })
-
-    const line = markRaw(new THREE.Line(geometry, material))
-    scene?.add(line)
-    orbitLines.push(line)
-  })
-}
-
-function setupSolarScene() {
-  // Create celestial bodies
-  createCelestialBodies()
-
-  // Create orbit lines
-  createOrbitLines()
-
-  // Create black hole (but hidden, just for effect)
-  createBlackHole()
-
-  // Add stars
-  createStars()
-
-  // Add distant nebulae
-  createNebulae()
-}
-
-function setupBlackholeSunScene() {
   // Create celestial bodies
   createCelestialBodies()
 
@@ -706,37 +564,40 @@ function setupBlackholeSunScene() {
   // Create black hole
   createBlackHole()
 
-  // Move sun closer to black hole to show it being "eaten"
-  if (sun) {
-    sun.position.set(0, 0, -50)
-    sun.userData.isBeingEaten = true
-  }
-
   // Add stars
   createStars()
 
   // Add distant nebulae
   createNebulae()
+
+  // Apply active scene defaults once all objects exist
+  applyScenePreset(activeScene.value)
+
+  // Initial camera position
+  updateCamera()
 }
 
-function setupBinaryScene() {
-  // Remove default sun
-  if (sun) {
-    scene?.remove(sun)
-    sun = null
-  }
+function createCompanionStar() {
+  const starGeometry = new THREE.SphereGeometry(2.8, 32, 32)
+  const starMaterial = new THREE.MeshBasicMaterial({
+    color: 0x8fc7ff
+  })
+  companionStar = markRaw(new THREE.Mesh(starGeometry, starMaterial))
+  companionStar.position.set(-20, 0, 0)
 
-  // Create binary star system
-  createBinaryStars()
+  const glowGeometry = new THREE.SphereGeometry(4.2, 32, 32)
+  const glowMaterial = new THREE.MeshBasicMaterial({
+    color: 0x7ab6ff,
+    transparent: true,
+    opacity: 0.28
+  })
+  const glow = markRaw(new THREE.Mesh(glowGeometry, glowMaterial))
+  companionStar.add(glow)
 
-  // Create planets around the binary system
-  createBinaryPlanets()
+  const starLight = new THREE.PointLight(0x9fcfff, 1000, 180)
+  companionStar.add(starLight)
 
-  // Add stars
-  createStars()
-
-  // Add distant nebulae
-  createNebulae()
+  scene?.add(companionStar)
 }
 
 function createCelestialBodies() {
@@ -769,6 +630,7 @@ function createCelestialBodies() {
 
     scene?.add(mesh)
     celestialBodies.push(mesh)
+    solarSystemObjects.push(mesh)
     bodies.value.push({
       name: planet.name,
       distance: planet.distance,
@@ -816,6 +678,7 @@ function createOrbitLines() {
     const line = markRaw(new THREE.Line(geometry, material))
     scene?.add(line)
     orbitLines.push(line)
+    solarSystemObjects.push(line)
   })
 }
 
@@ -831,6 +694,7 @@ function createBlackHole() {
   blackHole = markRaw(new THREE.Mesh(blackHoleGeometry, blackHoleMaterial))
   blackHole.position.set(0, 0, -120)
   scene?.add(blackHole)
+  blackHoleObjects.push(blackHole)
 
   // Realistic accretion disk using a custom shader
   // Single wide ring geometry, tilted to be viewed at a shallow angle
@@ -1143,6 +1007,7 @@ function createNebulae() {
     scene?.add(mesh)
     nebulaMeshes.push(mesh)
     nebulaMaterials.push(mat)
+    nebulaObjects.push(mesh)
   })
 }
 
@@ -1203,15 +1068,27 @@ function updateCamera() {
   cameraRadius = Math.max(20, Math.min(250, cameraRadius + zoomVelocity))
   zoomVelocity *= 0.88 // friction
 
-  const x = Math.cos(cameraAngle) * cameraRadius
-  const z = Math.sin(cameraAngle) * cameraRadius
-  const y = cameraVertical
+  const x = cameraTarget.x + Math.cos(cameraAngle) * cameraRadius
+  const z = cameraTarget.z + Math.sin(cameraAngle) * cameraRadius
+  const y = cameraTarget.y + cameraVertical
 
   camera.position.set(x, y, z)
-  camera.lookAt(0, 0, 0)
+  camera.lookAt(cameraTarget)
 }
 
 function handleKeyDown(event: KeyboardEvent) {
+  if (event.code === 'Digit1') {
+    switchScene('orbital-system')
+    return
+  }
+  if (event.code === 'Digit2') {
+    switchScene('black-hole-vs-star')
+    return
+  }
+  if (event.code === 'Digit3') {
+    switchScene('binary-star-system')
+    return
+  }
   keysPressed.value.add(event.code)
 }
 
@@ -1243,7 +1120,7 @@ function updateBlackHoleScreenPosition() {
   if (!camera || !lensingMaterial || !blackHole) return
 
   // Project black hole world position to screen space
-  tempV.copy(blackHolePosition)
+  blackHole.getWorldPosition(tempV)
   tempV.project(camera)
 
   // Convert from NDC (-1 to 1) to UV (0 to 1)
@@ -1254,26 +1131,52 @@ function updateBlackHoleScreenPosition() {
   lensingMaterial.uniforms.bhPos.value.set(screenX, screenY)
 }
 
+function updateSceneLayout(timeSeconds: number) {
+  if (!sun) return
+
+  if (activeScene.value === 'orbital-system') {
+    sun.position.set(0, 0, 0)
+    sun.scale.setScalar(1)
+    if (blackHole) {
+      blackHole.position.set(0, 0, -120)
+    }
+    return
+  }
+
+  if (activeScene.value === 'black-hole-vs-star') {
+    sun.position.set(26, 0, 0)
+    sun.scale.setScalar(1.15)
+    if (blackHole) {
+      blackHole.position.set(-26, 0, 0)
+    }
+    return
+  }
+
+  // Binary star system
+  const orbitRadius = 22
+  const phase = timeSeconds * 0.35
+  const px = Math.cos(phase) * orbitRadius
+  const pz = Math.sin(phase) * orbitRadius
+  sun.position.set(px, 0, pz)
+  sun.scale.setScalar(1)
+
+  if (companionStar) {
+    companionStar.position.set(-px, 0, -pz)
+  }
+
+  if (blackHole) {
+    blackHole.position.set(0, 0, -120)
+  }
+}
+
 function animate() {
   animationId = requestAnimationFrame(animate)
 
   const time = Date.now()
+  const timeSeconds = time * 0.001
 
-  // Animate binary stars (if they exist)
-  celestialBodies.filter((body) => body.userData.isStar).forEach((star, index) => {
-    star.userData.orbitAngle += (index === 0 ? 0.001 : -0.001) // Orbit in opposite directions
-    const orbitRadius = star.userData.orbitRadius || 15
-
-    // Star 1 orbits clockwise, Star 2 orbits counterclockwise
-    const direction = star.userData.starIndex === 1 ? 1 : -1
-    star.userData.orbitAngle += 0.0005 * direction
-
-    star.position.x = Math.cos(star.userData.orbitAngle) * orbitRadius
-    star.position.z = Math.sin(star.userData.orbitAngle) * orbitRadius
-  })
-
-  // Update celestial bodies (planets)
-  celestialBodies.filter((body) => !body.userData.isStar).forEach((body) => {
+  // Update celestial bodies
+  celestialBodies.forEach((body) => {
     body.userData.angle += body.userData.speed * 0.001
 
     body.position.x = Math.cos(body.userData.angle) * body.userData.distance
@@ -1290,8 +1193,11 @@ function animate() {
 
   // Animate nebula shaders
   nebulaMaterials.forEach((mat) => {
-    mat.uniforms.time.value = time * 0.001
+    mat.uniforms.time.value = timeSeconds
   })
+
+  // Apply per-scene object layout and binary-star animation
+  updateSceneLayout(timeSeconds)
 
   // Update camera
   updateCamera()
@@ -1376,6 +1282,26 @@ function cleanup() {
     })
   }
 
+  if (companionStar) {
+    companionStar.geometry.dispose()
+    if (Array.isArray(companionStar.material)) {
+      companionStar.material.forEach((m) => m.dispose())
+    } else {
+      companionStar.material.dispose()
+    }
+    companionStar.children.forEach((child) => {
+      if (child instanceof THREE.Mesh) {
+        child.geometry.dispose()
+        if (Array.isArray(child.material)) {
+          child.material.forEach((m) => m.dispose())
+        } else {
+          child.material.dispose()
+        }
+      }
+    })
+    companionStar = null
+  }
+
   nebulaMeshes.forEach((m) => {
     m.geometry.dispose()
   })
@@ -1387,6 +1313,9 @@ function cleanup() {
   })
   nebulaMeshes = []
   nebulaMaterials = []
+  solarSystemObjects = []
+  blackHoleObjects = []
+  nebulaObjects = []
 
   if (accretionDiskMaterial) {
     accretionDiskMaterial.dispose()
@@ -1482,59 +1411,41 @@ function cleanup() {
   height: 100%;
 }
 
-.scene-selector {
+.scene-switcher {
   position: fixed;
   top: 100px;
   left: 20px;
+  z-index: 10;
+  display: flex;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 10px;
   background: rgba(0, 0, 0, 0.7);
   backdrop-filter: blur(10px);
-  padding: 15px;
+  border: 1px solid rgba(100, 100, 150, 0.3);
+}
+
+.scene-button {
+  border: 1px solid rgba(100, 100, 150, 0.5);
   border-radius: 8px;
-  border: 1px solid rgba(100, 100, 150, 0.3);
-  z-index: 10;
-  font-size: 0.85rem;
-  color: #a5b4fc;
-}
-
-.scene-selector .selector-title {
-  color: #fff;
-  font-weight: bold;
-  margin-bottom: 10px;
-}
-
-.scene-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 10px 12px;
-  margin-bottom: 8px;
-  background: rgba(139, 92, 246, 0.2);
-  border: 1px solid rgba(100, 100, 150, 0.3);
-  border-radius: 6px;
+  background: rgba(20, 25, 45, 0.8);
+  color: #c7d2fe;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 8px 10px;
   cursor: pointer;
-  transition: all 0.2s ease;
-  font-size: 0.85rem;
-  color: #a5b4fc;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
 }
 
-.scene-btn:hover {
-  background: rgba(139, 92, 246, 0.4);
-  border-color: rgba(165, 180, 252, 0.5);
+.scene-button:hover {
+  border-color: rgba(168, 85, 247, 0.7);
+  color: #f0abfc;
 }
 
-.scene-btn.active {
-  background: rgba(139, 92, 246, 0.6);
-  border-color: #a5b4fc;
-  box-shadow: 0 0 8px rgba(165, 180, 252, 0.3);
-}
-
-.scene-icon {
-  font-size: 1.2rem;
-}
-
-.scene-name {
-  font-weight: 500;
+.scene-button.active {
+  background: rgba(139, 92, 246, 0.35);
+  border-color: rgba(217, 70, 239, 0.9);
+  color: #f5d0fe;
 }
 
 .controls-hint {
@@ -1619,6 +1530,21 @@ function cleanup() {
     left: 20px;
     right: auto;
     font-size: 0.75rem;
+  }
+
+  .scene-switcher {
+    top: auto;
+    bottom: 110px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(95%, 420px);
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .scene-button {
+    font-size: 0.72rem;
+    padding: 6px 9px;
   }
 
   .info-panel {
