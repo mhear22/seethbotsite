@@ -59,6 +59,32 @@ describe('useAuthStore', () => {
       expect(store.user).not.toBeNull()
       expect(store.isAuthenticated).toBe(true)
     })
+
+    it('should clear auth state when /auth/me response is malformed', async () => {
+      localStorage.setItem('auth_token', 'saved-token-123')
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          user: {
+            id: 1,
+            email: 'test@example.com',
+            display_name: 'Tester',
+            created_at: '2025-01-01',
+            updated_at: '2025-01-01'
+          }
+        })
+      })
+
+      const store = useAuthStore()
+      await store.init()
+      const valid = store.isAuthenticated
+
+      expect(valid).toBe(false)
+      expect(store.token).toBeNull()
+      expect(store.user).toBeNull()
+      expect(localStorage.getItem('auth_token')).toBeNull()
+    })
   })
 
   describe('register', () => {
@@ -351,8 +377,14 @@ describe('useAuthStore', () => {
 
   describe('logoutSession', () => {
     it('should send DELETE to /auth/sessions/:id', async () => {
-      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ success: true }) })
-      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ sessions: [] }) })
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true })
+      })
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ sessions: [] })
+      })
 
       const store = useAuthStore()
       store.token = 'session-token'
@@ -401,7 +433,7 @@ describe('useAuthStore', () => {
         (call: any[]) => call[0] === '/api/some-endpoint'
       )
       expect(fetchCall).toBeDefined()
-      expect(fetchCall![1].headers['Authorization']).toBe('Bearer bearer-token')
+      expect(new Headers(fetchCall![1].headers).get('Authorization')).toBe('Bearer bearer-token')
     })
   })
 })

@@ -125,13 +125,15 @@ describe('Multiplayer Controller', () => {
   describe('WebSocket Path Validation', () => {
     it('should validate correct WebSocket path', () => {
       const validPaths = [
+        '/ws/mech/multiplayer',
+        '/ws/mech/multiplayer?token=abc123',
         '/ws/multiplayer',
         '/ws/multiplayer?token=abc123'
       ];
 
       validPaths.forEach(path => {
         const url = new URL(path, 'http://localhost');
-        expect(url.pathname).toBe('/ws/multiplayer');
+        expect(['/ws/mech/multiplayer', '/ws/multiplayer']).toContain(url.pathname);
       });
     });
 

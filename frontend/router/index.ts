@@ -1,148 +1,111 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import Home from '../components/pages/HomePage.vue'
-import GirlMode from '../components/pages/GirlModePage.vue'
-import Gender from '../components/pages/GenderPage.vue'
-import About from '../components/pages/AboutPage.vue'
-import Rankings from '../components/pages/RankingsPage.vue'
-import Cats from '../components/pages/CatsPage.vue'
-import StockMarket from '../components/pages/StockMarket.vue'
-import MoviePage from '../components/pages/MoviePage.vue'
-import CountdownPage from '../components/pages/CountdownPage.vue'
-import TicketsPage from '../components/pages/TicketsPage.vue'
-import ClocksPage from '../components/pages/ClocksPage.vue'
-import MusicPage from '../components/pages/MusicPage.vue'
-import OpinionPage from '../components/pages/OpinionPage.vue'
-import MoldPage from '../components/pages/MoldPage.vue'
-import ClickerPage from '../components/pages/ClickerPage.vue'
-import ShopPage from '../components/pages/ShopPage.vue'
-import ApiDocsPage from '../components/pages/ApiDocsPage.vue'
-import AuthPage from '../components/pages/AuthPage.vue'
-import FishingPage from '../components/pages/FishingPage.vue'
-import StatsPage from '../components/pages/StatsPage.vue'
-import CharacterTinderPage from '../components/pages/CharacterTinderPage.vue'
-import WordCloudPage from '../components/pages/WordCloudPage.vue'
-import KeanuPage from '../components/pages/KeanuPage.vue'
-import PatchNotesPage from '../components/pages/PatchNotesPage.vue'
-import SettingsPage from '../components/pages/SettingsPage.vue'
-import CarPage from '../components/pages/CarPage.vue'
-import FavoritesPage from '../components/pages/FavoritesPage.vue'
-import DailyChallenges from '../components/pages/DailyChallenges.vue'
-import ArchiveHistoryPage from '../components/pages/ArchiveHistoryPage.vue'
-import MessagesPage from '../components/pages/MessagesPage.vue'
-import AnalyticsPage from '../components/pages/AnalyticsPage.vue'
-import SolarPanelPage from '../components/pages/SolarPanelPage.vue'
-import BatteryCalculatorPage from '../components/pages/BatteryCalculatorPage.vue'
-import MechBuilderPage from '../components/pages/MechBuilderPage.vue'
-import MechBattlePage from '../components/pages/MechBattlePage.vue'
-import SearchPage from '../components/pages/SearchPage.vue'
-import OrbitalMechanicsPage from '../components/pages/OrbitalMechanicsPage.vue'
-import HomeLoanPage from '../components/pages/HomeLoanPage.vue'
+import { mechRoutes } from '../features/mech/routes'
 
 const routes = [
   {
     path: '/',
     name: 'home',
-    component: Home
+    component: () => import('../components/pages/HomePage.vue')
   },
   {
     path: '/fishing',
     name: 'fishing',
-    component: FishingPage
+    component: () => import('../components/pages/FishingPage.vue')
   },
   {
     path: '/stats',
     name: 'stats',
-    component: StatsPage
+    component: () => import('../components/pages/StatsPage.vue')
   },
   {
     path: '/character-tinder',
     name: 'character-tinder',
-    component: CharacterTinderPage
+    component: () => import('../components/pages/CharacterTinderPage.vue')
   },
   {
     path: '/girl',
     name: 'girl',
-    component: GirlMode
+    component: () => import('../components/pages/GirlModePage.vue')
   },
   {
     path: '/gender',
     name: 'phrenology',
-    component: Gender
+    component: () => import('../components/pages/GenderPage.vue')
   },
   {
     path: '/about',
     name: 'about',
-    component: About
+    component: () => import('../components/pages/AboutPage.vue')
   },
   {
     path: '/rankings',
     name: 'rankings',
-    component: Rankings
+    component: () => import('../components/pages/RankingsPage.vue')
   },
   {
     path: '/cats',
     name: 'cats',
-    component: Cats
+    component: () => import('../components/pages/CatsPage.vue')
   },
   {
     path: '/stocks',
     name: 'stocks',
-    component: StockMarket
+    component: () => import('../components/pages/StockMarket.vue')
   },
   {
     path: '/movies',
     name: 'movies',
-    component: MoviePage
+    component: () => import('../components/pages/MoviePage.vue')
   },
   {
     path: '/countdowns',
     name: 'countdowns',
-    component: CountdownPage
+    component: () => import('../components/pages/CountdownPage.vue')
   },
   {
     path: '/tickets',
     name: 'tickets',
-    component: TicketsPage
+    component: () => import('../components/pages/TicketsPage.vue')
   },
   {
     path: '/clocks',
     name: 'clocks',
-    component: ClocksPage
+    component: () => import('../components/pages/ClocksPage.vue')
   },
   {
     path: '/music',
     name: 'music',
-    component: MusicPage
+    component: () => import('../components/pages/MusicPage.vue')
   },
   {
     path: '/opinion',
     name: 'opinion',
-    component: OpinionPage
+    component: () => import('../components/pages/OpinionPage.vue')
   },
   {
     path: '/mold',
     name: 'mold',
-    component: MoldPage
+    component: () => import('../components/pages/MoldPage.vue')
   },
   {
     path: '/clicker',
     name: 'clicker',
-    component: ClickerPage
+    component: () => import('../components/pages/ClickerPage.vue')
   },
   {
     path: '/shop',
     name: 'shop',
-    component: ShopPage
+    component: () => import('../components/pages/ShopPage.vue')
   },
   {
     path: '/api-docs',
     name: 'api-docs',
-    component: ApiDocsPage
+    component: () => import('../components/pages/ApiDocsPage.vue')
   },
   {
     path: '/auth',
     name: 'auth',
-    component: AuthPage
+    component: () => import('../components/pages/AuthPage.vue')
   },
   {
     path: '/login',
@@ -155,87 +118,78 @@ const routes = [
   {
     path: '/wordcloud',
     name: 'wordcloud',
-    component: WordCloudPage
+    component: () => import('../components/pages/WordCloudPage.vue')
   },
   {
     path: '/keanu',
     name: 'keanu',
-    component: KeanuPage
+    component: () => import('../components/pages/KeanuPage.vue')
   },
   {
     path: '/patch-notes',
     name: 'patch-notes',
-    component: PatchNotesPage
+    component: () => import('../components/pages/PatchNotesPage.vue')
   },
   {
     path: '/settings',
     name: 'settings',
-    component: SettingsPage
+    component: () => import('../components/pages/SettingsPage.vue')
   },
   {
     path: '/car',
     name: 'car',
-    component: CarPage
+    component: () => import('../components/pages/CarPage.vue')
   },
   {
     path: '/favorites',
     name: 'favorites',
-    component: FavoritesPage
+    component: () => import('../components/pages/FavoritesPage.vue')
   },
   {
     path: '/challenges',
     name: 'challenges',
-    component: DailyChallenges
+    component: () => import('../components/pages/DailyChallenges.vue')
   },
   {
     path: '/archive',
     name: 'archive',
-    component: ArchiveHistoryPage
+    component: () => import('../components/pages/ArchiveHistoryPage.vue')
   },
   {
     path: '/messages',
     name: 'messages',
-    component: MessagesPage
+    component: () => import('../components/pages/MessagesPage.vue')
   },
   {
     path: '/analytics',
     name: 'analytics',
-    component: AnalyticsPage
+    component: () => import('../components/pages/AnalyticsPage.vue')
   },
   {
     path: '/solar',
     name: 'solar',
-    component: SolarPanelPage
+    component: () => import('../components/pages/SolarPanelPage.vue')
   },
   {
     path: '/solar/battery',
     name: 'solar-battery',
-    component: BatteryCalculatorPage
+    component: () => import('../components/pages/BatteryCalculatorPage.vue')
   },
-  {
-    path: '/mech-builder',
-    name: 'mech-builder',
-    component: MechBuilderPage
-  },
-  {
-    path: '/mech-battle',
-    name: 'mech-battle',
-    component: MechBattlePage
-  },
+  ...mechRoutes,
   {
     path: '/search',
     name: 'search',
-    component: SearchPage
+    component: () => import('../components/pages/SearchPage.vue')
   },
   {
     path: '/orbital',
     name: 'orbital',
-    component: OrbitalMechanicsPage
+    component: () => import('../components/pages/OrbitalMechanicsPage.vue')
   },
   {
     path: '/home-loan',
     name: 'home-loan',
-    component: HomeLoanPage
+    component: () => import('../components/pages/HomeLoanPage.vue')
   }
 ]
 

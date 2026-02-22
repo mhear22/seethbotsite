@@ -41,7 +41,7 @@ import favoritesController from './controllers/favorites.controller';
 import themesController from './controllers/themes.controller';
 import discordController from './controllers/discord.controller';
 import { setupWebSocketServer } from './controllers/presence.controller';
-import { setupMultiplayerWebSocket, getGameStats } from './controllers/multiplayer.controller';
+import { multiplayerApiRouter, setupMechWebSockets } from './modules/mech';
 import { createServer } from 'http';
 
 const app: Express = express();
@@ -49,6 +49,7 @@ const PORT = process.env.PORT || 3001;
 // In production Docker: __dirname is /app/backend/dist, webdist is at /app/backend/webdist
 // In development: __dirname is /backend/src, webdist is at /backend/webdist
 const SERVE_ROOT = process.env.SERVE_ROOT || path.join(__dirname, '..', 'webdist');
+const MECH_SERVE_ROOT = process.env.MECH_SERVE_ROOT || path.join(__dirname, '..', 'mech-webdist');
 
 // Middleware
 app.use(cors());
@@ -95,6 +96,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 
 // Serve static files from the Vue.js app
 app.use(express.static(SERVE_ROOT));
+app.use('/mech', express.static(MECH_SERVE_ROOT));
 
 // Serve avatars from backend/public
 app.use('/avatars', express.static(path.join(__dirname, '..', 'public', 'avatars')));
@@ -132,8 +134,9 @@ app.use('/api/favorites', favoritesController);
 app.use('/api/themes', themesController);
 app.use('/api', discordController);
 
-// Multiplayer game stats endpoint
-app.get('/api/multiplayer/stats', getGameStats);
+// Mech multiplayer API routes (canonical + legacy compatibility alias)
+app.use('/api/mech/multiplayer', multiplayerApiRouter);
+app.use('/api/multiplayer', multiplayerApiRouter);
 
 // Serve raw OpenAPI JSON spec for type generation
 app.get('/api/openapi.json', (req: Request, res: Response) => {
@@ -147,6 +150,21 @@ app.get('/api-docs', swaggerUi.setup(swaggerSpec, {
   //customCss: '.swagger-ui .topbar { display: none }',
   //customSiteTitle: 'Seethbot API Docs'
 }));
+
+// Mech SPA fallback
+app.get('/mech', (req: Request, res: Response) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.sendFile(path.join(MECH_SERVE_ROOT, 'index.html'));
+});
+
+app.get('/mech/*', (req: Request, res: Response) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.sendFile(path.join(MECH_SERVE_ROOT, 'index.html'));
+});
 
 // Vue.js SPA fallback - all other routes serve index.html
 app.get('*', (req: Request, res: Response) => {
@@ -180,18 +198,19 @@ const server = createServer(app);
 setupWebSocketServer(server);
 
 // Setup multiplayer WebSocket server
-setupMultiplayerWebSocket(server);
+setupMechWebSockets(server);
 
 // Note: Prisma client is initialized automatically, no need for separate DB initialization
 
 server.listen(PORT, () => {
   console.log(`🌸 Server running on http://localhost:${PORT}`);
   console.log(`📁 Serving static files from: ${SERVE_ROOT}`);
+  console.log(`🤖 Serving mech app from: ${MECH_SERVE_ROOT} at /mech`);
   console.log(`✨ Ready to serve the Vue.js app!`);
   console.log(`🔒 Security: API key authentication enabled for destructive endpoints`);
   console.log(`⚡ Rate limiting: 10,000 requests per minute per IP (high for real-time gameplay)`);
   console.log(`🔗 WebSocket server listening on /ws`);
-  console.log(`🎮 Multiplayer WebSocket server listening on /ws/multiplayer`);
+  console.log(`🎮 Multiplayer WebSocket server listening on /ws/mech/multiplayer (and /ws/multiplayer legacy)`);
 });
 
 export default app;

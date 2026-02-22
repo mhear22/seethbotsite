@@ -17,20 +17,23 @@ const mockRoute = {
 
 vi.mock('vue-router', () => ({
   useRoute: () => mockRoute,
-  RouterLink: { template: '<a><slot /></a>', props: ['to'] },
 }))
 
 import { mount } from '@vue/test-utils'
 import BreadcrumbNav from '../../components/shared/ui/BreadcrumbNav.vue'
 
-const mountBreadcrumb = () =>
-  mount(BreadcrumbNav, {
+const mountBreadcrumb = () => {
+  return mount(BreadcrumbNav, {
     global: {
       stubs: {
-        'router-link': { template: '<a><slot /></a>' },
+        RouterLink: {
+          template: '<a class="breadcrumb-link"><slot /></a>',
+          props: ['to'],
+        },
       },
     },
   })
+}
 
 describe('BreadcrumbNav', () => {
   beforeEach(() => {

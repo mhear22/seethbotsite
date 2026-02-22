@@ -14,7 +14,7 @@ const API_BASE = '/api'
 const TOKEN_KEY = 'auth_token'
 const REFRESH_TIMER_KEY = 'auth_refresh_timer'
 
-interface Session {
+export interface Session {
   id: number
   user_id: number
   device_name: string | null
@@ -23,10 +23,6 @@ interface Session {
   expires_at: string
   created_at: string
   last_used_at: string
-}
-
-interface AuthSessionPayload {
-  expires_at?: string
 }
 
 export const useAuthStore = defineStore('auth', () => {
@@ -38,7 +34,7 @@ export const useAuthStore = defineStore('auth', () => {
   const sessions = ref<Session[]>([])
 
   let initialized = false
-  let refreshTimer: NodeJS.Timeout | null = null
+  let refreshTimer: ReturnType<typeof setTimeout> | null = null
 
   // Composables
   const profile = useProfile(() => token.value)
@@ -47,12 +43,6 @@ export const useAuthStore = defineStore('auth', () => {
   // Getters
   const isAuthenticated = computed(() => !!token.value && !!user.value)
   const isInitialized = computed(() => initialized)
-
-  const maybeStartTokenRefresh = (session?: AuthSessionPayload) => {
-    if (session?.expires_at) {
-      startTokenRefresh(session.expires_at)
-    }
-  }
 
   /**
    * Initialize auth state from localStorage
@@ -63,7 +53,7 @@ export const useAuthStore = defineStore('auth', () => {
     const savedToken = localStorage.getItem(TOKEN_KEY)
     if (savedToken) {
       token.value = savedToken
-      const isValid = await validateToken()
+      await validateToken()
 
       // Only mark as initialized if validation succeeded or explicitly failed (not network error)
       initialized = true
@@ -103,10 +93,17 @@ export const useAuthStore = defineStore('auth', () => {
 
       if (response.ok) {
         const data = await response.json()
-        user.value = data.user
+        const nextUser = data?.user
+        const nextExpiry = data?.session?.expires_at
+        if (!nextUser || typeof nextExpiry !== 'string') {
+          console.error('Token validation failed: malformed /auth/me response')
+          clearAuth()
+          return false
+        }
+        user.value = nextUser
 
         // Start automatic token refresh
-        maybeStartTokenRefresh(data.session)
+        startTokenRefresh(nextExpiry)
 
         // Load user settings
         await loadSettings()
@@ -173,10 +170,17 @@ export const useAuthStore = defineStore('auth', () => {
 
       if (response.ok) {
         const data = await response.json()
-        user.value = data.user
+        const nextUser = data?.user
+        const nextExpiry = data?.session?.expires_at
+        if (!nextUser || typeof nextExpiry !== 'string') {
+          console.error('Token refresh failed: malformed /auth/me response')
+          clearAuth()
+          return false
+        }
+        user.value = nextUser
 
         // Restart refresh timer
-        maybeStartTokenRefresh(data.session)
+        startTokenRefresh(nextExpiry)
 
         console.log('Token refreshed successfully')
         return true
@@ -232,8 +236,8 @@ export const useAuthStore = defineStore('auth', () => {
         error.value = data.error || 'Registration failed'
         return { success: false, error: error.value }
       }
-    } catch (error) {
-      console.error('Registration failed:', error)
+    } catch (err) {
+      console.error('Registration failed:', err)
       error.value = 'Registration failed. Please try again.'
       return { success: false, error: error.value }
     } finally {
@@ -272,8 +276,8 @@ export const useAuthStore = defineStore('auth', () => {
         error.value = data.error || 'Login failed'
         return { success: false, error: error.value }
       }
-    } catch (error) {
-      console.error('Login failed:', error)
+    } catch (err) {
+      console.error('Login failed:', err)
       error.value = 'Login failed. Please try again.'
       return { success: false, error: error.value }
     } finally {
@@ -290,7 +294,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     try {
-      const response = await fetch(`${API_BASE}/auth/logout`, {
+      await fetch(`${API_BASE}/auth/logout`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token.value}`
@@ -299,8 +303,8 @@ export const useAuthStore = defineStore('auth', () => {
 
       clearAuth()
       return { success: true }
-    } catch (error) {
-      console.error('Logout failed:', error)
+    } catch (err) {
+      console.error('Logout failed:', err)
       clearAuth()
       return { success: true }
     }
@@ -359,8 +363,8 @@ export const useAuthStore = defineStore('auth', () => {
         error.value = data.error || 'Password change failed'
         return { success: false, error: error.value }
       }
-    } catch (error) {
-      console.error('Password change failed:', error)
+    } catch (err) {
+      console.error('Password change failed:', err)
       error.value = 'Password change failed. Please try again.'
       return { success: false, error: error.value }
     } finally {
@@ -397,8 +401,8 @@ export const useAuthStore = defineStore('auth', () => {
         error.value = data.error || 'Account deletion failed. Please try again.'
         return { success: false, error: error.value }
       }
-    } catch (error) {
-      console.error('Account deletion failed:', error)
+    } catch (err) {
+      console.error('Account deletion failed:', err)
       error.value = 'Account deletion failed. Please try again.'
       return { success: false, error: error.value }
     } finally {
@@ -423,7 +427,7 @@ export const useAuthStore = defineStore('auth', () => {
 
       if (response.ok) {
         const data = await response.json()
-        sessions.value = data.sessions || []
+        sessions.value = Array.isArray(data?.sessions) ? data.sessions : []
         return sessions.value
       } else {
         console.error('Failed to fetch sessions', response.status)
@@ -590,12 +594,10 @@ export const useAuthStore = defineStore('auth', () => {
    * Fetch with auth headers
    */
   const fetchWithAuth = async (url: string, options?: RequestInit) => {
-    const headers: HeadersInit = {
-      ...(options?.headers || {}),
-    }
+    const headers = new Headers(options?.headers)
 
     if (token.value) {
-      headers['Authorization'] = `Bearer ${token.value}`
+      headers.set('Authorization', `Bearer ${token.value}`)
     }
 
     return fetch(url, {

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Spin up postgres (docker), backend (port 3001), and frontend (port 3000) for local dev
+# Spin up postgres (docker), backend (port 3001), main frontend (port 3000), and mech frontend (port 3002)
 
 POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-seethbot_secret_change_me}
 DATABASE_URL="postgresql://seethbot:${POSTGRES_PASSWORD}@localhost:5432/seethbot?schema=public"
@@ -27,5 +27,8 @@ echo "Starting backend on port 3001..."
 
 echo "Starting frontend on port 3000..."
 (cd frontend && npm run dev) &
+
+echo "Starting mech frontend app on port 3002..."
+(cd apps/mech/frontend && npm run dev) &
 
 wait

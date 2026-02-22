@@ -66,11 +66,10 @@ const toggle = () => {
           frameborder="0"
           class="cat-game-iframe"
           allowfullscreen
-          title="OTS-01 Virtual Toy Synth game">
-          <a href="https://bellicapelli.itch.io/ots-01" target="_blank">OTS-01 by bellicapelli</a>
-        </iframe>
+          title="OTS-01 Virtual Toy Synth game"
+        ></iframe>
         <div class="cat-game-fallback">
-          <a href="https://bellicapelli.itch.io/ots-01" target="_blank" class="cat-game-link">
+          <a href="https://bellicapelli.itch.io/ots-01" target="_blank" rel="noopener noreferrer" class="cat-game-link">
             🎮 Play OTS-01 (Virtual Toy Synth)
           </a>
         </div>

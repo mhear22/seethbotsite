@@ -33,6 +33,13 @@ const swipeProgress = ref(0)
 let heartSpawnTimeout: ReturnType<typeof setTimeout> | null = null
 let rankingsInterval: ReturnType<typeof setInterval> | null = null
 
+const handleVisibilityChange = () => {
+  if (!document.hidden && authStore.token) {
+    console.log('[Auth] Page became visible, re-validating token...')
+    authStore.validateToken()
+  }
+}
+
 // Initialize theme (applies automatically via useTheme onMounted)
 useTheme()
 
@@ -104,12 +111,6 @@ onMounted(() => {
   })
 
   // Re-validate token when page becomes visible (Ticket #197 - fix login persistence)
-  const handleVisibilityChange = () => {
-    if (!document.hidden && authStore.token) {
-      console.log('[Auth] Page became visible, re-validating token...')
-      authStore.validateToken()
-    }
-  }
   document.addEventListener('visibilitychange', handleVisibilityChange)
 
   // Initialize keyboard shortcuts (Ticket #128)
@@ -279,8 +280,8 @@ onMounted(() => {
 })
 
 // Handle swipe progress for visual feedback
-const handleSwipeProgress = (event: CustomEvent) => {
-  const { deltaX, deltaY } = event.detail
+const handleSwipeProgress = (event: Event) => {
+  const { deltaX, deltaY } = (event as CustomEvent<{ deltaX: number; deltaY: number }>).detail
   const absX = Math.abs(deltaX)
   const absY = Math.abs(deltaY)
 
@@ -295,8 +296,8 @@ const handleSwipeProgress = (event: CustomEvent) => {
 }
 
 // Handle swipe detected event
-const handleSwipeDetected = (event: CustomEvent) => {
-  const { direction } = event.detail
+const handleSwipeDetected = (event: Event) => {
+  const { direction } = (event as CustomEvent<{ direction: 'left' | 'right' | 'up' | 'down' }>).detail
   swipeDirection.value = direction
   swipeProgress.value = 1
 
@@ -308,14 +309,14 @@ const handleSwipeDetected = (event: CustomEvent) => {
 }
 
 // Handle swipe up event (open panel)
-const handleSwipeUp = (event: CustomEvent) => {
+const handleSwipeUp = () => {
   // Logic to open next panel can be handled by appStore
   // This is a placeholder for panel management
   console.log('Swipe up detected - open panel')
 }
 
 // Handle swipe down event (close panel)
-const handleSwipeDown = (event: CustomEvent) => {
+const handleSwipeDown = () => {
   // Logic to close current panel can be handled by appStore
   // This is a placeholder for panel management
   console.log('Swipe down detected - close panel')
@@ -351,7 +352,7 @@ onUnmounted(() => {
 <template>
   <MainApp />
   <KeyboardShortcutsHelp :is-open="showKeyboardHelp" @close="showKeyboardHelp = false" />
-  <SwipeIndicator v-if="swipeGestures.settings.visualFeedback" :direction="swipeDirection" :progress="swipeProgress" />
+  <SwipeIndicator v-if="swipeGestures.settings.value.visualFeedback" :direction="swipeDirection" :progress="swipeProgress" />
 </template>
 
 <style>

@@ -356,9 +356,7 @@ describe('useAuth', () => {
         ok: true,
         json: async () => ({
           user: { id: 1, email: 'test@example.com', display_name: 'Test' },
-          session: {
-            expires_at: new Date(Date.now() + 86400000).toISOString()
-          }
+          session: { expires_at: new Date(Date.now() + 60000).toISOString() }
         })
       })
 
@@ -481,7 +479,7 @@ describe('useAuth', () => {
         (call: any[]) => call[0] === '/api/some-endpoint'
       )
       expect(fetchCall).toBeDefined()
-      expect(fetchCall![1].headers['Authorization']).toBe('Bearer bearer-token')
+      expect(new Headers(fetchCall![1].headers).get('Authorization')).toBe('Bearer bearer-token')
     })
   })
 })
