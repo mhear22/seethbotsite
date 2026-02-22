@@ -1,0 +1,97 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "close": "Close",
+    "open": "Open",
+    "search": "Search",
+    "settings": "Settings",
+    "language": "Language",
+    "theme": "Theme",
+    "darkMode": "Dark Mode",
+    "lightMode": "Light Mode",
+    "logout": "Logout",
+    "login": "Login",
+    "register": "Register",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "submit": "Submit",
+    "reset": "Reset",
+    "clear": "Clear",
+    "filter": "Filter",
+    "sort": "Sort",
+    "refresh": "Refresh"
+  },
+  "nav": {
+    "home": "Home",
+    "tickets": "Tickets",
+    "settings": "Settings",
+    "profile": "Profile",
+    "about": "About",
+    "help": "Help"
+  },
+  "auth": {
+    "email": "Email",
+    "password": "Password",
+    "username": "Username",
+    "displayName": "Display Name",
+    "forgotPassword": "Forgot Password?",
+    "rememberMe": "Remember Me",
+    "loginSuccess": "Login successful",
+    "loginFailed": "Login failed",
+    "registerSuccess": "Registration successful",
+    "registerFailed": "Registration failed",
+    "logoutSuccess": "Logout successful"
+  },
+  "tickets": {
+    "title": "Tickets",
+    "create": "Create Ticket",
+    "edit": "Edit Ticket",
+    "delete": "Delete Ticket",
+    "status": "Status",
+    "priority": "Priority",
+    "type": "Type",
+    "description": "Description",
+    "created": "Created",
+    "updated": "Updated",
+    "pending": "Pending",
+    "inProgress": "In Progress",
+    "completed": "Completed",
+    "low": "Low",
+    "medium": "Medium",
+    "high": "High",
+    "feature": "Feature",
+    "bug": "Bug",
+    "improvement": "Improvement"
+  },
+  "panels": {
+    "rankings": "Rankings",
+    "favorites": "Favorites",
+    "search": "Search",
+    "filters": "Filters"
+  },
+  "keyboardShortcuts": {
+    "title": "Keyboard Shortcuts",
+    "description": "Press Ctrl+Cmd+/ to show or hide this help",
+    "modals": "Modals",
+    "panels": "Panels",
+    "navigation": "Navigation",
+    "actions": "Actions"
+  },
+  "quote": {
+    "title": "Quote of the Moment"
+  },
+  "language": {
+    "selectLanguage": "Select Language",
+    "english": "English",
+    "chinese": "中文 (Chinese)",
+    "japanese": "日本語 (Japanese)"
+  }
+}

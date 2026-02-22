@@ -1,0 +1,97 @@
+{
+  "common": {
+    "loading": "読み込み中...",
+    "error": "エラー",
+    "success": "成功",
+    "cancel": "キャンセル",
+    "confirm": "確認",
+    "save": "保存",
+    "delete": "削除",
+    "edit": "編集",
+    "close": "閉じる",
+    "open": "開く",
+    "search": "検索",
+    "settings": "設定",
+    "language": "言語",
+    "theme": "テーマ",
+    "darkMode": "ダークモード",
+    "lightMode": "ライトモード",
+    "logout": "ログアウト",
+    "login": "ログイン",
+    "register": "登録",
+    "back": "戻る",
+    "next": "次へ",
+    "previous": "前へ",
+    "submit": "送信",
+    "reset": "リセット",
+    "clear": "クリア",
+    "filter": "フィルター",
+    "sort": "並べ替え",
+    "refresh": "更新"
+  },
+  "nav": {
+    "home": "ホーム",
+    "tickets": "チケット",
+    "settings": "設定",
+    "profile": "プロフィール",
+    "about": "について",
+    "help": "ヘルプ"
+  },
+  "auth": {
+    "email": "メールアドレス",
+    "password": "パスワード",
+    "username": "ユーザー名",
+    "displayName": "表示名",
+    "forgotPassword": "パスワードをお忘れですか？",
+    "rememberMe": "ログイン状態を保持",
+    "loginSuccess": "ログイン成功",
+    "loginFailed": "ログイン失敗",
+    "registerSuccess": "登録成功",
+    "registerFailed": "登録失敗",
+    "logoutSuccess": "ログアウト成功"
+  },
+  "tickets": {
+    "title": "チケット",
+    "create": "チケット作成",
+    "edit": "チケット編集",
+    "delete": "チケット削除",
+    "status": "ステータス",
+    "priority": "優先度",
+    "type": "タイプ",
+    "description": "説明",
+    "created": "作成日時",
+    "updated": "更新日時",
+    "pending": "保留中",
+    "inProgress": "進行中",
+    "completed": "完了",
+    "low": "低",
+    "medium": "中",
+    "high": "高",
+    "feature": "機能",
+    "bug": "バグ",
+    "improvement": "改善"
+  },
+  "panels": {
+    "rankings": "ランキング",
+    "favorites": "お気に入り",
+    "search": "検索",
+    "filters": "フィルター"
+  },
+  "keyboardShortcuts": {
+    "title": "キーボードショートカット",
+    "description": "Ctrl+Cmd+/ を押してこのヘルプを表示または非表示",
+    "modals": "モーダル",
+    "panels": "パネル",
+    "navigation": "ナビゲーション",
+    "actions": "アクション"
+  },
+  "quote": {
+    "title": "今日の言葉"
+  },
+  "language": {
+    "selectLanguage": "言語を選択",
+    "english": "English",
+    "chinese": "中文",
+    "japanese": "日本語"
+  }
+}
