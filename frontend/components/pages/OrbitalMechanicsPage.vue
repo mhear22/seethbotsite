@@ -7,6 +7,18 @@
     <div class="canvas-container">
       <canvas ref="canvasRef" class="orbit-canvas"></canvas>
     </div>
+    <div class="scene-switcher">
+      <button
+        v-for="sceneOption in sceneOptions"
+        :key="sceneOption.id"
+        type="button"
+        class="scene-button"
+        :class="{ active: activeScene === sceneOption.id }"
+        @click="switchScene(sceneOption.id)"
+      >
+        {{ sceneOption.label }}
+      </button>
+    </div>
     <div class="controls-hint">
       <div class="title">Camera Controls</div>
       <div class="action">
@@ -18,6 +30,9 @@
       <div class="action">
         <span class="key">Scroll</span> or <span class="key">Q</span> <span class="key">E</span> Zoom
       </div>
+      <div class="action">
+        <span class="key">1</span> <span class="key">2</span> <span class="key">3</span> Scenes
+      </div>
     </div>
     <div class="info-panel">
       <div class="info-item">
@@ -26,7 +41,11 @@
       </div>
       <div class="info-item">
         <span class="label">Black Hole:</span>
-        <span class="value active">Visible</span>
+        <span class="value" :class="{ active: blackHoleVisible }">{{ blackHoleVisible ? 'Visible' : 'Hidden' }}</span>
+      </div>
+      <div class="info-item">
+        <span class="label">Scene:</span>
+        <span class="value active">{{ activeSceneLabel }}</span>
       </div>
       <div class="info-item">
         <span class="label">Camera:</span>
@@ -37,8 +56,64 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, markRaw } from 'vue'
+import { ref, onMounted, onUnmounted, markRaw, computed } from 'vue'
 import * as THREE from 'three'
+
+type OrbitalSceneId = 'orbital-system' | 'black-hole' | 'nebula-field'
+
+interface ScenePreset {
+  id: OrbitalSceneId
+  label: string
+  cameraRadius: number
+  cameraVertical: number
+  cameraAngle: number
+  cameraTarget: THREE.Vector3
+  showSolarSystem: boolean
+  showBlackHole: boolean
+  showNebulae: boolean
+  lensingStrength: number
+}
+
+const scenePresets: ScenePreset[] = [
+  {
+    id: 'orbital-system',
+    label: 'Orbital System',
+    cameraRadius: 80,
+    cameraVertical: 30,
+    cameraAngle: 0,
+    cameraTarget: new THREE.Vector3(0, 0, 0),
+    showSolarSystem: true,
+    showBlackHole: false,
+    showNebulae: false,
+    lensingStrength: 0
+  },
+  {
+    id: 'black-hole',
+    label: 'Black Hole',
+    cameraRadius: 50,
+    cameraVertical: 16,
+    cameraAngle: Math.PI * 1.5,
+    cameraTarget: new THREE.Vector3(0, 0, -120),
+    showSolarSystem: false,
+    showBlackHole: true,
+    showNebulae: true,
+    lensingStrength: 1
+  },
+  {
+    id: 'nebula-field',
+    label: 'Nebula Field',
+    cameraRadius: 95,
+    cameraVertical: -10,
+    cameraAngle: Math.PI * 1.75,
+    cameraTarget: new THREE.Vector3(20, -20, -130),
+    showSolarSystem: false,
+    showBlackHole: false,
+    showNebulae: true,
+    lensingStrength: 0
+  }
+]
+
+const sceneOptions = scenePresets.map((preset) => ({ id: preset.id, label: preset.label }))
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 let scene: THREE.Scene | null = null
@@ -47,17 +122,24 @@ let renderer: THREE.WebGLRenderer | null = null
 let animationId: number | null = null
 
 const bodies = ref<Array<{ name: string; distance: number; speed: number; angle: number }>>([])
+const activeScene = ref<OrbitalSceneId>('orbital-system')
+const activeSceneLabel = computed(() => getScenePreset(activeScene.value).label)
+const blackHoleVisible = computed(() => getScenePreset(activeScene.value).showBlackHole)
 
 // Scene objects
 let sun: THREE.Mesh | null = null
 let blackHole: THREE.Mesh | null = null
 let celestialBodies: THREE.Mesh[] = []
 let orbitLines: THREE.Line[] = []
+let solarSystemObjects: THREE.Object3D[] = []
+let blackHoleObjects: THREE.Object3D[] = []
+let nebulaObjects: THREE.Object3D[] = []
 
 // Camera movement
 let cameraAngle = 0
 let cameraRadius = 80
 let cameraVertical = 30
+const cameraTarget = new THREE.Vector3(0, 0, 0)
 
 // Camera control state
 const manualControl = ref(false)
@@ -80,8 +162,6 @@ let lensingMaterial: THREE.ShaderMaterial | null = null
 let lensingQuad: THREE.Mesh | null = null
 let orthoCamera: THREE.OrthographicCamera | null = null
 
-// Black hole world position for lensing
-const blackHolePosition = new THREE.Vector3(0, 0, -120)
 const tempV = new THREE.Vector3()
 
 onMounted(() => {
@@ -103,6 +183,41 @@ onUnmounted(() => {
   window.removeEventListener('wheel', handleWheel)
   cleanup()
 })
+
+function getScenePreset(sceneId: OrbitalSceneId): ScenePreset {
+  return scenePresets.find((preset) => preset.id === sceneId) ?? scenePresets[0]
+}
+
+function applyScenePreset(sceneId: OrbitalSceneId) {
+  activeScene.value = sceneId
+  manualControl.value = false
+  keysPressed.value.clear()
+
+  const preset = getScenePreset(sceneId)
+  cameraRadius = preset.cameraRadius
+  cameraVertical = preset.cameraVertical
+  cameraAngle = preset.cameraAngle
+  cameraTarget.copy(preset.cameraTarget)
+
+  solarSystemObjects.forEach((obj) => {
+    obj.visible = preset.showSolarSystem
+  })
+  blackHoleObjects.forEach((obj) => {
+    obj.visible = preset.showBlackHole
+  })
+  nebulaObjects.forEach((obj) => {
+    obj.visible = preset.showNebulae
+  })
+
+  if (lensingMaterial) {
+    lensingMaterial.uniforms.lensingStrength.value = preset.lensingStrength
+  }
+}
+
+function switchScene(sceneId: OrbitalSceneId) {
+  if (activeScene.value === sceneId) return
+  applyScenePreset(sceneId)
+}
 
 function initScene() {
   if (!canvasRef.value) return
@@ -395,6 +510,7 @@ function initScene() {
   sun = markRaw(new THREE.Mesh(sunGeometry, sunMaterial))
   sun.userData.isGlowing = true
   scene.add(sun)
+  solarSystemObjects.push(sun)
 
   // Realistic corona/glow using sprite
   const canvas = document.createElement('canvas')
@@ -440,6 +556,9 @@ function initScene() {
   // Add distant nebulae
   createNebulae()
 
+  // Apply active scene defaults once all objects exist
+  applyScenePreset(activeScene.value)
+
   // Initial camera position
   updateCamera()
 }
@@ -474,6 +593,7 @@ function createCelestialBodies() {
 
     scene?.add(mesh)
     celestialBodies.push(mesh)
+    solarSystemObjects.push(mesh)
     bodies.value.push({
       name: planet.name,
       distance: planet.distance,
@@ -521,6 +641,7 @@ function createOrbitLines() {
     const line = markRaw(new THREE.Line(geometry, material))
     scene?.add(line)
     orbitLines.push(line)
+    solarSystemObjects.push(line)
   })
 }
 
@@ -536,6 +657,7 @@ function createBlackHole() {
   blackHole = markRaw(new THREE.Mesh(blackHoleGeometry, blackHoleMaterial))
   blackHole.position.set(0, 0, -120)
   scene?.add(blackHole)
+  blackHoleObjects.push(blackHole)
 
   // Realistic accretion disk using a custom shader
   // Single wide ring geometry, tilted to be viewed at a shallow angle
@@ -848,6 +970,7 @@ function createNebulae() {
     scene?.add(mesh)
     nebulaMeshes.push(mesh)
     nebulaMaterials.push(mat)
+    nebulaObjects.push(mesh)
   })
 }
 
@@ -908,15 +1031,27 @@ function updateCamera() {
   cameraRadius = Math.max(20, Math.min(250, cameraRadius + zoomVelocity))
   zoomVelocity *= 0.88 // friction
 
-  const x = Math.cos(cameraAngle) * cameraRadius
-  const z = Math.sin(cameraAngle) * cameraRadius
-  const y = cameraVertical
+  const x = cameraTarget.x + Math.cos(cameraAngle) * cameraRadius
+  const z = cameraTarget.z + Math.sin(cameraAngle) * cameraRadius
+  const y = cameraTarget.y + cameraVertical
 
   camera.position.set(x, y, z)
-  camera.lookAt(0, 0, 0)
+  camera.lookAt(cameraTarget)
 }
 
 function handleKeyDown(event: KeyboardEvent) {
+  if (event.code === 'Digit1') {
+    switchScene('orbital-system')
+    return
+  }
+  if (event.code === 'Digit2') {
+    switchScene('black-hole')
+    return
+  }
+  if (event.code === 'Digit3') {
+    switchScene('nebula-field')
+    return
+  }
   keysPressed.value.add(event.code)
 }
 
@@ -948,7 +1083,7 @@ function updateBlackHoleScreenPosition() {
   if (!camera || !lensingMaterial || !blackHole) return
 
   // Project black hole world position to screen space
-  tempV.copy(blackHolePosition)
+  blackHole.getWorldPosition(tempV)
   tempV.project(camera)
 
   // Convert from NDC (-1 to 1) to UV (0 to 1)
@@ -1079,6 +1214,9 @@ function cleanup() {
   })
   nebulaMeshes = []
   nebulaMaterials = []
+  solarSystemObjects = []
+  blackHoleObjects = []
+  nebulaObjects = []
 
   if (accretionDiskMaterial) {
     accretionDiskMaterial.dispose()
@@ -1174,6 +1312,43 @@ function cleanup() {
   height: 100%;
 }
 
+.scene-switcher {
+  position: fixed;
+  top: 100px;
+  left: 20px;
+  z-index: 10;
+  display: flex;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(100, 100, 150, 0.3);
+}
+
+.scene-button {
+  border: 1px solid rgba(100, 100, 150, 0.5);
+  border-radius: 8px;
+  background: rgba(20, 25, 45, 0.8);
+  color: #c7d2fe;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 8px 10px;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.scene-button:hover {
+  border-color: rgba(168, 85, 247, 0.7);
+  color: #f0abfc;
+}
+
+.scene-button.active {
+  background: rgba(139, 92, 246, 0.35);
+  border-color: rgba(217, 70, 239, 0.9);
+  color: #f5d0fe;
+}
+
 .controls-hint {
   position: fixed;
   top: 100px;
@@ -1256,6 +1431,21 @@ function cleanup() {
     left: 20px;
     right: auto;
     font-size: 0.75rem;
+  }
+
+  .scene-switcher {
+    top: auto;
+    bottom: 110px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(95%, 420px);
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .scene-button {
+    font-size: 0.72rem;
+    padding: 6px 9px;
   }
 
   .info-panel {
