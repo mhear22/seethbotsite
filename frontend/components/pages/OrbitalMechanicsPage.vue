@@ -59,7 +59,7 @@
 import { ref, onMounted, onUnmounted, markRaw, computed } from 'vue'
 import * as THREE from 'three'
 
-type OrbitalSceneId = 'orbital-system' | 'black-hole' | 'nebula-field'
+type OrbitalSceneId = 'orbital-system' | 'black-hole-vs-star' | 'binary-star-system'
 
 interface ScenePreset {
   id: OrbitalSceneId
@@ -68,8 +68,9 @@ interface ScenePreset {
   cameraVertical: number
   cameraAngle: number
   cameraTarget: THREE.Vector3
-  showSolarSystem: boolean
+  showPlanets: boolean
   showBlackHole: boolean
+  showCompanionStar: boolean
   showNebulae: boolean
   lensingStrength: number
 }
@@ -82,32 +83,35 @@ const scenePresets: ScenePreset[] = [
     cameraVertical: 30,
     cameraAngle: 0,
     cameraTarget: new THREE.Vector3(0, 0, 0),
-    showSolarSystem: true,
+    showPlanets: true,
     showBlackHole: false,
+    showCompanionStar: false,
     showNebulae: false,
     lensingStrength: 0
   },
   {
-    id: 'black-hole',
-    label: 'Black Hole',
-    cameraRadius: 50,
-    cameraVertical: 16,
-    cameraAngle: Math.PI * 1.5,
-    cameraTarget: new THREE.Vector3(0, 0, -120),
-    showSolarSystem: false,
+    id: 'black-hole-vs-star',
+    label: 'Black Hole vs Star',
+    cameraRadius: 90,
+    cameraVertical: 18,
+    cameraAngle: Math.PI * 1.6,
+    cameraTarget: new THREE.Vector3(0, 0, 0),
+    showPlanets: false,
     showBlackHole: true,
+    showCompanionStar: false,
     showNebulae: true,
     lensingStrength: 1
   },
   {
-    id: 'nebula-field',
-    label: 'Nebula Field',
+    id: 'binary-star-system',
+    label: 'Binary Star System',
     cameraRadius: 95,
-    cameraVertical: -10,
-    cameraAngle: Math.PI * 1.75,
-    cameraTarget: new THREE.Vector3(20, -20, -130),
-    showSolarSystem: false,
+    cameraVertical: 24,
+    cameraAngle: Math.PI * 1.65,
+    cameraTarget: new THREE.Vector3(0, 0, 0),
+    showPlanets: false,
     showBlackHole: false,
+    showCompanionStar: true,
     showNebulae: true,
     lensingStrength: 0
   }
@@ -128,6 +132,7 @@ const blackHoleVisible = computed(() => getScenePreset(activeScene.value).showBl
 
 // Scene objects
 let sun: THREE.Mesh | null = null
+let companionStar: THREE.Mesh | null = null
 let blackHole: THREE.Mesh | null = null
 let celestialBodies: THREE.Mesh[] = []
 let orbitLines: THREE.Line[] = []
@@ -199,8 +204,15 @@ function applyScenePreset(sceneId: OrbitalSceneId) {
   cameraAngle = preset.cameraAngle
   cameraTarget.copy(preset.cameraTarget)
 
+  if (sun) {
+    sun.visible = true
+  }
+  if (companionStar) {
+    companionStar.visible = preset.showCompanionStar
+  }
+
   solarSystemObjects.forEach((obj) => {
-    obj.visible = preset.showSolarSystem
+    obj.visible = preset.showPlanets
   })
   blackHoleObjects.forEach((obj) => {
     obj.visible = preset.showBlackHole
@@ -510,7 +522,6 @@ function initScene() {
   sun = markRaw(new THREE.Mesh(sunGeometry, sunMaterial))
   sun.userData.isGlowing = true
   scene.add(sun)
-  solarSystemObjects.push(sun)
 
   // Realistic corona/glow using sprite
   const canvas = document.createElement('canvas')
@@ -541,6 +552,9 @@ function initScene() {
   corona.scale.set(0.7, 0.4, 2)
   sun.add(corona)
 
+  // Secondary star used by the binary-star scene
+  createCompanionStar()
+
   // Create celestial bodies
   createCelestialBodies()
 
@@ -561,6 +575,29 @@ function initScene() {
 
   // Initial camera position
   updateCamera()
+}
+
+function createCompanionStar() {
+  const starGeometry = new THREE.SphereGeometry(2.8, 32, 32)
+  const starMaterial = new THREE.MeshBasicMaterial({
+    color: 0x8fc7ff
+  })
+  companionStar = markRaw(new THREE.Mesh(starGeometry, starMaterial))
+  companionStar.position.set(-20, 0, 0)
+
+  const glowGeometry = new THREE.SphereGeometry(4.2, 32, 32)
+  const glowMaterial = new THREE.MeshBasicMaterial({
+    color: 0x7ab6ff,
+    transparent: true,
+    opacity: 0.28
+  })
+  const glow = markRaw(new THREE.Mesh(glowGeometry, glowMaterial))
+  companionStar.add(glow)
+
+  const starLight = new THREE.PointLight(0x9fcfff, 1000, 180)
+  companionStar.add(starLight)
+
+  scene?.add(companionStar)
 }
 
 function createCelestialBodies() {
@@ -1045,11 +1082,11 @@ function handleKeyDown(event: KeyboardEvent) {
     return
   }
   if (event.code === 'Digit2') {
-    switchScene('black-hole')
+    switchScene('black-hole-vs-star')
     return
   }
   if (event.code === 'Digit3') {
-    switchScene('nebula-field')
+    switchScene('binary-star-system')
     return
   }
   keysPressed.value.add(event.code)
@@ -1094,10 +1131,49 @@ function updateBlackHoleScreenPosition() {
   lensingMaterial.uniforms.bhPos.value.set(screenX, screenY)
 }
 
+function updateSceneLayout(timeSeconds: number) {
+  if (!sun) return
+
+  if (activeScene.value === 'orbital-system') {
+    sun.position.set(0, 0, 0)
+    sun.scale.setScalar(1)
+    if (blackHole) {
+      blackHole.position.set(0, 0, -120)
+    }
+    return
+  }
+
+  if (activeScene.value === 'black-hole-vs-star') {
+    sun.position.set(26, 0, 0)
+    sun.scale.setScalar(1.15)
+    if (blackHole) {
+      blackHole.position.set(-26, 0, 0)
+    }
+    return
+  }
+
+  // Binary star system
+  const orbitRadius = 22
+  const phase = timeSeconds * 0.35
+  const px = Math.cos(phase) * orbitRadius
+  const pz = Math.sin(phase) * orbitRadius
+  sun.position.set(px, 0, pz)
+  sun.scale.setScalar(1)
+
+  if (companionStar) {
+    companionStar.position.set(-px, 0, -pz)
+  }
+
+  if (blackHole) {
+    blackHole.position.set(0, 0, -120)
+  }
+}
+
 function animate() {
   animationId = requestAnimationFrame(animate)
 
   const time = Date.now()
+  const timeSeconds = time * 0.001
 
   // Update celestial bodies
   celestialBodies.forEach((body) => {
@@ -1117,8 +1193,11 @@ function animate() {
 
   // Animate nebula shaders
   nebulaMaterials.forEach((mat) => {
-    mat.uniforms.time.value = time * 0.001
+    mat.uniforms.time.value = timeSeconds
   })
+
+  // Apply per-scene object layout and binary-star animation
+  updateSceneLayout(timeSeconds)
 
   // Update camera
   updateCamera()
@@ -1201,6 +1280,26 @@ function cleanup() {
         child.material.dispose()
       }
     })
+  }
+
+  if (companionStar) {
+    companionStar.geometry.dispose()
+    if (Array.isArray(companionStar.material)) {
+      companionStar.material.forEach((m) => m.dispose())
+    } else {
+      companionStar.material.dispose()
+    }
+    companionStar.children.forEach((child) => {
+      if (child instanceof THREE.Mesh) {
+        child.geometry.dispose()
+        if (Array.isArray(child.material)) {
+          child.material.forEach((m) => m.dispose())
+        } else {
+          child.material.dispose()
+        }
+      }
+    })
+    companionStar = null
   }
 
   nebulaMeshes.forEach((m) => {
