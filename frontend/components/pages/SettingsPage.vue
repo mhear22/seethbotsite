@@ -7,6 +7,7 @@ import ThemeSettings from '../settings/ThemeSettings.vue'
 import SyncSettings from '../settings/SyncSettings.vue'
 import DiscordSettings from '../settings/DiscordSettings.vue'
 import AccessibilitySettings from '../settings/AccessibilitySettings.vue'
+import LanguageSettings from '../settings/LanguageSettings.vue'
 import VolumeSlider from '../settings/VolumeSlider.vue'
 
 const appStore = useAppStore()
@@ -125,6 +126,10 @@ const resetToDefaults = () => {
 
       <div class="settings-section">
         <AccessibilitySettings />
+      </div>
+
+      <div class="settings-section">
+        <LanguageSettings />
       </div>
 
       <div class="settings-section">
