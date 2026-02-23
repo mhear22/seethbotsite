@@ -26,7 +26,6 @@ build
 
 # Generated assets
 frontend/public/assets/images/resized/*
-frontend/locales/*
 backend/mech-webdist
 backend/dist
 

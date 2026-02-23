@@ -31,7 +31,7 @@ COPY backend/src ./src/
 
 # Copy shared files and validation script for prebuild validation
 COPY scripts/validate-shared-files.js ../scripts/validate-shared-files.js
-COPY backend/src/shared ../backend/src/shared
+COPY backend/src/shared ./src/shared
 COPY frontend/shared ../frontend/shared
 
 # Generate Prisma Client with cache
@@ -61,7 +61,7 @@ COPY frontend/ ./
 
 # Copy shared files and validation script for prebuild validation
 COPY scripts/validate-shared-files.js ../scripts/validate-shared-files.js
-COPY backend/src/shared ../backend/src/shared
+COPY backend/src/shared ./src/shared
 COPY frontend/shared ../frontend/shared
 
 # Build frontend
