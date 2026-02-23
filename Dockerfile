@@ -70,7 +70,8 @@ FROM builder-base AS prod-deps
 WORKDIR /app/backend
 
 COPY backend/package*.json ./
-COPY backend/prisma.config.ts backend/prisma ./
+COPY backend/prisma.config.ts ./
+COPY backend/prisma ./prisma/
 
 # Install ONLY production dependencies with cache mount
 RUN --mount=type=cache,target=/root/.npm \
