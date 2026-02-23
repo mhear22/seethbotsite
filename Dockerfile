@@ -23,8 +23,11 @@ COPY backend/package*.json ./
 RUN --mount=type=cache,target=/root/.npm \
     npm ci --prefer-offline --no-audit
 
-# Copy backend source in combined layer for better caching
-COPY backend/tsconfig.json backend/prisma.config.ts backend/scripts backend/prisma backend/src ./
+# Copy backend source files
+COPY backend/tsconfig.json backend/prisma.config.ts ./
+COPY backend/scripts ./scripts/
+COPY backend/prisma ./prisma/
+COPY backend/src ./src/
 
 # Copy shared files and validation script for prebuild validation
 COPY scripts/validate-shared-files.js ../scripts/validate-shared-files.js
