@@ -105,11 +105,15 @@ RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app/backend
 
-# Copy production dependencies and package.json together
-COPY --from=prod-deps /app/backend/node_modules /app/backend/package.json ./
+# Copy production dependencies and package.json
+COPY --from=prod-deps /app/backend/node_modules ./node_modules
+COPY --from=prod-deps /app/backend/package.json ./
 
-# Copy backend built files in combined layer
-COPY --from=backend-builder /app/backend/dist /app/backend/build-info.json /app/backend/prisma /app/backend/prisma.config.ts ./
+# Copy backend built files
+COPY --from=backend-builder /app/backend/dist ./dist
+COPY --from=backend-builder /app/backend/build-info.json ./
+COPY --from=backend-builder /app/backend/prisma ./prisma
+COPY --from=backend-builder /app/backend/prisma.config.ts ./
 
 # Copy startup script with permissions
 COPY --from=backend-builder /app/backend/scripts/start.sh ./scripts/start.sh

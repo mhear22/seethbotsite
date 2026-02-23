@@ -17,7 +17,7 @@ fi
 # Get git info
 GIT_HASH=$(git rev-parse --short HEAD 2>/dev/null || echo "dev")
 GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "main")
-BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%S.%3NZ")
+BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%S.000Z")
 
 # Update build-info.json
 jq --arg buildTime "$BUILD_TIME" \

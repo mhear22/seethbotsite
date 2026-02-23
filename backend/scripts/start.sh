@@ -10,6 +10,13 @@ else
   BASE_DIR="$(pwd)"
 fi
 
+# Determine prisma binary path (Docker has flat node_modules, local has node_modules dir)
+if [ -f "$BASE_DIR/.bin/prisma" ]; then
+  PRISMA_CMD="$BASE_DIR/.bin/prisma"
+else
+  PRISMA_CMD="node_modules/.bin/prisma"
+fi
+
 # Check if DATABASE_URL is set
 if [ -z "$DATABASE_URL" ]; then
   echo "Error: DATABASE_URL environment variable is not set."
@@ -21,8 +28,8 @@ fi
 # Check if we need to run migrations
 DB_NEEDS_INIT=0
 
-if ! npx prisma migrate status 2>/dev/null | grep -q "Can't reach database"; then
-  if ! npx prisma migrate status 2>/dev/null | grep -q "Last migration"; then
+if ! $PRISMA_CMD migrate status 2>/dev/null | grep -q "Can't reach database"; then
+  if ! $PRISMA_CMD migrate status 2>/dev/null | grep -q "Last migration"; then
     echo "Database needs initialization. Will run migrations..."
     DB_NEEDS_INIT=1
   else
@@ -36,7 +43,7 @@ fi
 # Run migrations if needed
 if [ "$DB_NEEDS_INIT" = "1" ]; then
   echo "Running database migrations..."
-  npx prisma migrate deploy
+  $PRISMA_CMD migrate deploy
   echo "Database migrations completed."
 fi
 
