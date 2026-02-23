@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { availableLocales, changeLocale, type Locale } from '../../config/i18n'
 
-const { locale } = useI18n
+const { locale } = useI18n()
 
 const selectedLocale = computed<Locale>({
   get: () => locale.value as Locale,
