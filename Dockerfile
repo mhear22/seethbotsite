@@ -20,7 +20,7 @@ WORKDIR /app/backend
 COPY backend/package*.json ./
 
 # Install with cache mount - use ci for faster, reproducible installs
-RUN --mount=type=cache,target=/root/.npm,sharing=locked \
+RUN --mount=type=cache,target=/root/.npm \
     npm ci --prefer-offline --no-audit
 
 # Copy backend source in combined layer for better caching
@@ -32,7 +32,7 @@ COPY backend/src/shared ../backend/src/shared
 COPY frontend/shared ../frontend/shared
 
 # Generate Prisma Client with cache
-RUN --mount=type=cache,target=/tmp/prisma,sharing=locked \
+RUN --mount=type=cache,target=/tmp/prisma \
     npx prisma generate
 
 # Build backend (generates dist/openapi.json)
@@ -47,7 +47,7 @@ WORKDIR /app/frontend
 COPY frontend/package*.json ./
 
 # Install with cache mount - use ci for faster, reproducible installs
-RUN --mount=type=cache,target=/root/.npm,sharing=locked \
+RUN --mount=type=cache,target=/root/.npm \
     npm ci --prefer-offline --no-audit
 
 # Copy backend OpenAPI spec for type generation
@@ -73,11 +73,11 @@ COPY backend/package*.json ./
 COPY backend/prisma.config.ts backend/prisma ./
 
 # Install ONLY production dependencies with cache mount
-RUN --mount=type=cache,target=/root/.npm,sharing=locked \
+RUN --mount=type=cache,target=/root/.npm \
     npm ci --omit=dev --prefer-offline --no-audit
 
 # Generate Prisma Client for production with cache
-RUN --mount=type=cache,target=/tmp/prisma,sharing=locked \
+RUN --mount=type=cache,target=/tmp/prisma \
     npx prisma generate
 
 # Stage 4: Build mech frontend app
@@ -87,7 +87,7 @@ WORKDIR /app/apps/mech/frontend
 
 COPY apps/mech/frontend/package*.json ./
 
-RUN --mount=type=cache,target=/root/.npm,sharing=locked \
+RUN --mount=type=cache,target=/root/.npm \
     npm ci --prefer-offline --no-audit
 
 COPY apps/mech/frontend/ ./
