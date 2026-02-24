@@ -1,6 +1,9 @@
 node_modules
+**/node_modules
 dist
+**/dist
 build
+**/build
 .git
 .gitignore
 *.md
@@ -8,6 +11,14 @@ build
 .env.local
 .vscode
 .idea
+worktrees
+docs
+backups
+tests
+test.mjs
+test_prisma.ts
+backend/tests
+frontend/tests
 **/.DS_Store
 **/npm-debug.log*
 **/yarn-debug.log*
@@ -27,6 +38,7 @@ build
 # Generated assets
 frontend/public/assets/images/resized/*
 backend/mech-webdist
+backend/tickets-webdist
 backend/dist
 
 # Development files

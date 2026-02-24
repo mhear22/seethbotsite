@@ -20,8 +20,18 @@ const selectedLocale = computed<Locale>({
     <div class="setting-item">
       <label class="setting-label">
         <span class="label-text">{{ $t('language.selectLanguage') }}</span>
-        <span class="label-desc">{{ $t('common.language') }}</span>
+        <span class="label-desc">{{ $t('language.manualDescription') }}</span>
       </label>
+
+      <select v-model="selectedLocale" class="language-select" :aria-label="$t('language.selectLanguage')">
+        <option
+          v-for="loc in availableLocales"
+          :key="loc.code"
+          :value="loc.code"
+        >
+          {{ loc.flag }} {{ loc.name }}
+        </option>
+      </select>
 
       <div class="language-grid">
         <button
@@ -40,7 +50,7 @@ const selectedLocale = computed<Locale>({
 
     <div class="setting-info">
       <p class="info-text">
-        💡 {{ $t('common.language') }} preference is saved automatically.
+        💡 {{ $t('language.savedAutomatically') }}
       </p>
     </div>
   </div>
@@ -122,6 +132,23 @@ const selectedLocale = computed<Locale>({
   gap: 0.75rem;
 }
 
+.language-select {
+  width: 100%;
+  margin-bottom: 0.75rem;
+  padding: 0.75rem 0.875rem;
+  border: 2px solid var(--border-color, #e2e8f0);
+  border-radius: 10px;
+  background: var(--input-bg, #f7fafc);
+  color: var(--text-color, #1a1a2e);
+  font-size: 0.9375rem;
+  font-weight: 500;
+}
+
+.language-select:focus {
+  outline: none;
+  border-color: var(--primary-color, #6366f1);
+}
+
 .language-option {
   display: flex;
   align-items: center;
@@ -188,6 +215,12 @@ const selectedLocale = computed<Locale>({
 .dark .language-option.active {
   background: var(--primary-bg, #6366f1);
   border-color: var(--primary-color, #6366f1);
+}
+
+.dark .language-select {
+  background: var(--input-bg, #2d3748);
+  border-color: var(--border-color, #4a5568);
+  color: white;
 }
 
 .setting-info {

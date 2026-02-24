@@ -2,6 +2,7 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import App from './App.vue'
 import router from './router'
+import i18n from './config/i18n'
 import './styles.css'
 import './theme-base.css'
 import { useAuthStore } from './stores/useAuthStore'
@@ -29,6 +30,7 @@ const app = createApp(App)
 const pinia = createPinia()
 
 app.use(pinia)
+app.use(i18n)
 app.use(router)
 
 // Register Font Awesome component globally

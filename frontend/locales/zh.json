@@ -92,6 +92,8 @@
     "selectLanguage": "选择语言",
     "english": "English",
     "chinese": "中文",
-    "japanese": "日本語"
+    "japanese": "日本語",
+    "manualDescription": "手动选择您偏好的语言",
+    "savedAutomatically": "语言偏好会自动保存。"
   }
 }

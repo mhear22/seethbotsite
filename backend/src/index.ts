@@ -50,6 +50,7 @@ const PORT = process.env.PORT || 3001;
 // In development: __dirname is /backend/src, webdist is at /backend/webdist
 const SERVE_ROOT = process.env.SERVE_ROOT || path.join(__dirname, '..', 'webdist');
 const MECH_SERVE_ROOT = process.env.MECH_SERVE_ROOT || path.join(__dirname, '..', 'mech-webdist');
+const TICKETS_SERVE_ROOT = process.env.TICKETS_SERVE_ROOT || path.join(__dirname, '..', 'tickets-webdist');
 
 // Middleware
 app.use(cors());
@@ -97,6 +98,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 // Serve static files from the Vue.js app
 app.use(express.static(SERVE_ROOT));
 app.use('/mech', express.static(MECH_SERVE_ROOT));
+app.use('/tickets', express.static(TICKETS_SERVE_ROOT));
 
 // Serve avatars from backend/public
 app.use('/avatars', express.static(path.join(__dirname, '..', 'public', 'avatars')));
@@ -166,6 +168,21 @@ app.get('/mech/*', (req: Request, res: Response) => {
   res.sendFile(path.join(MECH_SERVE_ROOT, 'index.html'));
 });
 
+// Tickets SPA fallback
+app.get('/tickets', (req: Request, res: Response) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.sendFile(path.join(TICKETS_SERVE_ROOT, 'index.html'));
+});
+
+app.get('/tickets/*', (req: Request, res: Response) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.sendFile(path.join(TICKETS_SERVE_ROOT, 'index.html'));
+});
+
 // Vue.js SPA fallback - all other routes serve index.html
 app.get('*', (req: Request, res: Response) => {
   // Ensure index.html is never cached
@@ -206,6 +223,7 @@ server.listen(PORT, () => {
   console.log(`🌸 Server running on http://localhost:${PORT}`);
   console.log(`📁 Serving static files from: ${SERVE_ROOT}`);
   console.log(`🤖 Serving mech app from: ${MECH_SERVE_ROOT} at /mech`);
+  console.log(`🎫 Serving tickets app from: ${TICKETS_SERVE_ROOT} at /tickets`);
   console.log(`✨ Ready to serve the Vue.js app!`);
   console.log(`🔒 Security: API key authentication enabled for destructive endpoints`);
   console.log(`⚡ Rate limiting: 10,000 requests per minute per IP (high for real-time gameplay)`);

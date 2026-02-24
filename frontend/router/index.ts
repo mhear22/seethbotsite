@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { mechRoutes } from '../features/mech/routes'
+import { ticketsRoutes } from '../features/tickets/routes'
 
 const routes = [
   {
@@ -62,11 +63,7 @@ const routes = [
     name: 'countdowns',
     component: () => import('../components/pages/CountdownPage.vue')
   },
-  {
-    path: '/tickets',
-    name: 'tickets',
-    component: () => import('../components/pages/TicketsPage.vue')
-  },
+  ...ticketsRoutes,
   {
     path: '/clocks',
     name: 'clocks',

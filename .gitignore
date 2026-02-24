@@ -4,6 +4,8 @@ node_modules/
 # Build outputs
 dist/
 webdist/
+backend/mech-webdist/
+backend/tickets-webdist/
 
 # Environment variables
 .env

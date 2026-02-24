@@ -39,6 +39,10 @@ const i18n = createI18n({
   }
 })
 
+if (typeof document !== 'undefined') {
+  document.documentElement.lang = i18n.global.locale.value as string
+}
+
 // Export functions to change locale
 export const changeLocale = (locale: Locale) => {
   i18n.global.locale.value = locale

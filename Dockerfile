@@ -1,5 +1,4 @@
-# Multi-stage build for full-stack application
-
+# syntax=docker/dockerfile:1.7
 # Multi-stage build for full-stack application
 # Build arguments for version tracking
 ARG GIT_HASH=dev
@@ -9,39 +8,45 @@ ARG BUILD_COUNT=1
 # Shared build base with native compilation tools
 # Using Debian-slim for better native module compatibility (libsql)
 FROM node:24-slim AS builder-base
-RUN apt-get update && apt-get install -y python3 make g++ openssl && rm -rf /var/lib/apt/lists/*
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends python3 make g++ openssl && rm -rf /var/lib/apt/lists/*
 
-# Stage 1: Build backend (TypeScript) - generates OpenAPI spec for frontend
-FROM builder-base AS backend-builder
+# Stage 1: Install backend build dependencies once (reused by backend build stages)
+FROM builder-base AS backend-deps
 
 WORKDIR /app/backend
 
-# Copy backend package files (cached unless package*.json changes)
 COPY backend/package*.json ./
+COPY backend/prisma.config.ts ./
+COPY backend/prisma ./prisma/
 
 # Install with cache mount - use ci for faster, reproducible installs
 RUN --mount=type=cache,target=/root/.npm \
     npm ci --prefer-offline --no-audit
 
+# Generate Prisma Client once and reuse it in dependent stages
+RUN --mount=type=cache,target=/tmp/prisma \
+    npx prisma generate
+
+# Stage 2: Build backend (TypeScript) - generates OpenAPI spec for frontend
+FROM backend-deps AS backend-builder
+
+WORKDIR /app/backend
+
 # Copy backend source files
-COPY backend/tsconfig.json backend/prisma.config.ts ./
+COPY backend/tsconfig.json ./
 COPY backend/scripts ./scripts/
-COPY backend/prisma ./prisma/
 COPY backend/src ./src/
 
 # Copy shared files and validation script for prebuild validation
 COPY scripts/validate-shared-files.js ../scripts/validate-shared-files.js
-COPY backend/src/shared ./src/shared
 COPY frontend/shared ../frontend/shared
-
-# Generate Prisma Client with cache
-RUN --mount=type=cache,target=/tmp/prisma \
-    npx prisma generate
 
 # Build backend (generates dist/openapi.json)
 RUN GIT_HASH="${GIT_HASH}" GIT_BRANCH="${GIT_BRANCH}" BUILD_COUNT="${BUILD_COUNT}" npm run build
 
-# Stage 2: Build frontend (Vite) - depends on backend's OpenAPI spec
+# Stage 3: Build frontend (Vite) - depends on backend's OpenAPI spec
 FROM builder-base AS frontend-builder
 
 WORKDIR /app/frontend
@@ -65,9 +70,10 @@ COPY backend/src/shared ./src/shared
 COPY frontend/shared ../frontend/shared
 
 # Build frontend
-RUN npm run build
+RUN --mount=type=cache,target=/app/frontend/public/assets/images/resized \
+    npm run build
 
-# Stage 3: Production dependencies (needs native build tools for bcrypt)
+# Stage 4: Production dependencies (separate, minimal install)
 FROM builder-base AS prod-deps
 
 WORKDIR /app/backend
@@ -84,7 +90,7 @@ RUN --mount=type=cache,target=/root/.npm \
 RUN --mount=type=cache,target=/tmp/prisma \
     npx prisma generate
 
-# Stage 4: Build mech frontend app
+# Stage 5: Build mech frontend app
 FROM builder-base AS mech-frontend-builder
 
 WORKDIR /app/apps/mech/frontend
@@ -98,10 +104,30 @@ COPY apps/mech/frontend/ ./
 
 RUN npm run build
 
-# Stage 5: Production image (minimal)
+# Stage 6: Build tickets frontend app
+FROM builder-base AS tickets-frontend-builder
+
+WORKDIR /app/apps/tickets/frontend
+
+COPY apps/tickets/frontend/package*.json ./
+
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --prefer-offline --no-audit
+
+COPY apps/tickets/frontend/ ./
+COPY frontend/ /app/frontend/
+
+RUN --mount=type=cache,target=/root/.npm \
+    npm --prefix /app/frontend install --no-save --prefer-offline --no-audit @vue/tsconfig
+
+RUN npm run build
+
+# Stage 7: Production image (minimal)
 FROM node:24-slim
 
-RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app/backend
 
@@ -122,6 +148,7 @@ RUN chmod +x ./scripts/start.sh
 # Copy frontend builds
 COPY --from=frontend-builder /app/frontend/dist ./webdist
 COPY --from=mech-frontend-builder /app/backend/mech-webdist ./mech-webdist
+COPY --from=tickets-frontend-builder /app/backend/tickets-webdist ./tickets-webdist
 
 # Create data directory for SQLite database
 RUN mkdir -p /app/backend/data
