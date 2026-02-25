@@ -39,6 +39,7 @@ frontend/tests
 frontend/public/assets/images/resized/*
 backend/mech-webdist
 backend/tickets-webdist
+backend/datacenter-webdist
 backend/dist
 
 # Development files

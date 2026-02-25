@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0b1f3a" />
+      <stop offset="1" stop-color="#050d1a" />
+    </linearGradient>
+    <linearGradient id="cityGlow" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#38bdf8" stop-opacity="0.45" />
+      <stop offset="1" stop-color="#14b8a6" stop-opacity="0.18" />
+    </linearGradient>
+    <pattern id="grid" width="90" height="90" patternUnits="userSpaceOnUse">
+      <path d="M90 0H0V90" fill="none" stroke="#38bdf8" stroke-opacity="0.12" stroke-width="1" />
+    </pattern>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#sky)" />
+  <rect width="1600" height="900" fill="url(#grid)" />
+
+  <g opacity="0.6">
+    <path d="M0 750L250 560L460 690L720 520L980 700L1220 570L1600 740V900H0Z" fill="#07182d" />
+  </g>
+
+  <g fill="#0a233f">
+    <rect x="80" y="360" width="110" height="360" />
+    <rect x="220" y="290" width="95" height="430" />
+    <rect x="355" y="245" width="120" height="475" />
+    <rect x="520" y="325" width="92" height="395" />
+    <rect x="640" y="275" width="130" height="445" />
+    <rect x="810" y="350" width="96" height="370" />
+    <rect x="940" y="300" width="108" height="420" />
+    <rect x="1090" y="255" width="118" height="465" />
+    <rect x="1245" y="305" width="92" height="415" />
+    <rect x="1375" y="250" width="128" height="470" />
+  </g>
+
+  <g fill="url(#cityGlow)">
+    <rect x="90" y="375" width="8" height="330" />
+    <rect x="246" y="305" width="7" height="400" />
+    <rect x="392" y="262" width="9" height="443" />
+    <rect x="671" y="294" width="9" height="411" />
+    <rect x="1138" y="272" width="8" height="433" />
+    <rect x="1420" y="270" width="8" height="435" />
+  </g>
+
+  <g fill="none" stroke="#67e8f9" stroke-opacity="0.24" stroke-width="3">
+    <path d="M40 210H340L420 290H730L810 365H1120L1210 420H1560" />
+    <path d="M0 470H230L330 410H610L710 500H930L1040 440H1290L1390 510H1600" />
+  </g>
+
+  <g fill="#a5f3fc" fill-opacity="0.55">
+    <circle cx="332" cy="409" r="5" />
+    <circle cx="711" cy="501" r="5" />
+    <circle cx="1038" cy="441" r="5" />
+    <circle cx="1210" cy="420" r="5" />
+  </g>
+</svg>

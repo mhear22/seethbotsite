@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { mechRoutes } from '../features/mech/routes'
 import { ticketsRoutes } from '../features/tickets/routes'
+import { dataCenterRoutes } from '../features/datacenter/routes'
 
 const routes = [
   {
@@ -173,6 +174,7 @@ const routes = [
     component: () => import('../components/pages/BatteryCalculatorPage.vue')
   },
   ...mechRoutes,
+  ...dataCenterRoutes,
   {
     path: '/search',
     name: 'search',

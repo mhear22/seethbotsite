@@ -122,7 +122,21 @@ RUN --mount=type=cache,target=/root/.npm \
 
 RUN npm run build
 
-# Stage 7: Production image (minimal)
+# Stage 7: Build datacenter frontend app
+FROM builder-base AS datacenter-frontend-builder
+
+WORKDIR /app/apps/datacenter/frontend
+
+COPY apps/datacenter/frontend/package*.json ./
+
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --prefer-offline --no-audit
+
+COPY apps/datacenter/frontend/ ./
+
+RUN npm run build
+
+# Stage 8: Production image (minimal)
 FROM node:24-slim
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
@@ -149,6 +163,7 @@ RUN chmod +x ./scripts/start.sh
 COPY --from=frontend-builder /app/frontend/dist ./webdist
 COPY --from=mech-frontend-builder /app/backend/mech-webdist ./mech-webdist
 COPY --from=tickets-frontend-builder /app/backend/tickets-webdist ./tickets-webdist
+COPY --from=datacenter-frontend-builder /app/backend/datacenter-webdist ./datacenter-webdist
 
 # Create data directory for SQLite database
 RUN mkdir -p /app/backend/data

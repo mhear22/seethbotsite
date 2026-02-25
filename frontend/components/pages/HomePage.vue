@@ -77,6 +77,7 @@ const featureCategories = [
       { name: 'Girl Mode', icon: '💕', path: '/girl' },
       { name: 'Gender', icon: '🔮', path: '/gender' },
       { name: 'Cats', icon: '🐱', path: '/cats' },
+      { name: 'Data Center', icon: '🖥️', path: '/datacenter' },
       { name: 'Stock Market', icon: '📈', path: '/stocks' },
       { name: 'Music', icon: '🎵', path: '/music' }
     ]

@@ -40,6 +40,7 @@ import profilesController from './controllers/profiles.controller';
 import favoritesController from './controllers/favorites.controller';
 import themesController from './controllers/themes.controller';
 import discordController from './controllers/discord.controller';
+import dataCenterRunsController from './controllers/datacenter-runs.controller';
 import { setupWebSocketServer } from './controllers/presence.controller';
 import { multiplayerApiRouter, setupMechWebSockets } from './modules/mech';
 import { createServer } from 'http';
@@ -51,6 +52,7 @@ const PORT = process.env.PORT || 3001;
 const SERVE_ROOT = process.env.SERVE_ROOT || path.join(__dirname, '..', 'webdist');
 const MECH_SERVE_ROOT = process.env.MECH_SERVE_ROOT || path.join(__dirname, '..', 'mech-webdist');
 const TICKETS_SERVE_ROOT = process.env.TICKETS_SERVE_ROOT || path.join(__dirname, '..', 'tickets-webdist');
+const DATACENTER_SERVE_ROOT = process.env.DATACENTER_SERVE_ROOT || path.join(__dirname, '..', 'datacenter-webdist');
 
 // Middleware
 app.use(cors());
@@ -99,6 +101,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 app.use(express.static(SERVE_ROOT));
 app.use('/mech', express.static(MECH_SERVE_ROOT));
 app.use('/tickets', express.static(TICKETS_SERVE_ROOT));
+app.use('/datacenter', express.static(DATACENTER_SERVE_ROOT));
 
 // Serve avatars from backend/public
 app.use('/avatars', express.static(path.join(__dirname, '..', 'public', 'avatars')));
@@ -135,6 +138,7 @@ app.use('/api/profiles', profilesController);
 app.use('/api/favorites', favoritesController);
 app.use('/api/themes', themesController);
 app.use('/api', discordController);
+app.use('/api', dataCenterRunsController);
 
 // Mech multiplayer API routes (canonical + legacy compatibility alias)
 app.use('/api/mech/multiplayer', multiplayerApiRouter);
@@ -183,6 +187,21 @@ app.get('/tickets/*', (req: Request, res: Response) => {
   res.sendFile(path.join(TICKETS_SERVE_ROOT, 'index.html'));
 });
 
+// Data Center SPA fallback
+app.get('/datacenter', (req: Request, res: Response) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.sendFile(path.join(DATACENTER_SERVE_ROOT, 'index.html'));
+});
+
+app.get('/datacenter/*', (req: Request, res: Response) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.sendFile(path.join(DATACENTER_SERVE_ROOT, 'index.html'));
+});
+
 // Vue.js SPA fallback - all other routes serve index.html
 app.get('*', (req: Request, res: Response) => {
   // Ensure index.html is never cached
@@ -224,6 +243,7 @@ server.listen(PORT, () => {
   console.log(`📁 Serving static files from: ${SERVE_ROOT}`);
   console.log(`🤖 Serving mech app from: ${MECH_SERVE_ROOT} at /mech`);
   console.log(`🎫 Serving tickets app from: ${TICKETS_SERVE_ROOT} at /tickets`);
+  console.log(`🖥️  Serving data center app from: ${DATACENTER_SERVE_ROOT} at /datacenter`);
   console.log(`✨ Ready to serve the Vue.js app!`);
   console.log(`🔒 Security: API key authentication enabled for destructive endpoints`);
   console.log(`⚡ Rate limiting: 10,000 requests per minute per IP (high for real-time gameplay)`);

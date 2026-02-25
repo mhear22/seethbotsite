@@ -17,6 +17,9 @@ cd apps/mech/frontend && npm run dev
 # Tickets app frontend dev server (http://localhost:3003)
 cd apps/tickets/frontend && npm run dev
 
+# Data Center app frontend dev server (http://localhost:3004)
+cd apps/datacenter/frontend && npm run dev
+
 # Mech-only backend app (optional standalone server)
 cd backend && npm run dev:mech
 ```
@@ -49,6 +52,7 @@ Do NOT create new root-level scripts. Use `node cli.js` instead.
 ├── frontend/       # Vue 3 + TypeScript frontend
 ├── apps/mech/      # Separate mech frontend app
 ├── apps/tickets/   # Separate tickets frontend app
+├── apps/datacenter/ # Separate data center frontend app
 ├── backend/        # Node.js + Express backend
 ├── docs/           # Documentation
 ├── scripts/        # Utility scripts

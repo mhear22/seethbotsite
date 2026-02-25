@@ -4,6 +4,7 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '../../../stores/useAppStore'
 import { useKeyboardShortcuts } from '../../../composables/useKeyboardShortcuts'
 import { mechNavRoutes } from '../../../features/mech/navigation'
+import { dataCenterNavRoutes } from '../../../features/datacenter/navigation'
 import KeyboardShortcutsHelp from '../../shared/ui/KeyboardShortcutsHelp.vue'
 import PageTicker from '../../shared/ui/PageTicker.vue'
 
@@ -54,6 +55,7 @@ const dropdowns = ref<DropdownData[]>([
       { title: 'Keanu', icon: '🥋', path: '/keanu' },
       { title: 'Orbital Mechanics', icon: '🌌', path: '/orbital' },
       ...mechNavRoutes,
+      ...dataCenterNavRoutes,
       { title: 'Stock Market', icon: '📈', path: '/stocks' },
       { title: 'Shop', icon: '🛍️', path: '/shop' },
       { title: 'Music', icon: '🎵', path: '/music' }
@@ -134,6 +136,7 @@ onMounted(() => {
     { key: 's', description: 'Go to Stocks', action: () => navigate('/stocks') },
     { key: 'k', description: 'Go to Clicker', action: () => navigate('/clicker') },
     { key: 'f', description: 'Go to Fishing', action: () => navigate('/fishing') },
+    { key: 'y', description: 'Go to Data Center', action: () => navigate('/datacenter') },
     { key: 'g', description: 'Go to Stats', action: () => navigate('/stats') },
     { key: 'o', description: 'Go to Shop', action: () => navigate('/shop') },
     { key: ',', description: 'Go to Settings', action: () => navigate('/settings') },

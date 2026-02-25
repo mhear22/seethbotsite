@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#234a73" />
+      <stop offset="1" stop-color="#14253f" />
+    </linearGradient>
+    <linearGradient id="ground" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1f6b6a" />
+      <stop offset="1" stop-color="#103f44" />
+    </linearGradient>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#sky)" />
+
+  <g fill="#dbeafe" fill-opacity="0.18">
+    <ellipse cx="260" cy="170" rx="120" ry="45" />
+    <ellipse cx="340" cy="170" rx="90" ry="34" />
+    <ellipse cx="1050" cy="145" rx="140" ry="48" />
+    <ellipse cx="1150" cy="145" rx="100" ry="36" />
+  </g>
+
+  <path d="M0 640C190 600 320 640 500 620C700 596 820 650 980 630C1140 610 1290 640 1600 610V900H0Z" fill="url(#ground)" />
+  <path d="M0 710C210 680 340 730 550 700C760 670 910 730 1110 700C1300 670 1440 715 1600 700V900H0Z" fill="#0f4d4f" fill-opacity="0.75" />
+
+  <g fill="#1c2f45">
+    <rect x="130" y="520" width="130" height="150" />
+    <polygon points="120,520 195,470 270,520" />
+
+    <rect x="330" y="535" width="140" height="145" />
+    <polygon points="320,535 400,478 480,535" />
+
+    <rect x="560" y="510" width="120" height="165" />
+    <polygon points="552,510 620,458 688,510" />
+
+    <rect x="760" y="540" width="150" height="145" />
+    <polygon points="748,540 835,486 922,540" />
+
+    <rect x="980" y="520" width="128" height="155" />
+    <polygon points="968,520 1044,468 1120,520" />
+
+    <rect x="1190" y="530" width="150" height="150" />
+    <polygon points="1178,530 1265,475 1352,530" />
+  </g>
+
+  <g fill="#7dd3fc" fill-opacity="0.3">
+    <rect x="165" y="565" width="26" height="28" />
+    <rect x="374" y="576" width="26" height="30" />
+    <rect x="603" y="560" width="24" height="27" />
+    <rect x="808" y="580" width="28" height="30" />
+    <rect x="1022" y="570" width="26" height="28" />
+    <rect x="1232" y="574" width="28" height="29" />
+  </g>
+
+  <g fill="#14532d" fill-opacity="0.75">
+    <circle cx="300" cy="635" r="36" />
+    <circle cx="520" cy="650" r="42" />
+    <circle cx="734" cy="648" r="34" />
+    <circle cx="945" cy="654" r="39" />
+    <circle cx="1155" cy="640" r="35" />
+    <circle cx="1390" cy="648" r="42" />
+  </g>
+</svg>

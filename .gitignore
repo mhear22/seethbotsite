@@ -6,6 +6,7 @@ dist/
 webdist/
 backend/mech-webdist/
 backend/tickets-webdist/
+backend/datacenter-webdist/
 
 # Environment variables
 .env

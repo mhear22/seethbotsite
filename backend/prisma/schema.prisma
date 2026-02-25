@@ -47,6 +47,7 @@ model User {
   theme                  Theme?
   characterMatches       CharacterMatch[] @relation("Voter")
   userDevices           UserDevice[]
+  dataCenterRuns        DataCenterRun[]
 
   @@index([email])
 }
@@ -163,6 +164,24 @@ model DailyChallenge {
   @@unique([user_id, challenge_type, date])
   @@index([user_id])
   @@index([date])
+}
+
+model DataCenterRun {
+  id             Int      @id @default(autoincrement())
+  user_id        Int
+  name           String
+  location       String
+  state_json     String
+  status         String   @default("active")
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+  last_played_at DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([user_id, status])
+  @@index([last_played_at])
 }
 
 model Achievement {

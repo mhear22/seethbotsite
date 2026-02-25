@@ -335,6 +335,14 @@ export function useVoiceNavigation() {
     })
 
     registerCommand({
+      phrases: ['go to data center', 'data center', 'datacenter', 'open data center'],
+      action: () => router.push('/datacenter'),
+      description: 'Navigate to data center game',
+      category: 'navigation',
+      feedback: 'Opening data center'
+    })
+
+    registerCommand({
       phrases: ['go to countdowns', 'countdowns', 'countdown page'],
       action: () => router.push('/countdowns'),
       description: 'Navigate to countdowns page',
