@@ -21,7 +21,7 @@ const __dirname = path.dirname(__filename)
 const SOURCE_DIR = path.join(__dirname, '../public/images')
 const OUTPUT_DIR = path.join(__dirname, '../public/assets/images/resized')
 const SIZES = [320, 640, 1024, 1920]
-const FORMATS = ['webp', 'avif']
+const FORMATS = ['webp']
 const QUALITY = 85
 
 // ANSI color codes for output
