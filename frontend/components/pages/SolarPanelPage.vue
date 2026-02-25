@@ -5,7 +5,6 @@ import { useAppStore } from '../../stores/useAppStore'
 import { useSolarCalculator } from '../../composables/useSolarCalculator'
 import { useSolarCanvas } from '../../composables/useSolarCanvas'
 import { useSolarStore } from '../../composables/useSolarStore'
-import SolarDayNightPreview from './solar/SolarDayNightPreview.vue'
 
 const store = useAppStore()
 const router = useRouter()
@@ -28,6 +27,11 @@ watch([() => canvas.verticesInMeters.value, () => canvas.isClosed.value], () => 
 watch(() => canvas.exclusionZonesInMeters.value, (zones) => {
   calculator.exclusionZones.value = zones
 }, { deep: true })
+
+// Persist roof geometry for the battery results visualization
+watch([() => calculator.roofVertices.value, () => calculator.isClosed.value], ([vertices, closed]) => {
+  solarStore.setRoofVertices(vertices, closed)
+}, { deep: true, immediate: true })
 
 function onCanvasClick(event: MouseEvent) {
   if (!svgRef.value) return
@@ -83,14 +87,6 @@ function insetPathSvg() {
     </div>
 
     <div class="solar-layout">
-      <div class="card cycle-card">
-        <div class="cycle-copy">
-          <h3>Day/Night Solar Cycle</h3>
-          <p>Preview how roof panels build battery charge in daylight and discharge overnight.</p>
-        </div>
-        <SolarDayNightPreview />
-      </div>
-
       <!-- Instructions -->
       <div class="card instructions-card">
         <h3>How to Use</h3>
@@ -379,22 +375,6 @@ function insetPathSvg() {
   display: flex;
   flex-direction: column;
   gap: 20px;
-}
-
-.cycle-card {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.cycle-copy p {
-  margin: 0;
-  color: #666;
-  font-size: 0.92rem;
-}
-
-.solar-page.dark .cycle-copy p {
-  color: #aaa;
 }
 
 /* Card base */

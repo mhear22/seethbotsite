@@ -7,6 +7,7 @@ import { useBatteryCalculator, BATTERY_PRESETS } from '../../composables/useBatt
 import { useBatteryChart } from '../../composables/useBatteryChart'
 import BatterySettings from '../battery/BatterySettings.vue'
 import BatteryChart from '../battery/BatteryChart.vue'
+import SolarDayNightPreview from './solar/SolarDayNightPreview.vue'
 
 const store = useAppStore()
 const router = useRouter()
@@ -16,6 +17,11 @@ const battery = useBatteryCalculator()
 const hasSolarData = computed(() => solarStore.solarResults.value !== null)
 const estimatedKW = computed(() => solarStore.solarResults.value?.estimatedKW ?? 0)
 const panelCount = computed(() => solarStore.solarResults.value?.panelCount ?? 0)
+const roofVertices = computed(() => solarStore.roofVertices.value)
+const roofPanelLayout = computed(() => solarStore.solarResults.value?.panels ?? [])
+const batteryUnitCount = computed(() =>
+  battery.selectedBatteries.value.reduce((sum, entry) => sum + entry.quantity, 0)
+)
 
 const results = computed(() => battery.calculateResults(estimatedKW.value))
 
@@ -152,6 +158,13 @@ console.log('Chart data:', {
       <!-- Results -->
       <div class="card results-card">
         <h3>Results</h3>
+        <div class="results-preview" v-if="hasSolarData">
+          <SolarDayNightPreview
+            :roof-vertices="roofVertices"
+            :panel-layout="roofPanelLayout"
+            :battery-count="batteryUnitCount"
+          />
+        </div>
         <div class="results-grid">
           <div class="stat-card">
             <div class="stat-value">{{ results.dailyGeneration.toFixed(1) }} kWh</div>
@@ -483,6 +496,10 @@ console.log('Chart data:', {
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 16px;
   margin-bottom: 24px;
+}
+
+.results-preview {
+  margin-bottom: 18px;
 }
 
 .stat-card {
