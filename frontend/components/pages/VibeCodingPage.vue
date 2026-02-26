@@ -10,33 +10,56 @@ import cursorLogo from '../../assets/logos/cursor.svg'
 import githubLogo from '../../assets/logos/github.svg'
 import ollamaLogo from '../../assets/logos/ollama.png'
 
+type SupportLevel = 'best' | 'works' | 'none'
+type ToolType = 'cli' | 'gui'
+
+interface ModelOption {
+  id: string
+  name: string
+  icon: string
+  logo: string
+  description: string
+}
+
+interface ToolOption {
+  id: string
+  name: string
+  icon: string
+  logo: string
+  description: string
+  bestModels: string[]
+  worksWith: string[]
+  notes: string
+}
+
 const store = useAppStore()
+const focusedModel = ref<string | null>(null)
+const activeTool = ref<ToolOption | null>(null)
+const activeToolType = ref<ToolType>('gui')
 
-const selectedModel = ref<string>('all')
-
-const models = [
-  { id: 'opus', name: 'Claude Opus', icon: '🟣', logo: anthropicLogo, description: 'Most capable Claude model, best for complex tasks' },
-  { id: 'sonnet', name: 'Claude Sonnet', icon: '🟣', logo: anthropicLogo, description: 'Balanced Claude model, great for everyday coding' },
-  { id: 'glm5', name: 'GLM 5', icon: '🟢', logo: zhipuLogo, description: 'Zhipu AI model, good multimodal capabilities' },
+const models: ModelOption[] = [
+  { id: 'opus', name: 'Claude Opus', icon: '🟣', logo: anthropicLogo, description: 'Most capable Claude model' },
+  { id: 'sonnet', name: 'Claude Sonnet', icon: '🟣', logo: anthropicLogo, description: 'Balanced Claude model' },
+  { id: 'glm5', name: 'GLM 5', icon: '🟢', logo: zhipuLogo, description: 'Zhipu multimodal model' },
   { id: 'codex', name: 'GPT Codex', icon: '🔵', logo: openaiLogo, description: 'OpenAI coding-focused model' },
-  { id: 'gemini', name: 'Gemini', icon: '🔴', logo: geminiLogo, description: 'Google\'s multimodal model' },
-  { id: 'local', name: 'Local Models', icon: '🟡', logo: ollamaLogo, description: 'Self-hosted models (Ollama, LM Studio, etc.)' }
+  { id: 'gemini', name: 'Gemini', icon: '🔴', logo: geminiLogo, description: 'Google multimodal model' },
+  { id: 'local', name: 'Local Models', icon: '🟡', logo: ollamaLogo, description: 'Self-hosted model stack' }
 ]
 
-const cliTools = [
-  { 
-    id: 'claude-code', 
-    name: 'Claude Code', 
+const cliTools: ToolOption[] = [
+  {
+    id: 'claude-code',
+    name: 'Claude Code',
     icon: '⚡',
     logo: anthropicLogo,
     description: 'Official Anthropic CLI for Claude models',
     bestModels: ['opus', 'sonnet'],
     worksWith: ['glm5'],
-    notes: 'First-class support for Opus/Sonnet. GLM 5 works with configuration tweaks (marked with *)'
+    notes: 'First-class support for Opus/Sonnet. GLM 5 works with configuration tweaks.'
   },
-  { 
-    id: 'opencode', 
-    name: 'Opencode', 
+  {
+    id: 'opencode',
+    name: 'Opencode',
     icon: '🔧',
     logo: githubLogo,
     description: 'Open-source coding assistant CLI',
@@ -44,676 +67,628 @@ const cliTools = [
     worksWith: ['opus', 'sonnet', 'codex', 'gemini'],
     notes: 'Flexible and supports many models. Great for local development.'
   },
-  { 
-    id: 'codex-cli', 
-    name: 'Codex CLI', 
+  {
+    id: 'codex-cli',
+    name: 'Codex CLI',
     icon: '🔵',
     logo: openaiLogo,
-    description: 'OpenAI\'s official CLI tool',
+    description: 'OpenAI official CLI tool',
     bestModels: ['codex'],
     worksWith: [],
-    notes: 'Optimized for GPT Codex. First-class OpenAI integration.'
+    notes: 'Optimized for GPT Codex with first-class OpenAI integration.'
   },
-  { 
-    id: 'copilot-cli', 
-    name: 'Copilot CLI', 
+  {
+    id: 'copilot-cli',
+    name: 'Copilot CLI',
     icon: '✈️',
     logo: githubLogo,
-    description: 'GitHub\'s terminal-based Copilot',
+    description: 'GitHub terminal Copilot',
     bestModels: ['codex'],
     worksWith: [],
     notes: 'Built on OpenAI models. Great for shell commands and scripts.'
   }
 ]
 
-const guiTools = [
-  { 
-    id: 'claude-cowork', 
-    name: 'Claude Cowork', 
+const guiTools: ToolOption[] = [
+  {
+    id: 'claude-cowork',
+    name: 'Claude Cowork',
     icon: '🤝',
     logo: anthropicLogo,
     description: 'Desktop app for Claude collaboration',
     bestModels: ['opus', 'sonnet'],
     worksWith: ['glm5'],
-    notes: 'First-class Claude experience. Native desktop integration.'
+    notes: 'First-class Claude experience with native desktop integration.'
   },
-  { 
-    id: 'codex-app', 
-    name: 'Codex App', 
+  {
+    id: 'codex-app',
+    name: 'Codex App',
     icon: '📱',
     logo: openaiLogo,
-    description: 'OpenAI\'s desktop application',
+    description: 'OpenAI desktop application',
     bestModels: ['codex'],
     worksWith: [],
-    notes: 'Official OpenAI desktop client. Seamless GPT integration.'
+    notes: 'Official OpenAI desktop client for GPT workflows.'
   },
-  { 
-    id: 'antigravity', 
-    name: 'Antigravity', 
+  {
+    id: 'antigravity',
+    name: 'Antigravity',
     icon: '🚀',
     logo: googleLogo,
     description: 'Multi-model AI coding environment',
     bestModels: ['local'],
     worksWith: ['opus', 'sonnet', 'glm5', 'codex', 'gemini'],
-    notes: 'Great for experimenting with different models. Supports local models well.'
+    notes: 'Great for experimenting with many models, especially local model setups.'
   },
-  { 
-    id: 'cursor', 
-    name: 'Cursor', 
+  {
+    id: 'cursor',
+    name: 'Cursor',
     icon: '🖱️',
     logo: cursorLogo,
     description: 'AI-first code editor',
     bestModels: ['codex'],
     worksWith: ['opus', 'sonnet', 'glm5', 'gemini', 'local'],
-    notes: 'Supports many models but not first-class for all. Built on VS Code.'
+    notes: 'Supports many models, with strong coding ergonomics.'
   },
-  { 
-    id: 'z-code', 
-    name: 'Z Code', 
+  {
+    id: 'z-code',
+    name: 'Z Code',
     icon: '💫',
     logo: zhipuLogo,
     description: 'Next-gen AI coding assistant',
     bestModels: ['glm5'],
     worksWith: ['opus', 'sonnet', 'codex', 'gemini', 'local'],
-    notes: 'Good GLM 5 integration. Growing model support.'
+    notes: 'Good GLM 5 integration and growing support across other models.'
   }
 ]
 
-const filteredCliTools = computed(() => {
-  if (selectedModel.value === 'all') return cliTools
-  return cliTools.filter(tool => 
-    tool.bestModels.includes(selectedModel.value) || 
-    tool.worksWith.includes(selectedModel.value)
-  )
+const visibleGuiTools = computed(() => {
+  if (!focusedModel.value) return guiTools
+  return guiTools.filter((tool) => getModelSupport(tool, focusedModel.value as string) !== 'none')
 })
 
-const filteredGuiTools = computed(() => {
-  if (selectedModel.value === 'all') return guiTools
-  return guiTools.filter(tool => 
-    tool.bestModels.includes(selectedModel.value) || 
-    tool.worksWith.includes(selectedModel.value)
-  )
+const visibleCliTools = computed(() => {
+  if (!focusedModel.value) return cliTools
+  return cliTools.filter((tool) => getModelSupport(tool, focusedModel.value as string) !== 'none')
 })
 
-function getModelSupport(tool: any, modelId: string): 'best' | 'works' | 'none' {
+function toggleModelFocus(modelId: string): void {
+  focusedModel.value = focusedModel.value === modelId ? null : modelId
+}
+
+function openToolDetails(tool: ToolOption, type: ToolType): void {
+  activeTool.value = tool
+  activeToolType.value = type
+}
+
+function closeToolDetails(): void {
+  activeTool.value = null
+}
+
+function getModelSupport(tool: ToolOption, modelId: string): SupportLevel {
   if (tool.bestModels.includes(modelId)) return 'best'
   if (tool.worksWith.includes(modelId)) return 'works'
   return 'none'
+}
+
+function getSupportLabel(level: SupportLevel): string {
+  if (level === 'best') return 'First Class'
+  if (level === 'works') return 'Works'
+  return 'Not Recommended'
+}
+
+function getSupportShort(level: SupportLevel): string {
+  if (level === 'best') return 'FC'
+  if (level === 'works') return 'OK'
+  return '--'
+}
+
+function isModelDeemphasized(modelId: string): boolean {
+  return focusedModel.value !== null && focusedModel.value !== modelId
 }
 </script>
 
 <template>
   <div class="page vibe-coding-page" :class="{ dark: store.darkMode }">
-    <h1>🌊 Vibe Coding Guide</h1>
-    <p class="subtitle">Your comprehensive reference for AI coding tools and models</p>
+    <header class="page-header">
+      <h1>Vibe Coding Matrix</h1>
+      <p class="subtitle">All model and app permutations in one glance. Click any app for details.</p>
+      <p v-if="focusedModel" class="focus-hint">
+        Focused model: {{ models.find((model) => model.id === focusedModel)?.name }}
+        <button class="clear-focus" @click="focusedModel = null">Clear</button>
+      </p>
+    </header>
 
-    <div class="content-sections">
-      <!-- Model Overview Section -->
-      <section class="content-section">
-        <h2>🤖 Available Models</h2>
-        <div class="model-grid">
-          <div 
-            v-for="model in models" 
+    <div class="workspace-grid">
+      <section class="column models-column">
+        <h2>Models</h2>
+        <div class="column-list">
+          <button
+            v-for="model in models"
             :key="model.id"
-            class="model-card"
-            :class="{ selected: selectedModel === model.id }"
-            @click="selectedModel = selectedModel === model.id ? 'all' : model.id"
+            class="model-row"
+            :class="{ selected: focusedModel === model.id }"
+            @click="toggleModelFocus(model.id)"
           >
-            <div class="model-icon">
-              <img v-if="model.logo" :src="model.logo" :alt="`${model.name} logo`" class="product-logo model-logo" />
-              <span v-else>{{ model.icon }}</span>
+            <img :src="model.logo" :alt="`${model.name} logo`" class="logo model-logo" />
+            <div class="row-copy">
+              <span class="row-title">{{ model.name }}</span>
+              <span class="row-subtitle">{{ model.description }}</span>
             </div>
-            <div class="model-info">
-              <h3>{{ model.name }}</h3>
-              <p>{{ model.description }}</p>
-            </div>
-          </div>
+          </button>
         </div>
-        <p class="filter-hint">
-          {{ selectedModel === 'all' ? 'Click a model to filter tools' : `Showing tools for ${models.find(m => m.id === selectedModel)?.name}. Click again to show all.` }}
-        </p>
       </section>
 
-      <!-- CLI Tools Section -->
-      <section class="content-section">
-        <h2>⌨️ CLI Tools</h2>
-        <div class="tools-list">
-          <div v-for="tool in filteredCliTools" :key="tool.id" class="tool-card">
+      <section class="column tools-column gui-column">
+        <h2>GUI Apps</h2>
+        <div class="column-list">
+          <button
+            v-for="tool in visibleGuiTools"
+            :key="tool.id"
+            class="tool-row"
+            @click="openToolDetails(tool, 'gui')"
+          >
             <div class="tool-header">
-              <span class="tool-icon">
-                <img v-if="tool.logo" :src="tool.logo" :alt="`${tool.name} logo`" class="product-logo tool-logo" />
-                <span v-else>{{ tool.icon }}</span>
-              </span>
-              <div>
-                <h3>{{ tool.name }}</h3>
-                <p class="tool-description">{{ tool.description }}</p>
+              <img :src="tool.logo" :alt="`${tool.name} logo`" class="logo tool-logo" />
+              <div class="row-copy">
+                <span class="row-title">{{ tool.name }}</span>
+                <span class="row-subtitle">{{ tool.description }}</span>
               </div>
             </div>
-            
-            <div class="model-support">
-              <h4>Model Support:</h4>
-              <div class="support-grid">
-                <div 
-                  v-for="model in models" 
-                  :key="model.id"
-                  class="support-item"
-                  :class="getModelSupport(tool, model.id)"
-                >
-                  <span class="support-icon">
-                    <img v-if="model.logo" :src="model.logo" :alt="`${model.name} logo`" class="support-logo" />
-                    <span v-else>{{ model.icon }}</span>
-                  </span>
-                  <span class="support-name">{{ model.name }}</span>
-                  <span class="support-badge">
-                    <template v-if="getModelSupport(tool, model.id) === 'best'">✓ First Class</template>
-                    <template v-else-if="getModelSupport(tool, model.id) === 'works'">* Works</template>
-                    <template v-else>—</template>
-                  </span>
-                </div>
+            <div class="support-strip">
+              <div
+                v-for="model in models"
+                :key="`${tool.id}-${model.id}`"
+                class="support-pill"
+                :class="[getModelSupport(tool, model.id), { deemphasized: isModelDeemphasized(model.id) }]"
+              >
+                <img :src="model.logo" :alt="`${model.name} logo`" class="logo support-logo" />
+                <span>{{ getSupportShort(getModelSupport(tool, model.id)) }}</span>
               </div>
             </div>
-            
-            <div class="tool-notes">
-              <strong>📝 Notes:</strong> {{ tool.notes }}
-            </div>
-          </div>
+          </button>
         </div>
       </section>
 
-      <!-- GUI Tools Section -->
-      <section class="content-section">
-        <h2>🖥️ GUI Tools</h2>
-        <div class="tools-list">
-          <div v-for="tool in filteredGuiTools" :key="tool.id" class="tool-card">
+      <section class="column tools-column cli-column">
+        <h2>CLI Apps</h2>
+        <div class="column-list">
+          <button
+            v-for="tool in visibleCliTools"
+            :key="tool.id"
+            class="tool-row"
+            @click="openToolDetails(tool, 'cli')"
+          >
             <div class="tool-header">
-              <span class="tool-icon">
-                <img v-if="tool.logo" :src="tool.logo" :alt="`${tool.name} logo`" class="product-logo tool-logo" />
-                <span v-else>{{ tool.icon }}</span>
-              </span>
-              <div>
-                <h3>{{ tool.name }}</h3>
-                <p class="tool-description">{{ tool.description }}</p>
+              <img :src="tool.logo" :alt="`${tool.name} logo`" class="logo tool-logo" />
+              <div class="row-copy">
+                <span class="row-title">{{ tool.name }}</span>
+                <span class="row-subtitle">{{ tool.description }}</span>
               </div>
             </div>
-            
-            <div class="model-support">
-              <h4>Model Support:</h4>
-              <div class="support-grid">
-                <div 
-                  v-for="model in models" 
-                  :key="model.id"
-                  class="support-item"
-                  :class="getModelSupport(tool, model.id)"
-                >
-                  <span class="support-icon">
-                    <img v-if="model.logo" :src="model.logo" :alt="`${model.name} logo`" class="support-logo" />
-                    <span v-else>{{ model.icon }}</span>
-                  </span>
-                  <span class="support-name">{{ model.name }}</span>
-                  <span class="support-badge">
-                    <template v-if="getModelSupport(tool, model.id) === 'best'">✓ First Class</template>
-                    <template v-else-if="getModelSupport(tool, model.id) === 'works'">* Works</template>
-                    <template v-else>—</template>
-                  </span>
-                </div>
+            <div class="support-strip">
+              <div
+                v-for="model in models"
+                :key="`${tool.id}-${model.id}`"
+                class="support-pill"
+                :class="[getModelSupport(tool, model.id), { deemphasized: isModelDeemphasized(model.id) }]"
+              >
+                <img :src="model.logo" :alt="`${model.name} logo`" class="logo support-logo" />
+                <span>{{ getSupportShort(getModelSupport(tool, model.id)) }}</span>
               </div>
             </div>
-            
-            <div class="tool-notes">
-              <strong>📝 Notes:</strong> {{ tool.notes }}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- Best Practices Section -->
-      <section class="content-section">
-        <h2>💡 Best Practices by Model</h2>
-        <div class="practices-grid">
-          <div class="practice-card">
-            <h3>🟣 Claude (Opus/Sonnet)</h3>
-            <ul>
-              <li><strong>Best with:</strong> Claude Code (CLI) or Claude Cowork (GUI)</li>
-              <li><strong>Approach:</strong> First-class experience, native integration</li>
-              <li><strong>Tips:</strong> Use extended thinking for complex problems</li>
-            </ul>
-          </div>
-          
-          <div class="practice-card">
-            <h3>🟢 GLM 5</h3>
-            <ul>
-              <li><strong>Best with:</strong> Z Code, Opencode, or Claude Code (with config)</li>
-              <li><strong>Approach:</strong> May require API configuration tweaks</li>
-              <li><strong>Tips:</strong> Good multimodal capabilities for visual tasks</li>
-            </ul>
-          </div>
-          
-          <div class="practice-card">
-            <h3>🔵 GPT Codex</h3>
-            <ul>
-              <li><strong>Best with:</strong> Codex CLI, Copilot CLI, Codex App, or Cursor</li>
-              <li><strong>Approach:</strong> First-class in OpenAI tools, good in Cursor</li>
-              <li><strong>Tips:</strong> Excellent for shell commands and quick scripts</li>
-            </ul>
-          </div>
-          
-          <div class="practice-card">
-            <h3>🔴 Gemini</h3>
-            <ul>
-              <li><strong>Best with:</strong> Antigravity or Cursor (with setup)</li>
-              <li><strong>Approach:</strong> Not first-class, requires configuration</li>
-              <li><strong>Tips:</strong> Strong at multimodal and long-context tasks</li>
-            </ul>
-          </div>
-          
-          <div class="practice-card">
-            <h3>🟡 Local Models</h3>
-            <ul>
-              <li><strong>Best with:</strong> Opencode, Antigravity, or LM Studio</li>
-              <li><strong>Approach:</strong> Full control, privacy-focused</li>
-              <li><strong>Tips:</strong> Requires good hardware, choose model size wisely</li>
-            </ul>
-          </div>
-        </div>
-      </section>
-
-      <!-- Legend Section -->
-      <section class="content-section legend-section">
-        <h2>📖 Legend</h2>
-        <div class="legend-items">
-          <div class="legend-item">
-            <span class="legend-badge best">✓ First Class</span>
-            <span>Native integration, optimal experience</span>
-          </div>
-          <div class="legend-item">
-            <span class="legend-badge works">* Works</span>
-            <span>Functional but may need configuration or have limitations</span>
-          </div>
-          <div class="legend-item">
-            <span class="legend-badge none">—</span>
-            <span>Not supported or not recommended</span>
-          </div>
+          </button>
         </div>
       </section>
     </div>
 
-    <footer class="page-footer">
-      <p>Happy vibe coding! 🌊✨ | {{ store.darkMode ? 'Dark' : 'Light' }} mode</p>
-    </footer>
+    <div v-if="activeTool" class="modal-overlay" @click.self="closeToolDetails">
+      <div class="modal-card" role="dialog" aria-modal="true" :aria-label="`${activeTool.name} details`">
+        <div class="modal-header">
+          <div class="modal-title-group">
+            <img :src="activeTool.logo" :alt="`${activeTool.name} logo`" class="logo modal-logo" />
+            <div>
+              <h3>{{ activeTool.name }}</h3>
+              <p>{{ activeToolType === 'cli' ? 'CLI App' : 'GUI App' }}</p>
+            </div>
+          </div>
+          <button class="modal-close" aria-label="Close details" @click="closeToolDetails">x</button>
+        </div>
+
+        <p class="modal-description">{{ activeTool.description }}</p>
+
+        <section class="modal-section">
+          <h4>What to consider</h4>
+          <p>{{ activeTool.notes }}</p>
+        </section>
+
+        <section class="modal-section">
+          <h4>Model Compatibility</h4>
+          <div class="modal-support-grid">
+            <div
+              v-for="model in models"
+              :key="`modal-${model.id}`"
+              class="modal-support-row"
+              :class="getModelSupport(activeTool, model.id)"
+            >
+              <div class="modal-model">
+                <img :src="model.logo" :alt="`${model.name} logo`" class="logo support-logo" />
+                <span>{{ model.name }}</span>
+              </div>
+              <span class="modal-badge">{{ getSupportLabel(getModelSupport(activeTool, model.id)) }}</span>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
   </div>
 </template>
 
 <style scoped>
-/* CSS Variables for theme colors */
 :root {
   --card-bg: rgba(255, 255, 255, 0.95);
-  --text-primary: #2d3748;
-  --text-secondary: #718096;
-  --hover-bg: #f7fafc;
-  --primary-color: #667eea;
-  --secondary-color: #764ba2;
-  --best-color: #48bb78;
-  --works-color: #ecc94b;
-  --none-color: #a0aec0;
+  --card-border: rgba(99, 102, 241, 0.2);
+  --text-primary: #1f2937;
+  --text-secondary: #475569;
+  --page-bg-start: #f8fafc;
+  --page-bg-end: #e2e8f0;
+  --row-bg: rgba(248, 250, 252, 0.9);
+  --row-hover: rgba(226, 232, 240, 0.95);
+  --best-color: #15803d;
+  --works-color: #a16207;
+  --none-color: #64748b;
 }
 
 .vibe-coding-page.dark {
-  --card-bg: #2d3748;
-  --text-primary: #ffffff;
-  --text-secondary: #f1f5f9;
-  --hover-bg: #4a5568;
+  --card-bg: rgba(30, 41, 59, 0.96);
+  --card-border: rgba(148, 163, 184, 0.35);
+  --text-primary: #e2e8f0;
+  --text-secondary: #cbd5e1;
+  --page-bg-start: #0b1220;
+  --page-bg-end: #1e293b;
+  --row-bg: rgba(30, 41, 59, 0.95);
+  --row-hover: rgba(51, 65, 85, 0.95);
+  --best-color: #86efac;
+  --works-color: #facc15;
+  --none-color: #cbd5e1;
 }
 
 .vibe-coding-page {
-  max-width: 1000px;
+  height: 100vh;
+  max-width: 1440px;
   margin: 0 auto;
-  padding: 40px 20px;
-  min-height: 100vh;
-  background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ed 100%);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: hidden;
+  background: linear-gradient(140deg, var(--page-bg-start) 0%, var(--page-bg-end) 100%);
+  color: var(--text-primary);
 }
 
-.vibe-coding-page.dark {
-  background: linear-gradient(135deg, #0d1219 0%, #1a202c 100%);
-}
-
-h1 {
-  font-size: 3rem;
-  margin-bottom: 0.5rem;
-  text-align: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+.page-header h1 {
+  margin: 0;
+  font-size: 2rem;
+  line-height: 1.1;
 }
 
 .subtitle {
-  text-align: center;
-  font-size: 1.2rem;
+  margin: 4px 0 0;
   color: var(--text-secondary);
-  margin-bottom: 3rem;
+  font-size: 0.95rem;
 }
 
-.content-sections {
-  display: flex;
-  flex-direction: column;
-  gap: 3rem;
-}
-
-.content-section {
-  background: var(--card-bg);
-  border-radius: 16px;
-  padding: 2rem;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-
-.content-section h2 {
-  font-size: 1.8rem;
-  margin-bottom: 1.5rem;
-  color: var(--primary-color);
-}
-
-/* Model Grid */
-.model-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 1rem;
-  margin-bottom: 1rem;
-}
-
-.model-card {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 1rem;
-  background: var(--hover-bg);
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  border: 2px solid transparent;
-  color: var(--text-primary);
-}
-
-.model-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-.model-card.selected {
-  border-color: var(--primary-color);
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
-}
-
-.model-icon {
-  width: 44px;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 2rem;
-  flex-shrink: 0;
-}
-
-.model-info h3 {
-  margin: 0;
-  font-size: 1.1rem;
-  color: var(--text-primary);
-}
-
-.model-info p {
-  margin: 0.25rem 0 0;
+.focus-hint {
+  margin: 6px 0 0;
   font-size: 0.85rem;
   color: var(--text-secondary);
 }
 
-.filter-hint {
-  text-align: center;
-  font-size: 0.9rem;
-  color: var(--text-secondary);
-  font-style: italic;
+.clear-focus {
+  margin-left: 8px;
+  border: 1px solid var(--card-border);
+  background: var(--row-bg);
+  border-radius: 999px;
+  padding: 2px 10px;
+  color: var(--text-primary);
+  cursor: pointer;
 }
 
-/* Tools List */
-.tools-list {
+.workspace-grid {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(230px, 0.9fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.column {
+  min-height: 0;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 14px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
 }
 
-.tool-card {
-  background: var(--hover-bg);
-  border-radius: 12px;
-  padding: 1.5rem;
-  border-left: 4px solid var(--primary-color);
+.column h2 {
+  margin: 0 0 10px;
+  font-size: 1rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.column-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-height: 0;
+}
+
+.models-column .model-row,
+.tools-column .tool-row {
+  flex: 1;
+  min-height: 0;
+}
+
+.model-row,
+.tool-row {
+  width: 100%;
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  background: var(--row-bg);
+  padding: 8px;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+}
+
+.model-row:hover,
+.tool-row:hover {
+  background: var(--row-hover);
+}
+
+.model-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.model-row.selected {
+  border-color: #2563eb;
+  box-shadow: inset 0 0 0 1px #2563eb;
+}
+
+.tool-row {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .tool-header {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  margin-bottom: 1rem;
+  gap: 10px;
 }
 
-.tool-icon {
-  width: 44px;
-  height: 44px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 2.5rem;
+.row-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.row-title {
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.row-subtitle {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.logo {
+  object-fit: contain;
   flex-shrink: 0;
 }
 
-.product-logo {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-
-.model-logo {
-  max-width: 36px;
-  max-height: 36px;
-}
-
+.model-logo,
 .tool-logo {
-  max-width: 40px;
-  max-height: 40px;
+  width: 26px;
+  height: 26px;
 }
 
-.tool-header h3 {
-  margin: 0;
-  font-size: 1.3rem;
-  color: var(--text-primary);
-}
-
-.tool-description {
-  margin: 0.25rem 0 0;
-  font-size: 0.95rem;
-  color: var(--text-secondary);
-}
-
-/* Model Support Grid */
-.model-support {
-  margin: 1rem 0;
-}
-
-.model-support h4 {
-  margin: 0 0 0.75rem;
-  font-size: 1rem;
-  color: var(--text-primary);
-}
-
-.support-grid {
+.support-strip {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 0.5rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
 }
 
-.support-item {
+.support-pill {
+  border-radius: 6px;
+  border: 1px solid transparent;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 4px 6px;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem;
-  background: var(--card-bg);
-  border-radius: 6px;
-  font-size: 0.85rem;
+  justify-content: space-between;
+  gap: 4px;
 }
 
-.support-icon {
-  width: 20px;
-  height: 20px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.2rem;
-  flex-shrink: 0;
+.support-pill.best {
+  background: rgba(22, 163, 74, 0.18);
+  border-color: rgba(22, 163, 74, 0.34);
+  color: var(--best-color);
+}
+
+.support-pill.works {
+  background: rgba(250, 204, 21, 0.2);
+  border-color: rgba(250, 204, 21, 0.35);
+  color: var(--works-color);
+}
+
+.support-pill.none {
+  background: rgba(148, 163, 184, 0.2);
+  border-color: rgba(148, 163, 184, 0.35);
+  color: var(--none-color);
+}
+
+.support-pill.deemphasized {
+  opacity: 0.42;
 }
 
 .support-logo {
-  width: 16px;
-  height: 16px;
-  object-fit: contain;
+  width: 14px;
+  height: 14px;
 }
 
-.support-name {
-  flex: 1;
-  color: var(--text-primary);
-}
-
-.support-badge {
-  font-size: 0.75rem;
-  padding: 0.2rem 0.5rem;
-  border-radius: 4px;
-  font-weight: 500;
-}
-
-.support-item.best .support-badge {
-  background: rgba(72, 187, 120, 0.2);
-  color: var(--best-color);
-}
-
-.support-item.works .support-badge {
-  background: rgba(236, 201, 75, 0.2);
-  color: var(--works-color);
-}
-
-.support-item.none .support-badge {
-  background: rgba(160, 174, 192, 0.2);
-  color: var(--none-color);
-}
-
-.tool-notes {
-  padding: 0.75rem;
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
-  border-radius: 6px;
-  font-size: 0.9rem;
-  color: var(--text-primary);
-}
-
-/* Practices Grid */
-.practices-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 1.5rem;
-}
-
-.practice-card {
-  padding: 1.5rem;
-  background: var(--hover-bg);
-  border-radius: 8px;
-  border-left: 4px solid var(--primary-color);
-}
-
-.practice-card h3 {
-  margin: 0 0 1rem;
-  font-size: 1.2rem;
-  color: var(--text-primary);
-}
-
-.practice-card ul {
-  margin: 0;
-  padding-left: 1.5rem;
-  color: var(--text-primary);
-}
-
-.practice-card li {
-  margin-bottom: 0.5rem;
-  font-size: 0.95rem;
-}
-
-.practice-card li strong {
-  color: var(--primary-color);
-}
-
-/* Legend Section */
-.legend-section {
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
-}
-
-.legend-items {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.legend-item {
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.65);
   display: flex;
   align-items: center;
-  gap: 1rem;
+  justify-content: center;
+  padding: 16px;
+  z-index: 30;
+}
+
+.modal-card {
+  width: min(640px, 100%);
+  max-height: min(80vh, 760px);
+  overflow: auto;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 14px;
+  padding: 16px;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.modal-title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.modal-title-group h3 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.modal-title-group p {
+  margin: 2px 0 0;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.modal-logo {
+  width: 30px;
+  height: 30px;
+}
+
+.modal-close {
+  border: 1px solid var(--card-border);
+  background: var(--row-bg);
   color: var(--text-primary);
+  border-radius: 8px;
+  width: 30px;
+  height: 30px;
+  cursor: pointer;
 }
 
-.legend-badge {
-  min-width: 120px;
-  padding: 0.4rem 0.8rem;
-  border-radius: 6px;
-  font-size: 0.85rem;
-  font-weight: 500;
-  text-align: center;
-}
-
-.legend-badge.best {
-  background: rgba(72, 187, 120, 0.2);
-  color: var(--best-color);
-}
-
-.legend-badge.works {
-  background: rgba(236, 201, 75, 0.2);
-  color: var(--works-color);
-}
-
-.legend-badge.none {
-  background: rgba(160, 174, 192, 0.2);
-  color: var(--none-color);
-}
-
-/* Footer */
-.page-footer {
-  text-align: center;
-  padding: 2rem;
+.modal-description {
+  margin: 12px 0;
   color: var(--text-secondary);
   font-size: 0.9rem;
 }
 
-@media (max-width: 768px) {
+.modal-section h4 {
+  margin: 0 0 8px;
+  font-size: 0.92rem;
+}
+
+.modal-section p {
+  margin: 0;
+  font-size: 0.87rem;
+  color: var(--text-secondary);
+}
+
+.modal-section + .modal-section {
+  margin-top: 14px;
+}
+
+.modal-support-grid {
+  display: grid;
+  gap: 6px;
+}
+
+.modal-support-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 7px 9px;
+}
+
+.modal-model {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.84rem;
+}
+
+.modal-badge {
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
+.modal-support-row.best .modal-badge {
+  color: var(--best-color);
+}
+
+.modal-support-row.works .modal-badge {
+  color: var(--works-color);
+}
+
+.modal-support-row.none .modal-badge {
+  color: var(--none-color);
+}
+
+@media (max-width: 1080px) {
   .vibe-coding-page {
-    padding: 20px 15px;
+    height: auto;
+    min-height: 100vh;
+    overflow: auto;
   }
 
-  h1 {
-    font-size: 2rem;
-  }
-
-  .content-section {
-    padding: 1.5rem;
-  }
-
-  .model-grid,
-  .practices-grid {
+  .workspace-grid {
     grid-template-columns: 1fr;
   }
 
-  .support-grid {
-    grid-template-columns: 1fr;
+  .column-list {
+    overflow: visible;
+  }
+
+  .row-subtitle {
+    white-space: normal;
   }
 }
 </style>
