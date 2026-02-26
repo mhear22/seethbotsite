@@ -1,231 +1,43 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-
-interface MonthlyData {
-  month: number
-  principal: number
-  interest: number
-  balance: number
-  extra: number
-}
-
-interface DRMonthlyData {
-  month: number
-  homeLoanBalance: number
-  investmentLoanBalance: number
-  portfolioValue: number
-  dividends: number
-  taxSaving: number
-  netWealth: number
-}
+import { useHomeLoanCalculator } from '../../composables/useHomeLoanCalculator'
+import { formatCurrency } from '../../utils/format'
 
 const disclaimerDismissed = ref(false)
 
-const loanAmount = ref(500000)
-const interestRate = ref(6.5)
-const loanTermYears = ref(30)
-const extraRepayment = ref(0)
-const extraFrequency = ref<'monthly' | 'fortnightly' | 'weekly'>('monthly')
+// Use the composable for all calculator logic
+const calculator = useHomeLoanCalculator()
 
-// Debt recycling
-const drEnabled = ref(false)
-const drIncome = ref(120000)
-const drTotalReturn = ref(9)
-const drDividendYield = ref(4)
-
-const formatCurrency = (val: number) =>
-  new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD', maximumFractionDigits: 0 }).format(val)
-
-// ATO 2025-26 tax brackets (including 2% Medicare levy)
-const getMarginalRate = (income: number): number => {
-  // Medicare levy threshold: $26,000 (low income)
-  // We calculate effective marginal rate at the margin
-  if (income <= 18200) return 0
-  if (income <= 45000) return 0.19 + 0.02
-  if (income <= 120000) return 0.325 + 0.02
-  if (income <= 180000) return 0.37 + 0.02
-  return 0.45 + 0.02
-}
-
-const marginalRate = computed(() => getMarginalRate(drIncome.value))
-
-const extraMonthly = computed(() => {
-  if (extraFrequency.value === 'fortnightly') return extraRepayment.value * 26 / 12
-  if (extraFrequency.value === 'weekly') return extraRepayment.value * 52 / 12
-  return extraRepayment.value
-})
-
-const schedule = computed((): MonthlyData[] => {
-  const principal = loanAmount.value
-  const annualRate = interestRate.value / 100
-  const months = loanTermYears.value * 12
-  const monthlyRate = annualRate / 12
-  const extra = extraMonthly.value
-
-  if (principal <= 0 || months <= 0) return []
-
-  let balance = principal
-  const result: MonthlyData[] = []
-
-  let payment: number
-  if (annualRate === 0) {
-    payment = principal / months
-  } else {
-    payment = principal * (monthlyRate * Math.pow(1 + monthlyRate, months)) / (Math.pow(1 + monthlyRate, months) - 1)
-  }
-
-  for (let m = 1; m <= months; m++) {
-    if (balance <= 0) break
-    const interestCharge = balance * monthlyRate
-    const totalPrincipal = Math.min(payment - interestCharge + extra, balance)
-
-    result.push({
-      month: m,
-      principal: Math.max(0, totalPrincipal),
-      interest: interestCharge,
-      balance: Math.max(0, balance - totalPrincipal),
-      extra
-    })
-
-    balance -= totalPrincipal
-  }
-
-  return result
-})
-
-const baseSchedule = computed((): MonthlyData[] => {
-  const principal = loanAmount.value
-  const annualRate = interestRate.value / 100
-  const months = loanTermYears.value * 12
-  const monthlyRate = annualRate / 12
-
-  if (principal <= 0 || months <= 0) return []
-
-  let balance = principal
-  const result: MonthlyData[] = []
-
-  let payment: number
-  if (annualRate === 0) {
-    payment = principal / months
-  } else {
-    payment = principal * (monthlyRate * Math.pow(1 + monthlyRate, months)) / (Math.pow(1 + monthlyRate, months) - 1)
-  }
-
-  for (let m = 1; m <= months; m++) {
-    if (balance <= 0) break
-    const interestCharge = balance * monthlyRate
-    const principalCharge = Math.min(payment - interestCharge, balance)
-
-    result.push({
-      month: m,
-      principal: Math.max(0, principalCharge),
-      interest: interestCharge,
-      balance: Math.max(0, balance - principalCharge),
-      extra: 0
-    })
-
-    balance -= principalCharge
-  }
-
-  return result
-})
-
-// Debt recycling schedule
-const drSchedule = computed((): DRMonthlyData[] => {
-  if (!drEnabled.value) return []
-
-  const principal = loanAmount.value
-  const annualRate = interestRate.value / 100
-  const months = loanTermYears.value * 12
-  const monthlyRate = annualRate / 12
-  const extra = extraMonthly.value
-  const capitalGrowthRate = (drTotalReturn.value - drDividendYield.value) / 100 / 12
-  const dividendRate = drDividendYield.value / 100 / 12
-  const taxRate = marginalRate.value
-
-  if (principal <= 0 || months <= 0) return []
-
-  let payment: number
-  if (annualRate === 0) {
-    payment = principal / months
-  } else {
-    payment = principal * (monthlyRate * Math.pow(1 + monthlyRate, months)) / (Math.pow(1 + monthlyRate, months) - 1)
-  }
-
-  let homeLoanBalance = principal
-  let investmentLoanBalance = 0
-  let portfolioValue = 0
-  const result: DRMonthlyData[] = []
-
-  for (let m = 1; m <= months; m++) {
-    if (homeLoanBalance <= 0) break
-
-    // 1. Pay P&I on the non-deductible home loan portion
-    const homeInterest = homeLoanBalance * monthlyRate
-    const homePrincipal = Math.min(payment - homeInterest + extra, homeLoanBalance)
-
-    // 2. Recycle: redraw the principal paid and invest it
-    const recycled = Math.max(0, homePrincipal)
-    investmentLoanBalance += recycled
-    portfolioValue += recycled
-
-    // 3. Portfolio grows (capital gains — dividends paid out separately)
-    portfolioValue *= (1 + capitalGrowthRate)
-
-    // 4. Dividends received (applied directly to home loan)
-    const dividends = portfolioValue * dividendRate
-
-    // 5. Tax saving on investment loan interest (deductible)
-    const investmentInterest = investmentLoanBalance * monthlyRate
-    const taxSaving = investmentInterest * taxRate
-
-    // 6. Apply dividends + tax savings as extra payment on home loan
-    const extraFromDR = dividends + taxSaving
-
-    // 7. Update home loan balance
-    homeLoanBalance = Math.max(0, homeLoanBalance - homePrincipal - extraFromDR)
-
-    const netWealth = portfolioValue - investmentLoanBalance
-
-    result.push({
-      month: m,
-      homeLoanBalance,
-      investmentLoanBalance,
-      portfolioValue,
-      dividends,
-      taxSaving,
-      netWealth
-    })
-  }
-
-  return result
-})
-
-const totalInterestPaid = computed(() => schedule.value.reduce((s, r) => s + r.interest, 0))
-const totalPaid = computed(() => schedule.value.reduce((s, r) => s + r.principal + r.interest, 0))
-const baseMonthlyPayment = computed(() => {
-  const principal = loanAmount.value
-  const annualRate = interestRate.value / 100
-  const months = loanTermYears.value * 12
-  const monthlyRate = annualRate / 12
-  if (annualRate === 0) return principal / months
-  return principal * (monthlyRate * Math.pow(1 + monthlyRate, months)) / (Math.pow(1 + monthlyRate, months) - 1)
-})
-const actualLoanLength = computed(() => schedule.value.length)
-const yearsEarlier = computed(() => Math.max(0, loanTermYears.value * 12 - actualLoanLength.value) / 12)
-const interestSaved = computed(() => {
-  const baseTotal = baseSchedule.value.reduce((s, r) => s + r.interest, 0)
-  return baseTotal - totalInterestPaid.value
-})
-
-// DR summary stats
-const drLoanLength = computed(() => drSchedule.value.length)
-const drYearsEarlier = computed(() => Math.max(0, actualLoanLength.value - drLoanLength.value) / 12)
-const drFinalPortfolio = computed(() => drSchedule.value.at(-1)?.portfolioValue ?? 0)
-const drFinalInvestmentLoan = computed(() => drSchedule.value.at(-1)?.investmentLoanBalance ?? 0)
-const drNetWealth = computed(() => drFinalPortfolio.value - drFinalInvestmentLoan.value)
-const drTotalDividends = computed(() => drSchedule.value.reduce((s, r) => s + r.dividends, 0))
-const drTotalTaxSavings = computed(() => drSchedule.value.reduce((s, r) => s + r.taxSaving, 0))
+// Destructure state
+const { 
+  loanAmount, 
+  interestRate, 
+  loanTermYears, 
+  extraRepayment, 
+  extraFrequency,
+  drEnabled,
+  drIncome,
+  drTotalReturn,
+  drDividendYield,
+  marginalRate,
+  extraMonthly,
+  schedule,
+  drSchedule,
+  totalInterestPaid,
+  totalPaid,
+  baseMonthlyPayment,
+  actualLoanLength,
+  yearsEarlier,
+  interestSaved,
+  drLoanLength,
+  drYearsEarlier,
+  drFinalPortfolio,
+  drFinalInvestmentLoan,
+  drNetWealth,
+  drTotalDividends,
+  drTotalTaxSavings,
+  validationErrors
+} = calculator
 
 // SVG chart data
 const SVG_W = 800

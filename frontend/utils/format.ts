@@ -1,4 +1,30 @@
 /**
+ * Shared formatting utility functions
+ * Provides consistent formatting across all components
+ */
+
+/**
+ * Format a number as currency (AUD by default)
+ * @param value - Number to format
+ * @param currency - Currency code (default: 'AUD')
+ * @param locale - Locale string (default: 'en-AU')
+ * @param maximumFractionDigits - Maximum decimal places (default: 0)
+ * @returns Formatted currency string (e.g., "$1,234")
+ */
+export function formatCurrency(
+  value: number,
+  currency: string = 'AUD',
+  locale: string = 'en-AU',
+  maximumFractionDigits: number = 0
+): string {
+  return new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency,
+    maximumFractionDigits
+  }).format(value)
+}
+
+/**
  * Shared date formatting utility functions
  * Provides consistent date formatting across all components
  */

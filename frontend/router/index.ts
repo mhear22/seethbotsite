@@ -189,6 +189,11 @@ const routes = [
     path: '/home-loan',
     name: 'home-loan',
     component: () => import('../components/pages/HomeLoanPage.vue')
+  },
+  {
+    path: '/vibe-coding',
+    name: 'vibe-coding',
+    component: () => import('../components/pages/VibeCodingPage.vue')
   }
 ]
 

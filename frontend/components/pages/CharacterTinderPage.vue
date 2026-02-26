@@ -1,148 +1,37 @@
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue'
+import { onMounted } from 'vue'
 import Modal from '../shared/ui/Modal.vue'
+import { useCharacterVoting } from '../../composables/useCharacterVoting'
 
-interface Character {
-  id: number
-  name: string
-  image_url: string | null
-  elo_rating: number
-  wins: number
-  losses: number
-  created_at: string
-}
+// Use the composable for all voting logic
+const voting = useCharacterVoting()
 
-interface VoteResult {
-  winner: Character
-  loser: Character
-  elo_change_winner: number
-  elo_change_loser: number
-}
+// Destructure state and methods
+const {
+  characters,
+  currentPair,
+  loading,
+  voting: isVoting,
+  showLeaderboard,
+  showAddModal,
+  lastVote,
+  showVoteResult,
+  newCharacter,
+  leadingCharacter,
+  totalBattles,
+  hasCharacters,
+  hasCurrentPair,
+  vote,
+  addCharacter,
+  toggleLeaderboard,
+  openAddModal,
+  closeAddModal,
+  getWinRate
+} = voting
 
-const characters = ref<Character[]>([])
-const currentPair = ref<[Character, Character] | null>(null)
-const showAddModal = ref(false)
-const showLeaderboard = ref(false)
-const loading = ref(false)
-const voting = ref(false)
-
-// Form state
-const newCharacter = ref({
-  name: '',
-  image_url: ''
-})
-
-// Vote result state
-const lastVote = ref<VoteResult | null>(null)
-const showVoteResult = ref(false)
-const leadingCharacter = computed(() => characters.value[0] || null)
-const totalBattles = computed(() => {
-  const totalRecords = characters.value.reduce((sum, character) => sum + character.wins + character.losses, 0)
-  return Math.floor(totalRecords / 2)
-})
-
-// Load all characters
-const loadCharacters = async () => {
-  loading.value = true
-  try {
-    const response = await fetch('/api/characters')
-    const data = await response.json()
-    characters.value = data.characters || []
-  } catch (error) {
-    console.error('Error loading characters:', error)
-  } finally {
-    loading.value = false
-  }
-}
-
-// Load random pair for voting
-const loadRandomPair = async () => {
-  loading.value = true
-  try {
-    const response = await fetch('/api/characters/random-pair')
-    const data = await response.json()
-    if (data.characters && data.characters.length >= 2) {
-      currentPair.value = [data.characters[0], data.characters[1]]
-    } else {
-      currentPair.value = null
-    }
-  } catch (error) {
-    console.error('Error loading random pair:', error)
-    currentPair.value = null
-  } finally {
-    loading.value = false
-  }
-}
-
-// Vote for a character
-const vote = async (winnerId: number) => {
-  if (!currentPair.value || voting.value) return
-
-  const loser = currentPair.value.find(c => c.id !== winnerId)
-  if (!loser) return
-
-  voting.value = true
-  try {
-    const response = await fetch('/api/characters/vote', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        winner_id: winnerId,
-        loser_id: loser.id
-      })
-    })
-
-    const data = await response.json()
-    lastVote.value = data
-    showVoteResult.value = true
-
-    // Reload characters and get new pair after short delay
-    setTimeout(async () => {
-      await loadCharacters()
-      await loadRandomPair()
-      showVoteResult.value = false
-    }, 1500)
-  } catch (error) {
-    console.error('Error voting:', error)
-  } finally {
-    voting.value = false
-  }
-}
-
-// Add new character
-const addCharacter = async () => {
-  if (!newCharacter.value.name.trim()) return
-
-  loading.value = true
-  try {
-    const response = await fetch('/api/characters', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: newCharacter.value.name.trim(),
-        image_url: newCharacter.value.image_url.trim() || null
-      })
-    })
-
-    if (!response.ok) throw new Error('Failed to add character')
-
-    // Reset form
-    newCharacter.value = { name: '', image_url: '' }
-    showAddModal.value = false
-
-    // Reload characters
-    await loadCharacters()
-    await loadRandomPair()
-  } catch (error) {
-    console.error('Error adding character:', error)
-  } finally {
-    loading.value = false
-  }
-}
-
-onMounted(async () => {
-  await loadCharacters()
-  await loadRandomPair()
+// Initialize on mount
+onMounted(() => {
+  voting.initialize()
 })
 </script>
 
@@ -168,11 +57,11 @@ onMounted(async () => {
           </div>
         </div>
         <div class="header-actions">
-          <button @click="showAddModal = true" class="action-btn add-btn" aria-label="Add a new character">
+          <button @click="openAddModal" class="action-btn add-btn" aria-label="Add a new character">
             ➕ Add Character
           </button>
           <button
-            @click="showLeaderboard = !showLeaderboard"
+            @click="toggleLeaderboard"
             class="action-btn leaderboard-btn"
             :aria-label="showLeaderboard ? 'Start voting' : 'Show leaderboard'"
             :aria-pressed="showLeaderboard"
@@ -204,7 +93,7 @@ onMounted(async () => {
         <div v-else-if="!currentPair" class="empty-state panel-state">
           <h2>🎭 No characters yet!</h2>
           <p>Be the first to add a character to start voting.</p>
-          <button @click="showAddModal = true" class="add-first-btn" aria-label="Add the first character">
+          <button @click="openAddModal" class="add-first-btn" aria-label="Add the first character">
             ➕ Add First Character
           </button>
         </div>
@@ -216,8 +105,8 @@ onMounted(async () => {
               :key="character.id"
               class="character-card"
               @click="vote(character.id)"
-              :class="{ voting: voting }"
-              :disabled="voting"
+              :class="{ voting: isVoting }"
+              :disabled="isVoting"
               :aria-label="`Vote for ${character.name}. Current ELO rating: ${character.elo_rating}, ${character.wins} wins, ${character.losses} losses`"
               role="listitem"
             >
@@ -240,7 +129,7 @@ onMounted(async () => {
                   <span class="losses">{{ character.losses }}L</span>
                   <span class="elo">)</span>
                 </div>
-                <span class="vote-cta">{{ voting ? 'Voting...' : 'Tap to vote' }}</span>
+                <span class="vote-cta">{{ isVoting ? 'Voting...' : 'Tap to vote' }}</span>
               </div>
             </button>
           </div>
@@ -293,7 +182,7 @@ onMounted(async () => {
                     <span class="losses">{{ character.losses }}L</span>
                     <span class="elo">)</span>
                     <span class="win-rate">
-                      {{ Math.round((character.wins / Math.max(character.wins + character.losses, 1)) * 100) }}% WR
+                      {{ getWinRate(character) }}% WR
                     </span>
                   </div>
                 </div>
@@ -307,7 +196,7 @@ onMounted(async () => {
       <Modal
         :is-open="showAddModal"
         title="Add New Character"
-        @close="showAddModal = false"
+        @close="closeAddModal"
       >
         <form @submit.prevent="addCharacter" class="add-character-form">
           <div class="form-group">
@@ -332,7 +221,7 @@ onMounted(async () => {
           <div class="form-actions">
             <button
               type="button"
-              @click="showAddModal = false"
+              @click="closeAddModal"
               class="cancel-btn"
               :disabled="loading"
             >
