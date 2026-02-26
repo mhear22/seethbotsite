@@ -1,18 +1,26 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useAppStore } from '../../stores/useAppStore'
+import anthropicLogo from '../../assets/logos/anthropic.svg'
+import openaiLogo from '../../assets/logos/openai.svg'
+import geminiLogo from '../../assets/logos/gemini.svg'
+import zhipuLogo from '../../assets/logos/zhipu.svg'
+import googleLogo from '../../assets/logos/google.svg'
+import cursorLogo from '../../assets/logos/cursor.svg'
+import githubLogo from '../../assets/logos/github.svg'
+import ollamaLogo from '../../assets/logos/ollama.png'
 
 const store = useAppStore()
 
 const selectedModel = ref<string>('all')
 
 const models = [
-  { id: 'opus', name: 'Claude Opus', icon: '🟣', description: 'Most capable Claude model, best for complex tasks' },
-  { id: 'sonnet', name: 'Claude Sonnet', icon: '🟣', description: 'Balanced Claude model, great for everyday coding' },
-  { id: 'glm5', name: 'GLM 5', icon: '🟢', description: 'Zhipu AI model, good multimodal capabilities' },
-  { id: 'codex', name: 'GPT Codex', icon: '🔵', description: 'OpenAI coding-focused model' },
-  { id: 'gemini', name: 'Gemini', icon: '🔴', description: 'Google\'s multimodal model' },
-  { id: 'local', name: 'Local Models', icon: '🟡', description: 'Self-hosted models (Ollama, LM Studio, etc.)' }
+  { id: 'opus', name: 'Claude Opus', icon: '🟣', logo: anthropicLogo, description: 'Most capable Claude model, best for complex tasks' },
+  { id: 'sonnet', name: 'Claude Sonnet', icon: '🟣', logo: anthropicLogo, description: 'Balanced Claude model, great for everyday coding' },
+  { id: 'glm5', name: 'GLM 5', icon: '🟢', logo: zhipuLogo, description: 'Zhipu AI model, good multimodal capabilities' },
+  { id: 'codex', name: 'GPT Codex', icon: '🔵', logo: openaiLogo, description: 'OpenAI coding-focused model' },
+  { id: 'gemini', name: 'Gemini', icon: '🔴', logo: geminiLogo, description: 'Google\'s multimodal model' },
+  { id: 'local', name: 'Local Models', icon: '🟡', logo: ollamaLogo, description: 'Self-hosted models (Ollama, LM Studio, etc.)' }
 ]
 
 const cliTools = [
@@ -20,6 +28,7 @@ const cliTools = [
     id: 'claude-code', 
     name: 'Claude Code', 
     icon: '⚡',
+    logo: anthropicLogo,
     description: 'Official Anthropic CLI for Claude models',
     bestModels: ['opus', 'sonnet'],
     worksWith: ['glm5'],
@@ -29,6 +38,7 @@ const cliTools = [
     id: 'opencode', 
     name: 'Opencode', 
     icon: '🔧',
+    logo: githubLogo,
     description: 'Open-source coding assistant CLI',
     bestModels: ['local', 'glm5'],
     worksWith: ['opus', 'sonnet', 'codex', 'gemini'],
@@ -38,6 +48,7 @@ const cliTools = [
     id: 'codex-cli', 
     name: 'Codex CLI', 
     icon: '🔵',
+    logo: openaiLogo,
     description: 'OpenAI\'s official CLI tool',
     bestModels: ['codex'],
     worksWith: [],
@@ -47,6 +58,7 @@ const cliTools = [
     id: 'copilot-cli', 
     name: 'Copilot CLI', 
     icon: '✈️',
+    logo: githubLogo,
     description: 'GitHub\'s terminal-based Copilot',
     bestModels: ['codex'],
     worksWith: [],
@@ -59,6 +71,7 @@ const guiTools = [
     id: 'claude-cowork', 
     name: 'Claude Cowork', 
     icon: '🤝',
+    logo: anthropicLogo,
     description: 'Desktop app for Claude collaboration',
     bestModels: ['opus', 'sonnet'],
     worksWith: ['glm5'],
@@ -68,6 +81,7 @@ const guiTools = [
     id: 'codex-app', 
     name: 'Codex App', 
     icon: '📱',
+    logo: openaiLogo,
     description: 'OpenAI\'s desktop application',
     bestModels: ['codex'],
     worksWith: [],
@@ -77,6 +91,7 @@ const guiTools = [
     id: 'antigravity', 
     name: 'Antigravity', 
     icon: '🚀',
+    logo: googleLogo,
     description: 'Multi-model AI coding environment',
     bestModels: ['local'],
     worksWith: ['opus', 'sonnet', 'glm5', 'codex', 'gemini'],
@@ -86,6 +101,7 @@ const guiTools = [
     id: 'cursor', 
     name: 'Cursor', 
     icon: '🖱️',
+    logo: cursorLogo,
     description: 'AI-first code editor',
     bestModels: ['codex'],
     worksWith: ['opus', 'sonnet', 'glm5', 'gemini', 'local'],
@@ -95,6 +111,7 @@ const guiTools = [
     id: 'z-code', 
     name: 'Z Code', 
     icon: '💫',
+    logo: zhipuLogo,
     description: 'Next-gen AI coding assistant',
     bestModels: ['glm5'],
     worksWith: ['opus', 'sonnet', 'codex', 'gemini', 'local'],
@@ -142,7 +159,10 @@ function getModelSupport(tool: any, modelId: string): 'best' | 'works' | 'none' 
             :class="{ selected: selectedModel === model.id }"
             @click="selectedModel = selectedModel === model.id ? 'all' : model.id"
           >
-            <div class="model-icon">{{ model.icon }}</div>
+            <div class="model-icon">
+              <img v-if="model.logo" :src="model.logo" :alt="`${model.name} logo`" class="product-logo model-logo" />
+              <span v-else>{{ model.icon }}</span>
+            </div>
             <div class="model-info">
               <h3>{{ model.name }}</h3>
               <p>{{ model.description }}</p>
@@ -160,7 +180,10 @@ function getModelSupport(tool: any, modelId: string): 'best' | 'works' | 'none' 
         <div class="tools-list">
           <div v-for="tool in filteredCliTools" :key="tool.id" class="tool-card">
             <div class="tool-header">
-              <span class="tool-icon">{{ tool.icon }}</span>
+              <span class="tool-icon">
+                <img v-if="tool.logo" :src="tool.logo" :alt="`${tool.name} logo`" class="product-logo tool-logo" />
+                <span v-else>{{ tool.icon }}</span>
+              </span>
               <div>
                 <h3>{{ tool.name }}</h3>
                 <p class="tool-description">{{ tool.description }}</p>
@@ -176,7 +199,10 @@ function getModelSupport(tool: any, modelId: string): 'best' | 'works' | 'none' 
                   class="support-item"
                   :class="getModelSupport(tool, model.id)"
                 >
-                  <span class="support-icon">{{ model.icon }}</span>
+                  <span class="support-icon">
+                    <img v-if="model.logo" :src="model.logo" :alt="`${model.name} logo`" class="support-logo" />
+                    <span v-else>{{ model.icon }}</span>
+                  </span>
                   <span class="support-name">{{ model.name }}</span>
                   <span class="support-badge">
                     <template v-if="getModelSupport(tool, model.id) === 'best'">✓ First Class</template>
@@ -200,7 +226,10 @@ function getModelSupport(tool: any, modelId: string): 'best' | 'works' | 'none' 
         <div class="tools-list">
           <div v-for="tool in filteredGuiTools" :key="tool.id" class="tool-card">
             <div class="tool-header">
-              <span class="tool-icon">{{ tool.icon }}</span>
+              <span class="tool-icon">
+                <img v-if="tool.logo" :src="tool.logo" :alt="`${tool.name} logo`" class="product-logo tool-logo" />
+                <span v-else>{{ tool.icon }}</span>
+              </span>
               <div>
                 <h3>{{ tool.name }}</h3>
                 <p class="tool-description">{{ tool.description }}</p>
@@ -216,7 +245,10 @@ function getModelSupport(tool: any, modelId: string): 'best' | 'works' | 'none' 
                   class="support-item"
                   :class="getModelSupport(tool, model.id)"
                 >
-                  <span class="support-icon">{{ model.icon }}</span>
+                  <span class="support-icon">
+                    <img v-if="model.logo" :src="model.logo" :alt="`${model.name} logo`" class="support-logo" />
+                    <span v-else>{{ model.icon }}</span>
+                  </span>
                   <span class="support-name">{{ model.name }}</span>
                   <span class="support-badge">
                     <template v-if="getModelSupport(tool, model.id) === 'best'">✓ First Class</template>
@@ -412,7 +444,13 @@ h1 {
 }
 
 .model-icon {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 2rem;
+  flex-shrink: 0;
 }
 
 .model-info h3 {
@@ -456,7 +494,29 @@ h1 {
 }
 
 .tool-icon {
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-size: 2.5rem;
+  flex-shrink: 0;
+}
+
+.product-logo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.model-logo {
+  max-width: 36px;
+  max-height: 36px;
+}
+
+.tool-logo {
+  max-width: 40px;
+  max-height: 40px;
 }
 
 .tool-header h3 {
@@ -499,7 +559,19 @@ h1 {
 }
 
 .support-icon {
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-size: 1.2rem;
+  flex-shrink: 0;
+}
+
+.support-logo {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
 }
 
 .support-name {
