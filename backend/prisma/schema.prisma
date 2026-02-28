@@ -32,6 +32,13 @@ model User {
   created_at       DateTime @default(now())
   updated_at       DateTime @default(now())
 
+  // Subscription fields
+  subscription_tier      String?   // 'free' | 'basic' | 'pro' | 'premium'
+  subscription_status    String?   // 'active' | 'expired' | 'cancelled' | 'pending'
+  subscription_start     DateTime?
+  subscription_end       DateTime?
+  payment_method         String?   // 'paypal' | 'bank_transfer'
+
   sessions              Session[]
   messages              Message[]
   gameStats             GameStat[]
@@ -48,8 +55,10 @@ model User {
   characterMatches       CharacterMatch[] @relation("Voter")
   userDevices           UserDevice[]
   dataCenterRuns        DataCenterRun[]
+  subscriptionPayments  SubscriptionPayment[]
 
   @@index([email])
+  @@index([subscription_status, subscription_end])
 }
 
 model Session {
@@ -471,6 +480,45 @@ model Theme {
   updated_at       DateTime @default(now())
 
   user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+// ============================================================================
+// Subscriptions & Payments
+// ============================================================================
+
+model MembershipTier {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique // 'basic', 'pro', 'premium'
+  price       Int      // Price in cents (500 = $5.00)
+  interval    String   @default("month") // 'month' | 'year'
+  features    String   // JSON array of feature strings
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @default(now())
+}
+
+model SubscriptionPayment {
+  id              Int      @id @default(autoincrement())
+  user_id         Int
+  tier_name       String   // 'basic', 'pro', 'premium'
+  amount          Int      // Amount in cents
+  currency        String   @default("AUD")
+  payment_method  String   // 'paypal' | 'bank_transfer'
+  status          String   @default("pending") // 'pending' | 'completed' | 'failed' | 'refunded'
+  paypal_order_id String?  // PayPal order ID for tracking
+  paypal_txn_id   String?  // PayPal transaction ID
+  bank_ref        String?  // Bank transfer reference
+  admin_notes     String?  // Admin notes for manual verification
+  created_at      DateTime @default(now())
+  updated_at      DateTime @default(now())
+  completed_at    DateTime?
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([status])
+  @@index([paypal_order_id])
+  @@index([created_at])
 }
 
 // ============================================================================

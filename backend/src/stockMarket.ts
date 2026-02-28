@@ -40,7 +40,8 @@ const rankings = [
   { avatar: '🎮', name: 'RIUM+', score: 501 },
   { avatar: '🍄', name: 'Goopsworthy', score: 667 },
   { avatar: '🎮', name: 'Blair', score: 900 },
-  { avatar: '✨', name: 'Others', score: 500 }
+  { avatar: '✨', name: 'Others', score: 500 },
+  { avatar: '%◕‿‿◕%', name: 'Claire Salem', score: 500 }
 ]
 
 // Database-backed storage

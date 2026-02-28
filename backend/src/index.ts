@@ -41,6 +41,7 @@ import favoritesController from './controllers/favorites.controller';
 import themesController from './controllers/themes.controller';
 import discordController from './controllers/discord.controller';
 import dataCenterRunsController from './controllers/datacenter-runs.controller';
+import subscriptionController from './controllers/subscription.controller';
 import { setupWebSocketServer } from './controllers/presence.controller';
 import { multiplayerApiRouter, setupMechWebSockets } from './modules/mech';
 import { createServer } from 'http';
@@ -139,6 +140,7 @@ app.use('/api/favorites', favoritesController);
 app.use('/api/themes', themesController);
 app.use('/api', discordController);
 app.use('/api', dataCenterRunsController);
+app.use('/api/subscriptions', subscriptionController);
 
 // Mech multiplayer API routes (canonical + legacy compatibility alias)
 app.use('/api/mech/multiplayer', multiplayerApiRouter);

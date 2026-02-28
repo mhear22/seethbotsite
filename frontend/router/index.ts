@@ -3,11 +3,54 @@ import { mechRoutes } from '../features/mech/routes'
 import { ticketsRoutes } from '../features/tickets/routes'
 import { dataCenterRoutes } from '../features/datacenter/routes'
 
+// Public routes that don't require subscription
+const PUBLIC_ROUTES = ['/', '/shop', '/auth', '/login', '/register']
+
+// Cache for subscription status
+let subscriptionCache: {
+  isActive: boolean;
+  timestamp: number;
+} | null = null
+
+const CACHE_DURATION = 60000 // 1 minute cache
+
+async function checkSubscription(): Promise<boolean> {
+  const token = localStorage.getItem('token')
+  if (!token) return false
+
+  // Check cache
+  if (subscriptionCache && Date.now() - subscriptionCache.timestamp < CACHE_DURATION) {
+    return subscriptionCache.isActive
+  }
+
+  try {
+    const response = await fetch('/api/subscriptions/status', {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    })
+
+    if (response.ok) {
+      const data = await response.json()
+      subscriptionCache = {
+        isActive: data.subscription?.isActive || false,
+        timestamp: Date.now()
+      }
+      return subscriptionCache.isActive
+    }
+  } catch (err) {
+    console.error('Error checking subscription:', err)
+  }
+
+  return false
+}
+
 const routes = [
   {
     path: '/',
     name: 'home',
-    component: () => import('../components/pages/HomePage.vue')
+    component: () => import('../components/pages/HomePage.vue'),
+    meta: { public: true }
   },
   {
     path: '/fishing',
@@ -93,7 +136,8 @@ const routes = [
   {
     path: '/shop',
     name: 'shop',
-    component: () => import('../components/pages/ShopPage.vue')
+    component: () => import('../components/pages/ShopPage.vue'),
+    meta: { public: true }
   },
   {
     path: '/api-docs',
@@ -103,15 +147,18 @@ const routes = [
   {
     path: '/auth',
     name: 'auth',
-    component: () => import('../components/pages/AuthPage.vue')
+    component: () => import('../components/pages/AuthPage.vue'),
+    meta: { public: true }
   },
   {
     path: '/login',
-    redirect: { path: '/auth', query: { mode: 'login' } }
+    redirect: { path: '/auth', query: { mode: 'login' } },
+    meta: { public: true }
   },
   {
     path: '/register',
-    redirect: { path: '/auth', query: { mode: 'register' } }
+    redirect: { path: '/auth', query: { mode: 'register' } },
+    meta: { public: true }
   },
   {
     path: '/wordcloud',
@@ -200,6 +247,41 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(),
   routes
+})
+
+// Navigation guard for subscription paywall
+router.beforeEach(async (to, from, next) => {
+  // Allow public routes
+  if (to.meta.public || PUBLIC_ROUTES.includes(to.path)) {
+    return next()
+  }
+
+  // Check if logged in
+  const token = localStorage.getItem('token')
+  if (!token) {
+    return next({
+      path: '/auth',
+      query: { redirect: to.fullPath, message: 'login-required' }
+    })
+  }
+
+  // Check subscription status
+  const hasSubscription = await checkSubscription()
+  if (!hasSubscription) {
+    return next({
+      path: '/shop',
+      query: { message: 'subscription-required', redirect: to.fullPath }
+    })
+  }
+
+  next()
+})
+
+// Clear subscription cache on login/logout
+window.addEventListener('storage', (e) => {
+  if (e.key === 'token') {
+    subscriptionCache = null
+  }
 })
 
 export default router
