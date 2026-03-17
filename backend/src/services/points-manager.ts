@@ -23,6 +23,7 @@ const BASE_SCORES: Map<string, UserPoints> = new Map([
   ['claire', { userId: 'claire', userName: "Claire Salem %◕‿‿◕%", avatar: '✨', points: 500, basePoints: 500, lastInteraction: 0 }],
   ['shiyuan', { userId: 'shiyuan', userName: 'ShiYuan', avatar: '🧶', points: 500, basePoints: 500, lastInteraction: 0 }],
   ['meixiang', { userId: 'meixiang', userName: '美香', avatar: '🏍️', points: 21467, basePoints: 21467, lastInteraction: 0 }],
+  ['animoo', { userId: 'animoo', userName: 'Animoo', avatar: '🎨', points: 500, basePoints: 500, lastInteraction: 0 }],
   ['others', { userId: 'others', userName: 'Others', avatar: '✨', points: 500, basePoints: 500, lastInteraction: 0 }],
 ]);
 
