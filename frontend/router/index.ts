@@ -1,9 +1,9 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHistory, type RouteRecordRaw, type RouterHistory } from 'vue-router'
 import { mechRoutes } from '../features/mech/routes'
 import { ticketsRoutes } from '../features/tickets/routes'
 import { dataCenterRoutes } from '../features/datacenter/routes'
 
-const routes = [
+export const routes: RouteRecordRaw[] = [
   {
     path: '/',
     name: 'home',
@@ -202,9 +202,11 @@ const routes = [
   }
 ]
 
-const router = createRouter({
-  history: createWebHistory(),
-  routes
-})
+export function createAppRouter(history: RouterHistory = createWebHistory()) {
+  return createRouter({
+    history,
+    routes
+  })
+}
 
-export default router
+export default createAppRouter()
