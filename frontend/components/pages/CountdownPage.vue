@@ -119,7 +119,7 @@ const sortedReleases = computed(() => {
       <div class="countdown-grid">
       <div v-for="release in sortedReleases" :key="release.game" class="countdown-card" :class="{ released: getTimeUntil(release.date).released }">
         <div class="game-image">
-          <img :src="release.image" :alt="release.title" />
+          <img :src="release.image" :alt="release.title" loading="lazy" decoding="async" />
           <div class="game-emoji">{{ release.emoji }}</div>
         </div>
         <div class="game-info">

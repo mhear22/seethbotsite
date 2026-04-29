@@ -3,9 +3,10 @@
  *
  * Reusable polling logic with support for fixed intervals and adaptive backoff.
  * Automatically handles cleanup on component unmount.
+ * Includes visibility-based pausing to save resources when tab is not active.
  */
 
-import { ref, onUnmounted } from 'vue'
+import { ref, onUnmounted, onMounted } from 'vue'
 import type { Ref } from 'vue';
 
 export interface PollingOptions {
@@ -46,6 +47,11 @@ export interface PollingOptions {
    * Whether to start polling immediately (default: true)
    */
   autoStart?: boolean;
+
+  /**
+   * Whether to pause polling when tab is not visible (default: true)
+   */
+  pauseOnHidden?: boolean;
 }
 
 export interface PollingControls<T> {
@@ -102,8 +108,22 @@ export function usePolling<T>(
     maxInterval = 30000,
     minInterval = 1000,
     backoffMultiplier = 2,
-    isUnchanged = (prev, next) => JSON.stringify(prev) === JSON.stringify(next),
-    autoStart = true
+    isUnchanged = (prev, next) => {
+      // Fast path for primitives and null
+      if (prev === next) return true;
+      if (prev == null || next == null) return prev === next;
+      if (typeof prev !== 'object' || typeof next !== 'object') return prev === next;
+
+      // For objects/arrays, use JSON.stringify as fallback
+      // (Deep comparison would be slower for most real-world cases)
+      try {
+        return JSON.stringify(prev) === JSON.stringify(next);
+      } catch {
+        return false;
+      }
+    },
+    autoStart = true,
+    pauseOnHidden = true
   } = options;
 
   const data = ref<T | null>(null) as Ref<T | null>;
@@ -113,6 +133,7 @@ export function usePolling<T>(
 
   let timeoutId: number | null = null;
   let previousData: T | null = null;
+  let wasPollingBeforeHidden = false;
 
   /**
    * Execute the fetch function and handle the result
@@ -176,6 +197,33 @@ export function usePolling<T>(
     }
   };
 
+  /**
+   * Handle visibility change
+   */
+  const handleVisibilityChange = (): void => {
+    if (!pauseOnHidden) return;
+
+    if (document.hidden) {
+      // Tab is hidden - pause polling
+      wasPollingBeforeHidden = isPolling.value;
+      if (isPolling.value) {
+        stop();
+      }
+    } else {
+      // Tab is visible again - resume polling if it was active before
+      if (wasPollingBeforeHidden) {
+        start();
+      }
+    }
+  };
+
+  // Setup visibility listener
+  onMounted(() => {
+    if (pauseOnHidden) {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+    }
+  });
+
   // Auto-start if enabled
   if (autoStart) {
     start();
@@ -184,6 +232,9 @@ export function usePolling<T>(
   // Cleanup on unmount
   onUnmounted(() => {
     stop();
+    if (pauseOnHidden) {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }
   });
 
   return {

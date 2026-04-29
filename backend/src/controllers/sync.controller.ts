@@ -10,11 +10,13 @@ import {
   resolveConflicts,
   getSyncStatus
 } from '../services/sync.service';
+import { validateTokenAndGetUser } from '../users';
 
 const router = Router();
 
 /**
- * Helper to extract user from JWT token
+ * Helper to extract user from JWT token with proper validation
+ * Uses the existing auth system to verify token signature and session validity
  */
 async function getUserFromToken(req: Request): Promise<{ user: any; session: any } | null> {
   const authHeader = req.headers.authorization;
@@ -23,12 +25,11 @@ async function getUserFromToken(req: Request): Promise<{ user: any; session: any
   }
 
   const token = authHeader.substring(7);
-  // TODO: Implement proper token validation
-  // For now, we'll just return a mock user
+
   try {
-    // This should use your auth system
-    const decoded = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
-    return { user: { id: decoded.userId || 1 }, session: {} };
+    // Use proper JWT validation with signature verification and session lookup
+    const result = await validateTokenAndGetUser(token);
+    return result;
   } catch {
     return null;
   }

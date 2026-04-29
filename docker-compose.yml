@@ -11,10 +11,15 @@ services:
     image: seethbotsite-server:latest
     container_name: seethbot-server
     restart: unless-stopped
+    env_file:
+      - .env
     ports:
       - "8081:3000"
     environment:
       NODE_ENV: production
+      SEETHBOT_JWT_SECRET: ${SEETHBOT_JWT_SECRET}
+      SEETHBOT_API_KEYS: ${SEETHBOT_API_KEYS:-}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
       DATABASE_URL: ${DATABASE_URL:-postgresql://seethbot:${POSTGRES_PASSWORD:-seethbot_secret_change_me}@postgres:5432/seethbot?schema=public}
       GIT_HASH: ${GIT_HASH:-unknown}
       GIT_BRANCH: ${GIT_BRANCH:-unknown}
@@ -41,8 +46,8 @@ services:
       POSTGRES_DB: seethbot
       POSTGRES_USER: seethbot
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-seethbot_secret_change_me}
-    ports:
-      - "5432:5432"
+    expose:
+      - "5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       #- ./scripts/postgres-init:/docker-entrypoint-initdb.d:ro

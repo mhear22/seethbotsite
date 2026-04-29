@@ -199,6 +199,11 @@ export const routes: RouteRecordRaw[] = [
     path: '/vibe-coding',
     name: 'vibe-coding',
     component: () => import('../components/pages/VibeCodingPage.vue')
+  },
+  {
+    path: '/qld-redistribution',
+    name: 'qld-redistribution',
+    component: () => import('../components/pages/QldRedistributionPage.vue')
   }
 ]
 

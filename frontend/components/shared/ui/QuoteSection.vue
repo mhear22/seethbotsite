@@ -2,9 +2,11 @@
 import { computed } from 'vue'
 import { useFavorites } from '../../../composables/useFavorites'
 import ShortcutBadge from './ShortcutBadge.vue'
+import LoadingSkeleton from './LoadingSkeleton.vue'
 
 defineProps<{
   currentQuote: string
+  loading?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -38,11 +40,17 @@ const formatQuote = (quote: string) => {
 
 <template>
   <div class="quote-section">
-    <div class="quote-text" @click="nextQuote" title="Click or press Ctrl+N for next quote">
+    <!-- Loading skeleton (Ticket #31) -->
+    <div v-if="loading" class="quote-loading">
+      <LoadingSkeleton variant="text" :count="2" />
+    </div>
+    <!-- Quote content -->
+    <div v-else class="quote-text" @click="nextQuote" title="Click or press Ctrl+N for next quote">
       <span v-html="formatQuote(currentQuote)"></span>
       <ShortcutBadge :shortcut="{ key: 'n', ctrl: true, meta: true }" class="quote-shortcut" />
     </div>
     <button
+      v-if="!loading"
       @click="handleFavorite"
       :class="['favorite-btn', { favorited: isQuoteFavorite }]"
       :title="isQuoteFavorite ? 'Remove from favorites' : 'Add to favorites'"
@@ -155,5 +163,11 @@ const formatQuote = (quote: string) => {
 
 .dark .advice-section {
   color: #b794f4;
+}
+
+/* Loading state (Ticket #31) */
+.quote-loading {
+  padding: 0 20px;
+  min-height: 60px;
 }
 </style>

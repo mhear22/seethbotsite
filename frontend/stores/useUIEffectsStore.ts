@@ -40,6 +40,9 @@ export const useUIEffectsStore = defineStore('uiEffects', () => {
   let chaosIntervals: NodeJS.Timeout[] = []
   const chaosParticles: HTMLElement[] = []
 
+  // Track mold circle growth intervals for cleanup
+  let moldGrowthIntervals: NodeJS.Timeout[] = []
+
   /**
    * Toggle chaos mode
    */
@@ -118,18 +121,22 @@ export const useUIEffectsStore = defineStore('uiEffects', () => {
   }
 
   /**
-   * Stop chaos effects
+   * Stop chaos effects and clean up all intervals
    */
   const stopChaosEffects = () => {
+    // Clear all intervals
     chaosIntervals.forEach(interval => clearInterval(interval))
     chaosIntervals = []
 
+    // Remove all chaos particles
     chaosParticles.forEach(particle => particle.remove())
     chaosParticles.length = 0
 
+    // Reset body styles
     document.body.style.filter = ''
     document.body.style.backgroundColor = ''
 
+    // Reset element transforms
     const elements = document.querySelectorAll('.main-app > *')
     elements.forEach((el) => {
       if (el instanceof HTMLElement) {
@@ -353,12 +360,18 @@ export const useUIEffectsStore = defineStore('uiEffects', () => {
       if (currentSize >= fiftyVw) {
         clearInterval(growthInterval)
         clearInterval(fadeInInterval)
+        // Remove from tracking array
+        const growthIndex = moldGrowthIntervals.indexOf(growthInterval)
+        if (growthIndex > -1) moldGrowthIntervals.splice(growthIndex, 1)
         if (circle.parentNode) {
           circle.remove()
           createMoldCircle()
         }
       }
     }, 100)
+    
+    // Track growth interval for cleanup
+    moldGrowthIntervals.push(growthInterval)
   }
 
   /**
@@ -395,9 +408,14 @@ export const useUIEffectsStore = defineStore('uiEffects', () => {
   }
 
   /**
-   * Clear all existing mold circles
+   * Clear all existing mold circles and their intervals
    */
   const clearMoldCircles = () => {
+    // Clear all tracked growth intervals
+    moldGrowthIntervals.forEach(interval => clearInterval(interval))
+    moldGrowthIntervals = []
+    
+    // Remove all mold circle elements
     const circles = document.querySelectorAll('.mold-circle')
     circles.forEach(circle => circle.remove())
   }
@@ -432,6 +450,20 @@ export const useUIEffectsStore = defineStore('uiEffects', () => {
     ;(window as any).moldLevel = moldLevel
   }
 
+  /**
+   * Cleanup all intervals and effects (call on component unmount)
+   */
+  const cleanup = () => {
+    // Stop chaos effects and clear intervals
+    if (chaosMode.value) {
+      stopChaosEffects()
+    }
+    
+    // Stop mold spawner and clear all circles with their intervals
+    stopMoldSpawner()
+    clearMoldCircles()
+  }
+
   return {
     // State
     chaosMode,
@@ -452,6 +484,7 @@ export const useUIEffectsStore = defineStore('uiEffects', () => {
     startMoldSpawner,
     stopMoldSpawner,
     clearMoldCircles,
-    updateMoldEffects
+    updateMoldEffects,
+    cleanup
   }
 })

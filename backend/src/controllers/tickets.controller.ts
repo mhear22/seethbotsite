@@ -20,6 +20,24 @@ import {
 const router = Router();
 
 /**
+ * Configurable title filter for next-task endpoint
+ * These titles are excluded from automated task pickup
+ * TODO: Move to database settings for runtime configuration
+ */
+const EXCLUDED_TITLE_PATTERNS = ['weiner', 'fire'];
+
+/**
+ * Build Prisma NOT filter for excluded title patterns
+ */
+const buildExcludedTitleFilter = () => ({
+  NOT: {
+    OR: EXCLUDED_TITLE_PATTERNS.map(pattern => ({
+      title: { contains: pattern }
+    }))
+  }
+});
+
+/**
  * @openapi
  * /api/tickets/settings/ignore-mode:
  *   get:
@@ -143,7 +161,7 @@ router.get('/tickets/next-task', async (req: Request, res: Response) => {
       where: {
         status: 'needs-info',
         is_deleted: false,
-        NOT: { OR: [{ title: { contains: 'weiner' } }, { title: { contains: 'fire' } }] }
+        ...buildExcludedTitleFilter()
       },
       orderBy: { created_at: 'asc' }
     });
@@ -156,7 +174,7 @@ router.get('/tickets/next-task', async (req: Request, res: Response) => {
           status: 'pending',
           is_deleted: false,
           updated_at: { lt: oneHourAgo },
-          NOT: { OR: [{ title: { contains: 'weiner' } }, { title: { contains: 'fire' } }] }
+          ...buildExcludedTitleFilter()
         },
         orderBy: { id: 'asc' }
       });

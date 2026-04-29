@@ -409,3 +409,24 @@ body.chaos .router-nav .dropdown-btn {
     display: none;
   }
 }
+
+/* Mobile touch improvements (Ticket #17) */
+@media (max-width: 768px) {
+  /* Prevent double-tap zoom on nav items */
+  .router-nav .router-link,
+  .router-nav .dropdown-btn,
+  .router-nav .dropdown-item {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: rgba(255, 182, 193, 0.2);
+  }
+  
+  /* Ensure nav-links are above backdrop */
+  .router-nav .nav-links {
+    z-index: 200;
+  }
+  
+  /* Backdrop should be below everything but still clickable */
+  .router-nav .mobile-menu-backdrop {
+    z-index: 198;
+  }
+}

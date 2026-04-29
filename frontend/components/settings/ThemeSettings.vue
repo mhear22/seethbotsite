@@ -18,7 +18,7 @@ const {
   categoryToggles,
   muteAll,
   unmuteAll,
-  playHonk,
+  playGooseHonk,
   previewClickSound,
   previewNotificationSound,
   previewAchievementSound,
@@ -26,7 +26,7 @@ const {
 } = useAudio()
 
 const previewHonkSound = () => {
-  playHonk()
+  playGooseHonk()
 }
 
 // Sound settings handlers

@@ -119,7 +119,7 @@ router.post('/movies',
   validations.addMovie,
   handleValidationErrors,
   sanitizeBody(['title', 'suggestedBy', 'genre', 'notes']),
-  // requireApiKey(),
+  requireApiKey(),
   (req: Request, res: Response) => {
     try {
       const { title, suggestedBy, year, genre, notes, thumbnail } = req.body;
@@ -196,7 +196,7 @@ router.post('/movies',
  *               $ref: '#/components/schemas/Error'
  */
 router.delete('/movies/:id',
-  // requireApiKey(),
+  requireApiKey(),
   (req: Request, res: Response) => {
     try {
       const { id } = req.params;
@@ -306,7 +306,7 @@ router.get('/movies/voting-round', (req: Request, res: Response) => {
 router.post('/movies/voting-round/start',
   validations.startVotingRound,
   handleValidationErrors,
-  // requireApiKey(),
+  requireApiKey(),
   (req: Request, res: Response) => {
     try {
       const { movieIds } = req.body;
@@ -365,7 +365,7 @@ router.post('/movies/voting-round/start',
  *                   example: Failed to end voting round
  */
 router.post('/movies/voting-round/end',
-  // requireApiKey(),
+  requireApiKey(),
   (req: Request, res: Response) => {
     try {
       const result = movies.endVotingRound();
@@ -413,7 +413,7 @@ router.post('/movies/voting-round/end',
  *               $ref: '#/components/schemas/Error'
  */
 router.post('/movies/voting-round/reset',
-  // requireApiKey(),
+  requireApiKey(),
   (req: Request, res: Response) => {
     try {
       movies.resetVoting();
@@ -525,7 +525,7 @@ router.get('/movies/votes', (req: Request, res: Response) => {
 router.post('/movies/vote',
   validations.addVote,
   handleValidationErrors,
-  // requireApiKey(),
+  requireApiKey(),
   (req: Request, res: Response) => {
     try {
       const { userId, rankings } = req.body;

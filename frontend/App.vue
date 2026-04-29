@@ -5,6 +5,7 @@ import MainApp from './components/shared/core/MainApp.vue'
 import KeyboardShortcutsHelp from './components/modals/KeyboardShortcutsHelp.vue'
 import { useAppStore } from './stores/useAppStore'
 import { useAuthStore } from './stores/useAuthStore'
+import { useUIEffectsStore } from './stores/useUIEffectsStore'
 import { useTheme } from './composables/useTheme'
 import { useAuth } from './composables/useAuth'
 import { useSync } from './composables/useSync'
@@ -346,10 +347,15 @@ onUnmounted(() => {
     clearInterval(rankingsInterval)
     rankingsInterval = null
   }
+  
+  // MEMORY LEAK FIX (Ticket #23): Cleanup UI effects store intervals
+  const uiEffectsStore = useUIEffectsStore()
+  uiEffectsStore.cleanup()
 })
 </script>
 
 <template>
+  <OfflineIndicator />
   <MainApp />
   <KeyboardShortcutsHelp :is-open="showKeyboardHelp" @close="showKeyboardHelp = false" />
   <SwipeIndicator v-if="swipeGestures.settings.value.visualFeedback" :direction="swipeDirection" :progress="swipeProgress" />

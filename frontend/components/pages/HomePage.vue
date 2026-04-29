@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import QuoteSection from '../shared/ui/QuoteSection.vue'
+import LoadingSkeleton from '../shared/ui/LoadingSkeleton.vue'
 import { useAppStore } from '../../stores/useAppStore'
 
 const appStore = useAppStore()
@@ -124,7 +125,16 @@ const featureCategories = [
     <QuoteSection :current-quote="appStore.currentQuote" @next-quote="appStore.nextQuote" />
 
     <!-- Latest Patch Note Section -->
-    <section v-if="latestPatchNote" class="patch-note-section">
+    <!-- Loading skeleton for patch notes (Ticket #31) -->
+    <section v-if="patchNoteLoading" class="patch-note-section">
+      <div class="patch-note-header">
+        <h2 class="patch-note-title">📝 Latest Update</h2>
+      </div>
+      <div class="patch-note-card">
+        <LoadingSkeleton variant="text" :count="4" />
+      </div>
+    </section>
+    <section v-else-if="latestPatchNote" class="patch-note-section">
       <div class="patch-note-header">
         <h2 class="patch-note-title">📝 Latest Update</h2>
         <RouterLink to="/patch-notes" class="view-all-link">View All →</RouterLink>
@@ -232,6 +242,14 @@ const featureCategories = [
   }
   100% {
     background-position: 0% 50%;
+  }
+}
+
+/* Reduced motion preference - disable gradient animation for accessibility */
+@media (prefers-reduced-motion: reduce) {
+  .page.home-page {
+    animation: none;
+    background-size: 100% 100%;
   }
 }
 

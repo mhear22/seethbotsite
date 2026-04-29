@@ -5,13 +5,16 @@ import { body, param, query, validationResult, ValidationChain } from 'express-v
 /**
  * Rate limiter configuration
  * Tracks requests per IP address in memory
+ * Uses bounded LRU eviction to prevent unbounded memory growth
  */
 interface RateLimitEntry {
   count: number;
   resetTime: number;
+  lastAccessed: number; // For LRU eviction
 }
 
 const rateLimitStore = new Map<string, RateLimitEntry>();
+const MAX_STORE_SIZE = 10000; // Maximum entries before LRU eviction kicks in
 
 // IMPORTANT: These limits are intentionally EXTREMELY HIGH because this is a real-time
 // multiplayer game app. During active gameplay, users send frequent WebSocket messages,
@@ -24,6 +27,7 @@ const DEFAULT_MAX_REQUESTS = 10000; // Very high - this is a real-time game, not
 /**
  * Rate limiter middleware
  * Limits requests per IP address to prevent abuse
+ * Implements bounded storage with LRU eviction
  */
 export const rateLimiter = (maxRequests: number = DEFAULT_MAX_REQUESTS, windowMs: number = DEFAULT_WINDOW_MS) => {
   return (req: Request, res: Response, next: NextFunction) => {
@@ -37,9 +41,27 @@ export const rateLimiter = (maxRequests: number = DEFAULT_MAX_REQUESTS, windowMs
     if (!entry || now > entry.resetTime) {
       entry = {
         count: 0,
-        resetTime: now + windowMs
+        resetTime: now + windowMs,
+        lastAccessed: now
       };
       rateLimitStore.set(ip, entry);
+    } else {
+      // Update last accessed time for LRU tracking
+      entry.lastAccessed = now;
+    }
+
+    // LRU eviction if store exceeds maximum size
+    if (rateLimitStore.size > MAX_STORE_SIZE) {
+      // Find and remove the least recently accessed entries (bottom 20%)
+      const entries = Array.from(rateLimitStore.entries())
+        .sort((a, b) => a[1].lastAccessed - b[1].lastAccessed);
+      
+      const toRemove = Math.ceil(MAX_STORE_SIZE * 0.2);
+      for (let i = 0; i < toRemove && i < entries.length; i++) {
+        rateLimitStore.delete(entries[i][0]);
+      }
+      
+      console.log(`[RateLimit] LRU evicted ${toRemove} entries (store size: ${rateLimitStore.size})`);
     }
 
     // Increment counter
@@ -256,6 +278,14 @@ export const securityHeaders = (req: Request, res: Response, next: NextFunction)
   // Prevent referrer leakage
   res.set('Referrer-Policy', 'strict-origin-when-cross-origin');
 
+  // Content Security Policy
+  res.set('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' wss: https:;");
+
+  // HSTS (only in production with HTTPS)
+  if (process.env.NODE_ENV === 'production') {
+    res.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
+
   next();
 };
 
@@ -296,6 +326,9 @@ if (typeof process !== 'undefined') {
         cleaned++;
       }
     }
+
+    // Log store size for monitoring
+    console.log(`[RateLimit] Store size: ${rateLimitStore.size}/${MAX_STORE_SIZE} entries`);
 
     if (cleaned > 0) {
       console.log(`[RateLimit] Cleaned up ${cleaned} expired entries`);

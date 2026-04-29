@@ -28,6 +28,7 @@ import patchNotesController from './controllers/patch-notes.controller';
 import miningController from './controllers/mining.controller';
 import statsController from './controllers/stats.controller';
 import challengesController from './controllers/challenges.controller';
+import modelStatusController from './controllers/model-status.controller';
 import achievementsController from './controllers/achievements.controller';
 import archiveController from './controllers/archive.controller';
 import messagesController from './controllers/messages.controller';
@@ -41,7 +42,6 @@ import favoritesController from './controllers/favorites.controller';
 import themesController from './controllers/themes.controller';
 import discordController from './controllers/discord.controller';
 import dataCenterRunsController from './controllers/datacenter-runs.controller';
-import subscriptionController from './controllers/subscription.controller';
 import { setupWebSocketServer } from './controllers/presence.controller';
 import { multiplayerApiRouter, setupMechWebSockets } from './modules/mech';
 import { createServer } from 'http';
@@ -56,7 +56,20 @@ const TICKETS_SERVE_ROOT = process.env.TICKETS_SERVE_ROOT || path.join(__dirname
 const DATACENTER_SERVE_ROOT = process.env.DATACENTER_SERVE_ROOT || path.join(__dirname, '..', 'datacenter-webdist');
 
 // Middleware
-app.use(cors());
+const allowedOrigins = process.env.CORS_ORIGINS
+  ? process.env.CORS_ORIGINS.split(',').map(o => o.trim())
+  : [];
+
+app.use(cors(allowedOrigins.length > 0 ? {
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, server-to-server)
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  }
+} : undefined));
 app.use(compression());
 app.use(express.json({ limit: '100kb' }));
 app.use(express.urlencoded({ extended: true }));
@@ -109,6 +122,7 @@ app.use('/avatars', express.static(path.join(__dirname, '..', 'public', 'avatars
 
 // Mount API controllers
 app.use('/api', healthController);
+app.use('/api', modelStatusController);
 app.use('/api', rankingsController);
 app.use('/api', stocksController);
 app.use('/api', clicksController);
@@ -140,7 +154,6 @@ app.use('/api/favorites', favoritesController);
 app.use('/api/themes', themesController);
 app.use('/api', discordController);
 app.use('/api', dataCenterRunsController);
-app.use('/api/subscriptions', subscriptionController);
 
 // Mech multiplayer API routes (canonical + legacy compatibility alias)
 app.use('/api/mech/multiplayer', multiplayerApiRouter);

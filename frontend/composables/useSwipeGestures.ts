@@ -22,7 +22,7 @@ export interface SwipeEvent {
 
 export function useSwipeGestures(settings?: Partial<SwipeSettings>) {
   const router = useRouter()
-  const isEnabled = ref(settings?.enabled ?? true)
+  const isEnabled = ref(localStorage.getItem('swipeEnabled') === 'true')
   const sensitivity = ref(settings?.sensitivity ?? 50)
   const hapticFeedback = ref(settings?.hapticFeedback ?? true)
   const visualFeedback = ref(settings?.visualFeedback ?? true)

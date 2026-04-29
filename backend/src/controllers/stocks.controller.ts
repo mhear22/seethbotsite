@@ -175,7 +175,7 @@ router.get('/stocks/:name', (req: Request, res: Response) => {
 router.post('/stocks/buy',
   validations.tradeStock,
   handleValidationErrors,
-  // requireApiKey(),
+  requireApiKey(),
   (req: Request, res: Response) => {
     try {
       const { userId, stockName, shares } = req.body;
@@ -263,7 +263,7 @@ router.post('/stocks/buy',
 router.post('/stocks/sell',
   validations.tradeStock,
   handleValidationErrors,
-  // requireApiKey(),
+  requireApiKey(),
   (req: Request, res: Response) => {
     try {
       const { userId, stockName, shares } = req.body;
@@ -317,11 +317,11 @@ router.post('/stocks/sell',
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.get('/portfolio/:userId', (req: Request, res: Response) => {
+router.get('/portfolio/:userId', async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
-    const portfolio = stockMarket.getUserPortfolio(userId);
-    const portfolioValue = stockMarket.calculatePortfolioValue(userId);
+    const portfolio = await stockMarket.getUserPortfolio(userId);
+    const portfolioValue = await stockMarket.calculatePortfolioValue(userId);
     res.json({ portfolio, portfolioValue, timestamp: new Date().toISOString() });
   } catch (error) {
     console.error('Error getting portfolio:', error);

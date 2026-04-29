@@ -28,13 +28,20 @@ export class NetworkManager {
   private connectedEndpoint: string | null = null;
   private connectionState: ConnectionState = 'disconnected';
   private reconnectAttempts = 0;
-  private maxReconnectAttempts = 5;
+  private maxReconnectAttempts = 10; // Increased from 5 to 10
   private reconnectDelay = 1000; // Start with 1 second
+  private maxReconnectDelay = 30000; // Cap at 30 seconds
   private messageQueue: ClientMessage[] = [];
   private eventHandlers: Map<string, NetworkEventHandler[]> = new Map();
   private pingInterval: NodeJS.Timeout | null = null;
   private lastPingTime = 0;
   private roundTripTime = 0;
+  private reconnectTimeout: NodeJS.Timeout | null = null;
+  private healthCheckInterval: NodeJS.Timeout | null = null;
+  private lastPongTime = 0;
+  private connectionHealth = 'unknown'; // 'healthy', 'degraded', 'unhealthy', 'unknown'
+  private storedToken: string | null = null;
+  private isManualDisconnect = false;
 
   // For dev mode latency simulation
   public debugLatency = 0;
@@ -48,6 +55,9 @@ export class NetworkManager {
       return;
     }
 
+    // Store token for automatic reconnection
+    this.storedToken = token;
+    this.isManualDisconnect = false;
     this.connectionState = 'connecting';
     const wsUrls = this.getWebSocketUrls(token);
 
@@ -83,8 +93,13 @@ export class NetworkManager {
       this.connectionState = 'disconnected';
       this.connectedEndpoint = null;
       this.stopPingLoop();
+      this.stopHealthCheck();
       this.emit('disconnected', null);
-      this.attemptReconnect(token);
+      
+      // Only attempt reconnect if not a manual disconnect
+      if (!this.isManualDisconnect && this.storedToken) {
+        this.attemptReconnect(this.storedToken);
+      }
     };
 
     this.ws.onerror = (error) => {
@@ -98,6 +113,7 @@ export class NetworkManager {
     this.reconnectAttempts = 0;
     this.reconnectDelay = 1000;
     this.startPingLoop();
+    this.startHealthCheck();
     this.flushMessageQueue();
     this.emit('connected', null);
   }
@@ -106,6 +122,11 @@ export class NetworkManager {
    * Disconnect from server
    */
   public disconnect(): void {
+    this.isManualDisconnect = true;
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
+    }
     if (this.ws) {
       this.ws.close();
       this.ws = null;
@@ -113,6 +134,8 @@ export class NetworkManager {
     this.connectedEndpoint = null;
     this.connectionState = 'disconnected';
     this.stopPingLoop();
+    this.stopHealthCheck();
+    this.storedToken = null;
   }
 
   private getWebSocketUrls(token: string): string[] {
@@ -166,9 +189,14 @@ export class NetworkManager {
   }
 
   /**
-   * Attempt to reconnect
+   * Attempt to reconnect with exponential backoff and jitter
    */
   private attemptReconnect(token: string): void {
+    if (this.isManualDisconnect) {
+      console.log('[NetworkManager] Skipping reconnect - manual disconnect');
+      return;
+    }
+
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
       console.error('[NetworkManager] Max reconnect attempts reached');
       this.emit('reconnect_failed', null);
@@ -176,16 +204,22 @@ export class NetworkManager {
     }
 
     this.reconnectAttempts++;
-    console.log(`[NetworkManager] Reconnecting in ${this.reconnectDelay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+    
+    // Add jitter to prevent thundering herd (random between 0-25% of delay)
+    const jitter = Math.random() * this.reconnectDelay * 0.25;
+    const actualDelay = this.reconnectDelay + jitter;
+    
+    console.log(`[NetworkManager] Reconnecting in ${actualDelay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
 
-    setTimeout(() => {
+    this.reconnectTimeout = setTimeout(() => {
       this.connect(token).catch((error) => {
         console.error('[NetworkManager] Reconnect failed:', error);
+        this.emit('reconnect_error', { attempt: this.reconnectAttempts, error });
       });
-    }, this.reconnectDelay);
+    }, actualDelay);
 
-    // Exponential backoff
-    this.reconnectDelay = Math.min(this.reconnectDelay * 2, 30000);
+    // Exponential backoff with cap
+    this.reconnectDelay = Math.min(this.reconnectDelay * 2, this.maxReconnectDelay);
   }
 
   /**
@@ -212,6 +246,44 @@ export class NetworkManager {
   }
 
   /**
+   * Start health check to monitor connection quality
+   */
+  private startHealthCheck(): void {
+    this.lastPongTime = Date.now();
+    this.healthCheckInterval = setInterval(() => {
+      const timeSinceLastPong = Date.now() - this.lastPongTime;
+      
+      // If no pong for 10 seconds, connection is unhealthy
+      if (timeSinceLastPong > 10000) {
+        this.connectionHealth = 'unhealthy';
+        console.warn('[NetworkManager] Connection unhealthy - no pong received for', timeSinceLastPong, 'ms');
+        this.emit('connection_health', { health: 'unhealthy', timeSinceLastPong });
+        
+        // Force reconnect if unhealthy for too long
+        if (timeSinceLastPong > 15000 && this.ws) {
+          console.warn('[NetworkManager] Forcing reconnect due to unhealthy connection');
+          this.ws.close();
+        }
+      } else if (timeSinceLastPong > 5000) {
+        this.connectionHealth = 'degraded';
+        this.emit('connection_health', { health: 'degraded', timeSinceLastPong });
+      } else {
+        this.connectionHealth = 'healthy';
+      }
+    }, 3000);
+  }
+
+  /**
+   * Stop health check
+   */
+  private stopHealthCheck(): void {
+    if (this.healthCheckInterval) {
+      clearInterval(this.healthCheckInterval);
+      this.healthCheckInterval = null;
+    }
+  }
+
+  /**
    * Handle incoming message
    */
   private async handleMessage(data: string): Promise<void> {
@@ -226,6 +298,7 @@ export class NetworkManager {
       // Handle ping response for latency measurement
       if ((message as any).type === 'pong') {
         this.roundTripTime = Date.now() - this.lastPingTime;
+        this.lastPongTime = Date.now(); // Track for health checks
         this.emit('latency_update', { rtt: this.roundTripTime });
         return;
       }
@@ -402,4 +475,42 @@ export class NetworkManager {
   public isConnected(): boolean {
     return this.connectionState === 'connected';
   }
+
+  /**
+   * Get connection health status
+   */
+  public getHealth(): string {
+    return this.connectionHealth;
+  }
+
+  /**
+   * Force reconnect (useful when tab becomes visible after being hidden)
+   */
+  public forceReconnect(): void {
+    if (this.storedToken && !this.isManualDisconnect) {
+      console.log('[NetworkManager] Force reconnecting...');
+      if (this.ws) {
+        this.ws.close();
+      }
+    }
+  }
+}
+
+// Add Page Visibility API integration for automatic reconnection
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      // When tab becomes visible, check if we need to reconnect
+      const instance = (window as any).__networkManager;
+      if (instance && instance instanceof NetworkManager) {
+        const state = instance.getState();
+        const health = instance.getHealth();
+        
+        if (state !== 'connected' || health === 'unhealthy') {
+          console.log('[NetworkManager] Tab visible - checking connection');
+          instance.forceReconnect();
+        }
+      }
+    }
+  });
 }

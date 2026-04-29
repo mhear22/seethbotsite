@@ -148,7 +148,13 @@ export async function initUserPortfolio(userId: string): Promise<UserPortfolio> 
   const userIdNum = parseInt(userId, 10);
 
   if (isNaN(userIdNum)) {
-    throw new Error(`Invalid userId: ${userId} cannot be converted to a number`);
+    // Return a default portfolio for non-numeric userIds (e.g., temporary/guest users)
+    return {
+      userId,
+      cash: 10000,
+      holdings: {},
+      transactions: []
+    };
   }
 
   try {

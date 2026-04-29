@@ -32,6 +32,16 @@ interface ToolOption {
   notes: string
 }
 
+interface Subscription {
+  id: string
+  name: string
+  logo: string
+  price: string
+  period: string
+  features: string[]
+  highlight?: boolean
+}
+
 const store = useAppStore()
 const focusedModel = ref<string | null>(null)
 const activeTool = ref<ToolOption | null>(null)
@@ -186,6 +196,50 @@ function getSupportShort(level: SupportLevel): string {
 function isModelDeemphasized(modelId: string): boolean {
   return focusedModel.value !== null && focusedModel.value !== modelId
 }
+
+const subscriptions: Subscription[] = [
+  {
+    id: 'claude',
+    name: 'Claude Pro',
+    logo: anthropicLogo,
+    price: '$20',
+    period: '/month',
+    features: ['Claude Opus & Sonnet', 'Extended context', 'Priority access'],
+    highlight: true
+  },
+  {
+    id: 'openai',
+    name: 'ChatGPT Plus',
+    logo: openaiLogo,
+    price: '$20',
+    period: '/month',
+    features: ['GPT-4o & GPT-4', 'DALL-E 3', 'Advanced Voice']
+  },
+  {
+    id: 'zhipu',
+    name: 'Z.ai',
+    logo: zhipuLogo,
+    price: 'Varies',
+    period: '',
+    features: ['GLM-4 & GLM-5', 'Multimodal', 'API access']
+  },
+  {
+    id: 'cursor',
+    name: 'Cursor Pro',
+    logo: cursorLogo,
+    price: '$20',
+    period: '/month',
+    features: ['Unlimited completions', 'Claude & GPT-4', 'Priority models']
+  },
+  {
+    id: 'gemini',
+    name: 'Gemini Advanced',
+    logo: geminiLogo,
+    price: '$20',
+    period: '/month',
+    features: ['Gemini Ultra', '2TB storage', 'Google One bundled']
+  }
+]
 </script>
 
 <template>
@@ -198,6 +252,29 @@ function isModelDeemphasized(modelId: string): boolean {
         <button class="clear-focus" @click="focusedModel = null">Clear</button>
       </p>
     </header>
+
+    <section class="subscriptions-section">
+      <h2>Subscriptions</h2>
+      <div class="subscriptions-grid">
+        <div
+          v-for="sub in subscriptions"
+          :key="sub.id"
+          class="subscription-card"
+          :class="{ highlight: sub.highlight }"
+        >
+          <div class="sub-header">
+            <img :src="sub.logo" :alt="`${sub.name} logo`" class="logo sub-logo" />
+            <div class="sub-info">
+              <span class="sub-name">{{ sub.name }}</span>
+              <span class="sub-price">{{ sub.price }}<span class="sub-period">{{ sub.period }}</span></span>
+            </div>
+          </div>
+          <ul class="sub-features">
+            <li v-for="(feature, idx) in sub.features" :key="idx">{{ feature }}</li>
+          </ul>
+        </div>
+      </div>
+    </section>
 
     <div class="workspace-grid">
       <section class="column models-column">
@@ -325,7 +402,7 @@ function isModelDeemphasized(modelId: string): boolean {
 </template>
 
 <style scoped>
-:root {
+.vibe-coding-page {
   --card-bg: rgba(255, 255, 255, 0.95);
   --card-border: rgba(99, 102, 241, 0.2);
   --text-primary: #1f2937;
@@ -337,6 +414,19 @@ function isModelDeemphasized(modelId: string): boolean {
   --best-color: #15803d;
   --works-color: #a16207;
   --none-color: #64748b;
+  --highlight-border: rgba(99, 102, 241, 0.5);
+  --highlight-bg: rgba(99, 102, 241, 0.08);
+  
+  height: 100vh;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: hidden;
+  background: linear-gradient(140deg, var(--page-bg-start) 0%, var(--page-bg-end) 100%);
+  color: var(--text-primary);
 }
 
 .vibe-coding-page.dark {
@@ -351,19 +441,8 @@ function isModelDeemphasized(modelId: string): boolean {
   --best-color: #86efac;
   --works-color: #facc15;
   --none-color: #cbd5e1;
-}
-
-.vibe-coding-page {
-  height: 100vh;
-  max-width: 1440px;
-  margin: 0 auto;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  overflow: hidden;
-  background: linear-gradient(140deg, var(--page-bg-start) 0%, var(--page-bg-end) 100%);
-  color: var(--text-primary);
+  --highlight-border: rgba(129, 140, 248, 0.5);
+  --highlight-bg: rgba(99, 102, 241, 0.15);
 }
 
 .page-header h1 {
@@ -392,6 +471,93 @@ function isModelDeemphasized(modelId: string): boolean {
   padding: 2px 10px;
   color: var(--text-primary);
   cursor: pointer;
+}
+
+.subscriptions-section {
+  flex-shrink: 0;
+}
+
+.subscriptions-section h2 {
+  margin: 0 0 8px;
+  font-size: 0.9rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.subscriptions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.subscription-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.subscription-card:hover {
+  border-color: var(--highlight-border);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.1);
+}
+
+.subscription-card.highlight {
+  border-color: var(--highlight-border);
+  background: linear-gradient(135deg, var(--card-bg) 0%, var(--highlight-bg) 100%);
+}
+
+.sub-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sub-logo {
+  width: 28px;
+  height: 28px;
+}
+
+.sub-info {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.sub-name {
+  font-weight: 600;
+  font-size: 0.88rem;
+  color: var(--text-primary);
+}
+
+.sub-price {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.sub-period {
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
+
+.sub-features {
+  margin: 0;
+  padding: 0 0 0 14px;
+  list-style: disc;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.sub-features li {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .workspace-grid {

@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
+import { pointsManager } from '../services/points-manager';
 
 const router = Router();
 
@@ -306,18 +307,41 @@ router.post('/purchase', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'You already own this item' });
     }
 
-    // Check user's current points (using User model)
-    const user = await prisma.user.findUnique({
-      where: { id: userIdNum }
-    });
-
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+    // Check user's current points using pointsManager
+    // userId can be either a numeric ID or a string identifier
+    const userPoints = pointsManager.getUser(String(userId));
+    
+    if (!userPoints) {
+      // User not in points system - check database for user existence
+      const dbUser = await prisma.user.findUnique({
+        where: { id: userIdNum }
+      });
+      
+      if (!dbUser) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      
+      // User exists in DB but not in points system - deny purchase
+      return res.status(400).json({ 
+        error: 'User not registered in points system',
+        message: 'Please interact with the bot first to be added to the points system'
+      });
     }
 
-    // TODO: Implement points system on User model
-    // For now, we'll assume the user has enough points
-    // In a real implementation, you'd need a points field on the User model
+    // Check if user has enough points
+    if (userPoints.points < item.price) {
+      return res.status(400).json({ 
+        error: 'Insufficient points',
+        currentPoints: userPoints.points,
+        requiredPoints: item.price,
+        shortfall: item.price - userPoints.points
+      });
+    }
+
+    // Deduct points from user's balance
+    // Note: This modifies the in-memory points directly
+    // In a production system, this should be a proper transaction
+    userPoints.points -= item.price;
 
     // Process purchase
     await prisma.purchasedItem.create({
@@ -330,7 +354,8 @@ router.post('/purchase', async (req: Request, res: Response) => {
     res.json({
       success: true,
       item,
-      newPoints: 1000, // Placeholder
+      newPoints: userPoints.points,
+      pointsSpent: item.price,
       message: `Successfully purchased ${item.name}!`
     });
   } catch (error) {

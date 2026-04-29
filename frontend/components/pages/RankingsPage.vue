@@ -57,23 +57,29 @@ const isRankingFavorite = (rank: RankingItem) => {
 }
 
 .rankings-container {
-  background: rgba(40, 44, 52, 0.95);
+  background: rgba(255, 255, 255, 0.95);
   border-radius: 16px;
   padding: 30px;
   max-width: 500px;
   width: 100%;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  transition: background 0.3s ease, box-shadow 0.3s ease;
 }
 
 .dark .rankings-container {
-  background: rgba(20, 24, 32, 0.95);
+  background: rgba(40, 44, 52, 0.95);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
 }
 
 .rankings-title {
   text-align: center;
-  color: #e2e8f0;
+  color: #2d3748;
   margin-bottom: 20px;
   font-size: 24px;
+}
+
+.dark .rankings-title {
+  color: #e2e8f0;
 }
 
 .rankings-list {
@@ -88,20 +94,32 @@ const isRankingFavorite = (rank: RankingItem) => {
   gap: 12px;
   align-items: center;
   padding: 12px;
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(0, 0, 0, 0.03);
   border-radius: 10px;
   transition: background 0.2s;
 }
 
+.dark .rank-item {
+  background: rgba(255, 255, 255, 0.05);
+}
+
 .rank-item:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.dark .rank-item:hover {
   background: rgba(255, 255, 255, 0.1);
 }
 
 .rank-number {
-  color: #a0aec0;
+  color: #718096;
   font-weight: bold;
   font-size: 16px;
   text-align: center;
+}
+
+.dark .rank-number {
+  color: #a0aec0;
 }
 
 .rank-avatar {
@@ -111,13 +129,17 @@ const isRankingFavorite = (rank: RankingItem) => {
 }
 
 .rank-name {
-  color: #e2e8f0;
+  color: #2d3748;
   font-weight: 500;
   font-size: 16px;
 }
 
+.dark .rank-name {
+  color: #e2e8f0;
+}
+
 .rank-name.current-user {
-  color: #48bb78;
+  color: #38a169;
   font-weight: bold;
 }
 
@@ -126,7 +148,7 @@ const isRankingFavorite = (rank: RankingItem) => {
 }
 
 .rank-score {
-  color: #48bb78;
+  color: #38a169;
   font-weight: bold;
   font-size: 14px;
 }
@@ -139,9 +161,9 @@ const isRankingFavorite = (rank: RankingItem) => {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  border: 2px solid #718096;
-  background: rgba(255, 255, 255, 0.05);
-  color: #718096;
+  border: 2px solid #cbd5e0;
+  background: rgba(0, 0, 0, 0.03);
+  color: #a0aec0;
   font-size: 1rem;
   cursor: pointer;
   display: flex;
@@ -149,6 +171,12 @@ const isRankingFavorite = (rank: RankingItem) => {
   justify-content: center;
   transition: all 0.2s;
   padding: 0;
+}
+
+.dark .favorite-btn {
+  border-color: #718096;
+  background: rgba(255, 255, 255, 0.05);
+  color: #718096;
 }
 
 .favorite-btn:hover {
@@ -167,5 +195,34 @@ const isRankingFavorite = (rank: RankingItem) => {
 .favorite-btn.favorited:hover {
   transform: scale(1.15);
   box-shadow: 0 4px 12px rgba(246, 211, 101, 0.4);
+}
+
+/* Responsive Design */
+@media (max-width: 640px) {
+  .rankings-page {
+    padding: 20px 16px;
+  }
+
+  .rankings-container {
+    padding: 20px;
+  }
+
+  .rankings-title {
+    font-size: 20px;
+  }
+
+  .rank-item {
+    grid-template-columns: 32px 40px 1fr auto 36px;
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .rank-name {
+    font-size: 14px;
+  }
+
+  .rank-score {
+    font-size: 12px;
+  }
 }
 </style>

@@ -1461,25 +1461,10 @@ body.dark .emulator-screen {
   50% { transform: scale(1.1); }
 }
 
-/* Gradient Headings */
+/* Gradient Headings - disabled in favor of per-page control */
 h1, h2, h3, h4, h5, h6 {
-  background: linear-gradient(135deg, #ff6b9d 0%, #ff8a80 50%, #ffb6c1 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
   font-weight: bold;
-}
-
-body.dark h1,
-body.dark h2,
-body.dark h3,
-body.dark h4,
-body.dark h5,
-body.dark h6 {
-  background: linear-gradient(135deg, #ffb6c1 0%, #ff91a4 50%, #e85e90 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: #2d3748;
 }
 
 h1 {
@@ -1751,7 +1736,12 @@ body.darker .container {
   background: rgba(12, 12, 16, 0.98);
 }
 
-body.dark h1 {
+body.dark h1,
+body.dark h2,
+body.dark h3,
+body.dark h4,
+body.dark h5,
+body.dark h6 {
   color: #e2e8f0;
 }
 
@@ -1761,14 +1751,7 @@ body.darker h3,
 body.darker h4,
 body.darker h5,
 body.darker h6 {
-  background: linear-gradient(135deg, #ff91a4 0%, #ff6b9d 50%, #e85e90 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-body.darker h1 {
-  color: #c0c0c0;
+  color: #e2e8f0;
 }
 
 body.dark p {

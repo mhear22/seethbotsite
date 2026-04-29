@@ -9,7 +9,15 @@
 
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET: string = process.env.SEETHBOT_JWT_SECRET || 'change-this-in-production-secret-key';
+// JWT secret (REQUIRED - no fallback for security)
+// App will fail to start if SEETHBOT_JWT_SECRET is not set
+if (!process.env.SEETHBOT_JWT_SECRET) {
+  throw new Error(
+    'CRITICAL: SEETHBOT_JWT_SECRET environment variable must be set. ' +
+    'Generate a secure secret with: node -e "console.log(require(\'crypto\').randomBytes(64).toString(\'hex\'))"'
+  );
+}
+const JWT_SECRET: string = process.env.SEETHBOT_JWT_SECRET;
 const ACCESS_TOKEN_EXPIRY = '15m'; // 15 minutes as per ticket requirements
 const REFRESH_TOKEN_EXPIRY = '7d'; // 7 days as per ticket requirements
 

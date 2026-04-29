@@ -88,7 +88,8 @@ const dropdowns = ref<DropdownData[]>([
       { title: 'API Docs', icon: '📚', path: '/api-docs' },
       { title: 'Account', icon: '🔐', path: '/auth' },
       { title: 'Solar Calculator', icon: '☀️', path: '/solar' },
-      { title: 'Home Loan Calculator', icon: '🏠', path: '/home-loan' }
+      { title: 'Home Loan Calculator', icon: '🏠', path: '/home-loan' },
+      { title: 'Vibe Coding', icon: '✨', path: '/vibe-coding' }
     ]
   }
 ])
@@ -184,6 +185,15 @@ const toggleMobileMenu = () => {
 const closeMobileMenu = () => {
   mobileMenuOpen.value = false
   scrollToTop()
+}
+
+// Close mobile menu after navigation (fixes mobile nav closing issue - Ticket #17)
+// Small delay allows Vue Router navigation to initiate before closing menu
+const closeMobileMenuAfterNav = () => {
+  setTimeout(() => {
+    mobileMenuOpen.value = false
+    scrollToTop()
+  }, 50)
 }
 
 // Dropdown handlers
@@ -315,7 +325,7 @@ if (typeof window !== 'undefined') {
           :class="{ active: route.path === routeData.path }"
           :aria-current="route.path === routeData.path ? 'page' : undefined"
           :title="routeData.title"
-          @click="closeMobileMenu"
+          @click="closeMobileMenuAfterNav"
         >
           <span class="link-icon" aria-hidden="true">{{ routeData.icon }}</span>
           <span class="link-text">{{ routeData.title }}</span>
@@ -352,7 +362,7 @@ if (typeof window !== 'undefined') {
               :aria-current="route.path === routeData.path ? 'page' : undefined"
               role="menuitem"
               :title="routeData.title"
-              @click="closeMobileMenu"
+              @click="closeMobileMenuAfterNav"
             >
               <span class="link-icon" aria-hidden="true">{{ routeData.icon }}</span>
               <span class="link-text">{{ routeData.title }}</span>

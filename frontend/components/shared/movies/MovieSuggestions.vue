@@ -264,7 +264,7 @@ onMounted(() => {
         @click="toggleSelect(movie.id)"
       >
         <div class="movie-poster" v-if="movie.thumbnail">
-          <img :src="movie.thumbnail" :alt="movie.title" />
+          <img :src="movie.thumbnail" :alt="movie.title" loading="lazy" decoding="async" />
         </div>
         <div class="movie-poster-placeholder" v-else>
           🎬

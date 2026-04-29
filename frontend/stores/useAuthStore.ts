@@ -35,6 +35,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   let initialized = false
   let refreshTimer: ReturnType<typeof setTimeout> | null = null
+  let refreshRetryTimer: ReturnType<typeof setTimeout> | null = null
 
   // Composables
   const profile = useProfile(() => token.value)
@@ -179,6 +180,12 @@ export const useAuthStore = defineStore('auth', () => {
         }
         user.value = nextUser
 
+        // Clear any existing retry timer
+        if (refreshRetryTimer) {
+          clearTimeout(refreshRetryTimer)
+          refreshRetryTimer = null
+        }
+
         // Restart refresh timer
         startTokenRefresh(nextExpiry)
 
@@ -192,13 +199,21 @@ export const useAuthStore = defineStore('auth', () => {
       } else {
         // Server error - try again later
         console.error('Token refresh failed with status:', response.status)
-        setTimeout(() => refreshToken(), 5 * 60 * 1000)
+        // Clear any existing retry timer before setting new one
+        if (refreshRetryTimer) {
+          clearTimeout(refreshRetryTimer)
+        }
+        refreshRetryTimer = setTimeout(() => refreshToken(), 5 * 60 * 1000)
         return false
       }
     } catch (err) {
       // Network error - try again later
       console.error('Token refresh error (network issue):', err)
-      setTimeout(() => refreshToken(), 5 * 60 * 1000)
+      // Clear any existing retry timer before setting new one
+      if (refreshRetryTimer) {
+        clearTimeout(refreshRetryTimer)
+      }
+      refreshRetryTimer = setTimeout(() => refreshToken(), 5 * 60 * 1000)
       return false
     }
   }
@@ -545,6 +560,13 @@ export const useAuthStore = defineStore('auth', () => {
       clearTimeout(refreshTimer)
       refreshTimer = null
     }
+    
+    // Clear refresh retry timer
+    if (refreshRetryTimer) {
+      clearTimeout(refreshRetryTimer)
+      refreshRetryTimer = null
+    }
+    
     localStorage.removeItem(TOKEN_KEY)
     localStorage.removeItem(REFRESH_TIMER_KEY)
   }

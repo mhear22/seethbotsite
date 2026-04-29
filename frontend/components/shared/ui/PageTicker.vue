@@ -36,7 +36,8 @@ const tickerItems = ref<TickerItem[]>([
   { title: 'Account', subtitle: 'Manage your profile and auth', icon: '🔐', path: '/auth' },
   { title: 'Mold', subtitle: 'Track mold levels and growth', icon: '🍄', path: '/mold' },
   { title: 'Moldbot Opinions', subtitle: 'AI-generated thoughts and opinions', icon: '🤖', path: '/opinion' },
-  { title: 'Analytics', subtitle: 'View platform statistics', icon: '📊', path: '/analytics' }
+  { title: 'Analytics', subtitle: 'View platform statistics', icon: '📊', path: '/analytics' },
+  { title: 'Vibe Coding', subtitle: 'AI-powered coding sessions', icon: '✨', path: '/vibe-coding' }
 ])
 
 const scrollPosition = ref(0)

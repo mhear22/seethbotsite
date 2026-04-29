@@ -81,11 +81,11 @@ const store = useAppStore()
         <h2>📊 Stats</h2>
         <div class="stats-grid">
           <div class="stat-item">
-            <div class="stat-number">45+</div>
+            <div class="stat-number">185+</div>
             <div class="stat-label">API Endpoints</div>
           </div>
           <div class="stat-item">
-            <div class="stat-number">12+</div>
+            <div class="stat-number">40+</div>
             <div class="stat-label">Interactive Pages</div>
           </div>
           <div class="stat-item">

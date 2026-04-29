@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import prisma from './lib/prisma';
 
 /**
@@ -174,7 +175,7 @@ export async function getUserStats(params: GetUserStatsParams): Promise<any> {
     SELECT COUNT(DISTINCT DATE(recorded_at)) as sessions
     FROM "GameStat"
     WHERE user_id = ${userId}
-    ${params.gameType ? prisma.$queryRawUnsafe(`AND game_type = '${params.gameType}'`) : prisma.$queryRaw``}
+    ${params.gameType ? Prisma.sql`AND game_type = ${params.gameType}` : Prisma.sql``}
   `;
   const totalSessions = sessionsResult[0]?.sessions || 0;
 
@@ -275,9 +276,9 @@ export async function getGlobalStats(params: GetGlobalStatsParams): Promise<any>
     SELECT COUNT(DISTINCT user_id) as count
     FROM "GameStat"
     WHERE 1=1
-    ${params.gameType ? prisma.$queryRawUnsafe(`AND game_type = '${params.gameType}'`) : prisma.$queryRaw``}
-    ${params.statType ? prisma.$queryRawUnsafe(`AND stat_type = '${params.statType}'`) : prisma.$queryRaw``}
-    ${params.timeRange ? getTimeRangeCondition(params.timeRange) : prisma.$queryRaw``}
+    ${params.gameType ? Prisma.sql`AND game_type = ${params.gameType}` : Prisma.sql``}
+    ${params.statType ? Prisma.sql`AND stat_type = ${params.statType}` : Prisma.sql``}
+    ${params.timeRange ? getTimeRangeCondition(params.timeRange) : Prisma.sql``}
   `;
 
   return {
@@ -740,5 +741,5 @@ function getTimeRangeCondition(timeRange: 'hour' | 'day' | 'week' | 'month') {
     week: "AND recorded_at >= datetime('now', '-7 days')",
     month: "AND recorded_at >= datetime('now', '-1 month')",
   };
-  return prisma.$queryRawUnsafe(timeMap[timeRange]);
+  return Prisma.sql([timeMap[timeRange]]);
 }

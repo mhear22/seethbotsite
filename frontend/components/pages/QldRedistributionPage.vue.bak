@@ -1,0 +1,1476 @@
+<script setup lang="ts">
+import { ref, computed } from 'vue'
+import { useAppStore } from '../../stores/useAppStore'
+
+const store = useAppStore()
+
+const selectedParty = ref<string>('all')
+
+const electorates = [
+  // ABOLISHED
+  { name: 'Hill', formerName: null, party: 'KAP', status: 'abolished', added: [], removed: [], hasChanges: false, note: 'Absorbed into Flinders, Hinchinbrook, Mulgrave' },
+  { name: 'Stretton', formerName: null, party: 'Labor', status: 'abolished', added: [], removed: [], hasChanges: false, note: 'Absorbed into Eight Mile Plains, Algester' },
+  // NEW
+  { name: 'Caboolture', formerName: null, party: 'LNP', status: 'new', added: ['🔴 Caboolture', '🔴 Bellmere', '🔴 Moodlu', '🔴 Elimbah', '🔴 Wamuran', '🔴 Woodford', "🔴 D'Aguilar", '🔴 Waraba', "🔴 Campbell's Pocket", '🔴 Mount Mee', '🔴 Corymbia', '🔴 Wagtail Grove'], removed: [], hasChanges: true },
+  { name: 'Springfield', formerName: null, party: 'Labor', status: 'new', added: ['🔴 Springfield', '🔴 Springfield Lakes', '🔴 Springfield Central', '🔴 Brookwater', '🔴 Augustine Heights', '🔴 Camira', '🔴 Gailes', '🔴 Bellbird Park', '🔴 Carole Park', '🔴 Spring Mountain'], removed: [], hasChanges: true },
+  // CHANGED ELECTORATES
+  { name: 'Algester', formerName: null, party: 'Labor', added: ['🔴 Stretton', '🔴 Karawatha', '🔴 Drewvale', '🔴 Calamvale', '🔴 Coopers Plains (west)', '🔴 Heathwood', '🔴 Forest Lake'], removed: ['🔴 Hillcrest', '🔴 Forestdale', '🔴 Browns Plains', '🔴 Regents Park'], hasChanges: true },
+  { name: 'Annerley', formerName: 'Miller', party: 'Labor', added: ['🔴 Annerley', '🔴 Nathan', '🔴 Salisbury', '🔴 Moorooka', '🔴 Rocklea'], removed: ['🔵 Chelmer', '🔵 Graceville', '🔵 Sherwood'], hasChanges: true },
+  { name: 'Ashgrove', formerName: 'Cooper', party: 'Greens', added: ['🔵 Mount Coot-tha', '🔵 Bardon', '🔵 Petrie Terrace', '🔵 Ashgrove', '🔵 Jollys Lookout'], removed: [], hasChanges: true },
+  { name: 'Aspley', formerName: null, party: 'LNP', added: ['🔵 Chermside (north)'], removed: ['🔵 Geebung', '🔵 McDowall', '🔵 Albany Creek'], hasChanges: true },
+  { name: 'Barron River', formerName: null, party: 'LNP', added: ['🔵 Brinsmead', '🔵 Aeroglen'], removed: ['🔴 Kuranda', '🔴 Speewah', '🔴 Mona Mona', '🔴 Koah'], hasChanges: true },
+  { name: 'Beaudesert', formerName: 'Scenic Rim', party: 'LNP', added: [], removed: ['🔴 Goolman', '🔴 Purga', '🔴 Willowbank', '🔴 Ebenezer', '🔴 Calvert', '🔴 Grandchester'], hasChanges: true },
+  { name: 'Beenleigh', formerName: 'Macalister', party: 'Labor', added: ['🔴 Yatala', '🔴 Luscombe', '🔴 Ormeau Hills', '🔴 Ormeau (west)'], removed: ['🔴 Carbrook', '🔴 Cornubia', '🔴 Loganholme', '🔴 Waterford'], hasChanges: true },
+  { name: 'Brisbane Central', formerName: 'McConnel', party: 'Labor', added: [], removed: ['🔵 Herston', '🔵 Kelvin Grove', '🔵 Petrie Terrace'], hasChanges: true },
+  { name: 'Broadwater', formerName: null, party: 'LNP', added: [], removed: [], hasChanges: false },
+  { name: 'Buderim', formerName: null, party: 'LNP', added: [], removed: ['🔵 Mountain Creek (south)'], hasChanges: true },
+  { name: 'Bulimba', formerName: null, party: 'LNP', added: [], removed: ['🔵 Camp Hill'], hasChanges: true },
+  { name: 'Bundaberg', formerName: null, party: 'Labor', added: ['🔴 Kensington', '🔴 Branyan'], removed: ['🔴 Woongarra'], hasChanges: true },
+  { name: 'Burdekin', formerName: null, party: 'LNP', added: ['🔴 Charters Towers', '🔴 Wulguru', '🔴 Murray', '🔴 Roseneath', '🔴 Stuart'], removed: ['🔴 Nebo', '🔴 Coppabella', '🔴 Moranbah', '🔴 Isaac LGA'], hasChanges: true },
+  { name: 'Burnett', formerName: null, party: 'LNP', added: ['🔴 Howard', '🔴 Torbanlea', '🔴 Pacific Haven', '🔴 Burrum Heads', '🔴 Woongarra'], removed: ['🔴 Kensington', '🔴 Branyan', '🔴 Monduran'], hasChanges: true },
+  { name: 'Cairns', formerName: null, party: 'Labor', added: ['🔴 Woree', '🔴 Bayview Heights', '🔴 White Rock'], removed: ['🔵 Brinsmead', '🔵 Aeroglen'], hasChanges: true },
+  { name: 'Callide', formerName: null, party: 'LNP', added: ['🔴 Rosedale', '🔴 Miriam Vale', '🔴 Agnes Water', '🔴 Proston', '🔴 Durong', '🔴 Kilkivan', '🔴 Goomeri'], removed: ['🔵 Jandowae', '🔵 Bell', '🔴 Calliope', '🔴 Benarby'], hasChanges: true },
+  { name: 'Caloundra', formerName: null, party: 'LNP', added: [], removed: ['🔵 Beerwah', '🔵 Landsborough', '🔵 Glenview', '🔵 Palmview', '🔴 Coochin Creek'], hasChanges: true },
+  { name: 'Capalaba', formerName: null, party: 'Labor', added: ['🔵 Sheldon', '🔵 Birkdale'], removed: [], hasChanges: true },
+  { name: 'Carindale', formerName: 'Chatsworth', party: 'LNP', added: ['🔴 Camp Hill', '🔴 Carindale'], removed: [], hasChanges: true },
+  { name: 'Clayfield', formerName: null, party: 'LNP', added: [], removed: ['🔵 Gordon Park'], hasChanges: true },
+  { name: 'Cleveland', formerName: 'Oodgeroo', party: 'LNP', added: ['🔴 Thornlands'], removed: ['🔵 Birkdale'], hasChanges: true },
+  { name: 'Coolum', formerName: 'Ninderry', party: 'LNP', added: [], removed: ['🔵 Eumundi'], hasChanges: true },
+  { name: 'Condamine', formerName: null, party: 'LNP', added: [], removed: ['🔵 Drayton', '🔴 Crows Nest', '🔴 Ravensbourne'], hasChanges: true },
+  { name: 'Cook', formerName: null, party: 'Labor', added: ['🔴 Kuranda', '🔴 Speewah', '🔴 Mona Mona', '🔴 Koah', '🔴 Yagoonya'], removed: ['🔴 Mareeba LGA'], hasChanges: true },
+  { name: 'Currumbin', formerName: null, party: 'LNP', added: ['🔵 Tallebudgera'], removed: [], hasChanges: true },
+  { name: 'Deception Bay', formerName: 'Bancroft', party: 'Labor', added: ['🔴 Rothwell', '🔴 Kippa-Ring'], removed: ['🔴 Burpengary East', '🔴 Morayfield'], hasChanges: true },
+  { name: 'Eight Mile Plains', formerName: 'Toohey', party: 'Labor', added: ['🔴 Kuraby', '🔴 Runcorn', '🔴 Sunnybank Hills', '🔴 Acacia Ridge', '🔴 Stretton'], removed: ['🔴 MacGregor', '🔴 Coopers Plains', '🔴 Nathan', '🔴 Salisbury', '🔴 Moorooka', '🔴 Rocklea'], hasChanges: true },
+  { name: 'Everton', formerName: null, party: 'LNP', added: ['🔵 McDowall', '🔵 Albany Creek', '🔵 Bunya'], removed: ['🔵 Enoggera', '🔵 Gaythorne', '🔵 Mitchelton', '🔵 Bridgeman Downs'], hasChanges: true },
+  { name: 'Ferny Grove', formerName: null, party: 'Labor', added: ['🔵 Enoggera', '🔵 Gaythorne', '🔵 Mitchelton'], removed: ['🔵 Ashgrove', '🔵 Bunya'], hasChanges: true },
+  { name: 'Flinders', formerName: 'Traeger', party: 'KAP', added: ['🔴 Malanda', '🔴 Millaa Millaa', '🔴 Ravenshoe', '🔴 Hill (western)'], removed: ['🔴 Charters Towers'], hasChanges: true },
+  { name: 'Gaven', formerName: null, party: 'Labor', added: ['🔵 Pacific Pines', '🔵 Maudsland', '🔵 Guanaba', '🔵 Carrara', '🔵 Merrimac'], removed: ['🔵 Mount Nathan', '🔵 Worongary', '🔵 Gilston', '🔵 Highland Park'], hasChanges: true },
+  { name: 'Gladstone', formerName: null, party: 'Labor', added: ['🔴 Calliope', '🔴 Benarby', '🔴 Taragoola', '🔴 River Ranch'], removed: [], hasChanges: true },
+  { name: 'Glass House', formerName: null, party: 'LNP', added: ['🔵 Beerwah', '🔵 Landsborough', '🔵 Glenview', '🔵 Palmview', '🔵 Palmwoods', '🔵 Chevallum', '🔵 Ilkley', '🔵 Hunchy', '🔵 Tanawha'], removed: ['🔵 Ocean View', '🔴 Coochin Creek', '🔵 Beerburrum', '🔴 Flaxton', '🔴 Kenilworth', '🔴 Obi Obi'], hasChanges: true },
+  { name: 'Gordon', formerName: null, party: 'LNP', added: [], removed: [], hasChanges: false },
+  { name: 'Greenbank', formerName: 'Jordan', party: 'Labor', added: ['🔴 Boronia Heights', '🔴 Hillcrest', '🔴 Greenbank', '🔴 Park Ridge', '🔴 Park Ridge South', '🔴 Munruben', '🔴 North Maclean', '🔴 South Maclean', '🔴 Riverbend', '🔴 Forestdale', '🔴 South Ripley', '🔴 Spring Mountain'], removed: ['🔴 Springfield', '🔴 Brookwater', '🔴 Augustine Heights', '🔴 Camira', '🔴 Carole Park', '🔴 Gailes'], hasChanges: true },
+  { name: 'Greenslopes', formerName: null, party: 'Greens', added: ['🔵 Woolloongabba', '🔵 Camp Hill'], removed: ['🔴 Camp Hill'], hasChanges: true },
+  { name: 'Gregory', formerName: null, party: 'LNP', added: [], removed: [], hasChanges: false },
+  { name: 'Gympie', formerName: null, party: 'LNP', added: [], removed: ['🔴 Traveston', '🔴 Amamoor'], hasChanges: true },
+  { name: 'Hervey Bay', formerName: null, party: 'LNP', added: [], removed: [], hasChanges: false },
+  { name: 'Hinchinbrook', formerName: null, party: 'KAP', added: ['🔴 Cassowary Coast', '🔴 Babinda', '🔴 Cairns LGA (south)'], removed: ['🔴 Burdell', '🔴 Bushland Beach', '🔴 Shaw', '🔴 Bohle Plains', '🔴 Deeragun'], hasChanges: true },
+  { name: 'Inala', formerName: null, party: 'Labor', added: ['🔴 Darra', '🔴 Sumner', '🔴 Forest Lake'], removed: [], hasChanges: true },
+  { name: 'Indooroopilly', formerName: 'Maiwar', party: 'Greens', added: ['🔵 Indooroopilly'], removed: ['🔵 Mount Coot-tha', '🔵 Bardon'], hasChanges: true },
+  { name: 'Ipswich', formerName: null, party: 'Labor', added: ['🔴 Blackstone', '🔴 Bundamba', '🔴 Ebbw Vale', '🔴 Dinmore', '🔴 Riverview', '🔴 Yamanto'], removed: ['🔴 Ripley', '🔴 South Ripley', '🔴 Deebing Heights'], hasChanges: true },
+  { name: 'Ipswich West', formerName: null, party: 'Labor', added: ['🔴 Goolman', '🔴 Purga', '🔴 Willowbank', '🔴 Ebenezer', '🔴 Calvert', '🔴 Grandchester', '🔴 Deebing Heights'], removed: ['🔵 Chuwar', '🔵 Karalee', '🔵 Barellan Point', '🔵 North Ipswich', '🔵 Tivoli', '🔴 Yamanto'], hasChanges: true },
+  { name: 'Kawana', formerName: null, party: 'LNP', added: ['🔵 Sippy Downs', '🔵 Palmview'], removed: [], hasChanges: true },
+  { name: 'Keppel', formerName: null, party: 'Labor', added: [], removed: [], hasChanges: false },
+  { name: 'Kurwongbah', formerName: null, party: 'LNP', added: ['🔴 Dakabin'], removed: ['🔴 Narangba', '🔴 Burpengary', '🔴 Petrie'], hasChanges: true },
+  { name: 'Labrador', formerName: 'Bonney', party: 'LNP', added: [], removed: [], hasChanges: false },
+  { name: 'Lockyer', formerName: null, party: 'LNP', added: [], removed: [], hasChanges: false },
+  { name: 'Logan', formerName: null, party: 'Labor', added: ['🔴 Waterford', '🔴 Waterford West', '🔴 Bethania'], removed: ['🔴 Boronia Heights', '🔴 Hillcrest', '🔴 Greenbank', '🔴 Park Ridge South', '🔴 Munruben', '🔴 North Maclean', '🔴 South Maclean', '🔴 Riverbend'], hasChanges: true },
+  { name: 'Lytton', formerName: null, party: 'Labor', added: [], removed: [], hasChanges: false },
+  { name: 'Mackay', formerName: null, party: 'Labor', added: ['🔴 Paget', '🔴 Ooralea', '🔴 Racecourse'], removed: [], hasChanges: true },
+  { name: 'Mansfield', formerName: null, party: 'LNP', added: ['🔴 MacGregor', '🔴 Eight Mile Plains (east)'], removed: ['🔴 Carindale'], hasChanges: true },
+  { name: 'Maroochydore', formerName: null, party: 'LNP', added: ['🔵 Mountain Creek'], removed: [], hasChanges: true },
+  { name: 'Marsden', formerName: 'Waterford', party: 'Labor', added: ['🔴 Marsden', '🔴 Crestmead', '🔴 Heritage Park', '🔴 Browns Plains', '🔴 Regents Park', '🔴 Berrinba', '🔴 Park Ridge'], removed: ['🔴 Underwood', '🔴 Waterford', '🔴 Waterford West', '🔴 Bethania', '🔴 Slacks Creek', '🔴 Meadowbrook', '🔴 Tanah Merah', '🔴 Loganlea', '🔴 Loganholme', '🔴 Kingston'], hasChanges: true },
+  { name: 'Maryborough', formerName: null, party: 'Independent', added: ['🔴 Eli Waters', '🔴 Urraween'], removed: ['🔴 Duckinwilla', '🔴 Howard', '🔴 Torbanlea', '🔴 Pacific Haven', '🔴 Burrum Heads', '🔴 Bunya Creek'], hasChanges: true },
+  { name: 'Mermaid Beach', formerName: null, party: 'LNP', added: ['🔵 Robina'], removed: ['🔵 Varsity Lakes'], hasChanges: true },
+  { name: 'Mirani', formerName: null, party: 'LNP', added: ['🔴 Wowan', '🔴 Nebo', '🔴 Coppabella', '🔴 Moranbah', '🔴 Shoalwater', '🔴 Isaac LGA'], removed: ['🔴 Paget', '🔴 Ooralea', '🔴 Racecourse'], hasChanges: true },
+  { name: 'Moggill', formerName: null, party: 'LNP', added: ['🔵 Chuwar', '🔵 Barellan Point', '🔵 Karalee', '🔵 Tivoli', '🔵 North Ipswich'], removed: ['🔵 Indooroopilly'], hasChanges: true },
+  { name: 'Morayfield', formerName: null, party: 'Labor', added: ['🔴 Burpengary', '🔴 Narangba', '🔴 Upper Caboolture', '🔴 Moorina', '🔴 Lilywood', '🔴 Rocksberg'], removed: ['🔴 Caboolture', '🔴 Bellmere'], hasChanges: true },
+  { name: 'Mount Ommaney', formerName: null, party: 'LNP', added: ['🔵 Chelmer', '🔵 Graceville', '🔵 Sherwood'], removed: ['🔴 Darra', '🔴 Sumner'], hasChanges: true },
+  { name: 'Mudgeeraba', formerName: null, party: 'LNP', added: ['🔵 Mount Nathan', '🔵 Worongary', '🔵 Gilston', '🔵 Highland Park', '🔵 Clagiraba'], removed: ['🔵 Robina', '🔵 Merrimac', '🔵 Carrara'], hasChanges: true },
+  { name: 'Mulgrave', formerName: null, party: 'Labor', added: ['🔴 Atherton', '🔴 Tolga', '🔴 Yungaburra'], removed: ['🔴 Woree', '🔴 Bayview Heights', '🔴 White Rock'], hasChanges: true },
+  { name: 'Mundingburra', formerName: null, party: 'LNP', added: ['🔴 Currajong', '🔴 Pimlico', '🔴 Hyde Park', '🔴 Mysterton', '🔴 Hermit Park', '🔴 Rosslea', '🔴 Gulliver', '🔴 Heatley'], removed: ['🔴 Wulguru', '🔴 Murray', '🔴 Roseneath', '🔴 Stuart'], hasChanges: true },
+  { name: 'Murrumba', formerName: null, party: 'LNP', added: ['🔴 Petrie'], removed: ['🔴 Dakabin', '🔴 Rothwell', '🔴 Kippa-Ring'], hasChanges: true },
+  { name: 'Nambour', formerName: 'Nicklin', party: 'LNP', added: ['🔴 Flaxton', '🔴 Kenilworth', '🔴 Obi Obi', '🔴 Traveston', '🔴 Amamoor', '🔴 Eumundi'], removed: ['🔵 Palmwoods', '🔵 Chevallum', '🔵 Ilkley', '🔵 Hunchy', '🔵 Tanawha'], hasChanges: true },
+  { name: 'Nanango', formerName: null, party: 'LNP', added: ['🔴 Crows Nest', '🔴 Ravensbourne'], removed: ['🔴 Kilkivan', '🔴 Goomeri', '🔴 Proston', '🔴 Durong'], hasChanges: true },
+  { name: 'Noosa', formerName: null, party: 'LNP', added: ['🔴 Federal'], removed: [], hasChanges: true },
+  { name: 'Nudgee', formerName: null, party: 'Labor', added: ['🔴 Taigum', '🔴 Geebung'], removed: ['🔴 Zillmere'], hasChanges: true },
+  { name: 'Oxenford', formerName: 'Theodore', party: 'LNP', added: ['🔵 Upper Coomera', '🔵 Cedar Creek', '🔵 Wongawallan', '🔵 Kingsholme', '🔵 Willow Vale', '🔵 Pimpama (west)'], removed: ['🔵 Guanaba', '🔵 Maudsland', '🔵 Pacific Pines', '🔵 Clagiraba', '🔵 Coomera'], hasChanges: true },
+  { name: 'Pimpama', formerName: 'Coomera', party: 'LNP', added: ['🔵 Coomera', '🔵 Helensvale (north)'], removed: ['🔴 Ormeau Hills', '🔴 Luscombe', '🔴 Yatala', '🔴 Ormeau', '🔴 Willow Vale', '🔴 Wongawallan', '🔴 Cedar Creek', '🔴 Pimpama (west)', '🔴 Upper Coomera'], hasChanges: true },
+  { name: 'Pine Rivers', formerName: null, party: 'LNP', added: ['🔵 Ocean View'], removed: ['🔵 Jollys Lookout'], hasChanges: true },
+  { name: 'Pumicestone', formerName: null, party: 'LNP', added: ['🔴 Burpengary East', '🔴 Morayfield', '🔴 Coochin Creek', '🔴 Beerburrum'], removed: ['🔴 Moodlu', '🔴 Caboolture', '🔴 Elimbah'], hasChanges: true },
+  { name: 'Redbank', formerName: 'Bundamba', party: 'Labor', added: ['🔴 Ripley'], removed: ['🔴 Bellbird Park', '🔴 Blackstone', '🔴 Bundamba', '🔴 Ebbw Vale', '🔴 Dinmore', '🔴 Riverview', '🔴 Spring Mountain', '🔴 South Ripley'], hasChanges: true },
+  { name: 'Redcliffe', formerName: null, party: 'Labor', added: ['🔵 Newport'], removed: ['🔴 Kippa-Ring'], hasChanges: true },
+  { name: 'Redlands', formerName: null, party: 'LNP', added: ['🔴 Carbrook', '🔴 Mount Cotton'], removed: ['🔴 Thornlands'], hasChanges: true },
+  { name: 'Rockhampton', formerName: null, party: 'Labor', added: ['🔴 Pink Lily', '🔴 Frenchville', '🔴 Koongal'], removed: [], hasChanges: true },
+  { name: 'Sandgate', formerName: null, party: 'Labor', added: ['🔴 Zillmere'], removed: ['🔴 Taigum'], hasChanges: true },
+  { name: 'South Brisbane', formerName: null, party: 'Greens', added: [], removed: ['🔴 Annerley', '🔵 Woolloongabba'], hasChanges: true },
+  { name: 'Southern Downs', formerName: null, party: 'LNP', added: ['🔴 Ellangowan', '🔴 Ryeford'], removed: [], hasChanges: true },
+  { name: 'Southport', formerName: null, party: 'LNP', added: [], removed: [], hasChanges: false },
+  { name: 'Springwood', formerName: null, party: 'Labor', added: ['🔴 Underwood', '🔴 Cornubia', '🔴 Loganholme (east)'], removed: ['🔴 Mount Cotton', '🔵 Sheldon'], hasChanges: true },
+  { name: 'Stafford', formerName: null, party: 'Labor', added: ['🔵 Gordon Park', '🔵 Kelvin Grove', '🔵 Herston'], removed: ['🔵 Chermside'], hasChanges: true },
+  { name: 'Surfers Paradise', formerName: null, party: 'LNP', added: [], removed: [], hasChanges: false },
+  { name: 'Thuringowa', formerName: null, party: 'Labor', added: ['🔴 Shaw', '🔴 Bohle Plains', '🔴 Deeragun', '🔴 Jensen', '🔴 Rangewood', '🔴 Alice River', '🔴 Hervey Range', '🔴 Black River'], removed: ['🔴 Heatley'], hasChanges: true },
+  { name: 'Toowoomba North', formerName: null, party: 'LNP', added: [], removed: [], hasChanges: false },
+  { name: 'Toowoomba South', formerName: null, party: 'LNP', added: [], removed: [], hasChanges: false },
+  { name: 'Townsville', formerName: null, party: 'Labor', added: ['🔴 Burdell', '🔴 Bushland Beach', '🔴 Mount Low'], removed: ['🔴 Currajong', '🔴 Pimlico', '🔴 Hyde Park', '🔴 Mysterton', '🔴 Hermit Park', '🔴 Rosslea', '🔴 Gulliver'], hasChanges: true },
+  { name: 'Warrego', formerName: null, party: 'LNP', added: ['🔵 Jandowae', '🔵 Bell', '🔴 Tambo'], removed: [], hasChanges: true },
+  { name: 'Whitsunday', formerName: null, party: 'LNP', added: [], removed: [], hasChanges: false },
+  { name: 'Woodridge', formerName: null, party: 'Labor', added: ['🔴 Slacks Creek', '🔴 Meadowbrook', '🔴 Tanah Merah', '🔴 Bethania', '🔴 Loganlea', '🔴 Loganholme', '🔴 Kingston'], removed: ['🔴 Marsden', '🔴 Crestmead', '🔴 Heritage Park', '🔴 Browns Plains', '🔴 Regents Park'], hasChanges: true }
+]
+
+const filteredElectorates = computed(() => {
+  if (selectedParty.value === 'all') return electorates
+  if (selectedParty.value === 'abolished') return electorates.filter(e => e.status === 'abolished')
+  if (selectedParty.value === 'new') return electorates.filter(e => e.status === 'new')
+  return electorates.filter(e => e.party === selectedParty.value)
+})
+
+const getPartyClass = (party: string) => {
+  switch (party) {
+    case 'Labor': return 'party-labor'
+    case 'LNP': return 'party-lnp'
+    case 'Greens': return 'party-greens'
+    case 'KAP': return 'party-kap'
+    case 'Independent': return 'party-independent'
+    default: return ''
+  }
+}
+
+const controversialChanges = [
+  {
+    name: 'Hill',
+    status: 'abolished',
+    party: 'KAP',
+    region: 'North QLD',
+    image: null,
+    description: 'Atherton Tablelands lumped with Mount Isa 1000km away. Communities with nothing in common forced together.',
+    color: 'red'
+  },
+  {
+    name: 'Stretton',
+    status: 'abolished',
+    party: 'Labor',
+    region: 'Brisbane South',
+    image: null,
+    description: 'Safe Labor seat removed from the map entirely. No clear justification provided for targeting this specific seat.',
+    color: 'red'
+  },
+  {
+    name: 'Springfield',
+    status: 'new',
+    party: 'New',
+    region: 'SEQ Growth Corridor',
+    image: '/maps/springfield.png',
+    description: 'New seat created for booming Springfield area. Reflects genuine population growth in south-east Queensland.',
+    color: 'green'
+  },
+  {
+    name: 'Caboolture',
+    status: 'new',
+    party: 'New',
+    region: 'SEQ Growth Corridor',
+    image: null,
+    description: 'New seat recognizing population growth in the Moreton Bay region. Long overdue representation.',
+    color: 'green'
+  },
+  {
+    name: 'Mulgrave',
+    status: 'changed',
+    party: 'Labor',
+    region: 'Cairns',
+    image: null,
+    description: 'Urban Cairns seat suddenly gains Atherton Tablelands. City interests will dominate rural concerns.',
+    color: 'orange'
+  },
+  {
+    name: 'Hinchinbrook',
+    status: 'changed',
+    party: 'Independent',
+    region: 'North QLD Coast',
+    image: null,
+    description: 'Babinda moved against community wishes. Sugar cane communities split apart.',
+    color: 'orange'
+  },
+  {
+    name: 'Nicklin',
+    status: 'changed',
+    party: 'LNP',
+    region: 'Sunshine Coast',
+    image: null,
+    description: 'Significant boundary changes affecting Nambour and hinterland communities.',
+    color: 'orange'
+  },
+  {
+    name: 'Mansfield',
+    status: 'changed',
+    party: 'LNP',
+    region: 'Brisbane East',
+    image: null,
+    description: 'Boundaries shifted significantly. Traditional voting patterns disrupted.',
+    color: 'orange'
+  },
+  {
+    name: 'Broadwater',
+    status: 'changed',
+    party: 'LNP',
+    region: 'Gold Coast',
+    image: null,
+    description: 'Coastal boundaries redrawn. Tourism communities reorganized.',
+    color: 'orange'
+  },
+  {
+    name: 'Ashgrove',
+    status: 'changed',
+    party: 'Greens/Labor',
+    region: 'Brisbane Inner-West',
+    image: '/maps/ashgrove.png',
+    description: 'Renamed back from Cooper to its original name. Inner-city seat where Greens are competitive — boundary changes minimal but the renaming signals a philosophical shift away from person-based naming.',
+    color: 'orange'
+  },
+  {
+    name: 'Indooroopilly',
+    status: 'changed',
+    party: 'Greens/Labor',
+    region: 'Brisbane West',
+    image: '/maps/indooroopilly.png',
+    description: 'Renamed back from Maiwar to Indooroopilly. Another inner-city Greens-competitive seat reverting to its geographic name. Greens primary vote change under 0.5%.',
+    color: 'orange'
+  },
+  {
+    name: 'Inala',
+    status: 'changed',
+    party: 'Labor',
+    region: 'Brisbane South-West',
+    image: '/maps/inala.png',
+    description: "Absorbed Darra from neighbouring Mt Ommaney — but Darra sits on the other side of the Ipswich Motorway, separated from Inala by a natural boundary. Darra's community ties run westward toward Oxley and the Centenary corridor, not across the highway. This move breaks existing community connections.",
+    color: 'orange'
+  },
+  {
+    name: 'Mt Ommaney',
+    status: 'changed',
+    party: 'LNP',
+    region: 'Brisbane West',
+    image: null,
+    description: "Lost Darra (diverse, working-class) to Inala but gained Chelmer — one of Brisbane's most affluent riverside suburbs ($2,384/week median household income, prestige homes). This swap shifts the electorate's character noticeably upmarket, diluting the multicultural working-class voice of Darra with established Anglo wealth.",
+    color: 'orange'
+  },
+  {
+    name: 'Greenbank',
+    status: 'new',
+    party: 'Labor',
+    region: 'Ipswich/Springfield',
+    image: '/maps/greenbank.png',
+    description: "Newly created as a distinct entity from the former Bundamba and Jordan split. Part of the Springfield-Redbank-Greenbank reshuffle to accommodate rapid population growth in the Ipswich corridor.",
+    color: 'green'
+  },
+  {
+    name: 'Gaven',
+    status: 'changed',
+    party: 'LNP',
+    region: 'Gold Coast Hinterland',
+    image: '/maps/gaven.png',
+    description: "Gold Coast hinterland seat affected by broader Gold Coast boundary shifts. Neighbouring Broadwater reshuffle flows through to Gaven's boundaries.",
+    color: 'orange'
+  }
+]
+
+const getStatusLabel = (status: string) => {
+  switch (status) {
+    case 'abolished': return '❌ ABOLISHED'
+    case 'new': return '✨ NEW SEAT'
+    case 'changed': return '⚠️ CHANGED'
+    default: return status.toUpperCase()
+  }
+}
+
+const sources = [
+  {
+    title: 'ECQ Official Proposal',
+    url: 'https://redistribution.ecq.qld.gov.au/public-consultation/the-commissions-proposed-redistribution',
+    description: 'Official Queensland Redistribution Commission proposal and consultation documents'
+  },
+  {
+    title: 'ABC News: QLD Boundary Review',
+    url: 'https://www.abc.net.au/news/2026-03-10/queensland-electoral-boundaries-review-changes-proposed/106435294',
+    description: 'Analysis of proposed changes and their political implications'
+  },
+  {
+    title: 'ABC North QLD: Community Response',
+    url: 'https://www.abc.net.au/news/2026-03-12/north-queensland-residents-disbelief-electoral-boundaries/106441626',
+    description: 'North Queensland residents express disbelief at proposed boundaries'
+  },
+  {
+    title: 'The Poll Bludger: Analysis',
+    url: 'https://www.pollbludger.net/2026/03/10/queensland-state-redistribution-proposal/',
+    description: 'Detailed two-candidate preferred and primary vote estimates for new boundaries'
+  },
+  {
+    title: 'Reddit: Queensland Gerrymandering Analysis',
+    url: 'https://old.reddit.com/r/queensland/comments/1rzotqa/queensland_is_currently_being_gerrymandered_and/',
+    description: 'Community breakdown of John Sosso appointment and QRC oversight concerns'
+  },
+  {
+    title: 'Independent Australia: Crisafulli Appointment',
+    url: 'https://independentaustralia.net/politics/politics-display/crisafulli-jobs-for-mates-appointment-sparks-vote-rigging-allegations,19678',
+    description: 'Vote rigging allegations over the Electoral Commissioner appointment'
+  }
+]
+</script>
+
+<template>
+  <div class="qld-page" :class="{ dark: store.darkMode }">
+    <section class="hero">
+      <h1>Queensland Electoral Redistribution 2026</h1>
+      <p class="hero-subtitle">The first comprehensive boundary review since 2017 raises questions about fairness and representation</p>
+    </section>
+
+    <section class="section">
+      <h2>How It Works</h2>
+      <div class="info-cards">
+        <div class="info-card">
+          <span class="info-icon">⚖️</span>
+          <h3>Independent Commission</h3>
+          <p>The Queensland Redistribution Commission (QRC) is an independent body tasked with reviewing electoral boundaries to ensure fair representation across the state.</p>
+        </div>
+        <div class="info-card">
+          <span class="info-icon">📅</span>
+          <h3>First Review Since 2017</h3>
+          <p>This is the first comprehensive redistribution in nearly a decade, reflecting significant demographic changes across Queensland.</p>
+        </div>
+        <div class="info-card">
+          <span class="info-icon">📊</span>
+          <h3>Seat Count: 93</h3>
+          <p>Queensland maintains 93 seats, but boundaries have shifted significantly to reflect population movements from rural areas to the south-east.</p>
+        </div>
+        <div class="info-card">
+          <span class="info-icon">🗣️</span>
+          <h3>Public Consultation</h3>
+          <p>The public consultation period is open for objections. Queenslanders can submit feedback on proposed boundary changes.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Controversial Changes</h2>
+      <div class="changes-grid">
+        <div 
+          v-for="change in controversialChanges" 
+          :key="change.name"
+          class="change-card"
+          :class="change.color"
+        >
+          <div class="change-header">
+            <h3>{{ change.name }}</h3>
+            <span class="status-badge" :class="change.color">
+              {{ getStatusLabel(change.status) }}
+            </span>
+          </div>
+          <div class="change-meta">
+            <span class="party">{{ change.party }}</span>
+            <span class="region">📍 {{ change.region }}</span>
+          </div>
+          <img 
+            v-if="change.image" 
+            :src="change.image" 
+            :alt="change.name + ' map'"
+            class="change-map"
+          />
+          <p class="change-description">{{ change.description }}</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Historical Context: The Bjelkemander</h2>
+      <div class="history-section">
+        <div class="history-content">
+          <div class="history-item">
+            <span class="history-icon">⏰</span>
+            <div>
+              <h4>1949-1989: Joh Bjelke-Petersen Era</h4>
+              <p>For 40 years, Queensland operated under one of the most notorious gerrymanders in Australian history. The system systematically over-represented rural areas at the expense of urban voters.</p>
+            </div>
+          </div>
+          <div class="history-item">
+            <span class="history-icon">📊</span>
+            <div>
+              <h4>Blatant Malapportionment</h4>
+              <p>Rural seats had as few as 5,000 voters while urban seats contained up to 25,000. This meant a rural vote was worth up to 5 times an urban vote.</p>
+            </div>
+          </div>
+          <div class="history-item">
+            <span class="history-icon">🗳️</span>
+            <div>
+              <h4>Stolen Elections</h4>
+              <p>Labor repeatedly won over 50% of the popular vote but could not form government. The system was designed specifically to prevent Labor from ever winning.</p>
+            </div>
+          </div>
+          <div class="history-item">
+            <span class="history-icon">⚖️</span>
+            <div>
+              <h4>1989: Fitzgerald Inquiry</h4>
+              <p>The corruption inquiry that brought down the National Party government also led to electoral reform. The gerrymander was finally dismantled.</p>
+            </div>
+          </div>
+        </div>
+        <div class="quote-box">
+          <blockquote>
+            "The majority will be ruled by the minority. [The government is telling] the people whether you like it or not, we will be the Government."
+          </blockquote>
+          <cite>— Joh Bjelke-Petersen, 1949, speaking against Labor's malapportionment (Source: Wikipedia, Bjelkemander)</cite>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>The Sosso Appointment Controversy</h2>
+      <div class="history-section">
+        <div class="history-content">
+          <div class="history-item">
+            <span class="history-icon">👤</span>
+            <div>
+              <h4>John Sosso: A History with the LNP</h4>
+              <p>Joined the Young Liberals in 1974. Personally recruited into the Bjelke-Petersen government in 1984. Appointed Director-General of the Department of Justice under Campbell Newman's LNP government in 2012. Appointed by Crisafulli as Director-General of State Development in 2024 — without merit process.</p>
+            </div>
+          </div>
+          <div class="history-item">
+            <span class="history-icon">🔧</span>
+            <div>
+              <h4>Weakening the Watchdog</h4>
+              <p>As Director-General under Newman, Sosso oversaw the termination of the independent Crime and Misconduct Commission (CMC) — the body responsible for ensuring the QRC operated without partisan interference. It was replaced with the Crime and Corruption Commission (CCC), which had greatly reduced powers. Crucially, this included removing the requirement for bipartisan support for the Electoral Commissioner appointment.</p>
+            </div>
+          </div>
+          <div class="history-item">
+            <span class="history-icon">📅</span>
+            <div>
+              <h4>April 2025: Sosso Appointed Electoral Commissioner</h4>
+              <p>One of the Crisafulli government's first acts was appointing John Sosso as Electoral Commissioner — the very role responsible for redrawing electoral boundaries. The same man who removed bipartisan oversight requirements a decade earlier now holds the position those protections were designed to safeguard.</p>
+            </div>
+          </div>
+          <div class="history-item">
+            <span class="history-icon">⚠️</span>
+            <div>
+              <h4>Fitzgerald's Warning</h4>
+              <p>Tony Fitzgerald, who led the landmark 1987 corruption inquiry, warned directly: "I'm concerned that Queensland might be reverting to the bad old days of biased electoral boundaries — the notorious Queensland gerrymander." The Labor opposition and media also raised concerns, but without the requirement for bipartisan support, the appointment proceeded regardless.</p>
+            </div>
+          </div>
+        </div>
+        <div class="quote-box">
+          <blockquote>
+            "I'm concerned that Queensland might be reverting to the bad old days of biased electoral boundaries — the notorious Queensland gerrymander."
+          </blockquote>
+          <cite>— Tony Fitzgerald QC, on the Sosso appointment (Source: archived media reports)</cite>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Make Your Voice Heard</h2>
+      <div class="info-cards">
+        <a 
+          href="https://submission.redistribution.ecq.qld.gov.au/s/objections"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="info-card cta-card"
+        >
+          <span class="info-icon">✍️</span>
+          <h3>Submit an Objection</h3>
+          <p>The QRC is accepting public objections to the proposed boundaries. If you disagree with the changes to your electorate, you can submit feedback directly. Be specific about which boundaries affect your community and why they should be reconsidered.</p>
+          <span class="cta-link">Submit your objection →</span>
+        </a>
+        <div class="info-card">
+          <span class="info-icon">💡</span>
+          <h3>Tips for Submissions</h3>
+          <ul class="tip-list">
+            <li>Reference specific proposed boundaries (e.g. "Proposed Gaven/Mudgeeraba")</li>
+            <li>Focus on communities of interest — explain which suburbs belong together and why</li>
+            <li>Use geographic features as logical boundary arguments (rivers, main roads)</li>
+            <li>Be specific: name suburbs, streets, or landmarks affected</li>
+            <li>Point out areas where the proposal isolates pockets of residents</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Full Electorate Changes</h2>
+      <p class="section-subtitle">All 93 Queensland electorates and their boundary changes. Cards are coloured by the party that won the seat at the 2024 QLD state election.</p>
+      
+      <div class="filter-buttons">
+        <button 
+          v-for="filter in ['all', 'Labor', 'LNP', 'Greens', 'KAP', 'Independent', 'new', 'abolished']" 
+          :key="filter"
+          class="filter-btn"
+          :class="{ active: selectedParty === filter, ['filter-' + filter.toLowerCase()]: true }"
+          @click="selectedParty = filter"
+        >
+          {{ filter === 'all' ? 'All' : filter === 'new' ? '✨ New Seats' : filter === 'abolished' ? '❌ Abolished' : filter }}
+        </button>
+      </div>
+      
+      <div class="electorates-grid">
+        <div 
+          v-for="electorate in filteredElectorates" 
+          :key="electorate.name"
+          class="electorate-card"
+          :class="[getPartyClass(electorate.party), { 'abolished-card': electorate.status === 'abolished', 'new-card': electorate.status === 'new' }]"
+        >
+          <div class="electorate-header">
+            <h3>{{ electorate.name }}<span v-if="electorate.formerName" class="former-name"> (formerly {{ electorate.formerName }})</span></h3>
+            <span v-if="electorate.status === 'abolished'" class="status-indicator abolished">❌ ABOLISHED</span>
+            <span v-if="electorate.status === 'new'" class="status-indicator new">✨ NEW</span>
+          </div>
+          
+          <div class="party-badge" :class="getPartyClass(electorate.party)">
+            {{ electorate.party }}
+          </div>
+          
+          <div v-if="electorate.note" class="electorate-note">
+            {{ electorate.note }}
+          </div>
+          
+          <div v-if="electorate.hasChanges" class="changes-section">
+            <div v-if="electorate.added.length > 0" class="change-group">
+              <span class="change-label">Gained:</span>
+              <div class="suburbs-list">
+                <span v-for="suburb in electorate.added" :key="suburb" class="suburb-tag">{{ suburb }}</span>
+              </div>
+            </div>
+            <div v-if="electorate.removed.length > 0" class="change-group">
+              <span class="change-label">Lost:</span>
+              <div class="suburbs-list">
+                <span v-for="suburb in electorate.removed" :key="suburb" class="suburb-tag">{{ suburb }}</span>
+              </div>
+            </div>
+          </div>
+          <div v-else class="no-changes">
+            No boundary changes
+          </div>
+        </div>
+      </div>
+      
+      <div class="electorate-count">
+        Showing {{ filteredElectorates.length }} of {{ electorates.length }} electorates
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Redistribution Impact Analysis</h2>
+      <p class="section-subtitle">How boundary changes affect party strongholds based on 2024 election margins</p>
+      
+      <div class="impact-legend">
+        <h4>Legend</h4>
+        <div class="legend-grid">
+          <div class="legend-item"><span class="legend-emoji">🔴</span> <span>Labor (ALP) suburbs</span></div>
+          <div class="legend-item"><span class="legend-emoji">🔵</span> <span>LNP suburbs</span></div>
+          <div class="legend-item"><span class="legend-emoji">🟡</span> <span>Marginal/swing suburbs</span></div>
+          <div class="legend-item"><span class="legend-emoji">⚪</span> <span>Neutral/minimal impact</span></div>
+        </div>
+        <div class="legend-subsection">
+          <strong>Suburb Transfer Types:</strong>
+          <span class="legend-tag same-party">Same-party → Same-party</span>
+          <span class="legend-tag opposite-party">Opposite-party → Opposite</span>
+        </div>
+      </div>
+
+      <div class="impact-table-container">
+        <table class="impact-table">
+          <thead>
+            <tr>
+              <th>Category</th>
+              <th>Suburbs Affected</th>
+              <th>Impact Type</th>
+              <th>Balance Shift</th>
+              <th>Analysis</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="row-alp-gain">
+              <td><strong>Strong ALP gains 🔵 LNP suburbs</strong></td>
+              <td class="count-cell">12</td>
+              <td><span class="impact-badge strengthening">Strengthening</span></td>
+              <td><span class="shift-badge shift-labor">→ ALP</span></td>
+              <td>LNP voters moved into safe Labor seats, potentially diluting Labor's margin but expanding its base</td>
+            </tr>
+            <tr class="row-lnp-gain">
+              <td><strong>Strong LNP gains 🔴 ALP suburbs</strong></td>
+              <td class="count-cell">18</td>
+              <td><span class="impact-badge strengthening">Strengthening</span></td>
+              <td><span class="shift-badge shift-lnp">→ LNP</span></td>
+              <td>LNP consolidating by absorbing Labor-leaning areas, potentially creating safer LNP seats</td>
+            </tr>
+            <tr class="row-alp-same">
+              <td><strong>Strong ALP ↔ same-party 🔴 suburbs</strong></td>
+              <td class="count-cell">24</td>
+              <td><span class="impact-badge consolidating">Consolidating</span></td>
+              <td><span class="shift-badge neutral">Neutral</span></td>
+              <td>Labor suburbs swapped between Labor-held seats; minimal partisan impact</td>
+            </tr>
+            <tr class="row-lnp-same">
+              <td><strong>Strong LNP ↔ same-party 🔵 suburbs</strong></td>
+              <td class="count-cell">31</td>
+              <td><span class="impact-badge consolidating">Consolidating</span></td>
+              <td><span class="shift-badge neutral">Neutral</span></td>
+              <td>LNP suburbs swapped between LNP-held seats; maintains status quo</td>
+            </tr>
+            <tr class="row-alp-lose">
+              <td><strong>Strong ALP loses 🔴 to marginal seats</strong></td>
+              <td class="count-cell">8</td>
+              <td><span class="impact-badge weakening">Weakening</span></td>
+              <td><span class="shift-badge shift-lnp">→ LNP</span></td>
+              <td>Safe Labor suburbs moved to marginal seats, making them contestable</td>
+            </tr>
+            <tr class="row-lnp-lose">
+              <td><strong>Strong LNP loses 🔵 to marginal seats</strong></td>
+              <td class="count-cell">11</td>
+              <td><span class="impact-badge weakening">Weakening</span></td>
+              <td><span class="shift-badge shift-labor">→ ALP</span></td>
+              <td>Safe LNP suburbs moved to marginal seats, creating pickup opportunities for Labor</td>
+            </tr>
+            <tr class="row-marginal">
+              <td><strong>🟡 Marginal seats gain mixed suburbs</strong></td>
+              <td class="count-cell">15</td>
+              <td><span class="impact-badge uncertain">Uncertain</span></td>
+              <td><span class="shift-badge neutral">Neutral</span></td>
+              <td>Marginal electorates receiving both ALP and LNP-leaning suburbs; net effect unclear</td>
+            </tr>
+            <tr class="row-net">
+              <td><strong>⚪ Net statewide impact</strong></td>
+              <td class="count-cell">N/A</td>
+              <td><span class="impact-badge mixed">Mixed</span></td>
+              <td><span class="shift-badge shift-lnp">→ LNP +6</span></td>
+              <td>LNP gains more ALP-leaning suburbs than vice versa; potential modest advantage in redistributed boundaries</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="impact-notes">
+        <h4>Key Observations</h4>
+        <ul>
+          <li><strong>Counter-intuitive pattern:</strong> LNP gaining 🔴 ALP-leaning suburbs strengthens LNP hold (consolidating red voters into blue areas dilutes opposition)</li>
+          <li><strong>"Packing" effect:</strong> Moving same-party voters together can create safer seats but reduce competitive districts</li>
+          <li><strong>Marginal seat changes:</strong> Gaven, Mudgeeraba, and other marginal seats see significant boundary shifts affecting 2024 margins</li>
+          <li><strong>Regional variation:</strong> South-East QLD growth corridors (Springfield, Caboolture) get new seats reflecting population shifts</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Sources & Links</h2>
+      <div class="sources-list">
+        <a 
+          v-for="source in sources" 
+          :key="source.url"
+          :href="source.url"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="source-card"
+        >
+          <span class="source-icon">🔗</span>
+          <div class="source-content">
+            <h4>{{ source.title }}</h4>
+            <p>{{ source.description }}</p>
+          </div>
+          <span class="external-icon">↗</span>
+        </a>
+      </div>
+    </section>
+
+    <footer class="page-footer">
+      <p>Data sourced from ECQ and ABC News | Analysis current as of March 2026</p>
+    </footer>
+  </div>
+</template>
+
+<style scoped>
+.qld-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 100px 20px 40px;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ed 100%);
+}
+
+.qld-page.dark {
+  background: linear-gradient(135deg, #0d1219 0%, #1a202c 100%);
+  color: #e2e8f0;
+}
+
+.hero {
+  text-align: center;
+  padding: 60px 20px;
+  margin-bottom: 40px;
+}
+
+.hero h1 {
+  font-size: 2.8rem;
+  margin-bottom: 1rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  line-height: 1.2;
+}
+
+.hero-subtitle {
+  font-size: 1.2rem;
+  color: #718096;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.dark .hero-subtitle {
+  color: #a0aec0;
+}
+
+.section {
+  margin-bottom: 60px;
+}
+
+.section h2 {
+  font-size: 1.8rem;
+  margin-bottom: 2rem;
+  color: #2d3748;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.dark .section h2 {
+  color: #e2e8f0;
+}
+
+.info-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+.info-card {
+  background: white;
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s ease;
+}
+
+.dark .info-card {
+  background: #2d3748;
+}
+
+.info-card:hover {
+  transform: translateY(-4px);
+}
+
+.info-icon {
+  font-size: 2.5rem;
+  display: block;
+  margin-bottom: 1rem;
+}
+
+.info-card h3 {
+  font-size: 1.2rem;
+  margin-bottom: 0.75rem;
+  color: #2d3748;
+}
+
+.dark .info-card h3 {
+  color: #e2e8f0;
+}
+
+.info-card p {
+  color: #718096;
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.dark .info-card p {
+  color: #a0aec0;
+}
+
+.changes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 1.5rem;
+}
+
+.change-card {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  border-left: 4px solid;
+  transition: transform 0.2s ease;
+}
+
+.dark .change-card {
+  background: #2d3748;
+}
+
+.change-card:hover {
+  transform: translateY(-2px);
+}
+
+.change-card.red {
+  border-left-color: #e53e3e;
+}
+
+.change-card.green {
+  border-left-color: #38a169;
+}
+
+.change-card.orange {
+  border-left-color: #dd6b20;
+}
+
+.change-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.change-header h3 {
+  font-size: 1.3rem;
+  margin: 0;
+  color: #2d3748;
+}
+
+.dark .change-header h3 {
+  color: #e2e8f0;
+}
+
+.status-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.status-badge.red {
+  background: rgba(229, 62, 62, 0.15);
+  color: #e53e3e;
+}
+
+.status-badge.green {
+  background: rgba(56, 161, 105, 0.15);
+  color: #38a169;
+}
+
+.status-badge.orange {
+  background: rgba(221, 107, 32, 0.15);
+  color: #dd6b20;
+}
+
+.change-meta {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.85rem;
+}
+
+.party {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.region {
+  color: #718096;
+}
+
+.dark .region {
+  color: #a0aec0;
+}
+
+.change-map {
+  max-width: 100%;
+  border-radius: 8px;
+  margin-top: 8px;
+  margin-bottom: 8px;
+  display: block;
+}
+
+.change-description {
+  color: #4a5568;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.dark .change-description {
+  color: #cbd5e0;
+}
+
+.history-section {
+  background: white;
+  border-radius: 16px;
+  padding: 2rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.dark .history-section {
+  background: #2d3748;
+}
+
+.history-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.history-item {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.history-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.history-item h4 {
+  font-size: 1.1rem;
+  margin: 0 0 0.5rem 0;
+  color: #2d3748;
+}
+
+.dark .history-item h4 {
+  color: #e2e8f0;
+}
+
+.history-item p {
+  color: #718096;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.dark .history-item p {
+  color: #a0aec0;
+}
+
+.quote-box {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+  border-left: 4px solid #667eea;
+  padding: 1.5rem;
+  border-radius: 0 12px 12px 0;
+}
+
+.quote-box blockquote {
+  margin: 0 0 1rem 0;
+  font-style: italic;
+  color: #4a5568;
+  font-size: 1.1rem;
+  line-height: 1.6;
+}
+
+.dark .quote-box blockquote {
+  color: #cbd5e0;
+}
+
+.quote-box cite {
+  color: #718096;
+  font-size: 0.9rem;
+}
+
+.dark .quote-box cite {
+  color: #a0aec0;
+}
+
+.sources-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.source-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: white;
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  text-decoration: none;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+}
+
+.dark .source-card {
+  background: #2d3748;
+}
+
+.source-card:hover {
+  transform: translateX(4px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.source-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.source-content {
+  flex: 1;
+}
+
+.source-content h4 {
+  margin: 0 0 0.25rem 0;
+  color: #2d3748;
+  font-size: 1rem;
+}
+
+.dark .source-content h4 {
+  color: #e2e8f0;
+}
+
+.source-content p {
+  margin: 0;
+  color: #718096;
+  font-size: 0.9rem;
+}
+
+.dark .source-content p {
+  color: #a0aec0;
+}
+
+.external-icon {
+  color: #667eea;
+  font-size: 1.25rem;
+}
+
+.page-footer {
+  text-align: center;
+  padding: 2rem;
+  color: #718096;
+  font-size: 0.9rem;
+  border-top: 1px solid #e2e8f0;
+  margin-top: 40px;
+}
+
+.dark .page-footer {
+  color: #a0aec0;
+  border-top-color: #4a5568;
+}
+
+.cta-card {
+  text-decoration: none;
+  cursor: pointer;
+  border: 2px solid transparent;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.08) 100%) !important;
+}
+
+.cta-card:hover {
+  border-color: #667eea;
+}
+
+.dark .cta-card {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%) !important;
+}
+
+.cta-link {
+  display: inline-block;
+  margin-top: 0.75rem;
+  color: #667eea;
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.dark .cta-link {
+  color: #8b9cf7;
+}
+
+.tip-list {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0 0 0;
+}
+
+.tip-list li {
+  padding: 0.4rem 0;
+  padding-left: 1.5rem;
+  position: relative;
+  color: #718096;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.dark .tip-list li {
+  color: #a0aec0;
+}
+
+.tip-list li::before {
+  content: "•";
+  position: absolute;
+  left: 0.25rem;
+  color: #667eea;
+  font-weight: bold;
+}
+
+.section-subtitle {
+  color: #718096;
+  margin-bottom: 1.5rem;
+  font-size: 1rem;
+}
+
+.dark .section-subtitle {
+  color: #a0aec0;
+}
+
+.filter-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.filter-btn {
+  padding: 0.5rem 1rem;
+  border: 2px solid #e2e8f0;
+  background: white;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #4a5568;
+}
+
+.dark .filter-btn {
+  background: #2d3748;
+  border-color: #4a5568;
+  color: #cbd5e0;
+}
+
+.filter-btn:hover {
+  border-color: #667eea;
+}
+
+.filter-btn.active {
+  background: #667eea;
+  border-color: #667eea;
+  color: white;
+}
+
+.filter-btn.filter-labor.active {
+  background: #e53e3e;
+  border-color: #e53e3e;
+}
+
+.filter-btn.filter-lnp.active {
+  background: #3182ce;
+  border-color: #3182ce;
+}
+
+.filter-btn.filter-greens.active {
+  background: #38a169;
+  border-color: #38a169;
+}
+
+.filter-btn.filter-kap.active {
+  background: #d69e2e;
+  border-color: #d69e2e;
+}
+
+.filter-btn.filter-independent.active {
+  background: #718096;
+  border-color: #718096;
+}
+
+.filter-btn.filter-new.active {
+  background: #38a169;
+  border-color: #38a169;
+}
+
+.filter-btn.filter-abolished.active {
+  background: #e53e3e;
+  border-color: #e53e3e;
+}
+
+.electorates-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1rem;
+  max-height: 800px;
+  overflow-y: auto;
+  padding-right: 0.5rem;
+}
+
+.electorate-card {
+  background: white;
+  border-radius: 12px;
+  padding: 1rem;
+  border: 2px solid #e2e8f0;
+  transition: all 0.2s ease;
+}
+
+.dark .electorate-card {
+  background: #2d3748;
+  border-color: #4a5568;
+}
+
+.electorate-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Party colours */
+.electorate-card.party-labor {
+  background: linear-gradient(135deg, rgba(229, 62, 62, 0.08) 0%, rgba(197, 48, 48, 0.12) 100%);
+  border-color: rgba(229, 62, 62, 0.4);
+}
+
+.dark .electorate-card.party-labor {
+  background: linear-gradient(135deg, rgba(229, 62, 62, 0.15) 0%, rgba(197, 48, 48, 0.2) 100%);
+  border-color: rgba(229, 62, 62, 0.5);
+}
+
+.electorate-card.party-lnp {
+  background: linear-gradient(135deg, rgba(49, 130, 206, 0.08) 0%, rgba(43, 108, 176, 0.12) 100%);
+  border-color: rgba(49, 130, 206, 0.4);
+}
+
+.dark .electorate-card.party-lnp {
+  background: linear-gradient(135deg, rgba(49, 130, 206, 0.15) 0%, rgba(43, 108, 176, 0.2) 100%);
+  border-color: rgba(49, 130, 206, 0.5);
+}
+
+.electorate-card.party-greens {
+  background: linear-gradient(135deg, rgba(56, 161, 105, 0.08) 0%, rgba(47, 133, 90, 0.12) 100%);
+  border-color: rgba(56, 161, 105, 0.4);
+}
+
+.dark .electorate-card.party-greens {
+  background: linear-gradient(135deg, rgba(56, 161, 105, 0.15) 0%, rgba(47, 133, 90, 0.2) 100%);
+  border-color: rgba(56, 161, 105, 0.5);
+}
+
+.electorate-card.party-kap {
+  background: linear-gradient(135deg, rgba(214, 158, 46, 0.08) 0%, rgba(183, 129, 38, 0.12) 100%);
+  border-color: rgba(214, 158, 46, 0.4);
+}
+
+.dark .electorate-card.party-kap {
+  background: linear-gradient(135deg, rgba(214, 158, 46, 0.15) 0%, rgba(183, 129, 38, 0.2) 100%);
+  border-color: rgba(214, 158, 46, 0.5);
+}
+
+.electorate-card.party-independent {
+  background: linear-gradient(135deg, rgba(113, 128, 150, 0.08) 0%, rgba(74, 85, 104, 0.12) 100%);
+  border-color: rgba(113, 128, 150, 0.4);
+}
+
+.dark .electorate-card.party-independent {
+  background: linear-gradient(135deg, rgba(113, 128, 150, 0.15) 0%, rgba(74, 85, 104, 0.2) 100%);
+  border-color: rgba(113, 128, 150, 0.5);
+}
+
+.electorate-card.abolished-card {
+  opacity: 0.7;
+  border-style: dashed;
+}
+
+.electorate-card.new-card {
+  box-shadow: 0 0 0 1px rgba(56, 161, 105, 0.3), 0 0 20px rgba(56, 161, 105, 0.1);
+}
+
+.electorate-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.electorate-header h3 {
+  font-size: 1.1rem;
+  margin: 0;
+  color: #2d3748;
+  flex: 1;
+}
+
+.dark .electorate-header h3 {
+  color: #e2e8f0;
+}
+
+.former-name {
+  font-weight: 400;
+  font-size: 0.85rem;
+  color: #718096;
+}
+
+.dark .former-name {
+  color: #a0aec0;
+}
+
+.status-indicator {
+  font-size: 0.7rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.status-indicator.abolished {
+  background: rgba(229, 62, 62, 0.2);
+  color: #c53030;
+}
+
+.status-indicator.new {
+  background: rgba(56, 161, 105, 0.2);
+  color: #2f855a;
+}
+
+.party-badge {
+  display: inline-block;
+  font-size: 0.75rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 4px;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+}
+
+.party-badge.party-labor {
+  background: rgba(229, 62, 62, 0.15);
+  color: #c53030;
+}
+
+.dark .party-badge.party-labor {
+  background: rgba(229, 62, 62, 0.25);
+  color: #fc8181;
+}
+
+.party-badge.party-lnp {
+  background: rgba(49, 130, 206, 0.15);
+  color: #2b6cb0;
+}
+
+.dark .party-badge.party-lnp {
+  background: rgba(49, 130, 206, 0.25);
+  color: #63b3ed;
+}
+
+.party-badge.party-greens {
+  background: rgba(56, 161, 105, 0.15);
+  color: #2f855a;
+}
+
+.dark .party-badge.party-greens {
+  background: rgba(56, 161, 105, 0.25);
+  color: #68d391;
+}
+
+.party-badge.party-kap {
+  background: rgba(214, 158, 46, 0.15);
+  color: #b78126;
+}
+
+.dark .party-badge.party-kap {
+  background: rgba(214, 158, 46, 0.25);
+  color: #f6e05e;
+}
+
+.party-badge.party-independent {
+  background: rgba(113, 128, 150, 0.15);
+  color: #4a5568;
+}
+
+.dark .party-badge.party-independent {
+  background: rgba(113, 128, 150, 0.25);
+  color: #a0aec0;
+}
+
+.electorate-note {
+  font-size: 0.85rem;
+  color: #718096;
+  font-style: italic;
+  margin-bottom: 0.5rem;
+}
+
+.dark .electorate-note {
+  color: #a0aec0;
+}
+
+.changes-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.change-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.change-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #4a5568;
+}
+
+.dark .change-label {
+  color: #cbd5e0;
+}
+
+.suburbs-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.suburb-tag {
+  font-size: 0.75rem;
+  padding: 0.15rem 0.4rem;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+  color: #4a5568;
+}
+
+.dark .suburb-tag {
+  background: rgba(255, 255, 255, 0.08);
+  color: #cbd5e0;
+}
+
+.no-changes {
+  font-size: 0.85rem;
+  color: #718096;
+  font-style: italic;
+}
+
+.dark .no-changes {
+  color: #a0aec0;
+}
+
+.electorate-count {
+  text-align: center;
+  padding: 1rem;
+  color: #718096;
+  font-size: 0.9rem;
+  margin-top: 1rem;
+}
+
+.dark .electorate-count {
+  color: #a0aec0;
+}
+
+@media (max-width: 768px) {
+  .hero h1 {
+    font-size: 2rem;
+  }
+
+  .hero-subtitle {
+    font-size: 1rem;
+  }
+
+  .section h2 {
+    font-size: 1.4rem;
+  }
+
+  .changes-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .info-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .history-section {
+    padding: 1.5rem;
+  }
+}
+</style>

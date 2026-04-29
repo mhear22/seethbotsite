@@ -18,6 +18,10 @@ import {
 } from '../users';
 import { extractApiKey } from '../auth';
 import { requireAuth } from '../middleware/auth';
+import { sanitizeString, rateLimiter } from '../middleware';
+
+// Stricter rate limits for sensitive auth endpoints
+const authRateLimiter = rateLimiter(20, 15 * 60 * 1000); // 20 requests per 15 minutes
 
 const router = Router();
 
@@ -81,7 +85,7 @@ const router = Router();
  *       400:
  *         description: Bad request - invalid input or email already registered
  */
-router.post('/auth/register', async (req: Request, res: Response) => {
+router.post('/auth/register', authRateLimiter, async (req: Request, res: Response) => {
   try {
     const { email, password, displayName, deviceName, deviceType } = req.body;
 
@@ -165,7 +169,7 @@ router.post('/auth/register', async (req: Request, res: Response) => {
  *       401:
  *         description: Invalid credentials
  */
-router.post('/auth/login', async (req: Request, res: Response) => {
+router.post('/auth/login', authRateLimiter, async (req: Request, res: Response) => {
   try {
     const { email, password, deviceName, deviceType } = req.body;
 
@@ -608,8 +612,8 @@ router.delete('/auth/account', requireAuth, async (req: Request, res: Response) 
 router.patch('/auth/avatar', requireAuth, (req: Request, res: Response) => {
   try {
     const { avatarUrl } = req.body;
-
-    const user = updateUserField(req.user!.id, 'avatar_url', avatarUrl || null);
+    const sanitized = avatarUrl ? sanitizeString(avatarUrl, 500) : null;
+    const user = updateUserField(req.user!.id, 'avatar_url', sanitized);
     res.json({ success: true, user });
   } catch (error) {
     console.error('Error updating avatar:', error);
@@ -643,8 +647,8 @@ router.patch('/auth/avatar', requireAuth, (req: Request, res: Response) => {
 router.patch('/auth/banner', requireAuth, (req: Request, res: Response) => {
   try {
     const { bannerUrl } = req.body;
-
-    const user = updateUserField(req.user!.id, 'banner_url', bannerUrl || null);
+    const sanitized = bannerUrl ? sanitizeString(bannerUrl, 500) : null;
+    const user = updateUserField(req.user!.id, 'banner_url', sanitized);
     res.json({ success: true, user });
   } catch (error) {
     console.error('Error updating banner:', error);
@@ -679,8 +683,8 @@ router.patch('/auth/banner', requireAuth, (req: Request, res: Response) => {
 router.patch('/auth/bio', requireAuth, (req: Request, res: Response) => {
   try {
     const { bio } = req.body;
-
-    const user = updateUserField(req.user!.id, 'bio', bio || null);
+    const sanitized = bio ? sanitizeString(bio, 500) : null;
+    const user = updateUserField(req.user!.id, 'bio', sanitized);
     res.json({ success: true, user });
   } catch (error) {
     console.error('Error updating bio:', error);
@@ -715,8 +719,8 @@ router.patch('/auth/bio', requireAuth, (req: Request, res: Response) => {
 router.patch('/auth/status', requireAuth, (req: Request, res: Response) => {
   try {
     const { status } = req.body;
-
-    const user = updateUserField(req.user!.id, 'status', status || null);
+    const sanitized = status ? sanitizeString(status, 100) : null;
+    const user = updateUserField(req.user!.id, 'status', sanitized);
     res.json({ success: true, user });
   } catch (error) {
     console.error('Error updating status:', error);

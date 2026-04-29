@@ -4522,6 +4522,152 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/models/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get status of all AI models
+         * @description Returns the current status of all tracked AI models (GLM 5, GLM 4.7, etc.)
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Model status information */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            models?: {
+                                [key: string]: {
+                                    name?: string;
+                                    provider?: string;
+                                    /** @enum {string} */
+                                    status?: "operational" | "degraded" | "down" | "unknown";
+                                    /** Format: date-time */
+                                    lastChecked?: string;
+                                    /** @description Response time in milliseconds */
+                                    responseTime?: number;
+                                    errorCount?: number;
+                                    lastError?: string;
+                                };
+                            };
+                            /** Format: date-time */
+                            updatedAt?: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models/status/{modelId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get status of a specific AI model */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    modelId: "glm-5" | "glm-4.7";
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Model status information */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Model not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models/status/{modelId}/update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Update status of a specific AI model */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    modelId: "glm-5" | "glm-4.7";
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        status: "operational" | "degraded" | "down" | "unknown";
+                        /** @description Response time in milliseconds */
+                        responseTime?: number;
+                        /** @description Error message if status is degraded or down */
+                        error?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Model status updated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/movies": {
         parameters: {
             query?: never;
@@ -8026,414 +8172,6 @@ export interface paths {
         };
         trace?: never;
     };
-    "/api/tickets/tags": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get all tags used across tickets
-         * @description Returns a list of all unique tags used in tickets, sorted by usage count
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Tags retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            tags?: {
-                                /** @example ui */
-                                name?: string;
-                                /** @example 5 */
-                                count?: number;
-                            }[];
-                        };
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/tickets/categories": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get all categories used across tickets
-         * @description Returns a list of all unique categories used in tickets, sorted by usage count
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Categories retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            categories?: {
-                                /** @example ui */
-                                name?: string;
-                                /** @example 3 */
-                                count?: number;
-                            }[];
-                        };
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/tickets/next-task": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get next task and update last collection time
-         * @description Returns the next pending ticket to work on (excluding those collected in the last hour) and updates the last collection timestamp. Designed for heartbeat automation.
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Next task retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            ticket?: {
-                                id?: number;
-                                title?: string;
-                                description?: string;
-                                status?: string;
-                                ticketType?: string;
-                                priority?: string;
-                                created_at?: string;
-                                updated_at?: string;
-                            } | null;
-                            /** @example 2024-02-04T00:00:00.000Z */
-                            lastCollection?: string;
-                        };
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/tickets/{id}/appeal": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Appeal a ticket
-         * @description Submit an appeal for a ticket, explaining why it should be reopened. Useful for joke tickets that were mistakenly closed.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description The ID of ticket to appeal */
-                    id: number;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        /** @description The reason for appeal */
-                        reason: string;
-                        /** @description The user ID submitting appeal */
-                        creator_id: string;
-                    };
-                };
-            };
-            responses: {
-                /** @description Appeal submitted successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            message?: string;
-                            appeal?: Record<string, never>;
-                        };
-                    };
-                };
-                /** @description Bad request - missing required fields or invalid ticket status */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Ticket not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/tickets/appeals": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get all ticket appeals
-         * @description Returns all ticket appeals. No authentication required.
-         */
-        get: {
-            parameters: {
-                query?: {
-                    /** @description Filter appeals by status */
-                    status?: "all" | "pending" | "approved" | "rejected";
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Appeals retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            appeals?: Record<string, never>[];
-                        };
-                    };
-                };
-                /** @description Unauthorized - invalid API key */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/tickets/appeals/{id}/review": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /**
-         * Review a ticket appeal
-         * @description Approve or reject a ticket appeal. No authentication required.
-         */
-        patch: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description The appeal ID */
-                    id: number;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        /**
-                         * @description The appeal decision
-                         * @enum {string}
-                         */
-                        decision: "approved" | "rejected";
-                        /** @description The ID of admin reviewing appeal */
-                        reviewer_id: string;
-                        /** @description Optional response from reviewer */
-                        response?: string;
-                    };
-                };
-            };
-            responses: {
-                /** @description Appeal reviewed successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            message?: string;
-                            appeal?: Record<string, never>;
-                        };
-                    };
-                };
-                /** @description Appeal not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        trace?: never;
-    };
-    "/api/tickets/search": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Search tickets by term
-         * @description Search tickets by a search term that matches title or description. Supports optional filtering by status, type, priority, tag, and category.
-         */
-        get: {
-            parameters: {
-                query: {
-                    /** @description Search term to match in title or description */
-                    q: string;
-                    /** @description Filter by status */
-                    status?: "all" | "pending" | "needs-info" | "completed" | "declined";
-                    /** @description Filter by type */
-                    type?: "all" | "feature" | "bug" | "feedback";
-                    /** @description Filter by priority */
-                    priority?: "all" | "high" | "medium" | "low";
-                    /** @description Filter by tag */
-                    tag?: string;
-                    /** @description Filter by category */
-                    category?: string;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Search results retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            tickets?: {
-                                id?: number;
-                                title?: string;
-                                description?: string;
-                                status?: string;
-                                type?: string;
-                                priority?: string;
-                                created_at?: string;
-                                updated_at?: string;
-                            }[];
-                            /** @description The search term used */
-                            query?: string;
-                        };
-                    };
-                };
-                /** @description Bad request - missing search term */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/tickets/settings/ignore-mode": {
         parameters: {
             query?: never;
@@ -8508,6 +8246,58 @@ export interface paths {
                 };
             };
         };
+        trace?: never;
+    };
+    "/api/tickets/next-task": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get next task and update last collection time
+         * @description Returns the next pending ticket to work on (excluding those collected in the last hour) and updates the last collection timestamp. Designed for heartbeat automation.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Next task retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            ticket?: {
+                                id?: number;
+                                title?: string;
+                                description?: string;
+                                status?: string;
+                                ticketType?: string;
+                                priority?: string;
+                                created_at?: string;
+                                updated_at?: string;
+                            } | null;
+                            /** @example 2024-02-04T00:00:00.000Z */
+                            lastCollection?: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/tickets/settings/last-collection": {
@@ -8679,6 +8469,177 @@ export interface paths {
                             };
                         };
                     };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tickets/tags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get all tags used across tickets
+         * @description Returns a list of all unique tags used in tickets, sorted by usage count
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Tags retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            tags?: {
+                                /** @example ui */
+                                name?: string;
+                                /** @example 5 */
+                                count?: number;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tickets/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get all categories used across tickets
+         * @description Returns a list of all unique categories used in tickets, sorted by usage count
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Categories retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            categories?: {
+                                /** @example ui */
+                                name?: string;
+                                /** @example 3 */
+                                count?: number;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tickets/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search tickets by term
+         * @description Search tickets by a search term that matches title or description. Supports optional filtering by status, type, priority, tag, and category.
+         */
+        get: {
+            parameters: {
+                query: {
+                    /** @description Search term to match in title or description */
+                    q: string;
+                    /** @description Filter by status */
+                    status?: "all" | "pending" | "needs-info" | "completed" | "declined";
+                    /** @description Filter by type */
+                    type?: "all" | "feature" | "bug" | "feedback";
+                    /** @description Filter by priority */
+                    priority?: "all" | "high" | "medium" | "low";
+                    /** @description Filter by tag */
+                    tag?: string;
+                    /** @description Filter by category */
+                    category?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Search results retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            tickets?: {
+                                id?: number;
+                                title?: string;
+                                description?: string;
+                                status?: string;
+                                type?: string;
+                                priority?: string;
+                                created_at?: string;
+                                updated_at?: string;
+                            }[];
+                            /** @description The search term used */
+                            query?: string;
+                        };
+                    };
+                };
+                /** @description Bad request - missing search term */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
                 };
             };
         };

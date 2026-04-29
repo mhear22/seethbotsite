@@ -37,6 +37,7 @@ const moldGrowthRate = ref(parseFloat(localStorage.getItem('moldGrowthRate') || 
 const maxMoldCircles = ref(parseInt(localStorage.getItem('maxMoldCircles') || '27'))
 const moldSpawnRate = ref(parseInt(localStorage.getItem('moldSpawnRate') || '15'))
 const showMold = ref(localStorage.getItem('showMold') !== 'false')
+const swipeEnabled = ref(localStorage.getItem('swipeEnabled') === 'true')
 const settingsSaved = ref(false)
 
 // Persist heart settings to localStorage when store values change
@@ -56,7 +57,9 @@ const saveSettings = () => {
   localStorage.setItem('moldSpawnRate', moldSpawnRate.value.toString())
   localStorage.setItem('showMold', showMold.value.toString())
 
-  // Show saved confirmation
+  localStorage.setItem('swipeEnabled', swipeEnabled.value.toString())
+
+  settingsSaved.value = true
   settingsSaved.value = true
   setTimeout(() => {
     settingsSaved.value = false
@@ -72,6 +75,7 @@ const resetToDefaults = () => {
   maxMoldCircles.value = 27
   moldSpawnRate.value = 15
   showMold.value = true
+  swipeEnabled.value = true
   saveSettings()
 }
 </script>
@@ -286,6 +290,24 @@ const resetToDefaults = () => {
             />
             <span class="range-value">{{ moldSpawnRate }}s</span>
           </div>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h2 class="section-title">📱 Navigation</h2>
+
+        <div class="setting-item">
+          <label class="setting-label">
+            <span class="label-text">Swipe Navigation</span>
+            <span class="label-desc">Swipe left/right to navigate between pages on mobile</span>
+          </label>
+          <button
+            @click="swipeEnabled = !swipeEnabled; localStorage.setItem('swipeEnabled', swipeEnabled.toString())"
+            class="toggle-btn"
+            :class="{ active: swipeEnabled }"
+          >
+            {{ swipeEnabled ? '🟢 On' : '🔴 Off' }}
+          </button>
         </div>
       </div>
 

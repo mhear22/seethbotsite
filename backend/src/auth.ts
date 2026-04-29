@@ -16,8 +16,15 @@ const API_KEYS = process.env.SEETHBOT_API_KEYS
   ? process.env.SEETHBOT_API_KEYS.split(',').map(k => k.trim())
   : [];
 
-// JWT secret for token generation (optional)
-const JWT_SECRET: string = process.env.SEETHBOT_JWT_SECRET || 'change-this-in-production-secret-key';
+// JWT secret for token generation (REQUIRED - no fallback for security)
+// App will fail to start if SEETHBOT_JWT_SECRET is not set
+if (!process.env.SEETHBOT_JWT_SECRET) {
+  throw new Error(
+    'CRITICAL: SEETHBOT_JWT_SECRET environment variable must be set. ' +
+    'Generate a secure secret with: node -e "console.log(require(\'crypto\').randomBytes(64).toString(\'hex\'))"'
+  );
+}
+const JWT_SECRET: string = process.env.SEETHBOT_JWT_SECRET;
 
 // JWT expiry time
 const JWT_EXPIRY: string = process.env.SEETHBOT_JWT_EXPIRY || '24h';
@@ -60,8 +67,12 @@ export const initializeApiKeys = () => {
   });
 
   console.log(`[Auth] Initialized with ${registeredKeys.size} API keys`);
-  console.log(`[Auth] Default admin key: ${defaultAdminKey}`);
-  console.log('[Auth] WARNING: This is a default key. Set SEETHBOT_API_KEYS in production!');
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('[Auth] Default admin key generated. Check server logs or set SEETHBOT_API_KEYS.');
+    console.log('[Auth] WARNING: This is a default key. Set SEETHBOT_API_KEYS in production!');
+  } else {
+    console.log('[Auth] Running in production mode. Set SEETHBOT_API_KEYS env var for custom keys.');
+  }
 
   // Add any keys from environment
   for (const envKey of API_KEYS) {
