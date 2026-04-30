@@ -41,6 +41,7 @@ import profilesController from './controllers/profiles.controller';
 import favoritesController from './controllers/favorites.controller';
 import themesController from './controllers/themes.controller';
 import discordController from './controllers/discord.controller';
+import busTrackerController from './controllers/bus-tracker.controller';
 import dataCenterRunsController from './controllers/datacenter-runs.controller';
 import { setupWebSocketServer } from './controllers/presence.controller';
 import { multiplayerApiRouter, setupMechWebSockets } from './modules/mech';
@@ -153,6 +154,7 @@ app.use('/api/profiles', profilesController);
 app.use('/api/favorites', favoritesController);
 app.use('/api/themes', themesController);
 app.use('/api', discordController);
+app.use('/api', busTrackerController);
 app.use('/api', dataCenterRunsController);
 
 // Mech multiplayer API routes (canonical + legacy compatibility alias)
@@ -172,57 +174,29 @@ app.get('/api-docs', swaggerUi.setup(swaggerSpec, {
   //customSiteTitle: 'Seethbot API Docs'
 }));
 
-// Mech SPA fallback
-app.get('/mech', (req: Request, res: Response) => {
-  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
-  res.sendFile(path.join(MECH_SERVE_ROOT, 'index.html'));
-});
+// SPA fallback helper
+function spaFallback(basePath: string, serveRoot: string) {
+  const noCacheHeaders = {
+    'Cache-Control': 'no-cache, no-store, must-revalidate',
+    'Pragma': 'no-cache',
+    'Expires': '0'
+  };
+  const handler = (_req: Request, res: Response) => {
+    res.set(noCacheHeaders);
+    res.sendFile(path.join(serveRoot, 'index.html'));
+  };
+  app.get(basePath, handler);
+  app.get(basePath + '/*', handler);
+}
 
-app.get('/mech/*', (req: Request, res: Response) => {
-  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
-  res.sendFile(path.join(MECH_SERVE_ROOT, 'index.html'));
-});
-
-// Tickets SPA fallback
-app.get('/tickets', (req: Request, res: Response) => {
-  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
-  res.sendFile(path.join(TICKETS_SERVE_ROOT, 'index.html'));
-});
-
-app.get('/tickets/*', (req: Request, res: Response) => {
-  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
-  res.sendFile(path.join(TICKETS_SERVE_ROOT, 'index.html'));
-});
-
-// Data Center SPA fallback
-app.get('/datacenter', (req: Request, res: Response) => {
-  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
-  res.sendFile(path.join(DATACENTER_SERVE_ROOT, 'index.html'));
-});
-
-app.get('/datacenter/*', (req: Request, res: Response) => {
-  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
-  res.sendFile(path.join(DATACENTER_SERVE_ROOT, 'index.html'));
-});
+// Sub-app SPA fallbacks
+spaFallback('/mech', MECH_SERVE_ROOT);
+spaFallback('/tickets', TICKETS_SERVE_ROOT);
+spaFallback('/datacenter', DATACENTER_SERVE_ROOT);
 
 // Vue.js SPA fallback - all other routes serve index.html
-app.get('*', (req: Request, res: Response) => {
-  // Ensure index.html is never cached
-  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
+app.get('*', (_req: Request, res: Response) => {
+  res.set({ 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache', 'Expires': '0' });
   res.sendFile(path.join(SERVE_ROOT, 'index.html'));
 });
 

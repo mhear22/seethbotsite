@@ -204,6 +204,18 @@ export const routes: RouteRecordRaw[] = [
     path: '/qld-redistribution',
     name: 'qld-redistribution',
     component: () => import('../components/pages/QldRedistributionPage.vue')
+  },
+  {
+    path: '/bus-tracker',
+    name: 'bus-tracker',
+    component: () => import('../components/pages/BusTrackerPage.vue'),
+    meta: { public: true }
+  },
+  {
+    path: '/:pathMatch(.*)*',
+    name: 'not-found',
+    component: () => import('../components/pages/NotFoundPage.vue'),
+    meta: { public: true }
   }
 ]
 

@@ -35,9 +35,23 @@ let heartSpawnTimeout: ReturnType<typeof setTimeout> | null = null
 let rankingsInterval: ReturnType<typeof setInterval> | null = null
 
 const handleVisibilityChange = () => {
-  if (!document.hidden && authStore.token) {
-    console.log('[Auth] Page became visible, re-validating token...')
-    authStore.validateToken()
+  if (document.hidden) {
+    // Pause rankings polling when tab is hidden
+    if (rankingsInterval) {
+      clearInterval(rankingsInterval)
+      rankingsInterval = null
+    }
+  } else {
+    // Resume rankings polling and refresh immediately
+    if (!rankingsInterval) {
+      appStore.loadRankings()
+      const rankingsRefreshRate = appStore.performanceMode ? 60000 : 30000
+      rankingsInterval = setInterval(appStore.loadRankings, rankingsRefreshRate)
+    }
+    if (authStore.token) {
+      console.log('[Auth] Page became visible, re-validating token...')
+      authStore.validateToken()
+    }
   }
 }
 

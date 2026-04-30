@@ -54,6 +54,7 @@ const dropdowns = ref<DropdownData[]>([
       { title: 'Cats', icon: '🐱', path: '/cats' },
       { title: 'Keanu', icon: '🥋', path: '/keanu' },
       { title: 'Orbital Mechanics', icon: '🌌', path: '/orbital' },
+      { title: 'Bus Tracker', icon: '🚌', path: '/bus-tracker' },
       ...mechNavRoutes,
       ...dataCenterNavRoutes,
       { title: 'Stock Market', icon: '📈', path: '/stocks' },

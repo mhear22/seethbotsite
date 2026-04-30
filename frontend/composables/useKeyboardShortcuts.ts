@@ -83,12 +83,16 @@ export function useKeyboardShortcuts() {
 
     for (const shortcut of shortcuts.value) {
       const keyMatches = event.key.toLowerCase() === shortcut.key.toLowerCase()
-      const ctrlMatches = !!shortcut.ctrl === event.ctrlKey
+      // ctrl and meta are treated as OR (either works) rather than AND
+      const ctrlMetaMatches = !shortcut.ctrl && !shortcut.meta
+        ? !event.ctrlKey && !event.metaKey // no modifier required
+        : (shortcut.ctrl || shortcut.meta)
+          ? (event.ctrlKey || event.metaKey) // at least one pressed
+          : true
       const shiftMatches = !!shortcut.shift === event.shiftKey
       const altMatches = !!shortcut.alt === event.altKey
-      const metaMatches = !!shortcut.meta === event.metaKey
 
-      if (keyMatches && ctrlMatches && shiftMatches && altMatches && metaMatches) {
+      if (keyMatches && ctrlMetaMatches && shiftMatches && altMatches) {
         event.preventDefault()
         shortcut.action()
         break
