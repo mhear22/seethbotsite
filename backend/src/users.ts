@@ -2,7 +2,10 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { prisma } from './lib/prisma';
 
-const JWT_SECRET = process.env.SEETHBOT_JWT_SECRET || 'change-this-in-production-secret-key';
+if (!process.env.SEETHBOT_JWT_SECRET) {
+  throw new Error('CRITICAL: SEETHBOT_JWT_SECRET environment variable must be set. Refusing to start with insecure default.');
+}
+const JWT_SECRET: string = process.env.SEETHBOT_JWT_SECRET;
 const JWT_EXPIRY = process.env.SEETHBOT_JWT_EXPIRY || '30d';
 
 /**

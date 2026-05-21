@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
+import { requireApiKey } from '../auth';
 import {
   getIgnoreMode,
   setIgnoreMode
@@ -332,7 +333,7 @@ router.get('/tickets', async (req: Request, res: Response) => {
  *     summary: Create a new ticket
  *     description: Creates a new ticket with title and description. Optionally includes type, priority, tags, category, and creator_id for ticket ownership tracking.
  */
-router.post('/tickets', async (req: Request, res: Response) => {
+router.post('/tickets', requireApiKey(), async (req: Request, res: Response) => {
   try {
     const data: CreateTicketDTO = req.body;
 
@@ -353,7 +354,7 @@ router.post('/tickets', async (req: Request, res: Response) => {
  *     summary: Update a ticket
  *     description: Update ticket fields including status, response, title, description, tags, and category. No authentication required.
  */
-router.patch('/tickets/:id', async (req: Request, res: Response) => {
+router.patch('/tickets/:id', requireApiKey(), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const data: UpdateTicketDTO = req.body;
@@ -413,7 +414,7 @@ router.patch('/tickets/:id', async (req: Request, res: Response) => {
  *       404:
  *         description: Ticket not found
  */
-router.delete('/tickets/:id', async (req: Request, res: Response) => {
+router.delete('/tickets/:id', requireApiKey(), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 

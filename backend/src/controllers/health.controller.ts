@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import * as fs from 'fs';
 import * as path from 'path';
+import { requireApiKey } from '../auth';
 
 const router = Router();
 // In production: __dirname is /app/backend/dist/controllers, data is at /app/backend/data
@@ -92,7 +93,7 @@ router.get('/health', (req: Request, res: Response) => {
  *                   type: string
  *                   format: date-time
  */
-router.post('/health/check', (req: Request, res: Response) => {
+router.post('/health/check', requireApiKey(), (req: Request, res: Response) => {
   try {
     const now = new Date();
     const healthState = {

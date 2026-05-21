@@ -279,6 +279,8 @@ export const securityHeaders = (req: Request, res: Response, next: NextFunction)
   res.set('Referrer-Policy', 'strict-origin-when-cross-origin');
 
   // Content Security Policy
+  // Note: 'unsafe-eval' is required by Vue 3's template compiler in development/non-optimized builds.
+  // For production, consider nonce-based CSP with pre-compiled templates to remove this directive.
   res.set('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' wss: https:;");
 
   // HSTS (only in production with HTTPS)

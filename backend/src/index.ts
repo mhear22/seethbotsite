@@ -48,7 +48,7 @@ import { multiplayerApiRouter, setupMechWebSockets } from './modules/mech';
 import { createServer } from 'http';
 
 const app: Express = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3000;
 // In production Docker: __dirname is /app/backend/dist, webdist is at /app/backend/webdist
 // In development: __dirname is /backend/src, webdist is at /backend/webdist
 const SERVE_ROOT = process.env.SERVE_ROOT || path.join(__dirname, '..', 'webdist');
@@ -227,6 +227,7 @@ setupMechWebSockets(server);
 
 // Note: Prisma client is initialized automatically, no need for separate DB initialization
 
+server.setTimeout(30000);
 server.listen(PORT, () => {
   console.log(`🌸 Server running on http://localhost:${PORT}`);
   console.log(`📁 Serving static files from: ${SERVE_ROOT}`);
