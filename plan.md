@@ -50,8 +50,10 @@
 - [x] Fixed test runner (pnpm install resolves npm scoped package bug)
 - [x] NotFoundPage tests written and passing (8 tests)
 - [x] QldRedistributionPage components extracted and tested (37 tests)
-- [ ] Next: Write tests for remaining 44 pages
-- [ ] Next: Refactor more large files
+- [x] GenderPage, CatsPage, MusicPage tests (23 tests)
+- [x] ClocksPage, KeanuPage, OpinionPage, MoldPage, WordCloudPage tests (25 tests)
+- [ ] Next: Write tests for remaining ~37 pages
+- [ ] Next: Refactor more large files (OrbitalMechanicsPage, MechBattlePage, etc.)
 
 ## Run Log
 | Time | What Was Done | Status |
@@ -62,3 +64,5 @@
 | 2026-06-10 16:20 | NotFoundPage.test.ts fixed (wrapper.find instead of document.body.querySelector) — 8/8 passing | ✅ |
 | 2026-06-10 16:22 | Extracted 5 components from QldRedistributionPage.vue (HeroSection, InfoCardsSection, MapModal, MapExpandedModal, BoothModal). File reduced from 3353→3205 lines. | ✅ |
 | 2026-06-10 16:22 | Wrote 37 tests for extracted QldRedistributionPage components — all passing | ✅ |
+| 2026-06-10 16:24 | GenderPage, CatsPage, MusicPage tests — 23 tests passing | ✅ |
+| 2026-06-10 16:27 | ClocksPage, KeanuPage, OpinionPage, MoldPage, WordCloudPage tests — 25 tests passing | ✅ |
