@@ -10,6 +10,7 @@
 - **Backend:** Express + TypeScript + SQLite/PostgreSQL
 - **Test framework:** Vitest (frontend), existing tests in `frontend/tests/`
 - **Test locations:** `frontend/tests/components/`, `frontend/tests/composables/`, `frontend/tests/repositories/`
+- **Package manager:** pnpm (npm has a scoped-package installation bug on this host — use `pnpm install` and `pnpm exec vitest`)
 
 ## Pages Missing Frontend Tests (46 components)
 - AboutPage, Achievements, AnalyticsPage, ApiDocsPage, ArchiveHistoryPage, AuthPage
@@ -23,23 +24,7 @@
 
 ## Large Files to Refactor (>500 lines)
 - `frontend/src/types/openapi.ts` — 8913 lines (auto-generated, skip)
-- `frontend/components/pages/QldRedistributionPage.vue` — 3353 lines
-- `frontend/components/pages/OrbitalMechanicsPage.vue` — 1561 lines
-- `frontend/components/pages/MechBattlePage.vue` — 1542 lines
-- `frontend/components/pages/ShopPage.vue` — 1187 lines
-- `frontend/components/pages/CharacterTinderPage.vue` — 996 lines
-- `frontend/components/pages/TicketsPage.vue` — 992 lines
-- `frontend/components/pages/HomeLoanPage.vue` — 988 lines
-- `frontend/components/pages/ClickerPage.vue` — 938 lines
-- `frontend/components/pages/SolarPanelPage.vue` — 912 lines
-- `frontend/components/pages/ArchiveHistoryPage.vue` — 862 lines
-- `frontend/components/pages/VibeCodingPage.vue` — 860 lines
-- `frontend/components/pages/MechBuilderPage.vue` — 800 lines
-
-## Blockers
-- **Vitest dependency issue**: Cannot run tests due to missing vitest binary and module resolution errors. Need to resolve package installation issues before running tests.
-- `frontend/src/types/openapi.ts` — 8913 lines (auto-generated, skip)
-- `frontend/components/pages/QldRedistributionPage.vue` — 3353 lines
+- `frontend/components/pages/QldRedistributionPage.vue` — 3353→3205 lines
 - `frontend/components/pages/OrbitalMechanicsPage.vue` — 1561 lines
 - `frontend/components/pages/MechBattlePage.vue` — 1542 lines
 - `frontend/components/pages/ShopPage.vue` — 1187 lines
@@ -62,10 +47,18 @@
 
 ## Current Progress
 - [x] Started
-- [x] First task picked up
+- [x] Fixed test runner (pnpm install resolves npm scoped package bug)
+- [x] NotFoundPage tests written and passing (8 tests)
+- [x] QldRedistributionPage components extracted and tested (37 tests)
+- [ ] Next: Write tests for remaining 44 pages
+- [ ] Next: Refactor more large files
 
 ## Run Log
 | Time | What Was Done | Status |
 |------|---------------|--------|
 | 2026-06-10 16:00 | Initial plan created | ✅ |
 | 2026-06-10 16:00 | Added NotFoundPage.test.ts (blocked - vitest dependency issue) | 🛑 |
+| 2026-06-10 16:20 | Fixed vitest: npm has scoped-package install bug on this host. Switched to pnpm. | ✅ |
+| 2026-06-10 16:20 | NotFoundPage.test.ts fixed (wrapper.find instead of document.body.querySelector) — 8/8 passing | ✅ |
+| 2026-06-10 16:22 | Extracted 5 components from QldRedistributionPage.vue (HeroSection, InfoCardsSection, MapModal, MapExpandedModal, BoothModal). File reduced from 3353→3205 lines. | ✅ |
+| 2026-06-10 16:22 | Wrote 37 tests for extracted QldRedistributionPage components — all passing | ✅ |

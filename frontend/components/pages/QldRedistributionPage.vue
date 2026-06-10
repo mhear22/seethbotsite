@@ -3,11 +3,16 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useAppStore } from '../../stores/useAppStore'
 import * as L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { 
+import {
   BarChart3, Scale, Home, Landmark, Ruler, Link as LinkIcon, ExternalLink, Map as MapIcon, Info, Calendar,
   Users, AlertTriangle, Sparkles, XCircle, PlusCircle, Clock, User, Wrench, ThumbsUp, Lightbulb, PenLine, 
   Quote, PersonStanding, Vote, Gavel, MessageCircleWarning, FileWarning, MapPin
 } from 'lucide-vue-next'
+import HeroSection from './QldRedistributionPage/HeroSection.vue'
+import InfoCardsSection from './QldRedistributionPage/InfoCardsSection.vue'
+import MapModal from './QldRedistributionPage/MapModal.vue'
+import MapExpandedModal from './QldRedistributionPage/MapExpandedModal.vue'
+import BoothModal from './QldRedistributionPage/BoothModal.vue'
 
 const store = useAppStore()
 
@@ -812,37 +817,13 @@ const sources = [
 
 <template>
   <div class="qld-page" :class="{ dark: store.darkMode }">
-    <section class="hero">
-      <h1>Queensland Electoral Redistribution 2026</h1>
-      <p class="hero-subtitle">The first comprehensive boundary review since 2017 raises questions about fairness and representation</p>
-    </section>
-
-    <section class="section">
-      <h2>How It Works</h2>
-      <div class="info-cards">
-        <div class="info-card">
-          <Scale :size="32" class="info-icon-svg" />
-          <h3>Independent Commission</h3>
-          <p>The Queensland Redistribution Commission reviews electoral boundaries for fair representation. Its independence has been questioned after the Crisafulli Government appointed former LNP director-general John Sosso as Electoral Commissioner.</p>
-          <a href="#sosso-section" class="read-more-link">Read more about the Sosso appointment controversy →</a>
-        </div>
-        <div class="info-card">
-          <Calendar :size="32" class="info-icon-svg" />
-          <h3>First Review Since 2017</h3>
-          <p>This is the first comprehensive redistribution in nearly a decade, reflecting significant demographic changes across Queensland.</p>
-        </div>
-        <div class="info-card">
-          <BarChart3 :size="32" class="info-icon-svg" />
-          <h3>Seat Count: 93</h3>
-          <p>Queensland maintains 93 seats, but boundaries have shifted significantly to reflect population movements from rural areas to the south-east.</p>
-        </div>
-        <div class="info-card">
-          <MessageCircleWarning :size="32" class="info-icon-svg" />
-          <h3>Public Consultation</h3>
-          <p>The public consultation period is open for objections. Queenslanders can submit feedback on proposed boundary changes.</p>
-        </div>
-      </div>
-    </section>
+    <!-- Hero Section -->
+    <HeroSection />
+    
+    <!-- Info Cards Section -->
+    <InfoCardsSection />
+    
+    <!-- Rest of the page content will go here -->
 
     <section class="section">
       <h2>Controversial Changes</h2>
@@ -871,45 +852,19 @@ const sources = [
       </div>
 
       <!-- Map Modal -->
-      <Teleport to="body">
-        <div v-if="selectedMap" class="map-modal-overlay" :class="{ 'dark-overlay': store.darkMode }" @click="selectedMap = null">
-          <div class="map-modal" :class="{ 'map-modal-dark': store.darkMode }" @click.stop>
-            <div class="map-modal-header" :class="{ 'map-modal-header-dark': store.darkMode }">
-              <h3 :class="{ 'map-modal-title-dark': store.darkMode }">{{ selectedMap.name }} — Proposed Boundaries</h3>
-              <button class="map-modal-close" :class="{ 'map-modal-close-dark': store.darkMode }" @click="selectedMap = null">✕</button>
-            </div>
-            <img 
-              :src="selectedMap.image" 
-              :alt="selectedMap.name + ' map'"
-              class="map-modal-image"
-              @click="mapExpanded = true"
-              style="cursor: zoom-in;"
-            />
-            <div class="map-modal-footer" :class="{ 'map-modal-footer-dark': store.darkMode }">
-              <span class="status-badge" :class="selectedMap.color">{{ getStatusLabel(selectedMap.status) }}</span>
-              <span class="party">{{ selectedMap.party }}</span>
-              <span class="region"><MapPin :size="14" style="display: inline;" /> {{ selectedMap.region }}</span>
-            </div>
-          </div>
-        </div>
-      </Teleport>
+      <MapModal 
+        :map-data="selectedMap" 
+        :dark-mode="store.darkMode"
+        @close="selectedMap = null"
+        @expand="mapExpanded = true"
+      />
 
       <!-- Expanded Map View -->
-      <Teleport to="body">
-        <div v-if="mapExpanded && selectedMap" class="map-expanded-overlay" @click="(mapExpanded = false), (selectedMap = null)">
-          <div class="map-expanded-container" @click.stop>
-            <button class="map-expanded-close" @click="(mapExpanded = false), (selectedMap = null)">✕</button>
-            <img 
-              :src="selectedMap.image" 
-              :alt="selectedMap.name + ' map'"
-              class="map-expanded-image"
-              :class="{ 'map-zoomed': mapZoomed }"
-              @click="mapZoomed = !mapZoomed"
-              style="cursor: zoom-in;"
-            />
-          </div>
-        </div>
-      </Teleport>
+      <MapExpandedModal
+        :visible="mapExpanded"
+        :map-data="selectedMap"
+        @close="mapExpanded = false; selectedMap = null"
+      />
     </section>
 
     <section class="section">
@@ -1273,75 +1228,11 @@ const sources = [
     </section>
 
     <!-- Booth Results Modal -->
-    <Teleport to="body">
-      <div v-if="selectedElectorate" class="booth-modal-overlay" @click="selectedElectorate = null">
-        <div class="booth-modal" @click.stop>
-          <div class="booth-modal-header">
-            <div>
-              <h3>{{ selectedElectorate.name }}</h3>
-              <span v-if="selectedElectorate.formerName" class="former-name-modal">(formerly {{ selectedElectorate.formerName }})</span>
-            </div>
-            <button class="booth-modal-close" @click="selectedElectorate = null">✕</button>
-          </div>
-          <div class="booth-modal-subtitle">2024 Election - Booth Results</div>
-          
-          <div v-if="boothLoading" class="booth-loading">
-            <div class="booth-spinner"></div>
-            Loading booth data...
-          </div>
-          
-          <div v-else-if="!selectedElectorate.booths?.length" class="booth-empty">
-            No booth data available for this electorate.
-          </div>
-          
-          <div v-else class="booth-grid">
-            <div 
-              v-for="(booth, idx) in selectedElectorate.booths" 
-              :key="idx"
-              class="booth-card"
-            >
-              <div class="donut-container">
-                <svg viewBox="0 0 100 100" class="donut-chart">
-                  <circle cx="50" cy="50" r="40" fill="none" stroke="#e2e8f0" class="donut-bg-circle" stroke-width="20" />
-                  <circle
-                    v-for="(seg, i) in getDonutSegments(booth.p)"
-                    :key="i"
-                    cx="50"
-                    cy="50"
-                    r="40"
-                    fill="none"
-                    :stroke="seg.color"
-                    stroke-width="20"
-                    :stroke-dasharray="seg.dash"
-                    :stroke-dashoffset="seg.dashOffset"
-                    class="donut-segment"
-                  />
-                </svg>
-                <div class="donut-center">
-                  <span class="donut-votes">{{ booth.v.toLocaleString() }}</span>
-                  <span class="donut-label">votes</span>
-                </div>
-              </div>
-              <div class="booth-info">
-                <span class="booth-name">{{ booth.n }}</span>
-                <span class="booth-type">{{ booth.t === 'EV' ? 'Early Voting' : 'Polling Booth' }}</span>
-              </div>
-              <div class="booth-legend">
-                <div 
-                  v-for="(seg, i) in getDonutSegments(booth.p)" 
-                  :key="i"
-                  class="legend-item"
-                >
-                  <span class="legend-color" :style="{ background: seg.color }"></span>
-                  <span class="legend-party">{{ seg.party }}</span>
-                  <span class="legend-pct">{{ booth.p[seg.party].toFixed(1) }}%</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </Teleport>
+    <BoothModal
+      :electorate="selectedElectorate"
+      :loading="boothLoading"
+      @close="selectedElectorate = null"
+    />
 
     <footer class="page-footer">
       <p>Data sourced from ECQ and ABC News | Analysis current as of March 2026</p>
@@ -1499,45 +1390,6 @@ const sources = [
   display: inline;
   font-style: italic;
   font-size: 0.875rem;
-}
-
-/* ============================================
-   HERO
-   ============================================ */
-
-.hero {
-  text-align: center;
-  padding: 48px 20px 40px;
-  margin-bottom: 48px;
-  border-bottom: 1px solid #e2e8f0;
-}
-.qld-page.dark .hero {
-  border-bottom-color: #2f3336;
-}
-
-.hero h1 {
-  font-size: 2.5rem;
-  font-weight: 800;
-  margin: 0 auto 12px;
-  line-height: 1.15;
-  letter-spacing: -0.02em;
-  max-width: 800px;
-  color: #8B1A1A;
-}
-
-.qld-page.dark .hero h1 {
-  color: #d4565a;
-}
-
-.hero-subtitle {
-  font-size: 1.125rem;
-  color: #536471;
-  max-width: 640px;
-  margin: 0 auto;
-  line-height: 1.6;
-}
-.qld-page.dark .hero-subtitle {
-  color: #8b98a5;
 }
 
 /* ============================================
