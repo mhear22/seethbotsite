@@ -43,6 +43,7 @@ import themesController from './controllers/themes.controller';
 import discordController from './controllers/discord.controller';
 import busTrackerController from './controllers/bus-tracker.controller';
 import dataCenterRunsController from './controllers/datacenter-runs.controller';
+import videosController from './controllers/videos.controller';
 import { setupWebSocketServer } from './controllers/presence.controller';
 import { multiplayerApiRouter, setupMechWebSockets } from './modules/mech';
 import { createServer } from 'http';
@@ -156,6 +157,7 @@ app.use('/api/themes', themesController);
 app.use('/api', discordController);
 app.use('/api', busTrackerController);
 app.use('/api', dataCenterRunsController);
+app.use('/api', videosController);
 
 // Mech multiplayer API routes (canonical + legacy compatibility alias)
 app.use('/api/mech/multiplayer', multiplayerApiRouter);

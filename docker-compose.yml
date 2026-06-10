@@ -25,6 +25,7 @@ services:
       GIT_BRANCH: ${GIT_BRANCH:-unknown}
     volumes:
       - seethbot-data:/app/backend/data
+      - /root/clawd/media/important-videos:/app/videos:ro
     depends_on:
       postgres:
         condition: service_healthy

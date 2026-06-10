@@ -212,6 +212,12 @@ export const routes: RouteRecordRaw[] = [
     meta: { public: true }
   },
   {
+    path: '/videos',
+    name: 'videos',
+    component: () => import('../components/pages/VideosPage.vue'),
+    meta: { public: true }
+  },
+  {
     path: '/:pathMatch(.*)*',
     name: 'not-found',
     component: () => import('../components/pages/NotFoundPage.vue'),
