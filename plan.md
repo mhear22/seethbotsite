@@ -52,7 +52,8 @@
 - [x] QldRedistributionPage components extracted and tested (37 tests)
 - [x] GenderPage, CatsPage, MusicPage tests (23 tests)
 - [x] ClocksPage, KeanuPage, OpinionPage, MoldPage, WordCloudPage tests (25 tests)
-- [ ] Next: Write tests for remaining ~37 pages
+- [x] AboutPage tests written and passing (10 tests)
+- [ ] Next: Write tests for remaining ~36 pages
 - [ ] Next: Refactor more large files (OrbitalMechanicsPage, MechBattlePage, etc.)
 
 ## Run Log
@@ -66,3 +67,4 @@
 | 2026-06-10 16:22 | Wrote 37 tests for extracted QldRedistributionPage components — all passing | ✅ |
 | 2026-06-10 16:24 | GenderPage, CatsPage, MusicPage tests — 23 tests passing | ✅ |
 | 2026-06-10 16:27 | ClocksPage, KeanuPage, OpinionPage, MoldPage, WordCloudPage tests — 25 tests passing | ✅ |
+| 2026-06-10 16:54 | AboutPage tests — 10/10 passing | ✅ |
