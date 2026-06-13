@@ -54,6 +54,13 @@
             <p>Team up online vs escalating AI waves</p>
             <span class="coming-soon-badge coop-badge">Co-op</span>
           </button>
+
+          <button @click="selectStoryMode" class="mode-btn story-btn">
+            <div class="mode-icon">🏘️</div>
+            <h3>Story Mode</h3>
+            <p>Roam an open world, help (or wreck) towns, build your mech</p>
+            <span class="coming-soon-badge story-badge">Campaign</span>
+          </button>
         </div>
 
         <div class="button-group">
@@ -682,6 +689,12 @@ function selectSurvival() {
   battleMode.value = 'single-player'
   selectedGameMode.value = 'survival'
   battle.battleState.value.phase = 'map-select'
+}
+
+// Story Mode is a separate single-player campaign route; it ignores the builder
+// loadout (starts from a Starter mech) and manages its own state.
+function selectStoryMode() {
+  router.push({ name: 'mech-story' })
 }
 
 function selectMap(mapId: string) {
@@ -1418,6 +1431,14 @@ function returnToBuilder() {
 
 .coop-badge {
   background: linear-gradient(135deg, #0891b2, #0e7490);
+}
+
+.story-badge {
+  background: linear-gradient(135deg, #16a34a, #15803d);
+}
+
+.story-btn:hover {
+  border-color: rgba(34, 197, 94, 0.6);
 }
 
 .best-wave-badge {
