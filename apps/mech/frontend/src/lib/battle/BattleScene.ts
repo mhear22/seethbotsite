@@ -11,13 +11,14 @@ import { applyWindowShaders, updateWindowShaders } from './WindowShader'
 import { createDamageShaderPass, decayDamageIntensity } from './DamageShader'
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
 import type { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js'
 import { markRaw } from 'vue'
 import { useAudio } from '../../composables/useAudio'
 import { getMapById } from '@shared/maps'
 import type { MapDefinition } from '@shared/types/MapDefinition'
-import type { GraphicsSettings } from '../../composables/useGameSettings'
+import type { GraphicsSettings, AIDifficulty } from '../../composables/useGameSettings'
 
 export interface BattleSceneConfig {
   canvas: HTMLCanvasElement
@@ -25,12 +26,18 @@ export interface BattleSceneConfig {
   enemyMech: MechEntity
   onBattleEnd: (result: 'victory' | 'defeat') => void
   onDamageDealt: (amount: number) => void
+  /** Fired when the PLAYER lands a shot on the enemy (single-player only). */
+  onPlayerHitConfirm?: (info: { kill: boolean; crit: boolean }) => void
+  /** Fired with screen-space position + amount for floating damage numbers (single-player only). */
+  onPlayerDamageNumber?: (info: { amount: number; crit: boolean; screenX: number; screenY: number }) => void
   mouseSensitivity?: number
   movementSpeed?: number
   invertMouseX?: boolean
   invertMouseY?: boolean
   mapId?: string
   graphics?: GraphicsSettings
+  /** AI behaviour tier (single-player only). Defaults to 'medium'. */
+  aiDifficulty?: AIDifficulty
   keyBindings?: {
     forward: string
     backward: string
@@ -78,7 +85,14 @@ export class BattleScene {
   // Post-processing
   private composer: EffectComposer | null = null
   private damagePass: ShaderPass | null = null
+  private bloomPass: UnrealBloomPass | null = null
   private damageIntensity: number = 0
+
+  // Graphics settings (kept for resize/bloom decisions)
+  private graphics?: GraphicsSettings
+
+  // Hitstop: when > 0, dt is scaled toward zero for a brief impact freeze.
+  private hitstopTimer: number = 0
 
   protected targetingState: TargetingState = {
     isTargeted: false,
@@ -92,6 +106,7 @@ export class BattleScene {
   private lastTime: number = 0
   private battleTime: number = 0
   private handleResizeBound: () => void
+  private handleVisibilityBound: () => void
 
   // FPS tracking
   private fpsFrameTimes: number[] = []
@@ -101,6 +116,8 @@ export class BattleScene {
   protected _shadowMapSize: number = 1024
   protected onBattleEnd: (result: 'victory' | 'defeat') => void
   private onDamageDealt: (amount: number) => void
+  private onPlayerHitConfirm?: (info: { kill: boolean; crit: boolean }) => void
+  private onPlayerDamageNumber?: (info: { amount: number; crit: boolean; screenX: number; screenY: number }) => void
 
   // Dual weapon cooldowns
   private lastLeftArmShot: number = 0
@@ -116,6 +133,9 @@ export class BattleScene {
     this.enemyMech = config.enemyMech
     this.onBattleEnd = config.onBattleEnd
     this.onDamageDealt = config.onDamageDealt
+    this.onPlayerHitConfirm = config.onPlayerHitConfirm
+    this.onPlayerDamageNumber = config.onPlayerDamageNumber
+    this.graphics = config.graphics
 
     // Initialize Three.js scene
     this.scene = markRaw(new THREE.Scene())
@@ -152,8 +172,14 @@ export class BattleScene {
     this.physicsSystem = new PhysicsSystem()
     this.projectileSystem = new ProjectileSystem(this.scene)
     this.particleSystem = new ParticleSystem(this.scene)
+    // Wire missile smoke trails to a tiny grey rising spark puff. Safe no-op if
+    // never called; ParticleSystem has no dedicated smoke helper so we reuse the
+    // low-intensity impact spark with an upward bias.
+    this.projectileSystem.onMissileSmoke = (p: THREE.Vector3) => {
+      this.particleSystem.spawnImpactSparks(p, new THREE.Vector3(0, 1, 0), 'floor')
+    }
     this.camera = new CameraController(this.playerMech)
-    this.enemyAI = new EnemyAI()
+    this.enemyAI = new EnemyAI(config.aiDifficulty ?? 'medium')
     this.audio = useAudio()
 
     // Apply settings
@@ -195,6 +221,22 @@ export class BattleScene {
     // Post-processing composer (used when map has no lensing)
     this.composer = markRaw(new EffectComposer(this.renderer))
     this.composer.addPass(new RenderPass(this.scene, this.camera.camera))
+
+    // Bloom — gated behind graphics quality (skip when shadows are off = "low
+    // end" profile). Threshold high so only bright VFX (muzzle flash, energy
+    // bolts, explosions) bloom; modest strength to avoid washing the scene out.
+    // NOTE: lensing maps render through their own pipeline (renderWithLensing)
+    // which bypasses this composer, so bloom is not applied on those maps.
+    if ((gfx?.shadowQuality ?? 'medium') !== 'off') {
+      this.bloomPass = markRaw(new UnrealBloomPass(
+        new THREE.Vector2(window.innerWidth, window.innerHeight),
+        0.6,   // strength (modest)
+        0.4,   // radius
+        0.85,  // threshold
+      ))
+      this.composer.addPass(this.bloomPass)
+    }
+
     this.damagePass = markRaw(createDamageShaderPass())
     this.damagePass.renderToScreen = true
     this.composer.addPass(this.damagePass)
@@ -204,6 +246,11 @@ export class BattleScene {
     // Handle window resize
     this.handleResizeBound = () => this.handleResize()
     window.addEventListener('resize', this.handleResizeBound)
+
+    // Pause rendering work while the tab is hidden (also clamps the dt spike on
+    // return so the sim doesn't fast-forward).
+    this.handleVisibilityBound = () => this.handleVisibilityChange()
+    document.addEventListener('visibilitychange', this.handleVisibilityBound)
   }
 
   private setupDefaultArena() {
@@ -419,9 +466,26 @@ export class BattleScene {
   }
 
   private handleResize() {
-    this.camera.handleResize(window.innerWidth, window.innerHeight)
-    this.renderer.setSize(window.innerWidth, window.innerHeight)
-    this.composer?.setSize(window.innerWidth, window.innerHeight)
+    const w = window.innerWidth
+    const h = window.innerHeight
+    this.camera.handleResize(w, h)
+    this.renderer.setSize(w, h)
+    this.composer?.setSize(w, h)
+    this.bloomPass?.setSize(w, h)
+    // Resize the gravitational-lensing offscreen target so it tracks the canvas.
+    this.mapRenderer?.resize(w, h)
+  }
+
+  private handleVisibilityChange() {
+    if (document.hidden) {
+      // Stop the rAF loop entirely while hidden.
+      this.stop()
+    } else if (this.animationId === null) {
+      // Resume; reset lastTime so the first frame after returning has a small dt
+      // (the animate loop also clamps, but this avoids a big jump).
+      this.lastTime = performance.now()
+      this.animate()
+    }
   }
 
   start() {
@@ -430,11 +494,24 @@ export class BattleScene {
   }
 
   private animate = () => {
+    // Don't queue further frames while the tab is hidden (visibilitychange will
+    // resume). Guards against any stray rAF that fires during the hidden window.
+    if (document.hidden) {
+      this.animationId = null
+      return
+    }
     this.animationId = requestAnimationFrame(this.animate)
 
     const currentTime = performance.now()
-    const deltaTime = Math.min((currentTime - this.lastTime) / 1000, 0.1) // Cap at 100ms
+    let deltaTime = Math.min((currentTime - this.lastTime) / 1000, 0.1) // Cap at 100ms
     this.lastTime = currentTime
+
+    // Hitstop: scale dt toward zero for a brief impact freeze on kills.
+    if (this.hitstopTimer > 0) {
+      this.hitstopTimer -= deltaTime
+      deltaTime *= 0.15
+    }
+
     this.battleTime += deltaTime
 
     // Track FPS using a rolling 60-frame window
@@ -495,7 +572,13 @@ export class BattleScene {
     const dashStarted = this.physicsSystem.updateDash(this.playerMech, input, deltaTime)
     if (dashStarted) {
       this.camera.triggerShake(0.25)
-      this.particleSystem.spawnExplosion(this.playerMech.position.clone())
+      // Dash juice: FOV kick, directional thruster trail, whoosh SFX.
+      this.camera.triggerFovKick(10)
+      const dashDir = this.playerMech.velocity.lengthSq() > 0.001
+        ? this.playerMech.velocity.clone().normalize()
+        : this.playerMech.getForwardDirection()
+      this.particleSystem.spawnDashBurst(this.playerMech.position.clone().setY(this.playerMech.position.y + 1.5), dashDir)
+      this.audio.playThruster()
     }
     if (!this.playerMech.isDashing) {
       const counterBoost = this.physicsSystem.updateMovement(this.playerMech, input, deltaTime)
@@ -558,18 +641,33 @@ export class BattleScene {
     // Left arm (right mouse button)
     if (input.shootLeft && this.battleTime - this.lastLeftArmShot > leftFireRate) {
       if (this.playerMech.loadout.leftArm) {
-        this.projectileSystem.fireWeapon(this.playerMech, getAimDirection('left'), 'left', this.enemyMech)
-        this.lastLeftArmShot = this.battleTime
+        const aim = getAimDirection('left')
+        const fired = this.projectileSystem.fireWeapon(this.playerMech, aim, 'left', this.enemyMech)
+        if (fired) {
+          this.onPlayerFire('left', aim)
+          this.lastLeftArmShot = this.battleTime
+        }
       }
     }
 
     // Right arm (left mouse button)
     if (input.shootRight && this.battleTime - this.lastRightArmShot > rightFireRate) {
       if (this.playerMech.loadout.rightArm) {
-        this.projectileSystem.fireWeapon(this.playerMech, getAimDirection('right'), 'right', this.enemyMech)
-        this.lastRightArmShot = this.battleTime
+        const aim = getAimDirection('right')
+        const fired = this.projectileSystem.fireWeapon(this.playerMech, aim, 'right', this.enemyMech)
+        if (fired) {
+          this.onPlayerFire('right', aim)
+          this.lastRightArmShot = this.battleTime
+        }
       }
     }
+
+    // Feed the AI the player's in-flight projectiles so it can dodge incoming
+    // fire (single-player only; multiplayer uses MultiplayerBattleScene).
+    const incomingThreats = this.projectileSystem.getProjectiles()
+      .filter((p) => p.ownerId === this.playerMech.id)
+      .map((p) => ({ position: p.position, velocity: p.velocity }))
+    this.enemyAI.feedThreats(incomingThreats)
 
     // Update enemy AI (new dedicated class)
     const shouldEnemyFire = this.enemyAI.update(
@@ -582,7 +680,12 @@ export class BattleScene {
     this.enemyMech.updatePower(deltaTime)
 
     if (shouldEnemyFire) {
-      const enemyAimDirection = this.playerMech.getCorePosition()
+      // Aim at a leading intercept point with an aim-error cone scaled by the
+      // difficulty's aimSkill, so the accuracy stat actually affects aim.
+      const armPart = this.enemyMech.loadout.rightArm ?? this.enemyMech.loadout.leftArm
+      const projSpeed = this.getWeaponProjectileSpeed(armPart?.weaponType, armPart?.id)
+      const aimPoint = this.enemyAI.computeAimPoint(this.enemyMech, this.playerMech, projSpeed)
+      const enemyAimDirection = aimPoint
         .sub(this.enemyMech.getArmPosition('right'))
         .normalize()
       // Enemy fires from right arm by default
@@ -602,7 +705,11 @@ export class BattleScene {
     const hits = this.projectileSystem.checkCollisions([this.playerMech, this.enemyMech])
 
     for (const hit of hits) {
-      const defeated = hit.target.takeDamage(hit.projectile.damage)
+      const damage = hit.projectile.damage
+      const defeated = hit.target.takeDamage(damage)
+      const isPlayerShot = hit.target === this.enemyMech
+      // Heuristic crit: high-damage hits (melee / heavy weapons) read as crits.
+      const crit = damage >= 15
 
       // Calculate impact position at the target's center (more visible)
       const impactPosition = hit.target.position.clone()
@@ -613,13 +720,36 @@ export class BattleScene {
         impactPosition,
         hit.projectile.type
       )
+      // Directional impact sparks off the mech surface (incoming bolt direction).
+      this.particleSystem.spawnImpactSparks(
+        impactPosition,
+        hit.projectile.velocity.clone().normalize(),
+        'mech',
+      )
 
-      // Play hit sound
-      //this.audio.playBulletHitMech()
+      // Track damage dealt by player + fire hit-confirm/damage-number feedback.
+      if (isPlayerShot) {
+        this.onDamageDealt(damage)
 
-      // Track damage dealt by player
-      if (hit.target === this.enemyMech) {
-        this.onDamageDealt(hit.projectile.damage)
+        // Hit-confirm marker + tink audio.
+        this.onPlayerHitConfirm?.({ kill: defeated, crit })
+        this.audio.playHitConfirm(crit || defeated)
+
+        // Floating damage number projected to screen space.
+        if (this.onPlayerDamageNumber) {
+          const screen = impactPosition.clone().project(this.camera.camera)
+          if (screen.z <= 1) {
+            this.onPlayerDamageNumber({
+              amount: damage,
+              crit,
+              screenX: (screen.x + 1) / 2 * window.innerWidth,
+              screenY: (-screen.y + 1) / 2 * window.innerHeight,
+            })
+          }
+        }
+
+        // Screenshake scaled by damage (player landing the hit).
+        this.camera.triggerShake(Math.min(0.5, 0.12 + damage * 0.012))
       }
 
       // Screen shake + pixel sort shader when player takes damage
@@ -632,8 +762,13 @@ export class BattleScene {
 
       // Check for battle end — start destruction animation instead of immediate stop
       if (defeated) {
-        this.particleSystem.spawnExplosion(hit.target.position.clone())
+        // Bigger explosion for kills (per VFX agent guidance: scale 1.5-2).
+        this.particleSystem.spawnExplosion(hit.target.position.clone(), 1.8)
         this.camera.triggerShake(1.0)
+        // Brief hitstop when the PLAYER scores the kill.
+        if (isPlayerShot) {
+          this.hitstopTimer = 0.12
+        }
         hit.target.isDestroyed = true
         this.battleEnding = true
         this.battleEndTimer = 2.0
@@ -667,6 +802,76 @@ export class BattleScene {
     }
   }
 
+  /**
+   * Swap in a fresh enemy for the next survival wave WITHOUT tearing down the
+   * scene or the player mech. Disposes the old enemy's mesh, adds the new one,
+   * resets the battle-ending state, and resumes the render loop. Single-player
+   * survival only; multiplayer never calls this.
+   */
+  respawnEnemy(newEnemy: MechEntity, difficulty?: AIDifficulty): void {
+    // Remove + dispose the previous enemy's mesh.
+    this.scene.remove(this.enemyMech.mesh)
+    this.enemyMech.cleanup()
+
+    // Adopt the new enemy and add it to the scene.
+    this.enemyMech = newEnemy
+    this.scene.add(this.enemyMech.mesh)
+
+    // Re-arm the AI for the new wave.
+    if (difficulty) this.enemyAI.setDifficulty(difficulty)
+    if (this.mapDef) {
+      this.enemyAI.setArenaBounds(this.mapDef.arena.width / 2, this.mapDef.arena.depth / 2)
+    }
+
+    // Clear ending state and any leftover in-flight projectiles, then resume.
+    // (Remove active projectiles without disposing the shared visual pools.)
+    this.battleEnding = false
+    this.battleEndTimer = 0
+    this.targetingState = { isTargeted: false, screenX: 0, screenY: 0, screenWidth: 0, screenHeight: 0 }
+    for (const proj of this.projectileSystem.getProjectiles().slice()) {
+      this.projectileSystem.removeProjectile(proj)
+    }
+
+    if (this.animationId === null && !document.hidden) {
+      this.lastTime = performance.now()
+      this.animate()
+    }
+  }
+
+  /**
+   * Player-only fire feedback: muzzle flash at the arm + a synthesized fire SFX.
+   * Single-player path only — multiplayer projectile spawns are untouched.
+   */
+  private onPlayerFire(arm: 'left' | 'right', aim: THREE.Vector3) {
+    const armPart = arm === 'left' ? this.playerMech.loadout.leftArm : this.playerMech.loadout.rightArm
+    const rawType = armPart?.weaponType ?? 'ballistic'
+    // Map the part-level weaponType to a VFX/SFX projectile type. WeaponType has
+    // no 'missile' member (missiles are ballistic parts whose id contains
+    // 'missile'); energy stays energy; melee/support read as a ballistic spark.
+    let fxType: 'ballistic' | 'energy' | 'missile'
+    if (rawType === 'energy') {
+      fxType = 'energy'
+    } else if (rawType === 'ballistic' && armPart?.id.includes('missile')) {
+      fxType = 'missile'
+    } else {
+      fxType = 'ballistic'
+    }
+
+    this.particleSystem.spawnMuzzleFlash(this.playerMech.getArmPosition(arm), fxType, aim)
+    this.audio.playWeaponFire(fxType)
+  }
+
+  /**
+   * Projectile speed for a weapon part, mirroring ProjectileSystem's per-type
+   * speeds. Used by the AI to lead its shots. Missiles are ballistic parts whose
+   * id contains 'missile'.
+   */
+  private getWeaponProjectileSpeed(weaponType?: string, partId?: string): number {
+    if (weaponType === 'energy') return 400
+    if (weaponType === 'ballistic' && partId?.includes('missile')) return 240
+    return 300 // ballistic / melee / support fallback
+  }
+
   triggerDamageEffect(intensity: number = 1.0) {
     this.damageIntensity = Math.min(1.0, this.damageIntensity + intensity)
     if (this.damagePass) {
@@ -677,6 +882,7 @@ export class BattleScene {
   cleanup() {
     this.stop()
     window.removeEventListener('resize', this.handleResizeBound)
+    document.removeEventListener('visibilitychange', this.handleVisibilityBound)
     this.inputManager.cleanup()
     this.projectileSystem.cleanup()
     this.particleSystem.cleanup()
@@ -824,13 +1030,12 @@ export class BattleScene {
         if (dx < building.width / 2 &&
             dy < building.height / 2 &&
             dz < building.depth / 2) {
-          // Projectile hit building - spawn impact effect and remove projectile
-          this.particleSystem.spawnHitEffect(
+          // Projectile hit building - directional debris sparks + remove.
+          this.particleSystem.spawnImpactSparks(
             projectile.position.clone(),
-            projectile.type
+            projectile.velocity.clone().normalize(),
+            'building',
           )
-          // Play hit sound for building impacts
-          //this.audio.playBulletHit()
           this.projectileSystem.removeProjectile(projectile)
           break
         }

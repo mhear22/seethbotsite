@@ -1,5 +1,23 @@
 import { ref, watch } from 'vue'
 
+// Shared WebAudio context for synthesized combat SFX (lazily created on first
+// use so we don't allocate one until the player is actually in a battle, and so
+// it's created inside a user-gesture handler when possible).
+let sharedAudioContext: AudioContext | null = null
+function getAudioContext(): AudioContext | null {
+  if (typeof window === 'undefined') return null
+  if (!sharedAudioContext) {
+    const Ctor = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+    if (!Ctor) return null
+    sharedAudioContext = new Ctor()
+  }
+  // Resume if the browser suspended it before a user gesture.
+  if (sharedAudioContext.state === 'suspended') {
+    sharedAudioContext.resume().catch(() => {})
+  }
+  return sharedAudioContext
+}
+
 export function useAudio() {
   const muted = ref(false)
 
@@ -119,6 +137,123 @@ export function useAudio() {
     playSound('buttonSound', { volume: volume.value, rate: 1.1 })
   }
 
+  // ── Synthesized combat SFX (WebAudio, no binary assets) ──────────────────
+  // Each respects the mute/volume setting and adds slight random pitch so
+  // repeated shots don't sound robotic.
+
+  /** Random pitch multiplier centred on 1.0. */
+  const jitter = (amount: number) => 1 + (Math.random() * 2 - 1) * amount
+
+  /**
+   * Play a short synthesized tone. gainScale lets each effect set its own
+   * loudness relative to the global volume setting.
+   */
+  const playTone = (opts: {
+    type: OscillatorType
+    startFreq: number
+    endFreq?: number
+    duration: number
+    gainScale?: number
+    attack?: number
+  }) => {
+    if (muted.value || volume.value <= 0) return
+    const ctx = getAudioContext()
+    if (!ctx) return
+
+    const now = ctx.currentTime
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+
+    osc.type = opts.type
+    osc.frequency.setValueAtTime(opts.startFreq, now)
+    if (opts.endFreq !== undefined) {
+      osc.frequency.exponentialRampToValueAtTime(Math.max(1, opts.endFreq), now + opts.duration)
+    }
+
+    const peak = Math.min(1, volume.value * (opts.gainScale ?? 1))
+    const attack = opts.attack ?? 0.005
+    gain.gain.setValueAtTime(0.0001, now)
+    gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, peak), now + attack)
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + opts.duration)
+
+    osc.connect(gain)
+    gain.connect(ctx.destination)
+    osc.start(now)
+    osc.stop(now + opts.duration + 0.02)
+  }
+
+  /** Add a short burst of filtered noise (used for whoosh/hit textures). */
+  const playNoise = (opts: { duration: number; gainScale?: number; filterFreq?: number; filterType?: BiquadFilterType }) => {
+    if (muted.value || volume.value <= 0) return
+    const ctx = getAudioContext()
+    if (!ctx) return
+
+    const now = ctx.currentTime
+    const frames = Math.floor(ctx.sampleRate * opts.duration)
+    const buffer = ctx.createBuffer(1, frames, ctx.sampleRate)
+    const data = buffer.getChannelData(0)
+    for (let i = 0; i < frames; i++) {
+      data[i] = (Math.random() * 2 - 1) * (1 - i / frames) // decaying noise
+    }
+    const src = ctx.createBufferSource()
+    src.buffer = buffer
+
+    const filter = ctx.createBiquadFilter()
+    filter.type = opts.filterType ?? 'bandpass'
+    filter.frequency.setValueAtTime(opts.filterFreq ?? 1200, now)
+
+    const gain = ctx.createGain()
+    const peak = Math.min(1, volume.value * (opts.gainScale ?? 1))
+    gain.gain.setValueAtTime(peak, now)
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + opts.duration)
+
+    src.connect(filter)
+    filter.connect(gain)
+    gain.connect(ctx.destination)
+    src.start(now)
+    src.stop(now + opts.duration + 0.02)
+  }
+
+  /** Ballistic pop — short punchy descending square blip. */
+  const playBallisticShot = () => {
+    playTone({ type: 'square', startFreq: 420 * jitter(0.08), endFreq: 110, duration: 0.09, gainScale: 0.35 })
+    playNoise({ duration: 0.05, gainScale: 0.25, filterFreq: 2000, filterType: 'highpass' })
+  }
+
+  /** Energy zap — bright sawtooth sweep. */
+  const playEnergyShot = () => {
+    playTone({ type: 'sawtooth', startFreq: 900 * jitter(0.1), endFreq: 1700, duration: 0.14, gainScale: 0.28 })
+    playTone({ type: 'sine', startFreq: 1800 * jitter(0.1), endFreq: 600, duration: 0.1, gainScale: 0.15 })
+  }
+
+  /** Missile whoosh — rising filtered noise. */
+  const playMissileShot = () => {
+    playNoise({ duration: 0.35, gainScale: 0.3, filterFreq: 700, filterType: 'bandpass' })
+    playTone({ type: 'sine', startFreq: 180 * jitter(0.1), endFreq: 320, duration: 0.3, gainScale: 0.18 })
+  }
+
+  /** Fire SFX dispatcher keyed by weapon type. */
+  const playWeaponFire = (weaponType: 'ballistic' | 'energy' | 'missile') => {
+    switch (weaponType) {
+      case 'energy': playEnergyShot(); break
+      case 'missile': playMissileShot(); break
+      default: playBallisticShot(); break
+    }
+  }
+
+  /** Thruster whoosh for dashes. */
+  const playThruster = () => {
+    playNoise({ duration: 0.25, gainScale: 0.35, filterFreq: 500 * jitter(0.1), filterType: 'bandpass' })
+    playTone({ type: 'sine', startFreq: 240 * jitter(0.1), endFreq: 90, duration: 0.22, gainScale: 0.2 })
+  }
+
+  /** Hit-confirm tink — bright metallic ping. crit = higher/brighter. */
+  const playHitConfirm = (crit: boolean = false) => {
+    const base = crit ? 1400 : 950
+    playTone({ type: 'triangle', startFreq: base * jitter(0.05), endFreq: base * 1.6, duration: 0.08, gainScale: crit ? 0.4 : 0.3 })
+    playNoise({ duration: 0.04, gainScale: 0.2, filterFreq: 4000, filterType: 'highpass' })
+  }
+
   // Set volume function
   const setVolume = (newVolume: number) => {
     volume.value = Math.min(Math.max(newVolume, 0), 1.0)
@@ -140,6 +275,13 @@ export function useAudio() {
     muteAll,
     unmuteAll,
     volume,
-    setVolume
+    setVolume,
+    // Synthesized combat SFX
+    playWeaponFire,
+    playBallisticShot,
+    playEnergyShot,
+    playMissileShot,
+    playThruster,
+    playHitConfirm,
   }
 }

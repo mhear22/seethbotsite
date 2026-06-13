@@ -16,15 +16,59 @@ export interface Projectile {
   // Homing missile fields
   targetId?: string
   homingDelay?: number // seconds before homing kicks in
+  // Visual-only fields
+  pooledGeometry?: boolean // geometry came from the shared pool; don't dispose per-shot
+  pooledMaterial?: boolean // material came from the shared pool; don't dispose per-shot
+  smokeTimer?: number // accumulator for missile smoke-trail emission
 }
+
+// Cap on simultaneously-pooled missile PointLights. Excess missiles render
+// without a light (they still have a glow sprite) to avoid blowing past the
+// renderer's light limit / GPU cost.
+const MAX_MISSILE_LIGHTS = 6
 
 export class ProjectileSystem {
   private projectiles: Projectile[] = []
   private scene: THREE.Scene
   private nextId: number = 0
 
+  // ---- Pooled visuals (created once, reused across shots, disposed on cleanup) ----
+  // One shared geometry per weapon type.
+  private geometryPool: Map<string, THREE.BufferGeometry> = new Map()
+  // One shared material per (weapon type + team). Key: `${type}:${isPlayer}`.
+  private materialPool: Map<string, THREE.Material> = new Map()
+  // Shared sprite texture + materials for trails.
+  private trailTexture: THREE.Texture
+  private trailMaterialPool: Map<string, THREE.SpriteMaterial> = new Map()
+  // Pool of reusable missile PointLights.
+  private missileLightPool: THREE.PointLight[] = []
+  private activeMissileLights: number = 0
+
+  // Optional callback so the integration layer can spawn smoke particles for
+  // missile trails without ProjectileSystem depending on ParticleSystem.
+  onMissileSmoke?: (position: THREE.Vector3) => void
+
   constructor(scene: THREE.Scene) {
     this.scene = scene
+    this.trailTexture = this.createTrailTexture()
+  }
+
+  /** Soft radial-gradient texture used for additive trail/streak sprites. */
+  private createTrailTexture(): THREE.Texture {
+    const size = 64
+    const canvas = document.createElement('canvas')
+    canvas.width = size
+    canvas.height = size
+    const ctx = canvas.getContext('2d')!
+    const grad = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2)
+    grad.addColorStop(0, 'rgba(255,255,255,1)')
+    grad.addColorStop(0.4, 'rgba(255,255,255,0.5)')
+    grad.addColorStop(1, 'rgba(255,255,255,0)')
+    ctx.fillStyle = grad
+    ctx.fillRect(0, 0, size, size)
+    const tex = new THREE.CanvasTexture(canvas)
+    tex.needsUpdate = true
+    return tex
   }
 
   fireWeapon(mech: MechEntity, targetDirection: THREE.Vector3, arm: 'left' | 'right' = 'left', target?: MechEntity): Projectile | null {
@@ -74,7 +118,10 @@ export class ProjectileSystem {
         damage: baseDamage,
         ownerId: mech.id,
         lifetime: 0.2, // Only 200ms to hit
-        mesh
+        mesh,
+        // Melee uses its own throwaway geom/material (not pooled).
+        pooledGeometry: false,
+        pooledMaterial: false,
       }
 
       this.projectiles.push(projectile)
@@ -115,45 +162,36 @@ export class ProjectileSystem {
 
       const spawnPosition = mech.getArmPosition(arm)
 
-      // Create projectile mesh
+      // Create projectile mesh from pooled geometry/material (not disposed per shot).
       const geometry = this.getProjectileGeometry(weaponType)
       const material = this.getProjectileMaterial(weaponType, mech.isPlayer)
       const mesh = markRaw(new THREE.Mesh(geometry, material))
       mesh.position.copy(spawnPosition)
       this.scene.add(mesh)
 
-      let missileLight: THREE.PointLight | undefined
-      let missileGlow: THREE.Sprite | undefined
-      if (weaponType === 'missile') {
-        missileLight = new THREE.PointLight(0xff6600, 40, 60)
-        missileLight.position.copy(spawnPosition)
-        this.scene.add(missileLight)
-
-        // Billboard glow sprite - always faces camera, visible from any distance
-        const glowMat = markRaw(new THREE.SpriteMaterial({
-          color: 0xff8800,
-          transparent: true,
-          opacity: 0.9,
-          depthWrite: false,
-          blending: THREE.AdditiveBlending
-        }))
-        missileGlow = markRaw(new THREE.Sprite(glowMat))
-        missileGlow.scale.set(6, 6, 1)
-        missileGlow.position.copy(spawnPosition)
-        this.scene.add(missileGlow)
-      }
+      const velocity = direction.clone().multiplyScalar(this.getProjectileSpeed(weaponType))
+      const { light: missileLight, glow: missileGlow } = this.createProjectileVisuals(
+        weaponType,
+        mech.isPlayer,
+        spawnPosition,
+        velocity,
+        mesh,
+      )
 
       const projectile: Projectile = {
         id: `proj_${this.nextId++}`,
         type: weaponType,
         position: spawnPosition,
-        velocity: direction.multiplyScalar(this.getProjectileSpeed(weaponType)),
+        velocity,
         damage: baseDamage,
         ownerId: mech.id,
         lifetime: 3, // 3 seconds
         mesh,
         light: missileLight,
         glow: missileGlow,
+        pooledGeometry: true,
+        pooledMaterial: true,
+        smokeTimer: 0,
         ...(weaponType === 'missile' && target ? {
           targetId: target.id,
           homingDelay: 0.4 // start homing after 0.4 seconds
@@ -171,32 +209,149 @@ export class ProjectileSystem {
     return firstProjectile
   }
 
+  /**
+   * Returns a POOLED shared geometry per weapon type. Never dispose the result
+   * per shot - it is reused across all projectiles of that type and disposed
+   * only in cleanup(). Geometry is built so weapons read distinctly:
+   *  - ballistic: small elongated tracer (stretched along travel axis)
+   *  - energy:    glowing sphere
+   *  - missile:   tapered cylinder body
+   */
   private getProjectileGeometry(type: string): THREE.BufferGeometry {
+    const cached = this.geometryPool.get(type)
+    if (cached) return cached
+
+    let geom: THREE.BufferGeometry
     switch (type) {
       case 'energy':
-        return new THREE.SphereGeometry(0.3, 8, 8)
+        geom = new THREE.SphereGeometry(0.3, 10, 10)
+        break
       case 'missile':
-        return new THREE.CylinderGeometry(0.3, 0.15, 1.2, 8)
-      default: // ballistic
-        return new THREE.SphereGeometry(0.2, 6, 6)
+        geom = new THREE.CylinderGeometry(0.3, 0.15, 1.2, 8)
+        break
+      default: { // ballistic - thin elongated tracer
+        // Cylinder oriented along +Z so the mesh can be aimed down the velocity.
+        geom = new THREE.CylinderGeometry(0.09, 0.09, 1.6, 6)
+        geom.rotateX(Math.PI / 2) // align length with local +Z
+        break
+      }
     }
+    this.geometryPool.set(type, geom)
+    return geom
   }
 
+  /**
+   * Returns a POOLED shared material per (weapon type + team). Never dispose the
+   * result per shot - reused across all matching projectiles, disposed only in
+   * cleanup().
+   */
   private getProjectileMaterial(type: string, isPlayer: boolean): THREE.Material {
-    const playerColor = isPlayer ? 0x60a5fa : 0xfca5a5
+    const key = `${type}:${isPlayer}`
+    const cached = this.materialPool.get(key)
+    if (cached) return cached
 
+    let mat: THREE.Material
     switch (type) {
       case 'energy':
-        return new THREE.MeshBasicMaterial({
+        mat = new THREE.MeshBasicMaterial({
           color: isPlayer ? 0x00ffff : 0xff00ff,
-          emissive: isPlayer ? 0x00ffff : 0xff00ff,
-          emissiveIntensity: 0.8
+          transparent: true,
+          opacity: 0.95,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
         })
+        break
       case 'missile':
-        return new THREE.MeshBasicMaterial({ color: 0xff6600 })
-      default: // ballistic
-        return new THREE.MeshStandardMaterial({ color: playerColor })
+        mat = new THREE.MeshBasicMaterial({ color: 0xff6600 })
+        break
+      default: // ballistic - bright tracer
+        mat = new THREE.MeshBasicMaterial({ color: isPlayer ? 0xbfdcff : 0xffd0d0 })
+        break
     }
+    this.materialPool.set(key, mat)
+    return mat
+  }
+
+  /** Pooled additive trail/streak sprite material keyed by colour. */
+  private getTrailMaterial(colorHex: number): THREE.SpriteMaterial {
+    const key = String(colorHex)
+    const cached = this.trailMaterialPool.get(key)
+    if (cached) return cached
+    const mat = markRaw(new THREE.SpriteMaterial({
+      map: this.trailTexture,
+      color: colorHex,
+      transparent: true,
+      opacity: 0.85,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    }))
+    this.trailMaterialPool.set(key, mat)
+    return mat
+  }
+
+  /**
+   * Attach weapon-distinct visuals (glow/streak trails, missile light+glow).
+   * The streak sprite is parented to the mesh and stretched back along -Z so it
+   * trails behind the bolt. Returns optional missile light/glow for the record.
+   */
+  private createProjectileVisuals(
+    type: string,
+    isPlayer: boolean,
+    spawnPosition: THREE.Vector3,
+    velocity: THREE.Vector3,
+    mesh: THREE.Mesh,
+  ): { light?: THREE.PointLight; glow?: THREE.Sprite } {
+    if (type === 'missile') {
+      // Aim the body down the velocity now so the spawn frame looks correct.
+      mesh.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0),
+        velocity.clone().normalize(),
+      )
+
+      let light: THREE.PointLight | undefined
+      if (this.activeMissileLights < MAX_MISSILE_LIGHTS) {
+        light = this.missileLightPool.pop()
+        if (!light) {
+          light = markRaw(new THREE.PointLight(0xff6600, 40, 60))
+        }
+        light.position.copy(spawnPosition)
+        this.scene.add(light)
+        this.activeMissileLights++
+      }
+
+      // Billboard glow sprite (pooled material).
+      const glow = markRaw(new THREE.Sprite(this.getTrailMaterial(0xff8800)))
+      glow.scale.set(6, 6, 1)
+      glow.position.copy(spawnPosition)
+      this.scene.add(glow)
+
+      return { light, glow }
+    }
+
+    // Energy + ballistic: a billboarded additive glow that sits on the bolt for
+    // a bright bloom. The directional "streak" comes from the elongated bolt
+    // MESH itself (ballistic cylinder is stretched along its velocity; energy is
+    // a glowing sphere), which reads correctly from any camera angle - unlike a
+    // stretched sprite, which would stretch in screen space.
+    const glowColor = type === 'energy'
+      ? (isPlayer ? 0x66ffff : 0xff66ff)
+      : (isPlayer ? 0x99ccff : 0xffb0b0)
+    const glowSize = type === 'energy' ? 1.8 : 0.9
+
+    const glow = markRaw(new THREE.Sprite(this.getTrailMaterial(glowColor)))
+    glow.scale.set(glowSize, glowSize, 1)
+    glow.position.copy(spawnPosition)
+    this.scene.add(glow)
+
+    // Orient the ballistic bolt mesh along its velocity for an elongated tracer.
+    if (type === 'ballistic') {
+      mesh.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 0, 1),
+        velocity.clone().normalize(),
+      )
+    }
+
+    return { glow }
   }
 
   private getProjectileSpeed(type: string): number {
@@ -234,8 +389,13 @@ export class ProjectileSystem {
       proj.position.add(proj.velocity.clone().multiplyScalar(deltaTime))
       proj.mesh.position.copy(proj.position)
 
-      // Rotate missile to face direction of travel and update light
+      // Glow trail follows every projectile that has one (energy/ballistic/missile).
+      if (proj.glow) {
+        proj.glow.position.copy(proj.position)
+      }
+
       if (proj.type === 'missile') {
+        // Rotate missile body to face direction of travel.
         proj.mesh.quaternion.setFromUnitVectors(
           new THREE.Vector3(0, 1, 0),
           proj.velocity.clone().normalize()
@@ -243,9 +403,20 @@ export class ProjectileSystem {
         if (proj.light) {
           proj.light.position.copy(proj.position)
         }
-        if (proj.glow) {
-          proj.glow.position.copy(proj.position)
+        // Emit a short fading smoke trail behind missiles via the optional hook.
+        if (this.onMissileSmoke) {
+          proj.smokeTimer = (proj.smokeTimer ?? 0) + deltaTime
+          if (proj.smokeTimer >= 0.03) {
+            proj.smokeTimer = 0
+            this.onMissileSmoke(proj.position.clone())
+          }
         }
+      } else if (proj.type === 'ballistic') {
+        // Keep the elongated tracer aligned with its travel direction.
+        proj.mesh.quaternion.setFromUnitVectors(
+          new THREE.Vector3(0, 0, 1),
+          proj.velocity.clone().normalize()
+        )
       }
 
       // Update lifetime
@@ -255,19 +426,8 @@ export class ProjectileSystem {
       if (proj.lifetime > 0) {
         activeProjectiles.push(proj)
       } else {
-        // Cleanup expired projectile
-        this.scene.remove(proj.mesh)
-        proj.mesh.geometry.dispose()
-        if (proj.mesh.material instanceof THREE.Material) {
-          proj.mesh.material.dispose()
-        }
-        if (proj.light) {
-          this.scene.remove(proj.light)
-        }
-        if (proj.glow) {
-          this.scene.remove(proj.glow)
-          ;(proj.glow.material as THREE.SpriteMaterial).dispose()
-        }
+        // Cleanup expired projectile (respects the geometry/material pool).
+        this.disposeProjectileVisuals(proj)
       }
     }
 
@@ -313,41 +473,58 @@ export class ProjectileSystem {
     return hits
   }
 
+  /**
+   * Tear down a projectile's scene objects. Pooled geometry/materials are NOT
+   * disposed (they are shared and reused); only per-projectile-owned resources
+   * (melee throwaway geom/material, missile glow sprite) are disposed. Missile
+   * PointLights are returned to the pool for reuse.
+   */
+  private disposeProjectileVisuals(proj: Projectile) {
+    this.scene.remove(proj.mesh)
+    if (proj.pooledGeometry !== true) {
+      proj.mesh.geometry.dispose()
+    }
+    if (proj.pooledMaterial !== true && proj.mesh.material instanceof THREE.Material) {
+      proj.mesh.material.dispose()
+    }
+    if (proj.light) {
+      this.scene.remove(proj.light)
+      // Return to pool (material is the shared light, safe to reuse).
+      if (this.missileLightPool.length < MAX_MISSILE_LIGHTS) {
+        this.missileLightPool.push(proj.light)
+      }
+      this.activeMissileLights = Math.max(0, this.activeMissileLights - 1)
+    }
+    if (proj.glow) {
+      this.scene.remove(proj.glow)
+      // Glow uses a POOLED sprite material - do not dispose it here.
+    }
+  }
+
   removeProjectile(projectile: Projectile) {
     const index = this.projectiles.indexOf(projectile)
     if (index !== -1) {
       this.projectiles.splice(index, 1)
-      this.scene.remove(projectile.mesh)
-      projectile.mesh.geometry.dispose()
-      if (projectile.mesh.material instanceof THREE.Material) {
-        projectile.mesh.material.dispose()
-      }
-      if (projectile.light) {
-        this.scene.remove(projectile.light)
-      }
-      if (projectile.glow) {
-        this.scene.remove(projectile.glow)
-        ;(projectile.glow.material as THREE.SpriteMaterial).dispose()
-      }
+      this.disposeProjectileVisuals(projectile)
     }
   }
 
   cleanup() {
     for (const proj of this.projectiles) {
-      this.scene.remove(proj.mesh)
-      proj.mesh.geometry.dispose()
-      if (proj.mesh.material instanceof THREE.Material) {
-        proj.mesh.material.dispose()
-      }
-      if (proj.light) {
-        this.scene.remove(proj.light)
-      }
-      if (proj.glow) {
-        this.scene.remove(proj.glow)
-        ;(proj.glow.material as THREE.SpriteMaterial).dispose()
-      }
+      this.disposeProjectileVisuals(proj)
     }
     this.projectiles = []
+
+    // Dispose pooled resources now that no projectiles reference them.
+    for (const geom of this.geometryPool.values()) geom.dispose()
+    this.geometryPool.clear()
+    for (const mat of this.materialPool.values()) mat.dispose()
+    this.materialPool.clear()
+    for (const mat of this.trailMaterialPool.values()) mat.dispose()
+    this.trailMaterialPool.clear()
+    this.trailTexture.dispose()
+    this.missileLightPool = []
+    this.activeMissileLights = 0
   }
 
   getProjectiles(): Projectile[] {
@@ -370,18 +547,28 @@ export class ProjectileSystem {
     const material = this.getProjectileMaterial(type, isLocalPlayer)
     const mesh = markRaw(new THREE.Mesh(geometry, material))
     const pos = new THREE.Vector3(position[0], position[1], position[2])
+    const vel = new THREE.Vector3(velocity[0], velocity[1], velocity[2])
     mesh.position.copy(pos)
     this.scene.add(mesh)
+
+    // Same weapon-distinct visuals (glow/streak, missile light+glow) as the
+    // single-player fire path. Purely cosmetic; does not touch network data.
+    const { light, glow } = this.createProjectileVisuals(type, isLocalPlayer, pos, vel, mesh)
 
     const projectile: Projectile = {
       id,
       type,
       position: pos,
-      velocity: new THREE.Vector3(velocity[0], velocity[1], velocity[2]),
+      velocity: vel,
       damage,
       ownerId,
       lifetime: 5,
-      mesh
+      mesh,
+      light,
+      glow,
+      pooledGeometry: true,
+      pooledMaterial: true,
+      smokeTimer: 0,
     }
 
     this.projectiles.push(projectile)

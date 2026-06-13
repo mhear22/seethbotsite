@@ -14,28 +14,34 @@
           <div class="mech-part mech-head">
             <MechIcons :icon="loadout.head?.icon || 'unknown'" :size="48" />
             <span class="part-label">{{ loadout.head?.name || 'No Head' }}</span>
+            <PartDeltaTooltip v-if="loadout.head" :part="loadout.head" />
           </div>
           <div class="mech-part mech-core">
             <MechIcons :icon="loadout.core?.icon || 'unknown'" :size="64" />
             <span class="part-label">{{ loadout.core?.name || 'No Core' }}</span>
+            <PartDeltaTooltip v-if="loadout.core" :part="loadout.core" />
           </div>
           <div class="mech-arms-row">
             <div class="mech-part mech-arm">
               <MechIcons :icon="loadout.leftArm?.icon || 'unknown'" :size="48" />
               <span class="part-label">{{ loadout.leftArm?.name || 'Empty' }}</span>
+              <PartDeltaTooltip v-if="loadout.leftArm" :part="loadout.leftArm" />
             </div>
             <div class="mech-part mech-arm">
               <MechIcons :icon="loadout.rightArm?.icon || 'unknown'" :size="48" />
               <span class="part-label">{{ loadout.rightArm?.name || 'Empty' }}</span>
+              <PartDeltaTooltip v-if="loadout.rightArm" :part="loadout.rightArm" />
             </div>
           </div>
           <div class="mech-part mech-legs">
             <MechIcons :icon="loadout.legs?.icon || 'unknown'" :size="48" />
             <span class="part-label">{{ loadout.legs?.name || 'No Legs' }}</span>
+            <PartDeltaTooltip v-if="loadout.legs" :part="loadout.legs" />
           </div>
           <div v-if="loadout.rack" class="mech-part mech-rack">
             <MechIcons :icon="loadout.rack.icon" :size="36" />
             <span class="part-label">{{ loadout.rack.name }}</span>
+            <PartDeltaTooltip :part="loadout.rack" />
           </div>
         </div>
       </div>
@@ -123,6 +129,7 @@
 import type { MechLoadout, MechStats, SynergyEffect } from '../../../../composables/useMechBuilder'
 import MechIcons from '../../../mech/MechIcons.vue'
 import MechPreview3D from '../../../mech/MechPreview3D.vue'
+import PartDeltaTooltip from './PartDeltaTooltip.vue'
 
 defineProps<{
   loadout: MechLoadout
@@ -177,6 +184,8 @@ defineProps<{
   border: 2px solid #cbd5e0;
   border-radius: 8px;
   min-width: 120px;
+  position: relative;
+  cursor: help;
 }
 
 .mech-arms-row {

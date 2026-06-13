@@ -215,6 +215,11 @@ function initScene() {
 }
 
 function animate() {
+  // Pause the render loop while the tab is hidden; visibilitychange resumes it.
+  if (document.hidden) {
+    animationFrameId = null
+    return
+  }
   animationFrameId = requestAnimationFrame(animate)
 
   if (controls) {
@@ -224,6 +229,12 @@ function animate() {
 
   if (renderer && scene && camera) {
     renderer.render(scene, camera)
+  }
+}
+
+function handleVisibilityChange() {
+  if (!document.hidden && animationFrameId === null && renderer) {
+    animate()
   }
 }
 
@@ -317,10 +328,12 @@ watch(
 onMounted(() => {
   initScene()
   window.addEventListener('resize', handleResize)
+  document.addEventListener('visibilitychange', handleVisibilityChange)
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
   cleanup()
 })
 </script>

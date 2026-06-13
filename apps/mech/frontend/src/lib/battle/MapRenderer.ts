@@ -235,6 +235,17 @@ export class MapRenderer {
   }
 
   /**
+   * Resize the gravitational-lensing offscreen render target to match the new
+   * canvas size. Without this the lensing target keeps its initial resolution on
+   * window resize, stretching/blurring the scene. No-op for non-lensing maps.
+   */
+  resize(width: number, height: number): void {
+    if (this.endOfUniverseLensing) {
+      this.endOfUniverseLensing.target.setSize(width, height);
+    }
+  }
+
+  /**
    * Two-pass render: scene → offscreen target → lensing quad → screen.
    * Call instead of renderer.render() when hasLensing() is true.
    */

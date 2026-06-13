@@ -1,8 +1,102 @@
 import * as THREE from 'three'
 import type { MechEntity } from './MechEntity'
 import { JUMP_VELOCITY_BASE, JUMP_VELOCITY_JETS } from './constants'
+import type { AIDifficulty } from '../../composables/useGameSettings'
 
 type AIState = 'flank' | 'retreat' | 'aggressive' | 'chase'
+
+/**
+ * Lightweight description of a hostile projectile the AI can react to. The scene
+ * feeds these each frame (single-player only) so the AI can dodge incoming fire.
+ */
+export interface IncomingThreat {
+  position: THREE.Vector3
+  velocity: THREE.Vector3
+}
+
+/**
+ * Per-difficulty behaviour profile. These change HOW the AI plays, not just its
+ * raw numbers: reaction time, evasion frequency, strafe aggression, range
+ * discipline, fire-rate, aim skill and whether it kites or brawls.
+ */
+interface DifficultyProfile {
+  /** 0..1 — drives the aim-error cone (1 = near-perfect leading). */
+  aimSkill: number
+  /** Seconds the AI takes to react to threats (higher = sloppier). */
+  reactionTime: number
+  /** 0..1 — how often it actively dodges incoming fire. */
+  evadeFrequency: number
+  /** Multiplier on strafe blend — higher = more aggressive juking. */
+  strafeAggression: number
+  /** Preferred engagement range; the AI keeps discipline around it. */
+  optimalRange: number
+  /** Tolerance band around optimalRange before it adjusts distance. */
+  rangeDiscipline: number
+  /** Multiplier on fire chance per frame. */
+  fireRateMult: number
+  /** 'kite' keeps distance and pokes; 'brawl' closes and pressures. */
+  combatStyle: 'kite' | 'brawl' | 'balanced'
+  /** Multiplier on how much the AI leads its shots (0 = no lead). */
+  leadFactor: number
+}
+
+const DIFFICULTY_PROFILES: Record<AIDifficulty, DifficultyProfile> = {
+  tutorial: {
+    aimSkill: 0.15,
+    reactionTime: 0.7,
+    evadeFrequency: 0.1,
+    strafeAggression: 0.4,
+    optimalRange: 18,
+    rangeDiscipline: 14,
+    fireRateMult: 0.9,
+    combatStyle: 'balanced',
+    leadFactor: 0.2,
+  },
+  easy: {
+    aimSkill: 0.35,
+    reactionTime: 0.45,
+    evadeFrequency: 0.3,
+    strafeAggression: 0.7,
+    optimalRange: 16,
+    rangeDiscipline: 10,
+    fireRateMult: 1.2,
+    combatStyle: 'balanced',
+    leadFactor: 0.5,
+  },
+  medium: {
+    aimSkill: 0.55,
+    reactionTime: 0.3,
+    evadeFrequency: 0.5,
+    strafeAggression: 1.0,
+    optimalRange: 15,
+    rangeDiscipline: 8,
+    fireRateMult: 1.5,
+    combatStyle: 'balanced',
+    leadFactor: 0.75,
+  },
+  hard: {
+    aimSkill: 0.78,
+    reactionTime: 0.18,
+    evadeFrequency: 0.7,
+    strafeAggression: 1.3,
+    optimalRange: 14,
+    rangeDiscipline: 6,
+    fireRateMult: 1.9,
+    combatStyle: 'kite',
+    leadFactor: 0.9,
+  },
+  boss: {
+    aimSkill: 0.95,
+    reactionTime: 0.08,
+    evadeFrequency: 0.9,
+    strafeAggression: 1.6,
+    optimalRange: 16,
+    rangeDiscipline: 5,
+    fireRateMult: 2.3,
+    combatStyle: 'kite',
+    leadFactor: 1.0,
+  },
+}
 
 export class EnemyAI {
   private state: AIState = 'flank'
@@ -19,12 +113,87 @@ export class EnemyAI {
   // Jump cooldown — only jump evasively, not constantly
   private jumpCooldown: number = 6 + Math.random() * 4
 
-  constructor() {
+  // Difficulty profile (mutable via setDifficulty)
+  private profile: DifficultyProfile = DIFFICULTY_PROFILES.medium
+  private difficulty: AIDifficulty = 'medium'
+
+  // Reaction-delay accumulator for dodging. The AI only commits to an evasive
+  // manoeuvre after observing a threat for `reactionTime` seconds.
+  private threatReactTimer: number = 0
+  // Short-lived sidestep impulse direction when actively dodging.
+  private dodgeDir: THREE.Vector3 = new THREE.Vector3()
+  private dodgeTimer: number = 0
+
+  // Incoming hostile projectiles for this frame (set by feedThreats).
+  private threats: IncomingThreat[] = []
+
+  // Estimated player velocity for shot leading (smoothed).
+  private lastPlayerPos: THREE.Vector3 | null = null
+  private playerVelEstimate: THREE.Vector3 = new THREE.Vector3()
+
+  constructor(difficulty: AIDifficulty = 'medium') {
+    this.setDifficulty(difficulty)
     this.pickNewWaypoint(new THREE.Vector3())
+  }
+
+  setDifficulty(difficulty: AIDifficulty): void {
+    this.difficulty = difficulty
+    this.profile = DIFFICULTY_PROFILES[difficulty] ?? DIFFICULTY_PROFILES.medium
   }
 
   setArenaBounds(halfWidth: number, halfDepth: number): void {
     this.arenaHalf = Math.min(halfWidth, halfDepth)
+  }
+
+  /**
+   * Feed the AI the hostile projectiles in flight this frame so it can react.
+   * Single-player only; multiplayer netcode never calls this.
+   */
+  feedThreats(threats: IncomingThreat[]): void {
+    this.threats = threats
+  }
+
+  /**
+   * Aim point the enemy should fire at, accounting for player velocity leading
+   * and an aim-error cone inversely proportional to aimSkill. Exposed so the
+   * scene can fire at a realistic intercept instead of the player's current
+   * position. Returns a world-space target point.
+   */
+  computeAimPoint(enemy: MechEntity, player: MechEntity, projectileSpeed: number): THREE.Vector3 {
+    const target = player.getCorePosition()
+    const spawn = enemy.getArmPosition('right')
+
+    // --- Leading: solve for intercept time using estimated player velocity. ---
+    const lead = this.profile.leadFactor
+    let aimPoint = target.clone()
+    if (lead > 0 && projectileSpeed > 0) {
+      const toTarget = target.clone().sub(spawn)
+      const dist = toTarget.length()
+      // First-order intercept: t ≈ distance / projectileSpeed, then project the
+      // target forward along its velocity. Scaled by leadFactor so weaker AIs
+      // under-lead.
+      const interceptTime = (dist / projectileSpeed) * lead
+      aimPoint = target.clone().add(this.playerVelEstimate.clone().multiplyScalar(interceptTime))
+    }
+
+    // --- Aim-error cone inversely proportional to aimSkill. ---
+    const dir = aimPoint.clone().sub(spawn).normalize()
+    // At aimSkill 1 -> ~0 spread; at 0 -> ~0.18 rad cone half-angle.
+    const maxConeRad = 0.18
+    const coneHalf = maxConeRad * (1 - this.profile.aimSkill)
+    if (coneHalf > 0) {
+      // Random small rotation off the perfect direction (random axis + angle).
+      const axis = new THREE.Vector3(
+        Math.random() - 0.5,
+        Math.random() - 0.5,
+        Math.random() - 0.5,
+      ).normalize()
+      const angle = (Math.random() ** 1.5) * coneHalf // bias toward smaller errors
+      dir.applyAxisAngle(axis, angle)
+    }
+
+    const aimDist = aimPoint.distanceTo(spawn)
+    return spawn.clone().add(dir.multiplyScalar(aimDist))
   }
 
   private pickNewWaypoint(_currentPos: THREE.Vector3): void {
@@ -41,11 +210,62 @@ export class EnemyAI {
   }
 
   /**
+   * Detects whether any incoming projectile is on an intercept course with the
+   * enemy and, if so, returns a sidestep direction perpendicular to the threat.
+   * Returns null when nothing dangerous is inbound.
+   */
+  private detectIncomingDodge(enemy: MechEntity): THREE.Vector3 | null {
+    if (this.threats.length === 0) return null
+
+    const enemyCenter = enemy.position.clone()
+    enemyCenter.y += 2.5
+
+    let best: { dir: THREE.Vector3; closeness: number } | null = null
+
+    for (const threat of this.threats) {
+      const rel = enemyCenter.clone().sub(threat.position)
+      const speed = threat.velocity.length()
+      if (speed < 0.01) continue
+      const vDir = threat.velocity.clone().normalize()
+
+      // Only consider projectiles heading roughly toward us.
+      const along = rel.dot(vDir)
+      if (along <= 0 || along > 60) continue // behind us or too far
+
+      // Perpendicular miss distance (how close the projectile passes).
+      const closestPoint = threat.position.clone().add(vDir.clone().multiplyScalar(along))
+      const miss = closestPoint.distanceTo(enemyCenter)
+      if (miss > 4) continue // will miss comfortably
+
+      // Sidestep perpendicular to the incoming direction (flat).
+      const perp = new THREE.Vector3(-vDir.z, 0, vDir.x).normalize()
+      // Choose the side that moves away from the projectile path.
+      const offset = enemyCenter.clone().sub(closestPoint)
+      if (offset.dot(perp) < 0) perp.multiplyScalar(-1)
+
+      const closeness = 1 - miss / 4
+      if (!best || closeness > best.closeness) {
+        best = { dir: perp, closeness }
+      }
+    }
+
+    return best ? best.dir : null
+  }
+
+  /**
    * Updates enemy AI and returns whether the enemy should fire this frame.
    */
   update(enemy: MechEntity, player: MechEntity, deltaTime: number): boolean {
     const distanceToPlayer = enemy.position.distanceTo(player.position)
-    const optimalRange = 15
+    const optimalRange = this.profile.optimalRange
+
+    // --- Estimate player velocity (for leading) from frame-to-frame movement. ---
+    if (this.lastPlayerPos && deltaTime > 0) {
+      const instantVel = player.position.clone().sub(this.lastPlayerPos).divideScalar(deltaTime)
+      // Smooth to reduce jitter.
+      this.playerVelEstimate.lerp(instantVel, 0.4)
+    }
+    this.lastPlayerPos = player.position.clone()
 
     // Direction to player (flat)
     const dirToPlayer = player.position.clone().sub(enemy.position)
@@ -55,25 +275,32 @@ export class EnemyAI {
     // Face player
     enemy.rotation.y = Math.atan2(dirToPlayer.x, dirToPlayer.z)
 
-    // Health-based state selection
+    // Health-based state selection — combat style biases the thresholds.
     const enemyHealthPct = enemy.stats.currentHealth / enemy.stats.maxHealth
     const playerHealthPct = player.stats.currentHealth / player.stats.maxHealth
+    const band = this.profile.rangeDiscipline
 
     if (enemyHealthPct < 0.3) {
       this.state = 'retreat'
-    } else if (playerHealthPct < 0.3) {
+    } else if (playerHealthPct < 0.3 && this.profile.combatStyle !== 'kite') {
       this.state = 'aggressive'
-    } else if (distanceToPlayer > optimalRange + 10) {
+    } else if (this.profile.combatStyle === 'kite' && distanceToPlayer < optimalRange - band) {
+      // Kiters back off when the player gets inside their preferred range.
+      this.state = 'retreat'
+    } else if (distanceToPlayer > optimalRange + band) {
       this.state = 'chase'
+    } else if (this.profile.combatStyle === 'brawl') {
+      this.state = 'aggressive'
     } else {
       this.state = 'flank'
     }
 
-    // Strafe direction — flip every 2–4 seconds
+    // Strafe direction — flip every 2–4 seconds (faster for aggressive profiles)
     this.strafeDirTimer -= deltaTime
     if (this.strafeDirTimer <= 0) {
       this.strafeDir *= -1
-      this.strafeDirTimer = 2 + Math.random() * 2
+      const baseHold = 2 + Math.random() * 2
+      this.strafeDirTimer = baseHold / Math.max(0.5, this.profile.strafeAggression)
     }
 
     // Waypoint roaming — tick down and pick a new destination periodically
@@ -114,10 +341,27 @@ export class EnemyAI {
       }
       case 'aggressive': {
         combatDir = dirToPlayer.clone()
-          .add(strafeVec.clone().multiplyScalar(0.3))
+          .add(strafeVec.clone().multiplyScalar(0.3 * this.profile.strafeAggression))
           .normalize()
         break
       }
+    }
+
+    // --- Reactive dodging: react to incoming fire after a reaction delay. ---
+    const dodge = this.detectIncomingDodge(enemy)
+    if (dodge) {
+      this.threatReactTimer += deltaTime
+      // Commit to a dodge once the reaction delay elapses and a random roll
+      // (scaled by evadeFrequency) passes.
+      if (this.threatReactTimer >= this.profile.reactionTime && this.dodgeTimer <= 0) {
+        if (Math.random() < this.profile.evadeFrequency) {
+          this.dodgeDir.copy(dodge)
+          this.dodgeTimer = 0.4
+        }
+        this.threatReactTimer = 0
+      }
+    } else {
+      this.threatReactTimer = Math.max(0, this.threatReactTimer - deltaTime)
     }
 
     // Direction toward the current roam waypoint
@@ -132,6 +376,12 @@ export class EnemyAI {
     const desiredDir = combatDir.clone()
       .multiplyScalar(1 - roamBlend)
       .add(waypointDir.clone().multiplyScalar(roamBlend))
+
+    // Active dodge overrides the blend with a strong sidestep impulse.
+    if (this.dodgeTimer > 0) {
+      this.dodgeTimer -= deltaTime
+      desiredDir.add(this.dodgeDir.clone().multiplyScalar(2.5 * this.profile.strafeAggression))
+    }
 
     if (desiredDir.lengthSq() > 0.001) desiredDir.normalize()
 
@@ -149,7 +399,8 @@ export class EnemyAI {
     }
 
     // --- Evasive jump ---
-    // Jump when the player is close and aiming at us, or when retreating
+    // Jump when the player is close and aiming at us, when retreating, or to
+    // leap over an imminent incoming shot (scaled by evadeFrequency).
     this.jumpCooldown -= deltaTime
     if (this.jumpCooldown <= 0 && !enemy.isJumping) {
       // Estimate if player is aimed toward us
@@ -165,15 +416,17 @@ export class EnemyAI {
 
       const isBeingAimedAt = aimDot > 0.85 && distanceToPlayer < 15
       const isRetreating = this.state === 'retreat' && distanceToPlayer < 20
+      const dodgeJump = dodge !== null && Math.random() < this.profile.evadeFrequency * 0.5
 
-      if (isBeingAimedAt || isRetreating) {
+      if (isBeingAimedAt || isRetreating || dodgeJump) {
         const hasJumpJets = enemy.loadout.rack?.id === 'rack-jump-jets'
         enemy.velocity.y = hasJumpJets ? JUMP_VELOCITY_JETS * enemy.weightPenalty : JUMP_VELOCITY_BASE * enemy.weightPenalty
         enemy.isJumping = true
       }
 
-      // Reset cooldown whether we jumped or not — check again in 3–6s
-      this.jumpCooldown = 6 + Math.random() * 4
+      // Reset cooldown whether we jumped or not. Tighter AIs check more often.
+      const baseCd = 6 + Math.random() * 4
+      this.jumpCooldown = baseCd * (0.5 + (1 - this.profile.evadeFrequency) * 0.5)
     }
 
     // Gravity and landing
@@ -200,11 +453,13 @@ export class EnemyAI {
     enemy.position.x = Math.max(-this.arenaHalf, Math.min(this.arenaHalf, enemy.position.x))
     enemy.position.z = Math.max(-this.arenaHalf, Math.min(this.arenaHalf, enemy.position.z))
 
-    // Fire decision
-    let fireRateMult = 1.5
-    if (this.state === 'aggressive') fireRateMult = 2.5
-    if (this.state === 'retreat') fireRateMult = 1.0
+    // Fire decision — accuracy stat AND difficulty fire-rate both gate firing.
+    let fireRateMult = this.profile.fireRateMult
+    if (this.state === 'aggressive') fireRateMult *= 1.4
+    if (this.state === 'retreat') fireRateMult *= 0.7
 
+    // Better aim skill also lets the AI hold fire for cleaner shots (only shoot
+    // when the player is reasonably within the firing arc at higher skill).
     const fireChance = (enemy.stats.accuracy / 100) * deltaTime * fireRateMult
     return Math.random() < fireChance && distanceToPlayer < 30
   }

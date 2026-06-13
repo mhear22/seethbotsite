@@ -29,10 +29,15 @@ export class CameraController {
   private shakeIntensity = 0
   private readonly SHAKE_DECAY = 8 // How fast shake fades
 
+  // FOV kick (dash juice): current vs base FOV, eased back each frame.
+  private readonly BASE_FOV = 75
+  private targetFovBoost = 0
+  private readonly FOV_RETURN = 6 // higher = snappier return to base
+
   constructor(target: MechEntity) {
     this.target = target
     this.camera = markRaw(new THREE.PerspectiveCamera(
-      75, // FOV
+      this.BASE_FOV, // FOV
       window.innerWidth / window.innerHeight,
       0.1, // Near
       1000 // Far
@@ -109,12 +114,29 @@ export class CameraController {
     const lookTarget = this.camera.position.clone().add(aimDir)
     this.camera.lookAt(lookTarget)
 
+    // Ease the FOV boost back toward zero and apply to the camera.
+    if (this.targetFovBoost > 0.01) {
+      this.targetFovBoost *= Math.max(0, 1 - this.FOV_RETURN * deltaTime)
+    } else {
+      this.targetFovBoost = 0
+    }
+    const desiredFov = this.BASE_FOV + this.targetFovBoost
+    if (Math.abs(this.camera.fov - desiredFov) > 0.01) {
+      this.camera.fov = desiredFov
+      this.camera.updateProjectionMatrix()
+    }
+
     // Update mech rotation based on camera (player faces camera direction)
     this.target.rotation.y = this.mouseRotation.x
   }
 
   triggerShake(intensity: number) {
     this.shakeIntensity = Math.max(this.shakeIntensity, intensity)
+  }
+
+  /** Punch the FOV outward (dash juice); eased back to base in update(). */
+  triggerFovKick(amount: number) {
+    this.targetFovBoost = Math.max(this.targetFovBoost, amount)
   }
 
   handleResize(width: number, height: number) {

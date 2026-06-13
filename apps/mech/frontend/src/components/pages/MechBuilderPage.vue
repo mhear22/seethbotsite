@@ -24,6 +24,55 @@
       </div>
     </div>
 
+    <!-- Loadouts: starter presets + saved builds -->
+    <div class="loadouts-bar">
+      <div class="starter-presets">
+        <span class="loadouts-label">Quick Start:</span>
+        <button
+          v-for="preset in STARTER_PRESETS"
+          :key="preset.id"
+          class="preset-chip"
+          :title="preset.description"
+          @click="applyPreset(preset.id)"
+        >
+          <MechIcons :icon="preset.icon" :size="18" />
+          {{ preset.name }}
+        </button>
+      </div>
+      <button class="my-builds-toggle" @click="showBuildsPanel = !showBuildsPanel">
+        💾 My Builds ({{ savedBuilds.length }})
+      </button>
+    </div>
+
+    <div v-if="showBuildsPanel" class="my-builds-panel">
+      <div class="save-row">
+        <input
+          v-model="newBuildName"
+          class="build-name-input"
+          type="text"
+          placeholder="Name this build…"
+          @keyup.enter="saveCurrentBuild"
+        />
+        <button class="save-build-btn" @click="saveCurrentBuild">Save Current Build</button>
+      </div>
+
+      <div v-if="savedBuilds.length === 0" class="no-builds">
+        No saved builds yet. Save your current loadout to reuse it later.
+      </div>
+      <div v-else class="saved-builds-list">
+        <div v-for="(build, idx) in savedBuilds" :key="build.timestamp" class="saved-build-item">
+          <div class="saved-build-info">
+            <span class="saved-build-name">{{ build.name }}</span>
+            <span class="saved-build-date">{{ new Date(build.timestamp).toLocaleDateString() }}</span>
+          </div>
+          <div class="saved-build-actions">
+            <button class="load-build-btn" @click="loadBuild(idx)">Load</button>
+            <button class="delete-build-btn" @click="deleteBuild(idx)">Delete</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Progress Steps -->
     <div class="progress-steps">
       <div
@@ -188,6 +237,7 @@ const builder = useMechBuilder()
 const {
   loadout,
   totalStats,
+  savedBuilds,
   activeSynergies,
   threatLevel,
   warnings,
@@ -197,6 +247,10 @@ const {
   removePart,
   resetBuild,
   randomizeBuild,
+  loadPresetBuild,
+  saveBuild,
+  loadBuild,
+  deleteBuild,
   exportBuild,
   importBuild,
   loadFromBrowser,
@@ -205,7 +259,8 @@ const {
   CORE_PRESETS,
   LEGS_PRESETS,
   HEAD_PRESETS,
-  RACK_PRESETS
+  RACK_PRESETS,
+  STARTER_PRESETS
 } = builder
 
 // Wizard state
@@ -213,6 +268,20 @@ const currentStep = ref(0)
 const showArmModal = ref(false)
 const pendingArm = ref<ArmPart | null>(null)
 const showShareNotification = ref(false)
+
+// My Builds panel state
+const showBuildsPanel = ref(false)
+const newBuildName = ref('')
+
+function saveCurrentBuild() {
+  const name = newBuildName.value.trim() || `Build ${savedBuilds.value.length + 1}`
+  saveBuild(name)
+  newBuildName.value = ''
+}
+
+function applyPreset(presetId: string) {
+  loadPresetBuild(presetId)
+}
 
 const steps = [
   { id: 'core', label: 'Core', required: true },
@@ -430,6 +499,189 @@ onMounted(() => {
   color: #1e293b;
   min-width: 40px;
   text-align: right;
+}
+
+/* Loadouts bar: starter presets + my builds toggle */
+.loadouts-bar {
+  max-width: 1200px;
+  margin: 0 auto 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  background: white;
+  border-radius: 12px;
+  padding: 12px 16px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.starter-presets {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.loadouts-label {
+  font-weight: 700;
+  color: #475569;
+  font-size: 14px;
+}
+
+.preset-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 2px solid #cbd5e0;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #1e293b;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.preset-chip:hover {
+  border-color: #3b82f6;
+  background: #dbeafe;
+  transform: translateY(-1px);
+}
+
+.my-builds-toggle {
+  padding: 8px 16px;
+  border: 2px solid #a78bfa;
+  border-radius: 8px;
+  background: #ede9fe;
+  color: #5b21b6;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.my-builds-toggle:hover {
+  background: #ddd6fe;
+}
+
+.my-builds-panel {
+  max-width: 1200px;
+  margin: 0 auto 16px;
+  background: white;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.save-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.build-name-input {
+  flex: 1;
+  padding: 10px 14px;
+  border: 2px solid #cbd5e0;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.build-name-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+}
+
+.save-build-btn {
+  padding: 10px 18px;
+  border: none;
+  border-radius: 8px;
+  background: #10b981;
+  color: white;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.save-build-btn:hover {
+  background: #059669;
+}
+
+.no-builds {
+  text-align: center;
+  color: #94a3b8;
+  padding: 16px;
+  font-size: 14px;
+}
+
+.saved-builds-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.saved-build-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.saved-build-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.saved-build-name {
+  font-weight: 600;
+  color: #1e293b;
+  font-size: 14px;
+}
+
+.saved-build-date {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.saved-build-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.load-build-btn {
+  padding: 6px 14px;
+  border: none;
+  border-radius: 6px;
+  background: #3b82f6;
+  color: white;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.load-build-btn:hover {
+  background: #2563eb;
+}
+
+.delete-build-btn {
+  padding: 6px 14px;
+  border: none;
+  border-radius: 6px;
+  background: #fecaca;
+  color: #991b1b;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.delete-build-btn:hover {
+  background: #fca5a5;
 }
 
 .progress-steps {
@@ -725,8 +977,40 @@ onMounted(() => {
 /* Dark mode */
 .dark .header,
 .dark .progress-steps,
-.dark .wizard-content {
+.dark .wizard-content,
+.dark .loadouts-bar,
+.dark .my-builds-panel {
   background: #1e293b;
+}
+
+.dark .loadouts-label {
+  color: #cbd5e0;
+}
+
+.dark .preset-chip {
+  background: #334155;
+  border-color: #475569;
+  color: #f1f5f9;
+}
+
+.dark .preset-chip:hover {
+  background: #1e40af;
+  border-color: #3b82f6;
+}
+
+.dark .saved-build-item {
+  background: #334155;
+  border-color: #475569;
+}
+
+.dark .saved-build-name {
+  color: #f1f5f9;
+}
+
+.dark .build-name-input {
+  background: #334155;
+  border-color: #475569;
+  color: #f1f5f9;
 }
 
 .dark .header h1 {

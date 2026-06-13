@@ -43,6 +43,84 @@ export const HEAD_PRESETS = HEAD_PARTS
 export const RACK_PRESETS = RACK_PARTS
 export const SYNERGY_PRESETS = SYNERGIES
 
+/**
+ * Curated, warning-free starter loadouts surfaced as one-click presets in the
+ * builder. Each is a distinct archetype; Brawler/Scout complete a synergy.
+ */
+export interface StarterPreset {
+  id: string
+  name: string
+  description: string
+  icon: string
+  parts: {
+    leftArm: string | null
+    rightArm: string | null
+    core: string | null
+    legs: string | null
+    head: string | null
+    rack: string | null
+  }
+}
+
+export const STARTER_PRESETS: StarterPreset[] = [
+  {
+    id: 'preset-brawler',
+    name: 'Brawler',
+    description: 'Heavy melee bruiser — completes the Melee Brawler synergy.',
+    icon: 'synergy-fist',
+    parts: {
+      leftArm: 'arm-pile-driver',
+      rightArm: 'arm-autocannon-mk1',
+      core: 'core-diesel-gen',
+      legs: 'legs-quad',
+      head: 'head-reinforced',
+      rack: 'rack-repair-drone',
+    },
+  },
+  {
+    id: 'preset-sniper',
+    name: 'Sniper',
+    description: 'Long-range railgun with a precision targeting array.',
+    icon: 'railgun',
+    parts: {
+      leftArm: 'arm-railgun',
+      rightArm: 'arm-autocannon-mk1',
+      core: 'core-fusion',
+      legs: 'legs-tracked-heavy',
+      head: 'head-targeting-array',
+      rack: 'rack-ammo-feed',
+    },
+  },
+  {
+    id: 'preset-scout',
+    name: 'Scout',
+    description: 'Fast hover skirmisher — completes the Scout Configuration synergy.',
+    icon: 'scout-suite',
+    parts: {
+      leftArm: 'arm-autocannon-mk1',
+      rightArm: null,
+      core: 'core-gas-turbine',
+      legs: 'legs-hover',
+      head: 'head-scout-suite',
+      rack: null,
+    },
+  },
+  {
+    id: 'preset-tank',
+    name: 'Tank',
+    description: 'Armored firing platform that soaks damage and keeps shooting.',
+    icon: 'armor',
+    parts: {
+      leftArm: 'arm-autocannon-mk1',
+      rightArm: 'arm-missile-pod',
+      core: 'core-diesel-gen',
+      legs: 'legs-tracked-heavy',
+      head: 'head-reinforced',
+      rack: 'rack-ammo-feed',
+    },
+  },
+]
+
 export function useMechBuilder() {
   // State
   const loadout = ref<MechLoadout>({
@@ -191,16 +269,84 @@ export function useMechBuilder() {
     saveToBrowser()
   }
 
+  /**
+   * Total energy for an arbitrary candidate loadout (mirrors totalStats energy
+   * incl. synergy bonuses) so randomizeBuild can guarantee a non-negative budget.
+   */
+  function energyForLoadout(candidate: MechLoadout): number {
+    let energy = 0
+    Object.values(candidate).forEach(part => {
+      if (part) energy += part.stats.energy
+    })
+    const equippedIds = Object.values(candidate).filter(p => p !== null).map(p => p!.id)
+    SYNERGIES.forEach(synergy => {
+      if (synergy.requiredParts.every(id => equippedIds.includes(id)) && synergy.statBonus.energy) {
+        energy += synergy.statBonus.energy
+      }
+    })
+    return energy
+  }
+
+  /**
+   * Produces a random build that is GUARANTEED warning-free: valid core/legs/head,
+   * at least one real weapon, and a non-negative energy budget. Retries a bounded
+   * number of times; falls back to a known-good safe build if it can't satisfy
+   * the energy constraint (e.g. very draw-heavy random picks).
+   */
   function randomizeBuild() {
     const randomItem = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)]
+    // Only real weapons (not the support shield) count toward "armed".
+    const weaponArms = ARM_PARTS.filter(a => a.weaponType !== 'support')
 
+    let candidate: MechLoadout | null = null
+    for (let attempt = 0; attempt < 40; attempt++) {
+      const c: MechLoadout = {
+        leftArm: randomItem(weaponArms),
+        rightArm: Math.random() < 0.85 ? randomItem(ARM_PARTS) : null,
+        core: randomItem(CORE_PARTS),
+        legs: randomItem(LEGS_PARTS),
+        head: randomItem(HEAD_PARTS),
+        rack: Math.random() < 0.8 ? randomItem(RACK_PARTS) : null,
+      }
+      // Validity: core/legs/head present, >=1 weapon, no energy deficit.
+      const hasWeapon = c.leftArm !== null || c.rightArm !== null
+      if (c.core && c.legs && c.head && hasWeapon && energyForLoadout(c) >= 0) {
+        candidate = c
+        break
+      }
+    }
+
+    // Fallback: a balanced, definitely-valid build.
+    if (!candidate) {
+      candidate = {
+        leftArm: ARM_PARTS.find(a => a.id === 'arm-autocannon-mk1') ?? weaponArms[0],
+        rightArm: ARM_PARTS.find(a => a.id === 'arm-autocannon-mk1') ?? weaponArms[0],
+        core: CORE_PARTS.find(c => c.id === 'core-diesel-gen') ?? CORE_PARTS[0],
+        legs: LEGS_PARTS.find(l => l.id === 'legs-bipedal-standard') ?? LEGS_PARTS[0],
+        head: HEAD_PARTS.find(h => h.id === 'head-standard-optics') ?? HEAD_PARTS[0],
+        rack: null,
+      }
+    }
+
+    loadout.value = candidate
+    saveToBrowser()
+  }
+
+  /**
+   * Curated one-click starter loadouts. Each is warning-free and built around a
+   * clear archetype (and where possible completes a synergy).
+   */
+  function loadPresetBuild(presetId: string) {
+    const preset = STARTER_PRESETS.find(p => p.id === presetId)
+    if (!preset) return
+    const ids = preset.parts
     loadout.value = {
-      leftArm: randomItem(ARM_PARTS),
-      rightArm: randomItem(ARM_PARTS),
-      core: randomItem(CORE_PARTS),
-      legs: randomItem(LEGS_PARTS),
-      head: randomItem(HEAD_PARTS),
-      rack: randomItem(RACK_PARTS)
+      leftArm: ids.leftArm ? findPartById(ids.leftArm) as ArmPart : null,
+      rightArm: ids.rightArm ? findPartById(ids.rightArm) as ArmPart : null,
+      core: ids.core ? findPartById(ids.core) as CorePart : null,
+      legs: ids.legs ? findPartById(ids.legs) as LegsPart : null,
+      head: ids.head ? findPartById(ids.head) as HeadPart : null,
+      rack: ids.rack ? findPartById(ids.rack) as RackPart : null,
     }
     saveToBrowser()
   }
@@ -348,6 +494,7 @@ export function useMechBuilder() {
     removePart,
     resetBuild,
     randomizeBuild,
+    loadPresetBuild,
     saveBuild,
     loadBuild,
     deleteBuild,
@@ -362,6 +509,7 @@ export function useMechBuilder() {
     CORE_PRESETS,
     LEGS_PRESETS,
     HEAD_PRESETS,
-    RACK_PRESETS
+    RACK_PRESETS,
+    STARTER_PRESETS
   }
 }

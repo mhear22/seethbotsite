@@ -36,23 +36,29 @@ export function useFishingScene() {
     scene.value.add(fishingLine)
   }
 
+  // Global rare pool (any zone) so a rare/legendary can surface anywhere
+  const rarePool = fishTypes.filter(f => f.rare)
+
   const createFish = (targetDepth: 'shallow' | 'medium' | 'deep' = 'medium') => {
     if (!scene.value) return
 
-    // Filter fish by target depth
-    const availableFish = fishTypes.filter(f => f.depth === targetDepth)
+    // Fish eligible for the selected depth band
+    const zoneFish = fishTypes.filter(f => f.depth === targetDepth)
+    const zoneRegular = zoneFish.filter(f => !f.rare)
+    const zoneRare = zoneFish.filter(f => f.rare)
 
     // Select fish type with rarity check
     let fishType: FishType
     const rand = Math.random()
     if (rand > 0.95) {
-      const rareFishes = availableFish.filter(f => f.rare)
-      fishType = rareFishes.length > 0
-        ? rareFishes[Math.floor(Math.random() * rareFishes.length)]
-        : availableFish[Math.floor(Math.random() * availableFish.length)]
+      // 5% rare roll: prefer this zone's rare, otherwise pull from the global rare pool
+      const candidates = zoneRare.length > 0 ? zoneRare : rarePool
+      fishType = candidates.length > 0
+        ? candidates[Math.floor(Math.random() * candidates.length)]
+        : zoneRegular[Math.floor(Math.random() * zoneRegular.length)]
     } else {
-      const regularFishes = availableFish.filter(f => !f.rare)
-      fishType = regularFishes[Math.floor(Math.random() * regularFishes.length)]
+      const pool = zoneRegular.length > 0 ? zoneRegular : zoneFish
+      fishType = pool[Math.floor(Math.random() * pool.length)]
     }
 
     // Fish body
@@ -95,10 +101,12 @@ export function useFishingScene() {
     }
     const depthRange = depthRanges[fishType.depth]
 
+    const spawnX = (Math.random() - 0.5) * 20
+    const spawnZ = (Math.random() - 0.5) * 15
     fishGroup.position.set(
-      (Math.random() - 0.5) * 20,
+      spawnX,
       depthRange.min - Math.random() * (depthRange.max - depthRange.min),
-      (Math.random() - 0.5) * 15
+      spawnZ
     )
     fishGroup.rotation.y = Math.random() * Math.PI * 2
 
@@ -106,11 +114,15 @@ export function useFishingScene() {
     const speedMultipliers = { slow: 0.5, normal: 1.0, fast: 1.8 }
     const speedMult = speedMultipliers[fishType.speed]
 
-    // Store fish type as userData with behavior
+    // Store fish type as userData with behavior. Circle fish orbit their OWN
+    // spawn center with a per-fish radius so they don't clump at the origin.
     const userData: FishUserData = {
       ...fishType,
       id: fishes.length,
-      behaviorOffset: Math.random() * Math.PI * 2
+      behaviorOffset: Math.random() * Math.PI * 2,
+      centerX: spawnX,
+      centerZ: spawnZ,
+      orbitRadius: 1.5 + Math.random() * 2.5
     }
     fishGroup.userData = userData
 
@@ -140,11 +152,13 @@ export function useFishingScene() {
       const time = Date.now() * 0.001
 
       if (behavior === 'circle') {
-        // Circular swimming pattern
-        const radius = 3
+        // Circular swimming around this fish's OWN spawn center
+        const radius = userData.orbitRadius ?? 3
+        const cx = userData.centerX ?? 0
+        const cz = userData.centerZ ?? 0
         const angle = time * 0.5 + (userData.behaviorOffset || 0)
-        fish.position.x = Math.cos(angle) * radius
-        fish.position.z = Math.sin(angle) * radius
+        fish.position.x = cx + Math.cos(angle) * radius
+        fish.position.z = cz + Math.sin(angle) * radius
         fish.rotation.y = angle + Math.PI / 2
       } else if (behavior === 'zigzag') {
         // Zigzag pattern
@@ -223,9 +237,15 @@ export function useFishingScene() {
     // Fishing line
     createFishingLine()
 
-    // Create fishes
-    for (let i = 0; i < 8; i++) {
-      createFish()
+    // Seed the initial fish across all three depth zones so the tank looks
+    // varied and alive from the first frame (instead of all-medium).
+    const seedZones: ('shallow' | 'medium' | 'deep')[] = [
+      'shallow', 'medium', 'deep',
+      'shallow', 'medium', 'deep',
+      'shallow', 'deep'
+    ]
+    for (let i = 0; i < seedZones.length; i++) {
+      createFish(seedZones[i])
     }
 
     // Handle resize
@@ -243,7 +263,13 @@ export function useFishingScene() {
     renderer.value.setSize(container.value.clientWidth, container.value.clientHeight)
   }
 
-  const castLine = (depth: 'shallow' | 'medium' | 'deep', onCatch: (fish: THREE.Group, fishData: FishUserData) => void, onMiss: () => void, selectedBaitDepth: string) => {
+  const castLine = (
+    depth: 'shallow' | 'medium' | 'deep',
+    onCatch: (fish: THREE.Group, fishData: FishUserData) => void,
+    onMiss: () => void,
+    selectedBaitDepth: string,
+    catchChanceBonus: number = 0
+  ) => {
     if (!hook) return
 
     // Phase 1: Drop hook
@@ -271,22 +297,30 @@ export function useFishingScene() {
     }
 
     const checkForBite = () => {
-      // Fish collision detection
+      // Only fish whose own depth zone matches the chosen depth are eligible,
+      // so depth selection genuinely determines the catch pool. Bait then acts
+      // as a within-pool quality/rarity modifier.
       const caughtIndex = fishes.findIndex(fish => {
         if (!hook || !fish || !fish.position) return false
+
+        const fishData = fish.userData as FishUserData
+
+        // Depth gate: the fish must belong to the selected depth band
+        if (fishData.depth !== depth) return false
 
         const dx = hook.position.x - fish.position.x
         const dy = hook.position.y - fish.position.y
         const dz = hook.position.z - fish.position.z
         const distance = Math.sqrt(dx * dx + dy * dy + dz * dz)
-        const fishData = fish.userData as FishUserData
-        const catchRadius = 0.6 + (fishData.size * 0.3)
+        // Generous catch radius (depth already gates eligibility)
+        const catchRadius = 4 + (fishData.size * 0.3)
 
-        // Check if bait attracts this fish
+        // Bait acts as a quality modifier within the pool
         const baitMatch = selectedBaitDepth === 'all' || selectedBaitDepth === fishData.depth
-
-        // Higher catch chance with matching bait
-        const catchChance = baitMatch ? 0.7 : 0.2
+        let catchChance = (baitMatch ? 0.7 : 0.4) + catchChanceBonus
+        // Rare/legendary fish are harder to actually hook
+        if (fishData.rare) catchChance *= 0.6
+        catchChance = Math.max(0.05, Math.min(0.97, catchChance))
 
         return distance < catchRadius && Math.random() < catchChance
       })
@@ -341,7 +375,7 @@ export function useFishingScene() {
     fishTimeouts.push(timeoutId)
   }
 
-  const animateFishEscape = (fishItem: THREE.Group) => {
+  const animateFishEscape = (fishItem: THREE.Group, respawnDepth?: 'shallow' | 'medium' | 'deep') => {
     const escapeAnim = () => {
       if (!fishItem) return
       fishItem.position.x += (fishItem.position.x > 0 ? 0.5 : -0.5)
@@ -350,8 +384,21 @@ export function useFishingScene() {
       if (Math.abs(fishItem.position.x) < 15) {
         requestAnimationFrame(escapeAnim)
       } else {
+        // Remove from scene AND keep the parallel arrays index-synced, then
+        // schedule a respawn so the tank doesn't slowly empty on failures.
         scene.value?.remove(fishItem)
-        fishes = fishes.filter(f => f !== fishItem)
+        const idx = fishes.indexOf(fishItem)
+        if (idx > -1) {
+          fishes.splice(idx, 1)
+          fishVelocities.splice(idx, 1)
+        }
+
+        const timeoutId = window.setTimeout(() => {
+          if (scene.value) createFish(respawnDepth)
+          const tIdx = fishTimeouts.indexOf(timeoutId)
+          if (tIdx > -1) fishTimeouts.splice(tIdx, 1)
+        }, 2000)
+        fishTimeouts.push(timeoutId)
       }
     }
     escapeAnim()
@@ -373,11 +420,16 @@ export function useFishingScene() {
     }
   }
 
-  const shakeHook = (fishItem: THREE.Group) => {
+  // Shake amplitude/frequency scale with fish strength (0..1 normalized).
+  // intensity defaults to a mild shake. Caller should stop shaking (e.g. when
+  // the struggle ends) before resetHookPosition runs.
+  const shakeHook = (fishItem: THREE.Group, intensity: number = 0.5) => {
     if (hook && fishItem) {
-      const shake = Math.sin(Date.now() * 0.02) * 0.3
+      const amp = 0.15 + intensity * 0.45
+      const freq = 0.015 + intensity * 0.02
+      const shake = Math.sin(Date.now() * freq) * amp
       hook.position.x = shake
-      fishItem.rotation.y += 0.05
+      fishItem.rotation.y += 0.03 + intensity * 0.05
     }
   }
 

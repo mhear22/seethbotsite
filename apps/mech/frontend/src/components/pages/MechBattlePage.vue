@@ -27,11 +27,18 @@
         <h1>Select Battle Mode</h1>
         <p class="mode-description">Choose how you want to battle</p>
 
-        <div class="mode-options">
-          <button @click="selectSinglePlayer" class="mode-btn single-player-btn">
+        <div class="mode-options mode-options-3">
+          <button @click="selectDuel" class="mode-btn single-player-btn">
             <div class="mode-icon">🤖</div>
             <h3>Practice vs AI</h3>
-            <p>Battle against AI opponent to test your mech</p>
+            <p>Battle a single AI opponent to test your mech</p>
+          </button>
+
+          <button @click="selectSurvival" class="mode-btn survival-btn">
+            <div class="mode-icon">🌊</div>
+            <h3>Survival</h3>
+            <p>Endless escalating waves — how long can you last?</p>
+            <span v-if="survivalBestWave > 0" class="best-wave-badge">Best: Wave {{ survivalBestWave }}</span>
           </button>
 
           <button @click="selectMultiplayer" class="mode-btn multiplayer-btn">
@@ -96,6 +103,22 @@
           </div>
         </div>
 
+        <!-- In-flow difficulty selector (wired to gameSettings.aiDifficulty) -->
+        <div class="difficulty-selector">
+          <span class="difficulty-selector-label">AI Difficulty:</span>
+          <div class="difficulty-options">
+            <button
+              v-for="opt in difficultyOptions"
+              :key="opt.value"
+              class="difficulty-option"
+              :class="[`difficulty-${opt.value}`, { active: currentDifficulty === opt.value }]"
+              @click="setDifficulty(opt.value)"
+            >
+              {{ opt.label }}
+            </button>
+          </div>
+        </div>
+
         <div class="button-group">
           <button @click="confirmMapSelection" class="start-btn">Continue</button>
           <button @click="returnToModeSelect" class="back-btn">Back</button>
@@ -117,38 +140,30 @@
         <h1>Ready for Combat</h1>
 
         <div class="mech-preview">
-          <h3>Your Mech</h3>
-          <div class="stat-grid">
-            <div class="stat-item">
-              <span class="stat-label">Health:</span>
-              <span class="stat-value">{{ playerStats.maxHealth }}</span>
-            </div>
-            <div class="stat-item">
-              <span class="stat-label">Armor:</span>
-              <span class="stat-value">{{ playerStats.armor }}%</span>
-            </div>
-            <div class="stat-item">
-              <span class="stat-label">Firepower:</span>
-              <span class="stat-value">{{ playerStats.firepower }}</span>
-            </div>
-            <div class="stat-item">
-              <span class="stat-label">Speed:</span>
-              <span class="stat-value">{{ playerStats.speed }}</span>
-            </div>
-            <div class="stat-item">
-              <span class="stat-label">Accuracy:</span>
-              <span class="stat-value">{{ playerStats.accuracy }}</span>
-            </div>
-            <div class="stat-item">
-              <span class="stat-label">Energy:</span>
-              <span class="stat-value">{{ playerStats.energy }}</span>
+          <div class="versus-header">
+            <span class="versus-side you">Your Mech</span>
+            <span class="versus-vs">VS</span>
+            <span class="versus-side them">{{ enemyName }}</span>
+          </div>
+
+          <!-- Side-by-side stat comparison with higher/lower indicators -->
+          <div class="stat-compare">
+            <div v-for="row in statComparison" :key="row.label" class="compare-row">
+              <span class="compare-val" :class="{ better: row.mine > row.theirs, worse: row.mine < row.theirs }">
+                <span class="compare-arrow" v-if="row.mine !== row.theirs">{{ row.mine > row.theirs ? '▲' : '▼' }}</span>
+                {{ row.mine }}
+              </span>
+              <span class="compare-label">{{ row.label }}</span>
+              <span class="compare-val them" :class="{ better: row.theirs > row.mine, worse: row.theirs < row.mine }">
+                {{ row.theirs }}
+                <span class="compare-arrow" v-if="row.mine !== row.theirs">{{ row.theirs > row.mine ? '▲' : '▼' }}</span>
+              </span>
             </div>
           </div>
 
-          <h3 style="margin-top: 30px">Enemy: {{ enemyName }}</h3>
           <div class="enemy-info">
+            <p v-if="selectedGameMode === 'survival'" class="mode-tag">Mode: <span class="difficulty-badge difficulty-hard">SURVIVAL</span></p>
             <p>Difficulty: <span class="difficulty-badge" :class="difficultyClass">{{ difficultyLabel }}</span></p>
-            <p>Prepare for combat!</p>
           </div>
         </div>
 
@@ -168,6 +183,7 @@
           :player-mech="(battle.battleState.value.player! as MechEntity)"
           :enemy-mech="(battle.battleState.value.enemy! as MechEntity)"
           :map-id="selectedMapId"
+          :ai-difficulty="activeAIDifficulty"
           @battle-end="handleBattleEnd"
           @damage-dealt="handleDamageDealt"
           @time-update="handleTimeUpdate"
@@ -184,6 +200,7 @@
           :player-max-power="hudData.playerMaxPower"
           :jump-fuel="battle.battleState.value.player?.jumpFuel ?? 0"
           :has-jump-jets="hasJumpJets"
+          :leg-mobility-type="legMobilityType"
           :dash-cooldown="hudData.dashCooldown"
           :dash-max-cooldown="hudData.dashMaxCooldown"
           :ability-cooldown="hudData.abilityCooldown"
@@ -193,7 +210,17 @@
           :enemy-radar-x="hudData.enemyRadarX"
           :enemy-radar-y="hudData.enemyRadarY"
           :targeting="targetingState"
+          :battle-mode="battleMode2"
+          :wave="survivalWave"
+          :score="survivalScore"
+          :best-wave="survivalBestWave"
         />
+
+        <!-- Between-wave repair / staging overlay (survival only) -->
+        <div v-if="battleMode2 === 'survival' && battle.battleState.value.betweenWaves" class="wave-transition">
+          <h2>WAVE {{ survivalWave }} CLEARED</h2>
+          <p>Repairing… next wave incoming</p>
+        </div>
       </template>
 
       <!-- Multiplayer Battle -->
@@ -221,6 +248,7 @@
           :player-max-power="hudData.playerMaxPower"
           :jump-fuel="multiplayerPlayerMech.jumpFuel"
           :has-jump-jets="hasMultiplayerJumpJets"
+          :leg-mobility-type="multiplayerLegMobilityType"
           :dash-cooldown="hudData.dashCooldown"
           :dash-max-cooldown="hudData.dashMaxCooldown"
           :ability-cooldown="hudData.abilityCooldown"
@@ -261,6 +289,10 @@
             <span class="stat-label">Health Remaining:</span>
             <span class="stat-value">{{ Math.round(battle.playerHealth.value) }} / {{ Math.round(battle.playerMaxHealth.value) }}</span>
           </div>
+          <div v-if="battleMode2 === 'survival'" class="stat-row">
+            <span class="stat-label">Wave Reached:</span>
+            <span class="stat-value">{{ survivalWave }}</span>
+          </div>
           <div class="stat-row final-score">
             <span class="stat-label">Final Score:</span>
             <span class="stat-value">{{ battle.battleState.value.score }}</span>
@@ -268,6 +300,14 @@
         </div>
 
         <div class="button-group">
+          <button @click="rematch" class="start-btn">Rematch</button>
+          <button
+            v-if="nextDifficulty"
+            @click="rematchHarder"
+            class="settings-btn next-difficulty-btn"
+          >
+            Try {{ nextDifficultyLabel }} →
+          </button>
           <button @click="returnToBuilder" class="return-btn">Return to Builder</button>
         </div>
       </div>
@@ -287,9 +327,18 @@
             <span class="stat-label">Damage Dealt:</span>
             <span class="stat-value">{{ Math.round(battle.battleState.value.damageDealt) }}</span>
           </div>
+          <div v-if="battleMode2 === 'survival'" class="stat-row">
+            <span class="stat-label">Waves Cleared:</span>
+            <span class="stat-value">{{ Math.max(0, survivalWave - 1) }}</span>
+          </div>
+          <div v-if="battleMode2 === 'survival'" class="stat-row">
+            <span class="stat-label">Best Wave:</span>
+            <span class="stat-value">{{ survivalBestWave }}</span>
+          </div>
         </div>
 
         <div class="button-group">
+          <button @click="rematch" class="start-btn">Try Again</button>
           <button @click="returnToBuilder" class="return-btn">Return to Builder</button>
         </div>
       </div>
@@ -336,6 +385,9 @@ import type { MechLoadout, MatchFoundMessage, MatchEndMessage, WeaponConfig, Abi
 import { SINGLE_PLAYER_MAP_IDS, getAllMaps, getMapById } from '@shared/maps'
 import type { MapDefinition } from '@shared/types/MapDefinition'
 import * as THREE from 'three'
+
+// Selected battle game-mode for single player: classic duel or escalating waves.
+const selectedGameMode = ref<'duel' | 'survival'>('duel')
 
 // Multiplayer state
 const battleMode = ref<'single-player' | 'multiplayer'>('single-player')
@@ -385,13 +437,6 @@ const targetingState = ref({
   screenHeight: 0
 })
 
-const playerStats = computed(() => {
-  if (!battle.battleState.value.player) {
-    return { maxHealth: 0, armor: 0, firepower: 0, speed: 0, accuracy: 0, energy: 0 }
-  }
-  return battle.battleState.value.player.stats
-})
-
 const enemyName = computed(() => battle.battleState.value.enemy?.name ?? 'Unknown Enemy')
 
 const hasJumpJets = computed(() => {
@@ -409,8 +454,16 @@ const abilityName = computed(() => {
   return rack.name.replace(/System|Pack|Bay|Feed/gi, '').trim().toUpperCase()
 })
 
+const legMobilityType = computed(() => {
+  return battle.battleState.value.player?.loadout.legs?.mobilityType
+})
+
 const hasMultiplayerJumpJets = computed(() => {
   return multiplayerPlayerMech.value?.loadout.rack?.id === 'rack-jump-jets'
+})
+
+const multiplayerLegMobilityType = computed(() => {
+  return multiplayerPlayerMech.value?.loadout.legs?.mobilityType
 })
 
 const hasMultiplayerRackAbility = computed(() => {
@@ -438,6 +491,80 @@ const difficultyLabel = computed(() => {
 
 const difficultyClass = computed(() => {
   return `difficulty-${gameSettings.settings.value.aiDifficulty}`
+})
+
+// In-flow difficulty selector (wired to gameSettings.aiDifficulty).
+const difficultyOptions: { value: AIDifficulty; label: string }[] = [
+  { value: 'tutorial', label: 'Tutorial' },
+  { value: 'easy', label: 'Easy' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'hard', label: 'Hard' },
+  { value: 'boss', label: 'Boss' },
+]
+
+const currentDifficulty = computed(() => gameSettings.settings.value.aiDifficulty)
+
+// AI behaviour tier actually used in battle: in survival it escalates with the
+// wave (matching the enemy's stat tier); in duel it's the selected difficulty.
+const activeAIDifficulty = computed<AIDifficulty>(() => {
+  if (battle.battleState.value.mode === 'survival') {
+    return battle.currentWaveDifficulty()
+  }
+  return gameSettings.settings.value.aiDifficulty
+})
+
+function setDifficulty(d: AIDifficulty) {
+  gameSettings.settings.value.aiDifficulty = d
+}
+
+// --- Opponent stat comparison (your stats vs enemy.stats) for the ready screen. ---
+interface StatComparisonRow {
+  label: string
+  mine: number
+  theirs: number
+}
+
+const statComparison = computed<StatComparisonRow[]>(() => {
+  const p = battle.battleState.value.player?.stats
+  const e = battle.battleState.value.enemy?.stats
+  if (!p || !e) return []
+  return [
+    { label: 'Health', mine: Math.round(p.maxHealth), theirs: Math.round(e.maxHealth) },
+    { label: 'Armor', mine: Math.round(p.armor), theirs: Math.round(e.armor) },
+    { label: 'Firepower', mine: Math.round(p.firepower), theirs: Math.round(e.firepower) },
+    { label: 'Speed', mine: Math.round(p.speed), theirs: Math.round(e.speed) },
+    { label: 'Accuracy', mine: Math.round(p.accuracy), theirs: Math.round(e.accuracy) },
+    { label: 'Energy', mine: Math.round(p.energy), theirs: Math.round(e.energy) },
+  ]
+})
+
+// Survival HUD passthrough.
+const battleMode2 = computed(() => battle.battleState.value.mode)
+const survivalWave = computed(() => battle.battleState.value.wave)
+const survivalScore = computed(() => battle.battleState.value.score)
+const survivalBestWave = computed(() => battle.battleState.value.bestWave)
+
+// Next-difficulty nudge on victory (suggest the next harder tier).
+const nextDifficulty = computed<AIDifficulty | null>(() => {
+  const order: AIDifficulty[] = ['tutorial', 'easy', 'medium', 'hard', 'boss']
+  const idx = order.indexOf(currentDifficulty.value)
+  return idx >= 0 && idx < order.length - 1 ? order[idx + 1] : null
+})
+
+const nextDifficultyLabel = computed(() => {
+  if (!nextDifficulty.value) return ''
+  return difficultyOptions.find(o => o.value === nextDifficulty.value)?.label ?? ''
+})
+
+// Between-wave handling: when the battle composable stages the next wave, briefly
+// pause then re-enter the active phase with a fresh, tougher enemy.
+watch(() => battle.battleState.value.betweenWaves, (between) => {
+  if (between) {
+    // Brief repair/staging pause before the next wave begins.
+    setTimeout(() => {
+      battle.nextWave()
+    }, 1500)
+  }
 })
 
 onMounted(() => {
@@ -534,9 +661,16 @@ function handleHudUpdate(data: {
   targetingState.value = data.targeting
 }
 
-function selectSinglePlayer() {
+function selectDuel() {
   battleMode.value = 'single-player'
+  selectedGameMode.value = 'duel'
   // Go to map selection first
+  battle.battleState.value.phase = 'map-select'
+}
+
+function selectSurvival() {
+  battleMode.value = 'single-player'
+  selectedGameMode.value = 'survival'
   battle.battleState.value.phase = 'map-select'
 }
 
@@ -556,8 +690,40 @@ function confirmMapSelection() {
     playerSpawn
   )
 
-  // Generate enemy mech at map spawn position using selected difficulty
-  battle.generateEnemy(gameSettings.settings.value.aiDifficulty, enemySpawn)
+  if (selectedGameMode.value === 'survival') {
+    // Survival: chain escalating waves from the selected base difficulty.
+    battle.startSurvival(gameSettings.settings.value.aiDifficulty, enemySpawn)
+  } else {
+    // Duel: generate a single enemy at the selected difficulty.
+    battle.battleState.value.mode = 'duel'
+    battle.generateEnemy(gameSettings.settings.value.aiDifficulty, enemySpawn)
+  }
+}
+
+// Re-initialize the same loadout + enemy and jump straight back into combat.
+// Used by the Rematch / Try Again buttons on victory/defeat.
+function rematch() {
+  const mapDef = getMapById(selectedMapId.value)
+  const playerSpawn = mapDef?.spawnPoints.find(s => s.playerSlot === 0)
+  const enemySpawn = mapDef?.spawnPoints.find(s => s.playerSlot === 1)
+
+  battle.initializeBattle(builder.loadout.value, builder.totalStats.value, playerSpawn)
+
+  if (selectedGameMode.value === 'survival') {
+    battle.startSurvival(gameSettings.settings.value.aiDifficulty, enemySpawn)
+  } else {
+    battle.battleState.value.mode = 'duel'
+    battle.generateEnemy(gameSettings.settings.value.aiDifficulty, enemySpawn)
+  }
+  battle.startBattle()
+}
+
+// Bump to the next difficulty tier (if any) and rematch.
+function rematchHarder() {
+  if (nextDifficulty.value) {
+    setDifficulty(nextDifficulty.value)
+  }
+  rematch()
 }
 
 function returnToModeSelect() {
@@ -1082,6 +1248,199 @@ function returnToBuilder() {
   background: #ef4444;
 }
 
+/* Versus header + stat comparison (ready screen) */
+.versus-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.versus-side {
+  font-size: 1.3rem;
+  font-weight: bold;
+  flex: 1;
+}
+
+.versus-side.you {
+  color: #34d399;
+  text-align: left;
+}
+
+.versus-side.them {
+  color: #f87171;
+  text-align: right;
+}
+
+.versus-vs {
+  color: #fbbf24;
+  font-size: 1.1rem;
+  font-weight: bold;
+  text-shadow: 0 0 12px rgba(245, 158, 11, 0.7);
+}
+
+.stat-compare {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.compare-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+  padding: 8px 14px;
+}
+
+.compare-label {
+  color: #9ca3af;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.compare-val {
+  color: #e5e7eb;
+  font-size: 1.2rem;
+  font-weight: bold;
+  text-align: right;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.compare-val.them {
+  text-align: left;
+  justify-content: flex-start;
+}
+
+.compare-val.better {
+  color: #34d399;
+}
+
+.compare-val.worse {
+  color: #f87171;
+}
+
+.compare-arrow {
+  font-size: 0.7rem;
+}
+
+.mode-tag {
+  margin-bottom: 6px;
+}
+
+/* In-flow difficulty selector */
+.difficulty-selector {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.difficulty-selector-label {
+  color: #9ca3af;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.difficulty-options {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.difficulty-option {
+  padding: 8px 18px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.3);
+  color: #cbd5e0;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.difficulty-option:hover {
+  border-color: rgba(255, 255, 255, 0.45);
+  color: #fff;
+}
+
+.difficulty-option.active {
+  color: #fff;
+  border-color: transparent;
+}
+
+.difficulty-option.active.difficulty-tutorial { background: #6b7280; }
+.difficulty-option.active.difficulty-easy { background: #10b981; }
+.difficulty-option.active.difficulty-medium { background: #3b82f6; }
+.difficulty-option.active.difficulty-hard { background: #f59e0b; }
+.difficulty-option.active.difficulty-boss { background: #ef4444; }
+
+.next-difficulty-btn {
+  background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+}
+
+.next-difficulty-btn:hover {
+  background: linear-gradient(135deg, #7c3aed, #5b21b6);
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.5);
+}
+
+/* Survival mode button + best-wave badge */
+.mode-options-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.best-wave-badge {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background: linear-gradient(135deg, #0891b2, #0e7490);
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: bold;
+}
+
+/* Between-wave transition overlay */
+.wave-transition {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 200;
+  pointer-events: none;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.wave-transition h2 {
+  color: #fbbf24;
+  font-size: 3rem;
+  text-shadow: 0 0 24px rgba(245, 158, 11, 0.8);
+  margin-bottom: 12px;
+}
+
+.wave-transition p {
+  color: #e5e7eb;
+  font-size: 1.3rem;
+}
+
 /* Buttons */
 .button-group {
   display: flex;
@@ -1506,7 +1865,8 @@ function returnToBuilder() {
     width: 100%;
   }
 
-  .mode-options {
+  .mode-options,
+  .mode-options-3 {
     grid-template-columns: 1fr;
   }
 

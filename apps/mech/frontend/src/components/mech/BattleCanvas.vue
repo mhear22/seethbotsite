@@ -6,15 +6,19 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, markRaw } from 'vue'
+import { ref, computed, onMounted, onUnmounted, markRaw, watch } from 'vue'
 import { BattleScene } from '../../lib/battle/BattleScene'
 import type { MechEntity } from '../../lib/battle/MechEntity'
 import { useGameSettings } from '../../composables/useGameSettings'
+import { useBattleEffects } from '../../composables/useBattleEffects'
+
+import type { AIDifficulty } from '../../composables/useGameSettings'
 
 const props = defineProps<{
   playerMech: MechEntity
   enemyMech: MechEntity
   mapId?: string
+  aiDifficulty?: AIDifficulty
 }>()
 
 const emit = defineEmits<{
@@ -43,6 +47,7 @@ const emit = defineEmits<{
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 let battleScene: BattleScene | null = null
 const gameSettings = useGameSettings()
+const battleEffects = useBattleEffects()
 const fps = ref(0)
 const showFPS = computed(() => gameSettings.settings.value.graphics.showFPS)
 
@@ -54,11 +59,18 @@ onMounted(() => {
     playerMech: props.playerMech,
     enemyMech: props.enemyMech,
     mapId: props.mapId,
+    aiDifficulty: props.aiDifficulty ?? gameSettings.settings.value.aiDifficulty,
     onBattleEnd: (result) => {
       emit('battle-end', result)
     },
     onDamageDealt: (amount) => {
       emit('damage-dealt', amount)
+    },
+    onPlayerHitConfirm: ({ kill }) => {
+      battleEffects.pushHitMarker(kill)
+    },
+    onPlayerDamageNumber: ({ amount, crit, screenX, screenY }) => {
+      battleEffects.pushDamageNumber(amount, crit, screenX, screenY)
     },
     mouseSensitivity: gameSettings.settings.value.mouseSensitivity,
     movementSpeed: gameSettings.settings.value.movementSpeed,
@@ -69,6 +81,15 @@ onMounted(() => {
   }))
 
   battleScene.start()
+
+  // Survival waves swap in a fresh enemy without remounting (which would dispose
+  // the persistent player mech). When the enemyMech prop identity changes, hand
+  // the new enemy to the running scene.
+  watch(() => props.enemyMech, (newEnemy, oldEnemy) => {
+    if (battleScene && newEnemy && newEnemy !== oldEnemy) {
+      battleScene.respawnEnemy(newEnemy, props.aiDifficulty ?? gameSettings.settings.value.aiDifficulty)
+    }
+  })
 
   // Emit time + HUD updates periodically
   const timeInterval = setInterval(() => {
@@ -118,6 +139,9 @@ onUnmounted(() => {
     battleScene.cleanup()
     battleScene = null
   }
+  // Drop any leftover hit markers / damage numbers so they don't bleed into a
+  // subsequent battle.
+  battleEffects.clear()
 })
 
 // ESC key to exit

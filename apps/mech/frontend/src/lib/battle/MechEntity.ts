@@ -34,6 +34,11 @@ export class MechEntity {
   // Walk animation
   private walkCycle: number = 0
 
+  // Emissive-based damage flash (0 = none, 1 = full red). Decayed in update().
+  private damageFlash: number = 0
+  // Cached base emissive per mesh so the flash never captures a transient colour.
+  private baseEmissive: WeakMap<THREE.Mesh, { color: number; intensity: number }> = new WeakMap()
+
   // Power system
   currentPower: number = 100
   maxPower: number = 100
@@ -200,6 +205,37 @@ export class MechEntity {
     if (!this.isDestroyed) {
       this.animateWalk(deltaTime)
     }
+
+    // Decay emissive damage flash
+    this.updateDamageFlash(deltaTime)
+  }
+
+  /**
+   * Emissive-based damage flash. On hit we set damageFlash = 1; here it decays
+   * back to 0 and the cached base emissive is restored. Using emissive (not the
+   * material colour) avoids the captured-colour bug from the old setTimeout swap
+   * and is safe to drive from multiplayer too (purely visual).
+   */
+  private updateDamageFlash(deltaTime: number) {
+    if (this.damageFlash <= 0) return
+    this.damageFlash = Math.max(0, this.damageFlash - deltaTime * 5) // ~0.2s flash
+
+    const flash = this.damageFlash
+    this.mesh.traverse((child) => {
+      if (!(child instanceof THREE.Mesh)) return
+      const mat = child.material
+      if (!(mat instanceof THREE.MeshStandardMaterial) || !mat.emissive) return
+
+      // Cache the resting emissive once, before we ever modify it.
+      if (!this.baseEmissive.has(child)) {
+        this.baseEmissive.set(child, { color: mat.emissive.getHex(), intensity: mat.emissiveIntensity })
+      }
+      const base = this.baseEmissive.get(child)!
+
+      // Lerp from base toward red proportional to the current flash value.
+      mat.emissive.setHex(base.color).lerp(new THREE.Color(0xff0000), flash)
+      mat.emissiveIntensity = base.intensity + flash * 1.5
+    })
   }
 
   private animateWalk(deltaTime: number) {
@@ -356,17 +392,8 @@ export class MechEntity {
   }
 
   private flashDamage() {
-    // Brief red flash effect
-    this.mesh.traverse((child) => {
-      if (child instanceof THREE.Mesh) {
-        const originalColor = child.material.color.getHex()
-        child.material.color.setHex(0xff0000)
-
-        setTimeout(() => {
-          child.material.color.setHex(originalColor)
-        }, 100)
-      }
-    })
+    // Trigger the emissive flash; the decay + restore happens in update().
+    this.damageFlash = 1
   }
 
   playDestroyAnimation(deltaTime: number) {

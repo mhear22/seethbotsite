@@ -9,6 +9,13 @@
       </div>
     </div>
 
+    <!-- Survival wave + score banner -->
+    <div v-if="battleMode === 'survival'" class="survival-banner">
+      <div class="survival-wave">WAVE {{ wave }}</div>
+      <div class="survival-score">SCORE {{ score }}</div>
+      <div v-if="bestWave > 0" class="survival-best">BEST WAVE {{ bestWave }}</div>
+    </div>
+
     <!-- Enemy Health Bar -->
     <div class="health-bar enemy">
       <div class="bar-label">{{ enemyName }}</div>
@@ -25,6 +32,30 @@
       <div class="crosshair-line vertical"></div>
     </div>
 
+    <!-- Hit markers (brief expanding crosshair on a confirmed player hit) -->
+    <div
+      v-for="marker in hitMarkers"
+      :key="marker.id"
+      class="hit-marker"
+      :class="{ kill: marker.kill }"
+    >
+      <span class="hit-marker-line tl"></span>
+      <span class="hit-marker-line tr"></span>
+      <span class="hit-marker-line bl"></span>
+      <span class="hit-marker-line br"></span>
+    </div>
+
+    <!-- Floating damage numbers -->
+    <div
+      v-for="dmg in damageNumbers"
+      :key="dmg.id"
+      class="damage-number"
+      :class="{ crit: dmg.crit }"
+      :style="damageNumberStyle(dmg)"
+    >
+      {{ Math.round(dmg.amount) }}{{ dmg.crit ? '!' : '' }}
+    </div>
+
     <!-- Targeting Box -->
     <div v-if="targeting.isTargeted" class="targeting-box" :style="targetingStyle">
       <div class="targeting-corner tl"></div>
@@ -36,11 +67,11 @@
 
     <!-- Dash Cooldown Indicator -->
     <div class="dash-indicator">
-      <div class="dash-label" :class="{ ready: dashReady }">
+      <div class="dash-label" :class="{ ready: dashReady, 'ready-flash': dashReadyFlash }">
         {{ dashReady ? 'DASH READY' : 'DASH' }}
       </div>
       <div class="dash-bar-container">
-        <div class="dash-fill" :style="{ width: dashPercent + '%' }"></div>
+        <div class="dash-fill" :class="{ 'ready-flash': dashReadyFlash }" :style="{ width: dashPercent + '%' }"></div>
       </div>
     </div>
 
@@ -63,11 +94,11 @@
 
     <!-- Ability Cooldown Indicator -->
     <div v-if="hasRackAbility" class="ability-indicator">
-      <div class="ability-label" :class="{ ready: abilityReady }">
+      <div class="ability-label" :class="{ ready: abilityReady, 'ready-flash': abilityReadyFlash }">
         {{ abilityReady ? abilityName + ' READY' : abilityName }}
       </div>
       <div class="ability-bar-container">
-        <div class="ability-fill" :style="{ width: abilityPercent + '%' }"></div>
+        <div class="ability-fill" :class="{ 'ready-flash': abilityReadyFlash }" :style="{ width: abilityPercent + '%' }"></div>
       </div>
     </div>
 
@@ -88,7 +119,7 @@
       <div class="control-item">LMB - Right Arm</div>
       <div class="control-item">RMB - Left Arm</div>
       <div class="control-item">Shift - Dash</div>
-      <div v-if="hasJumpJets" class="control-item">Space - Jump</div>
+      <div v-if="showSpaceJump" class="control-item">Space - Jump</div>
       <div v-if="hasRackAbility" class="control-item">E - Ability</div>
       <div class="control-item">ESC - Exit</div>
     </div>
@@ -96,7 +127,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { useBattleEffects, type DamageNumberEvent } from '../../../composables/useBattleEffects'
 
 const props = defineProps<{
   playerHealth: number
@@ -114,6 +146,12 @@ const props = defineProps<{
   abilityMaxCooldown: number
   hasRackAbility: boolean
   abilityName: string
+  /**
+   * Leg locomotion type. When provided, Space-Jump is shown for every type
+   * except 'tracked'. Optional so existing call sites keep working; falls back
+   * to hasJumpJets when omitted.
+   */
+  legMobilityType?: 'bipedal' | 'quadrupedal' | 'hover' | 'tracked'
   enemyRadarX: number
   enemyRadarY: number
   targeting: {
@@ -123,6 +161,14 @@ const props = defineProps<{
     screenWidth: number
     screenHeight: number
   }
+  /** Battle mode — 'survival' surfaces the wave/score banner. */
+  battleMode?: 'duel' | 'survival'
+  /** Current survival wave (1-based). */
+  wave?: number
+  /** Running survival score. */
+  score?: number
+  /** Best survival wave reached (persisted). */
+  bestWave?: number
 }>()
 
 const playerHealthPercent = computed(() => {
@@ -180,6 +226,48 @@ const abilityPercent = computed(() => {
   if (!props.hasRackAbility || props.abilityCooldown <= 0) return 100
   return Math.max(0, Math.min(100, (1 - props.abilityCooldown / props.abilityMaxCooldown) * 100))
 })
+
+// Show Space-Jump for every leg type except tracked. When legMobilityType isn't
+// provided by the parent, fall back to the legacy hasJumpJets behaviour.
+const showSpaceJump = computed(() => {
+  if (props.legMobilityType !== undefined) return props.legMobilityType !== 'tracked'
+  return props.hasJumpJets
+})
+
+// Brief ready-flash pulse when dash / ability come off cooldown.
+const dashReadyFlash = ref(false)
+const abilityReadyFlash = ref(false)
+let dashFlashTimer: number | undefined
+let abilityFlashTimer: number | undefined
+
+watch(dashReady, (now, was) => {
+  if (now && !was) {
+    dashReadyFlash.value = true
+    window.clearTimeout(dashFlashTimer)
+    dashFlashTimer = window.setTimeout(() => { dashReadyFlash.value = false }, 700)
+  }
+})
+
+watch(abilityReady, (now, was) => {
+  if (now && !was && props.hasRackAbility) {
+    abilityReadyFlash.value = true
+    window.clearTimeout(abilityFlashTimer)
+    abilityFlashTimer = window.setTimeout(() => { abilityReadyFlash.value = false }, 700)
+  }
+})
+
+// Transient combat feedback shared from BattleCanvas via the battle-effects channel.
+const { hitMarkers, damageNumbers } = useBattleEffects()
+
+const damageNumberStyle = (dmg: DamageNumberEvent) => {
+  // Scale font by damage (clamped); crits handled via the .crit class.
+  const fontSize = Math.min(42, 16 + dmg.amount * 0.8)
+  return {
+    left: `${dmg.screenX}px`,
+    top: `${dmg.screenY}px`,
+    fontSize: `${fontSize}px`,
+  }
+}
 </script>
 
 <style scoped>
@@ -253,6 +341,45 @@ const abilityPercent = computed(() => {
   font-size: 14px;
   font-weight: bold;
   text-shadow: 0 0 10px rgba(0, 0, 0, 0.9);
+}
+
+/* Survival Banner */
+.survival-banner {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 22px;
+  align-items: baseline;
+  padding: 8px 22px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 2px solid rgba(245, 158, 11, 0.5);
+  border-radius: 8px;
+  box-shadow: 0 0 16px rgba(245, 158, 11, 0.25);
+  pointer-events: none;
+}
+
+.survival-wave {
+  color: #fbbf24;
+  font-size: 22px;
+  font-weight: bold;
+  text-shadow: 0 0 12px rgba(245, 158, 11, 0.8);
+  letter-spacing: 0.05em;
+}
+
+.survival-score {
+  color: #fff;
+  font-size: 16px;
+  font-weight: bold;
+  text-shadow: 0 0 8px rgba(0, 0, 0, 0.9);
+}
+
+.survival-best {
+  color: #9ca3af;
+  font-size: 12px;
+  font-weight: bold;
+  text-shadow: 0 0 6px rgba(0, 0, 0, 0.9);
 }
 
 /* Crosshair */
@@ -622,6 +749,75 @@ const abilityPercent = computed(() => {
 
 .control-item:last-child {
   margin-bottom: 0;
+}
+
+/* Hit Markers */
+.hit-marker {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 28px;
+  height: 28px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  animation: hit-marker-pop 0.4s ease-out forwards;
+}
+
+.hit-marker-line {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  border-color: #ffffff;
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.8);
+}
+
+.hit-marker.kill .hit-marker-line {
+  border-color: #ff3b3b;
+  box-shadow: 0 0 8px rgba(255, 59, 59, 0.9);
+}
+
+.hit-marker-line.tl { top: 0; left: 0; border-top: 2px solid; border-left: 2px solid; }
+.hit-marker-line.tr { top: 0; right: 0; border-top: 2px solid; border-right: 2px solid; }
+.hit-marker-line.bl { bottom: 0; left: 0; border-bottom: 2px solid; border-left: 2px solid; }
+.hit-marker-line.br { bottom: 0; right: 0; border-bottom: 2px solid; border-right: 2px solid; }
+
+@keyframes hit-marker-pop {
+  0% { transform: translate(-50%, -50%) scale(0.5); opacity: 1; }
+  60% { transform: translate(-50%, -50%) scale(1.3); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(1.6); opacity: 0; }
+}
+
+/* Floating Damage Numbers */
+.damage-number {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  color: #ffe08a;
+  font-weight: bold;
+  font-family: 'Courier New', monospace;
+  text-shadow: 0 0 6px rgba(0, 0, 0, 0.9), 0 0 10px rgba(255, 180, 0, 0.6);
+  pointer-events: none;
+  animation: damage-float 1s ease-out forwards;
+}
+
+.damage-number.crit {
+  color: #ff5555;
+  text-shadow: 0 0 8px rgba(0, 0, 0, 0.9), 0 0 14px rgba(255, 60, 60, 0.85);
+}
+
+@keyframes damage-float {
+  0% { transform: translate(-50%, -50%) scale(0.6); opacity: 0; }
+  15% { transform: translate(-50%, -60%) scale(1.1); opacity: 1; }
+  100% { transform: translate(-50%, -160%) scale(1); opacity: 0; }
+}
+
+/* Ready-flash pulse for dash / ability coming off cooldown */
+.ready-flash {
+  animation: ready-flash-pulse 0.7s ease-out;
+}
+
+@keyframes ready-flash-pulse {
+  0% { filter: brightness(2.5); box-shadow: 0 0 16px currentColor; }
+  100% { filter: brightness(1); box-shadow: none; }
 }
 
 /* Responsive adjustments */
