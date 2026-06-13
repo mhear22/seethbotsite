@@ -67,3 +67,6 @@ backend/build-info.json
 
 # Ticket meta file (generated)
 .ticket-meta.json
+
+# Database backups (generated)
+backups/
