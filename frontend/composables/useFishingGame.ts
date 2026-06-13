@@ -255,7 +255,7 @@ export function useFishingGame() {
       if (Array.isArray(data.caughtFish)) caughtFish.value = data.caughtFish
       if (data.baitInventory && typeof data.baitInventory === 'object') {
         // worm stays Infinity even though JSON can't store it
-        baitInventory.value = { worm: Infinity, ...data.baitInventory, worm: Infinity }
+        baitInventory.value = { ...data.baitInventory, worm: Infinity }
       }
       if (data.bestiary && typeof data.bestiary === 'object') bestiary.value = data.bestiary
       if (typeof data.bestScore === 'number') bestScore.value = data.bestScore
