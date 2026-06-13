@@ -72,9 +72,10 @@ RUN GIT_HASH="${GIT_HASH}" GIT_BRANCH="${GIT_BRANCH}" BUILD_COUNT="${BUILD_COUNT
 FROM shared-src AS frontend-builder
 # Backend OpenAPI spec for type generation
 COPY --from=backend-builder /app/backend/dist/openapi.json ./backend/dist/openapi.json
-# Frontend source + both shared trees (for prebuild validation)
+# Frontend source + backend shared tree at repo-root path (for prebuild validation,
+# which resolves backend/src/shared & frontend/shared relative to the workspace root)
 COPY frontend/ ./frontend/
-COPY backend/src/shared ./frontend/src/shared/
+COPY backend/src/shared ./backend/src/shared/
 RUN --mount=type=cache,target=/app/frontend/public/assets/images/resized \
     pnpm --filter ./frontend run build
 
@@ -87,8 +88,11 @@ RUN pnpm --filter ./apps/mech/frontend run build
 
 # ---------------------------------------------------------------------------
 # Stage: build tickets frontend app (relies on hoisted @vue/tsconfig from workspace)
+# Note: tickets imports @frontend/* (alias -> ../../../frontend), so the main
+# frontend source must be present.
 # ---------------------------------------------------------------------------
 FROM deps AS tickets-frontend-builder
+COPY frontend/ ./frontend/
 COPY apps/tickets/frontend/ ./apps/tickets/frontend/
 RUN pnpm --filter ./apps/tickets/frontend run build
 
