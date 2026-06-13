@@ -59,8 +59,15 @@ const DATACENTER_SERVE_ROOT = process.env.DATACENTER_SERVE_ROOT || path.join(__d
 
 // Middleware
 const allowedOrigins = process.env.CORS_ORIGINS
-  ? process.env.CORS_ORIGINS.split(',').map(o => o.trim())
+  ? process.env.CORS_ORIGINS.split(',').map(o => o.trim()).filter(Boolean)
   : [];
+
+if (allowedOrigins.length === 0 && process.env.NODE_ENV === 'production') {
+  console.warn(
+    '⚠️  CORS_ORIGINS is not set in production: CORS is allowing ALL origins. ' +
+    'Set CORS_ORIGINS to a comma-separated allowlist of your own domain(s) to restrict cross-origin access.'
+  );
+}
 
 app.use(cors(allowedOrigins.length > 0 ? {
   origin: (origin, callback) => {

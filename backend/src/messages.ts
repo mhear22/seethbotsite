@@ -161,9 +161,30 @@ export async function getUserConversations(userId: number): Promise<Conversation
 
   const userMap = new Map(users.map((u) => [u.id, u]));
 
+  // Compute unread counts for all conversations in parallel so the per-conversation
+  // count queries pipeline instead of running sequentially. Each query keeps its own
+  // per-conversation last_read_at cutoff to preserve exact filtering.
+  const unreadCounts = await Promise.all(
+    participations.map((participation) =>
+      prisma.message.count({
+        where: {
+          conversation_id: participation.conversation.id,
+          sender_id: {
+            not: userId,
+          },
+          is_deleted: false,
+          created_at: {
+            gt: participation.last_read_at ?? new Date(0),
+          },
+        },
+      })
+    )
+  );
+
   const results: ConversationWithDetails[] = [];
 
-  for (const participation of participations) {
+  for (let i = 0; i < participations.length; i++) {
+    const participation = participations[i];
     const conv = participation.conversation;
 
     // Build participants array with user info
@@ -180,19 +201,8 @@ export async function getUserConversations(userId: number): Promise<Conversation
     // Get last message
     const lastMessage = conv.messages[0];
 
-    // Get unread count
-    const unreadCount = await prisma.message.count({
-      where: {
-        conversation_id: conv.id,
-        sender_id: {
-          not: userId,
-        },
-        is_deleted: false,
-        created_at: {
-          gt: participation.last_read_at ?? new Date(0),
-        },
-      },
-    });
+    // Get unread count (computed in parallel above)
+    const unreadCount = unreadCounts[i];
 
     results.push({
       id: conv.id,

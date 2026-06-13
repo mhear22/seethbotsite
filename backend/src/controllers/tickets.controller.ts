@@ -150,12 +150,26 @@ router.get('/tickets/next-task', async (req: Request, res: Response) => {
   try {
     const now = new Date();
 
-    // Update last collection timestamp
-    await prisma.setting.upsert({
-      where: { key: 'last_collection' },
-      create: { key: 'last_collection', value: now.toISOString() },
-      update: { value: now.toISOString(), updated_at: now }
+    // Update last collection timestamp (heartbeat). Throttle the write so a
+    // frequently-polling automation doesn't hammer this hot row: only upsert
+    // when the existing value is missing or older than ~60s.
+    const existing = await prisma.setting.findUnique({
+      where: { key: 'last_collection' }
     });
+    const THROTTLE_MS = 60 * 1000;
+    const existingTime = existing?.value ? new Date(existing.value).getTime() : 0;
+    const isStale = !existing?.value || Number.isNaN(existingTime) ||
+      now.getTime() - existingTime >= THROTTLE_MS;
+
+    if (isStale) {
+      await prisma.setting.upsert({
+        where: { key: 'last_collection' },
+        create: { key: 'last_collection', value: now.toISOString() },
+        update: { value: now.toISOString(), updated_at: now }
+      });
+    }
+
+    const lastCollection = isStale ? now.toISOString() : existing!.value;
 
     // First, check if there's already a ticket in progress (needs-info status)
     let ticket = await prisma.ticket.findFirst({
@@ -181,7 +195,7 @@ router.get('/tickets/next-task', async (req: Request, res: Response) => {
       });
     }
 
-    res.json({ ticket, lastCollection: now.toISOString() });
+    res.json({ ticket, lastCollection });
   } catch (error) {
     console.error('Error fetching next task:', error);
     res.status(500).json({ error: 'Failed to fetch next task' });
@@ -314,7 +328,7 @@ router.get('/tickets', async (req: Request, res: Response) => {
       category: category as string,
       sortBy: sortBy as 'relevance' | 'created_at' | 'updated_at',
       page: page ? parseInt(page as string) : undefined,
-      limit: limit ? parseInt(limit as string) : undefined
+      limit: limit ? Math.min(parseInt(limit as string) || 50, 100) : undefined
     };
 
     const result = await ticketsFilterService.getFilteredTickets(filters);

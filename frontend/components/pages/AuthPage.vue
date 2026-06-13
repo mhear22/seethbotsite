@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuth } from '../../composables/useAuth'
 import { formatDate } from '../../utils/format'
@@ -172,26 +172,116 @@ const handleChangePassword = async () => {
   }
 }
 
-const handleLogout = async () => {
-  if (confirm('Are you sure you want to logout?')) {
-    await auth.logout()
-    successMessage.value = 'Logged out successfully'
-    setMode('login')
+// Confirmation modal state
+const showLogoutModal = ref(false)
+const showDeleteModal = ref(false)
+const deletePassword = ref('')
+const modalError = ref('')
+
+const modalRef = ref<HTMLElement | null>(null)
+const previouslyFocused = ref<HTMLElement | null>(null)
+
+const modalOpen = ref(false)
+watch([showLogoutModal, showDeleteModal], ([logout, del]) => {
+  modalOpen.value = logout || del
+})
+
+// Focus trap within the active modal
+const handleModalTab = (e: KeyboardEvent) => {
+  if (e.key !== 'Tab' || !modalRef.value) return
+
+  const elements = Array.from(
+    modalRef.value.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
+    )
+  )
+  if (elements.length === 0) return
+
+  const first = elements[0]
+  const last = elements[elements.length - 1]
+
+  if (e.shiftKey) {
+    if (document.activeElement === first) {
+      e.preventDefault()
+      last.focus()
+    }
+  } else if (document.activeElement === last) {
+    e.preventDefault()
+    first.focus()
   }
 }
 
-const handleDeleteAccount = async () => {
-  if (confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
-    const password = prompt('Please enter your password to confirm account deletion:')
-    if (!password) return
+const handleModalEscape = (e: KeyboardEvent) => {
+  if (e.key === 'Escape' && modalOpen.value) {
+    closeModals()
+  }
+}
 
-    const result = await auth.deleteAccount(password)
-    if (result.success) {
-      successMessage.value = 'Account deleted successfully'
-      setMode('login')
-    } else if (result.error) {
-      errorMessage.value = result.error
-    }
+watch(modalOpen, async (open) => {
+  if (open) {
+    previouslyFocused.value = document.activeElement as HTMLElement
+    document.addEventListener('keydown', handleModalTab)
+    await nextTick()
+    const focusable = modalRef.value?.querySelector<HTMLElement>(
+      'input:not([disabled]), button:not([disabled])'
+    )
+    focusable?.focus()
+  } else {
+    document.removeEventListener('keydown', handleModalTab)
+    previouslyFocused.value?.focus()
+    previouslyFocused.value = null
+  }
+})
+
+onMounted(() => {
+  document.addEventListener('keydown', handleModalEscape)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('keydown', handleModalEscape)
+  document.removeEventListener('keydown', handleModalTab)
+})
+
+const closeModals = () => {
+  showLogoutModal.value = false
+  showDeleteModal.value = false
+  deletePassword.value = ''
+  modalError.value = ''
+}
+
+const handleLogout = () => {
+  clearMessages()
+  modalError.value = ''
+  showLogoutModal.value = true
+}
+
+const confirmLogout = async () => {
+  await auth.logout()
+  closeModals()
+  successMessage.value = 'Logged out successfully'
+  setMode('login')
+}
+
+const handleDeleteAccount = () => {
+  clearMessages()
+  deletePassword.value = ''
+  modalError.value = ''
+  showDeleteModal.value = true
+}
+
+const confirmDeleteAccount = async () => {
+  if (!deletePassword.value) {
+    modalError.value = 'Please enter your password to confirm.'
+    return
+  }
+
+  const result = await auth.deleteAccount(deletePassword.value)
+  if (result.success) {
+    closeModals()
+    successMessage.value = 'Account deleted successfully'
+    setMode('login')
+  } else if (result.error) {
+    modalError.value = result.error
   }
 }
 </script>
@@ -431,6 +521,66 @@ const handleDeleteAccount = async () => {
         <p class="auth-info">
           Account created: {{ formatDate(auth.user.value?.created_at || '') }}
         </p>
+      </div>
+    </div>
+
+    <!-- Logout confirmation modal -->
+    <div
+      v-if="showLogoutModal"
+      class="modal-overlay"
+      @click.self="closeModals"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="logout-modal-title"
+    >
+      <div class="modal-box" ref="modalRef">
+        <h2 id="logout-modal-title">Log out?</h2>
+        <p>Are you sure you want to log out?</p>
+        <div class="modal-actions">
+          <button type="button" class="auth-btn auth-btn-secondary" @click="closeModals">Cancel</button>
+          <button type="button" class="auth-btn auth-btn-primary" @click="confirmLogout" :disabled="auth.loading.value">
+            {{ auth.loading.value ? 'Logging out...' : 'Log out' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Delete account confirmation modal -->
+    <div
+      v-if="showDeleteModal"
+      class="modal-overlay"
+      @click.self="closeModals"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="delete-modal-title"
+    >
+      <div class="modal-box" ref="modalRef">
+        <h2 id="delete-modal-title">Delete account?</h2>
+        <p>This action cannot be undone. Enter your password to confirm.</p>
+
+        <div v-if="modalError" class="auth-message auth-message-error" role="alert" aria-live="assertive">
+          ❌ {{ modalError }}
+        </div>
+
+        <div class="form-group">
+          <label for="delete-confirm-password">Password</label>
+          <input
+            id="delete-confirm-password"
+            v-model="deletePassword"
+            type="password"
+            placeholder="••••••••"
+            autocomplete="current-password"
+            @keyup.enter="confirmDeleteAccount"
+            :disabled="auth.loading.value"
+          />
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="auth-btn auth-btn-secondary" @click="closeModals">Cancel</button>
+          <button type="button" class="auth-btn auth-btn-danger" @click="confirmDeleteAccount" :disabled="auth.loading.value">
+            {{ auth.loading.value ? 'Deleting...' : 'Delete Account' }}
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -691,6 +841,49 @@ const handleDeleteAccount = async () => {
   }
 }
 
+/* Confirmation modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 1000;
+}
+
+.modal-box {
+  background: white;
+  padding: 28px;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  border: 1px solid #e2e8f0;
+  max-width: 420px;
+  width: 100%;
+}
+
+.modal-box h2 {
+  margin: 0 0 12px 0;
+  color: #2d3748;
+  font-size: 1.5rem;
+}
+
+.modal-box p {
+  margin: 0 0 20px 0;
+  color: #4a5568;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.modal-actions .auth-btn {
+  margin-bottom: 0;
+}
+
 /* Dark mode */
 .dark .auth-header h1 {
   color: #f7fafc;
@@ -754,5 +947,19 @@ const handleDeleteAccount = async () => {
 
 .dark .auth-divider {
   border-top-color: #4a5568;
+}
+
+.dark .modal-box {
+  background: #2d3748;
+  border-color: #4a5568;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+.dark .modal-box h2 {
+  color: #f7fafc;
+}
+
+.dark .modal-box p {
+  color: #e2e8f0;
 }
 </style>

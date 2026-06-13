@@ -54,25 +54,28 @@ interface ApiKeyInfo {
 const registeredKeys: Map<string, ApiKeyInfo> = new Map();
 
 /**
- * Initialize default API keys for development
+ * Initialize API keys
+ *
+ * In production, only keys from SEETHBOT_API_KEYS are registered; no default
+ * admin key is auto-created. In development, a convenience admin key is
+ * generated to ease local testing.
  */
 export const initializeApiKeys = () => {
-  // Generate a default admin key for development
-  const defaultAdminKey = generateApiKey();
-
-  registeredKeys.set(defaultAdminKey, {
-    key: defaultAdminKey,
-    type: ApiKeyType.ADMIN,
-    description: 'Default admin key for development',
-    createdAt: new Date()
-  });
-
-  console.log(`[Auth] Initialized with ${registeredKeys.size} API keys`);
+  // Only auto-create a default admin key outside of production. This is a
+  // dev convenience and must never exist in a live deployment.
   if (process.env.NODE_ENV !== 'production') {
-    console.log('[Auth] Default admin key generated. Check server logs or set SEETHBOT_API_KEYS.');
-    console.log('[Auth] WARNING: This is a default key. Set SEETHBOT_API_KEYS in production!');
+    const defaultAdminKey = generateApiKey();
+
+    registeredKeys.set(defaultAdminKey, {
+      key: defaultAdminKey,
+      type: ApiKeyType.ADMIN,
+      description: 'Default admin key for development',
+      createdAt: new Date()
+    });
+
+    console.log('[Auth] Default admin key generated for development. Set SEETHBOT_API_KEYS to use your own keys.');
   } else {
-    console.log('[Auth] Running in production mode. Set SEETHBOT_API_KEYS env var for custom keys.');
+    console.log('[Auth] Running in production mode. Set SEETHBOT_API_KEYS env var to configure API keys.');
   }
 
   // Add any keys from environment
@@ -83,6 +86,10 @@ export const initializeApiKeys = () => {
       description: 'Key from environment',
       createdAt: new Date()
     });
+  }
+
+  if (process.env.NODE_ENV === 'production' && registeredKeys.size === 0) {
+    console.warn('[Auth] WARNING: No API keys configured. Write-protected endpoints will reject all requests. Set SEETHBOT_API_KEYS.');
   }
 
   console.log(`[Auth] Total active API keys: ${registeredKeys.size}`);

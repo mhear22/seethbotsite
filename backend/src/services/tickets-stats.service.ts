@@ -79,15 +79,29 @@ export class TicketsStatsService {
     let totalAge = 0;
     const now = Date.now();
 
-    for (const ticket of allTickets) {
-      const dependencies: number[] = ticket.dependencies ? JSON.parse(ticket.dependencies) : [];
+    // Parse dependencies once and collect all unique dependency IDs so they can
+    // be resolved with a single query instead of one findUnique per dependency.
+    const ticketDependencies = allTickets.map(ticket =>
+      ticket.dependencies ? (JSON.parse(ticket.dependencies) as number[]) : []
+    );
+    const allDepIds = [...new Set(ticketDependencies.flat())];
+
+    const depTickets = allDepIds.length > 0
+      ? await prisma.ticket.findMany({
+          where: { id: { in: allDepIds } },
+          select: { id: true, status: true, is_deleted: true }
+        })
+      : [];
+
+    const depTicketById = new Map(depTickets.map(dep => [dep.id, dep]));
+
+    for (let i = 0; i < allTickets.length; i++) {
+      const ticket = allTickets[i];
+      const dependencies = ticketDependencies[i];
       if (dependencies.length > 0) {
         let isBlocked = false;
         for (const depId of dependencies) {
-          const depTicket = await prisma.ticket.findUnique({
-            where: { id: depId },
-            select: { status: true, is_deleted: true }
-          });
+          const depTicket = depTicketById.get(depId);
           if (!depTicket || depTicket.is_deleted || !['completed', 'declined'].includes(depTicket.status)) {
             isBlocked = true;
             break;

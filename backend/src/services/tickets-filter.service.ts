@@ -195,18 +195,44 @@ export class TicketsFilterService {
       take: limit
     });
 
+    // Parse dependencies once per ticket
+    const parsedDependencies = tickets.map(ticket =>
+      safeJsonParse<number[]>(ticket.dependencies, [])
+    );
+
+    // Batch-fetch all dependency statuses in a single query to avoid an N+1
+    // (previously each ticket awaited isTicketBlocked, which queried per dependency).
+    const allDepIds = Array.from(new Set(parsedDependencies.flat()));
+    const depTickets = allDepIds.length > 0
+      ? await prisma.ticket.findMany({
+          where: { id: { in: allDepIds } },
+          select: { id: true, status: true }
+        })
+      : [];
+    const depStatusById = new Map(depTickets.map(dep => [dep.id, dep.status]));
+
+    // A ticket is blocked if any dependency is missing OR its status is not
+    // completed/declined (preserving isTicketBlocked semantics).
+    const isBlocked = (dependencies: number[]): boolean => {
+      if (!dependencies || dependencies.length === 0) return false;
+      return dependencies.some(depId => {
+        const status = depStatusById.get(depId);
+        return status === undefined || !['completed', 'declined'].includes(status);
+      });
+    };
+
     // Add computed fields to each ticket
-    const ticketsWithComputed = await Promise.all(tickets.map(async (ticket) => {
-      const dependencies = safeJsonParse<number[]>(ticket.dependencies, []);
+    const ticketsWithComputed = tickets.map((ticket, index) => {
+      const dependencies = parsedDependencies[index];
 
       return {
         ...ticket,
         dependencies,
-        blocked: await isTicketBlocked(dependencies),
+        blocked: isBlocked(dependencies),
         relevanceScore: ticketsService.calculateRelevanceScore(ticket),
         daysSinceCreation: ticketsService.getDaysSinceCreation(ticket)
       };
-    }));
+    });
 
     // If sorting by relevance, sort the results in memory
     if (sortBy === 'relevance') {

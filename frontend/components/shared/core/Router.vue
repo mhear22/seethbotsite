@@ -202,6 +202,30 @@ const toggleDropdown = (dropdownTitle: string) => {
   openDropdown.value = openDropdown.value === dropdownTitle ? null : dropdownTitle
 }
 
+// Only hover-open on devices that actually have a hover-capable, fine pointer.
+// On touch a tap synthesises mouseenter then click; opening on hover there would
+// be immediately undone by the click toggle, so we gate hover-open out for touch.
+const canHover = () =>
+  typeof window !== 'undefined' &&
+  typeof window.matchMedia === 'function' &&
+  window.matchMedia('(hover: hover) and (pointer: fine)').matches
+
+// Mouseenter SETS the dropdown open (does not toggle) so a following click can
+// cleanly close it. No-op on touch/coarse pointers.
+const handleDropdownMouseenter = (dropdownTitle: string) => {
+  if (!canHover()) return
+  openDropdown.value = dropdownTitle
+}
+
+// Close the dropdown when keyboard focus leaves the wrapper entirely. Used
+// instead of a focus toggle to avoid open/close races with the click toggle.
+const handleDropdownFocusout = (event: FocusEvent, dropdownTitle: string) => {
+  const currentTarget = event.currentTarget as HTMLElement | null
+  const nextTarget = event.relatedTarget as Node | null
+  if (currentTarget && nextTarget && currentTarget.contains(nextTarget)) return
+  if (openDropdown.value === dropdownTitle) closeDropdowns()
+}
+
 const isDropdownOpen = (dropdownTitle: string) => {
   return openDropdown.value === dropdownTitle
 }
@@ -338,7 +362,8 @@ if (typeof window !== 'undefined') {
           :key="dropdown.title"
           class="dropdown"
           :class="{ open: isDropdownOpen(dropdown.title) }"
-          @mouseenter="toggleDropdown(dropdown.title)"
+          @mouseenter="handleDropdownMouseenter(dropdown.title)"
+          @focusout="handleDropdownFocusout($event, dropdown.title)"
         >
           <button
             class="dropdown-btn"

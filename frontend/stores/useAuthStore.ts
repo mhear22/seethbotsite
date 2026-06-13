@@ -9,6 +9,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useProfile, type User } from '../composables/useProfile'
 import { useSettingsPersistence } from '../composables/useSettingsPersistence'
+import { detectDeviceName, detectDeviceType } from '../composables/useDeviceInfo'
 
 const API_BASE = '/api'
 const TOKEN_KEY = 'auth_token'
@@ -86,11 +87,23 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
-   * Validate current token with server
+   * Result of a /auth/me fetch-and-apply attempt.
+   * - 'ok': user applied and refresh timer (re)started
+   * - 'cleared': auth was cleared (malformed response or 401/403)
+   * - 'serverError': non-auth server error (5xx etc), token kept
+   * - 'networkError': request failed before a response was received
    */
-  const validateToken = async (): Promise<boolean> => {
-    if (!token.value) return false
+  type SessionResult = 'ok' | 'cleared' | 'serverError' | 'networkError'
 
+  /**
+   * Shared GET /auth/me request: validates response shape, applies the user
+   * and (re)starts the refresh timer on success, and clears auth on a
+   * malformed response or 401/403. Callers layer their own behavior on top
+   * of the returned result (e.g. loadSettings, retry scheduling).
+   */
+  const fetchAndApplySession = async (
+    malformedMessage: string
+  ): Promise<SessionResult> => {
     try {
       const response = await fetch(`${API_BASE}/auth/me`, {
         headers: {
@@ -103,34 +116,54 @@ export const useAuthStore = defineStore('auth', () => {
         const nextUser = data?.user
         const nextExpiry = data?.session?.expires_at
         if (!nextUser || typeof nextExpiry !== 'string') {
-          console.error('Token validation failed: malformed /auth/me response')
+          console.error(malformedMessage)
           clearAuth()
-          return false
+          return 'cleared'
         }
         user.value = nextUser
 
         // Start automatic token refresh
         startTokenRefresh(nextExpiry)
 
-        // Load user settings
-        await loadSettings()
-
-        return true
+        return 'ok'
       } else if (response.status === 401 || response.status === 403) {
         // Token is invalid or expired - clear auth
-        console.error('Token validation failed: Invalid or expired token')
         clearAuth()
-        return false
+        return 'cleared'
       } else {
         // Server error (5xx) or other error - keep token for retry
-        console.error('Token validation failed with status:', response.status)
-        return false
+        return 'serverError'
       }
-    } catch (error) {
+    } catch (err) {
       // Network error - keep token for retry
-      console.error('Token validation error (network issue):', error)
-      return false
+      console.error('Auth /me request error (network issue):', err)
+      return 'networkError'
     }
+  }
+
+  /**
+   * Validate current token with server
+   */
+  const validateToken = async (): Promise<boolean> => {
+    if (!token.value) return false
+
+    const result = await fetchAndApplySession(
+      'Token validation failed: malformed /auth/me response'
+    )
+
+    if (result === 'ok') {
+      // Load user settings
+      await loadSettings()
+      return true
+    }
+
+    if (result === 'cleared') {
+      console.error('Token validation failed: Invalid or expired token')
+    } else if (result === 'serverError') {
+      console.error('Token validation failed (server error)')
+    }
+
+    return false
   }
 
   /**
@@ -164,61 +197,40 @@ export const useAuthStore = defineStore('auth', () => {
       return false
     }
 
-    try {
-      // Simply call /auth/me to refresh the session
-      const response = await fetch(`${API_BASE}/auth/me`, {
-        headers: {
-          'Authorization': `Bearer ${token.value}`
-        }
-      })
+    // Simply call /auth/me to refresh the session
+    const result = await fetchAndApplySession(
+      'Token refresh failed: malformed /auth/me response'
+    )
 
-      if (response.ok) {
-        const data = await response.json()
-        const nextUser = data?.user
-        const nextExpiry = data?.session?.expires_at
-        if (!nextUser || typeof nextExpiry !== 'string') {
-          console.error('Token refresh failed: malformed /auth/me response')
-          clearAuth()
-          return false
-        }
-        user.value = nextUser
-
-        // Clear any existing retry timer
-        if (refreshRetryTimer) {
-          clearTimeout(refreshRetryTimer)
-          refreshRetryTimer = null
-        }
-
-        // Restart refresh timer
-        startTokenRefresh(nextExpiry)
-
-        console.log('Token refreshed successfully')
-        return true
-      } else if (response.status === 401 || response.status === 403) {
-        // Token is invalid or expired - clear auth
-        console.error('Token refresh failed: Invalid or expired token')
-        clearAuth()
-        return false
-      } else {
-        // Server error - try again later
-        console.error('Token refresh failed with status:', response.status)
-        // Clear any existing retry timer before setting new one
-        if (refreshRetryTimer) {
-          clearTimeout(refreshRetryTimer)
-        }
-        refreshRetryTimer = setTimeout(() => refreshToken(), REFRESH_RETRY_MS)
-        return false
-      }
-    } catch (err) {
-      // Network error - try again later
-      console.error('Token refresh error (network issue):', err)
-      // Clear any existing retry timer before setting new one
+    if (result === 'ok') {
+      // Clear any existing retry timer
       if (refreshRetryTimer) {
         clearTimeout(refreshRetryTimer)
+        refreshRetryTimer = null
       }
-      refreshRetryTimer = setTimeout(() => refreshToken(), REFRESH_RETRY_MS)
+
+      console.log('Token refreshed successfully')
+      return true
+    }
+
+    if (result === 'cleared') {
+      // Token is invalid or expired - auth already cleared
+      console.error('Token refresh failed: Invalid or expired token')
       return false
     }
+
+    // Server error or network error - try again later
+    if (result === 'serverError') {
+      console.error('Token refresh failed (server error)')
+    } else {
+      console.error('Token refresh failed (network issue)')
+    }
+    // Clear any existing retry timer before setting new one
+    if (refreshRetryTimer) {
+      clearTimeout(refreshRetryTimer)
+    }
+    refreshRetryTimer = setTimeout(() => refreshToken(), REFRESH_RETRY_MS)
+    return false
   }
 
   /**
@@ -571,47 +583,6 @@ export const useAuthStore = defineStore('auth', () => {
     }
     
     localStorage.removeItem(TOKEN_KEY)
-  }
-
-  /**
-   * Detect device name
-   */
-  const detectDeviceName = (): string => {
-    const ua = navigator.userAgent
-    let browser = 'Unknown'
-    let os = 'Unknown'
-
-    // Browser detection
-    if (ua.includes('Chrome')) browser = 'Chrome'
-    else if (ua.includes('Firefox')) browser = 'Firefox'
-    else if (ua.includes('Safari')) browser = 'Safari'
-    else if (ua.includes('Edge')) browser = 'Edge'
-
-    // OS detection
-    if (ua.includes('Windows')) os = 'Windows'
-    else if (ua.includes('Mac')) os = 'macOS'
-    else if (ua.includes('Linux')) os = 'Linux'
-    else if (ua.includes('Android')) os = 'Android'
-    else if (ua.includes('iOS')) os = 'iOS'
-
-    return `${browser} on ${os}`
-  }
-
-  /**
-   * Detect device type
-   */
-  const detectDeviceType = (): string => {
-    const ua = navigator.userAgent
-
-    if (/Mobile|Android|iP(hone|od|ad)|BlackBerry|IEMobile|Kindle/.test(ua)) {
-      return 'mobile'
-    }
-
-    if (/Tablet|iPad/.test(ua)) {
-      return 'tablet'
-    }
-
-    return 'desktop'
   }
 
   /**
