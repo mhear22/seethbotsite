@@ -32,11 +32,20 @@ export interface PlayerInput {
 }
 
 /**
+ * Game mode for a match.
+ * - 'pvp': classic 1v1 player-vs-player (default when absent for backward compat).
+ * - 'survival': co-op survival vs escalating server-driven AI waves.
+ */
+export type GameMode = 'pvp' | 'survival';
+
+/**
  * Request to join matchmaking queue
  */
 export interface MatchRequestMessage {
   type: 'match_request';
   loadout: MechLoadout;
+  /** Desired game mode. Absent => 'pvp' (existing behavior unchanged). */
+  gameMode?: GameMode;
 }
 
 /**
@@ -81,6 +90,20 @@ export interface StateSnapshotMessage {
   lastProcessedSeq: number; // Last client input seq processed (for reconciliation)
   players: Record<string, PlayerState>;
   projectiles: ProjectileState[];
+
+  // --- Survival mode (optional; absent in PvP) ---------------------------
+  /**
+   * Server-controlled AI mechs broadcast as extra entities (survival mode).
+   * Keyed by AI mech id. Reuses the PlayerState shape so clients can render
+   * them with the same interpolation path as opponent players.
+   */
+  aiMechs?: Record<string, AIMechState>;
+  /** Current survival wave number (1-based). */
+  wave?: number;
+  /** Accumulated survival score for the match. */
+  survivalScore?: number;
+  /** True during the brief repair/staging interval between waves. */
+  betweenWaves?: boolean;
 }
 
 export interface PlayerState {
@@ -94,6 +117,31 @@ export interface PlayerState {
   isJumping: boolean;
   abilityActive: boolean;
 }
+
+/**
+ * Server-controlled AI mech entity (survival mode).
+ * Extends the on-wire PlayerState shape with an explicit id and optional
+ * presentation/difficulty metadata so clients can label and render waves.
+ * All extra fields are optional => safe to render with the PlayerState path.
+ */
+export interface AIMechState extends PlayerState {
+  /** Unique id for this AI mech within the match. */
+  id: string;
+  /** Difficulty tier driving this AI's stats/loadout. */
+  difficulty?: AIDifficultyTier;
+  /** Wave this AI belongs to (1-based). */
+  wave?: number;
+  /** Display name (e.g. "Heavy Mech W3"). */
+  name?: string;
+  /** Loadout the AI is using (for client model rendering). */
+  loadout?: MechLoadout;
+}
+
+/**
+ * AI difficulty tiers, mirroring the single-player ladder.
+ * Steps up the ladder as survival waves progress.
+ */
+export type AIDifficultyTier = 'tutorial' | 'easy' | 'medium' | 'hard' | 'boss';
 
 export interface ProjectileState {
   id: string;
@@ -121,7 +169,10 @@ export type GameEventType =
   | 'projectile_hit'
   | 'damage'
   | 'ability_used'
-  | 'mech_destroyed';
+  | 'mech_destroyed'
+  // --- Survival mode events (optional; only emitted in survival mode) ---
+  | 'wave_started'
+  | 'wave_complete';
 
 // Event data types
 export interface WeaponFireEvent {
@@ -167,6 +218,59 @@ export interface MechDestroyedEvent {
   position: [number, number, number];
 }
 
+// --- Survival mode event data ---------------------------------------------
+
+/**
+ * Emitted when a new survival wave begins.
+ */
+export interface WaveStartedEvent {
+  /** Wave number that just started (1-based). */
+  wave: number;
+  /** Difficulty tier for this wave. */
+  difficulty: AIDifficultyTier;
+  /** Number of AI mechs spawned this wave. */
+  enemyCount: number;
+  /** Optional preview of the AI loadout(s) for this wave (for HUD/intro). */
+  aiLoadoutPreview?: AIMechPreview[];
+}
+
+/**
+ * Lightweight preview of an AI mech for an upcoming wave.
+ */
+export interface AIMechPreview {
+  id: string;
+  name: string;
+  difficulty: AIDifficultyTier;
+  loadout?: MechLoadout;
+}
+
+/**
+ * Emitted when a survival wave is fully cleared (all AI destroyed).
+ */
+export interface WaveCompleteEvent {
+  /** Wave number that was just cleared (1-based). */
+  wave: number;
+  /** Score awarded for clearing this wave. */
+  waveScore: number;
+  /** Total accumulated survival score after this wave. */
+  totalScore: number;
+  /** Per-player health restored during the between-wave repair. */
+  repair?: WaveRepairInfo[];
+  /** Duration (ms) of the between-wave staging interval before the next wave. */
+  repairDurationMs?: number;
+}
+
+/**
+ * Repair applied to a single player between waves.
+ */
+export interface WaveRepairInfo {
+  playerId: string;
+  /** Health restored this repair. */
+  healthRestored: number;
+  /** Player health after the repair. */
+  newHealth: number;
+}
+
 /**
  * Match found notification
  */
@@ -181,6 +285,14 @@ export interface MatchFoundMessage {
   yourSpawnPosition: [number, number, number];
   opponentSpawnPosition: [number, number, number];
   arenaBuildings: ArenaBuilding[];
+
+  // --- Survival mode (optional; absent in PvP) ---------------------------
+  /** Game mode for this match. Absent => 'pvp'. */
+  gameMode?: GameMode;
+  /** Starting wave for survival matches (typically 1). */
+  initialWave?: number;
+  /** Initial AI mechs for the first survival wave (preview/spawn info). */
+  initialAIMechs?: AIMechPreview[];
 }
 
 export interface ArenaBuilding {
@@ -200,8 +312,17 @@ export interface MatchStartMessage {
 export interface MatchEndMessage {
   type: 'match_end';
   winnerId: string;
-  reason: 'health_depleted' | 'disconnect' | 'forfeit';
+  /**
+   * Why the match ended. 'survival_defeat' is the survival co-op end reason
+   * (all human players destroyed). Existing PvP reasons are unchanged.
+   */
+  reason: 'health_depleted' | 'disconnect' | 'forfeit' | 'survival_defeat';
   stats: MatchStats;
+  // --- Survival mode (optional; absent in PvP) ---------------------------
+  /** Final survival score (survival mode). */
+  survivalScore?: number;
+  /** Highest wave reached/cleared (survival mode). */
+  wavesCleared?: number;
 }
 
 export interface MatchStats {

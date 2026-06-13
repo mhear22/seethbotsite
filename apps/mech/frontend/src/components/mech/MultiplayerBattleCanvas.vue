@@ -8,12 +8,17 @@
       :latency="latency"
       :match-time="matchTime"
       :opponent-name="opponentName"
+      :survival-active="survivalActive"
+      :wave="survivalWave"
+      :score="survivalScore"
+      :best-wave="bestWave"
+      :between-waves="survivalBetweenWaves"
     />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, markRaw } from 'vue'
+import { ref, computed, onMounted, onUnmounted, markRaw } from 'vue'
 import { MultiplayerBattleScene } from '../../lib/battle/MultiplayerBattleScene'
 import type { MechEntity } from '../../lib/battle/MechEntity'
 import { useGameSettings } from '../../composables/useGameSettings'
@@ -26,6 +31,7 @@ const props = defineProps<{
   matchData: MatchFoundMessage
   authToken: string
   existingNetworkManager?: any // Optional: reuse existing NetworkManager instead of creating new one
+  bestWave?: number // Persisted best survival wave (survival mode only)
 }>()
 
 const emit = defineEmits<{
@@ -61,6 +67,13 @@ const connectionStatus = ref<'connected' | 'connecting' | 'disconnected' | 'erro
 const latency = ref(0)
 const matchTime = ref(0)
 const opponentName = ref(props.matchData.opponentName)
+
+// Survival co-op HUD state (mirrored from the scene each tick; inert in PvP).
+const survivalActive = ref(props.matchData.gameMode === 'survival')
+const survivalWave = ref(props.matchData.initialWave ?? 1)
+const survivalScore = ref(0)
+const survivalBetweenWaves = ref(false)
+const bestWave = computed(() => props.bestWave ?? 0)
 
 let hudUpdateInterval: NodeJS.Timeout | null = null
 
@@ -129,6 +142,15 @@ onMounted(() => {
     if (battleScene) {
       matchTime.value = battleScene.getBattleTime()
       emit('time-update', matchTime.value)
+
+      // Mirror survival HUD state from the (server-authoritative) scene.
+      const sv = battleScene.getSurvivalState()
+      if (sv.active) {
+        survivalActive.value = true
+        survivalWave.value = sv.wave
+        survivalScore.value = sv.score
+        survivalBetweenWaves.value = sv.betweenWaves
+      }
 
       // Compute radar-relative enemy position rotated by player yaw
       const playerPos = battleScene.getPlayerPosition()

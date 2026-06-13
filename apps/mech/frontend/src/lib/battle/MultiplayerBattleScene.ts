@@ -8,10 +8,27 @@ import { BattleScene, type BattleSceneConfig } from './BattleScene';
 import { NetworkManager } from './NetworkManager';
 import { StateInterpolation } from './StateInterpolation';
 import { ClientPrediction } from './ClientPrediction';
-import { MechEntity } from './MechEntity';
-import type { PlayerInput, MechLoadout, PlayerState } from '@shared/types/NetworkMessages';
+import { MechEntity, type CombatStats } from './MechEntity';
+import type { PlayerInput, MechLoadout, PlayerState, AIMechState } from '@shared/types/NetworkMessages';
 import { computeAABB, type AABB } from '@shared/types/MapDefinition';
 import { markRaw } from 'vue';
+
+/**
+ * Survival-mode public state surfaced for the HUD. Populated only when the
+ * server is broadcasting survival snapshots; remains at defaults for PvP.
+ */
+export interface SurvivalHudState {
+  active: boolean;
+  wave: number;
+  score: number;
+  betweenWaves: boolean;
+}
+
+/** Per-AI client-side bookkeeping: the visual entity + its interpolation buffer. */
+interface AIMechSlot {
+  entity: MechEntity;
+  interpolation: StateInterpolation;
+}
 
 export interface MultiplayerBattleSceneConfig extends Omit<BattleSceneConfig, 'enemyMech'> {
   authToken: string;
@@ -38,6 +55,14 @@ export class MultiplayerBattleScene extends BattleScene {
   private matchStarted = true;
   private ownsNetworkManager = false; // Track if we created the NetworkManager (and should disconnect it)
 
+  // --- Survival co-op (additive; all inert in PvP) -----------------------
+  /** Server-driven AI mechs, keyed by aiId. Interpolated like the opponent. */
+  private aiMechs = new Map<string, AIMechSlot>();
+  /** Latest survival HUD state mirrored from snapshots/events. */
+  private survival: SurvivalHudState = { active: false, wave: 1, score: 0, betweenWaves: false };
+  /** Spawn position used as a placeholder when first creating an AI entity. */
+  private aiSpawnFallback = new THREE.Vector3(0, 0, 0);
+
   // Store event handlers so we can remove them on cleanup
   private eventHandlers = new Map<string, NetworkEventHandler>();
 
@@ -51,6 +76,14 @@ export class MultiplayerBattleScene extends BattleScene {
     this.matchId = config.matchId;
     this.yourPlayerId = config.yourPlayerId;
     this.opponentId = config.opponentId;
+
+    // Solo survival echoes the player as their own "opponent". There is no real
+    // opponent mech to render in that case, so hide the placeholder enemy mesh
+    // (server-driven AI mechs are added separately). PvP is unaffected.
+    if (this.opponentId === this.yourPlayerId) {
+      this.enemyMech.mesh.visible = false;
+      this.enemyMech.isDestroyed = true; // skip walk animation / targeting feedback
+    }
 
     // Initialize network manager - reuse existing if provided, otherwise create new
     if (config.existingNetworkManager) {
@@ -184,12 +217,28 @@ export class MultiplayerBattleScene extends BattleScene {
       this.playerMech.isDashing = predictedState.isDashing;
     }
 
-    // Get opponent state
-    const opponentState = snapshot.players[this.opponentId];
-    if (!opponentState) return;
+    // --- Survival mode bookkeeping (fields absent in PvP) ----------------
+    if (snapshot.wave !== undefined || snapshot.aiMechs !== undefined) {
+      this.survival.active = true;
+      if (snapshot.wave !== undefined) this.survival.wave = snapshot.wave;
+      if (snapshot.survivalScore !== undefined) this.survival.score = snapshot.survivalScore;
+      if (snapshot.betweenWaves !== undefined) this.survival.betweenWaves = snapshot.betweenWaves;
+    }
 
-    // Add to interpolation buffer - actual state application happens in update()
-    this.stateInterpolation.addState(opponentState, snapshot.serverTime);
+    // Sync AI mechs (survival): create/manage entities + buffer their states.
+    if (snapshot.aiMechs) {
+      this.syncAIMechs(snapshot.aiMechs, snapshot.serverTime);
+    }
+
+    // Get opponent state. In solo survival the opponent id echoes ourselves, so
+    // skip interpolating the "opponent" onto the enemy mech in that case.
+    const opponentState = this.opponentId === this.yourPlayerId
+      ? undefined
+      : snapshot.players[this.opponentId];
+    if (opponentState) {
+      // Add to interpolation buffer - actual state application happens in update()
+      this.stateInterpolation.addState(opponentState, snapshot.serverTime);
+    }
 
     // Sync projectiles from server snapshot
     if (snapshot.projectiles) {
@@ -198,10 +247,106 @@ export class MultiplayerBattleScene extends BattleScene {
   }
 
   /**
+   * Create/update/remove the server-driven AI mechs from a snapshot.
+   * Server is authoritative — we never run local EnemyAI here, only interpolate.
+   */
+  private syncAIMechs(aiMechs: Record<string, AIMechState>, serverTime: number): void {
+    const seen = new Set<string>();
+
+    for (const aiId of Object.keys(aiMechs)) {
+      const state = aiMechs[aiId];
+      if (!state) continue;
+      seen.add(aiId);
+
+      let slot = this.aiMechs.get(aiId);
+      if (!slot) {
+        slot = this.createAIMechSlot(aiId, state);
+        this.aiMechs.set(aiId, slot);
+        this.scene.add(slot.entity.mesh);
+      }
+
+      // Buffer the AI state for interpolation in update().
+      slot.interpolation.addState(state, serverTime);
+    }
+
+    // Remove AI mechs the server no longer reports (e.g. destroyed / wave ended).
+    for (const [aiId, slot] of this.aiMechs.entries()) {
+      if (!seen.has(aiId)) {
+        this.removeAIMechSlot(aiId, slot);
+      }
+    }
+  }
+
+  /**
+   * Build a new AI MechEntity. Uses isPlayer=false so it gets the enemy team
+   * coloring (red) — clearly an enemy. Health is the SCALED health from the
+   * server (may exceed 100 for bosses), so maxHealth tracks the reported value.
+   */
+  private createAIMechSlot(aiId: string, state: AIMechState): AIMechSlot {
+    const spawn = new THREE.Vector3(
+      state.position?.[0] ?? this.aiSpawnFallback.x,
+      state.position?.[1] ?? this.aiSpawnFallback.y,
+      state.position?.[2] ?? this.aiSpawnFallback.z
+    );
+
+    const builderLoadout = this.networkLoadoutToBuilder(state.loadout);
+    const maxHealth = Math.max(state.health || 0, 100);
+    const stats: CombatStats = {
+      maxHealth,
+      currentHealth: state.health ?? maxHealth,
+      armor: 0,
+      speed: 50,
+      firepower: 50,
+      accuracy: 50,
+      energy: 100
+    };
+
+    const entity = markRaw(new MechEntity(
+      aiId,
+      state.name || 'Enemy Mech',
+      builderLoadout,
+      stats,
+      false, // enemy team coloring
+      spawn
+    ));
+    return { entity, interpolation: markRaw(new StateInterpolation()) };
+  }
+
+  private removeAIMechSlot(aiId: string, slot: AIMechSlot): void {
+    this.scene.remove(slot.entity.mesh);
+    slot.entity.cleanup();
+    slot.interpolation.clear();
+    this.aiMechs.delete(aiId);
+  }
+
+  /**
+   * Convert a network MechLoadout into the partial builder loadout shape the
+   * MechEntity model loader understands (mirrors MechBattlePage's opponent
+   * conversion). Falls back to an empty object so rendering still succeeds.
+   */
+  private networkLoadoutToBuilder(loadout?: MechLoadout): any {
+    if (!loadout) return {};
+    return {
+      core: { id: loadout.chassisType },
+      leftArm: { name: loadout.leftWeapon?.name },
+      rightArm: { name: loadout.rightWeapon?.name },
+      rack: { name: loadout.ability?.name }
+    };
+  }
+
+  /** Survival HUD state snapshot (defaults/inert in PvP). */
+  getSurvivalState(): SurvivalHudState {
+    return { ...this.survival };
+  }
+
+  /**
    * Handle match end
    */
   private handleMatchEnd(data: any): void {
-    const isVictory = data.winnerId === this.yourPlayerId;
+    // Survival: the only match_end is survival_defeat (all humans destroyed).
+    const isVictory = data.reason === 'survival_defeat'
+      ? false
+      : data.winnerId === this.yourPlayerId;
     // The battle ending animation should already be triggered by mech_destroyed event
     // This just ensures we call the callback if not already ending
     if (!this.battleEnding) {
@@ -252,6 +397,15 @@ export class MultiplayerBattleScene extends BattleScene {
         // Optional: play weapon fire sound/animation
         break;
 
+      // --- Survival mode events (only emitted in survival) ---------------
+      case 'wave_started':
+        this.handleWaveStarted(event.data);
+        break;
+
+      case 'wave_complete':
+        this.handleWaveComplete(event.data);
+        break;
+
       default:
         console.warn('[MultiplayerBattleScene] Unknown event type:', event.eventType);
     }
@@ -288,10 +442,22 @@ export class MultiplayerBattleScene extends BattleScene {
   }
 
   /**
+   * Resolve a target/owner id to a mech entity. Handles the player, the PvP
+   * opponent, and any survival AI mech. Returns null if unknown.
+   */
+  private resolveMech(id: string): MechEntity | null {
+    if (id === this.yourPlayerId) return this.playerMech;
+    if (id === this.opponentId) return this.enemyMech;
+    const slot = this.aiMechs.get(id);
+    return slot ? slot.entity : null;
+  }
+
+  /**
    * Handle damage event
    */
   private handleDamage(data: any): void {
-    const targetMech = data.targetId === this.yourPlayerId ? this.playerMech : this.enemyMech;
+    const targetMech = this.resolveMech(data.targetId);
+    if (!targetMech) return;
 
     // Update health immediately for visual feedback (server snapshot will confirm)
     targetMech.stats.currentHealth = data.newHealth;
@@ -306,6 +472,27 @@ export class MultiplayerBattleScene extends BattleScene {
    * Handle mech destroyed event
    */
   private handleMechDestroyed(data: any): void {
+    // Survival: a destroyed AI mech is just an explosion + cleanup, NOT a
+    // battle end. The match only ends via the survival_defeat match_end.
+    if (this.survival.active) {
+      const slot = this.aiMechs.get(data.playerId);
+      if (slot) {
+        this.particleSystem.spawnExplosion(slot.entity.position.clone(), 1.8);
+        this.camera.triggerShake(0.6);
+        this.removeAIMechSlot(data.playerId, slot);
+        return;
+      }
+      // A human player went down in co-op survival — explosion only; the server
+      // decides whether the match is over (survival_defeat match_end).
+      const human = this.resolveMech(data.playerId);
+      if (human) {
+        this.particleSystem.spawnExplosion(human.position.clone());
+        this.camera.triggerShake(1.0);
+        human.isDestroyed = true;
+      }
+      return;
+    }
+
     const destroyedMech = data.playerId === this.yourPlayerId ? this.playerMech : this.enemyMech;
     const isVictory = data.playerId !== this.yourPlayerId;
 
@@ -316,6 +503,27 @@ export class MultiplayerBattleScene extends BattleScene {
     this.battleEnding = true;
     this.battleEndTimer = 2.0;
     this.battleEndResult = isVictory ? 'victory' : 'defeat';
+  }
+
+  /**
+   * Survival: a new wave began. Mark survival active and update the wave number.
+   * AI entities are created lazily from the next snapshot's aiMechs.
+   */
+  private handleWaveStarted(data: any): void {
+    this.survival.active = true;
+    if (data?.wave !== undefined) this.survival.wave = data.wave;
+    this.survival.betweenWaves = false;
+  }
+
+  /**
+   * Survival: the current wave was cleared. Update score and flag the
+   * between-wave repair/staging interval for the HUD.
+   */
+  private handleWaveComplete(data: any): void {
+    this.survival.active = true;
+    if (data?.totalScore !== undefined) this.survival.score = data.totalScore;
+    if (data?.wave !== undefined) this.survival.wave = data.wave;
+    this.survival.betweenWaves = true;
   }
 
   // Counter for periodic interpolation delay adjustment
@@ -375,7 +583,8 @@ export class MultiplayerBattleScene extends BattleScene {
     this.projectileSystem.update(deltaTime);
 
     // Interpolate opponent position for smooth rendering
-    const currentState = this.stateInterpolation.getInterpolatedState(Date.now());
+    const now = Date.now();
+    const currentState = this.stateInterpolation.getInterpolatedState(now);
     if (currentState) {
       this.enemyMech.position.set(
         currentState.position[0],
@@ -389,6 +598,25 @@ export class MultiplayerBattleScene extends BattleScene {
       this.enemyMech.isDashing = currentState.isDashing;
     }
     this.enemyMech.update(deltaTime);
+
+    // Interpolate survival AI mechs exactly like the opponent (server-authoritative).
+    for (const slot of this.aiMechs.values()) {
+      const aiState = slot.interpolation.getInterpolatedState(now);
+      if (aiState) {
+        slot.entity.position.set(
+          aiState.position[0],
+          aiState.position[1],
+          aiState.position[2]
+        );
+        slot.entity.rotation.y = aiState.rotation[1];
+        // health here is the SCALED server health (may exceed 100 for bosses).
+        slot.entity.stats.currentHealth = aiState.health;
+        slot.entity.currentPower = aiState.power;
+        slot.entity.jumpFuel = aiState.jumpFuel;
+        slot.entity.isDashing = aiState.isDashing;
+      }
+      slot.entity.update(deltaTime);
+    }
 
     // Update camera
     this.camera.update(deltaTime, input.mouseX, input.mouseY);
@@ -456,6 +684,11 @@ export class MultiplayerBattleScene extends BattleScene {
    * Override cleanup to disconnect network (only if we created it)
    */
   cleanup(): void {
+    // Remove survival AI mechs before the scene is torn down.
+    for (const [aiId, slot] of this.aiMechs.entries()) {
+      this.removeAIMechSlot(aiId, slot);
+    }
+
     super.cleanup();
 
     // Remove our event handlers from the NetworkManager

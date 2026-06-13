@@ -12,11 +12,14 @@ import {
   CancelMatchmakingMessage,
   MatchFoundMessage,
   ArenaBuilding,
-  MechLoadout
+  MechLoadout,
+  AIMechPreview
 } from '../shared/types/NetworkMessages';
-import { ARENA, MATCHMAKING } from '../shared/constants/GameConstants';
+import { ARENA, MATCHMAKING, SURVIVAL } from '../shared/constants/GameConstants';
 import { getRandomMap } from '../shared/maps';
 import type { MapDefinition } from '../shared/types/MapDefinition';
+import { SeededRNG } from '../game/SeededRNG';
+import { WaveManager } from '../game/WaveManager';
 
 interface ConnectedPlayer {
   playerId: string;
@@ -66,8 +69,9 @@ export class GameServer {
    */
   private createMatch(pair: MatchPair): void {
     console.log('[GameServer] createMatch() called');
-    const { player1, player2, matchId } = pair;
-    console.log(`[GameServer] Match pair: ${player1?.playerName} vs ${player2?.playerName}, matchId: ${matchId}`);
+    const { player1, player2, matchId, gameMode } = pair;
+    const isSurvival = gameMode === 'survival';
+    console.log(`[GameServer] Match pair (${gameMode}): ${player1?.playerName} vs ${player2?.playerName ?? '(AI)'}, matchId: ${matchId}`);
 
     // Select a random map
     const map = getRandomMap();
@@ -86,43 +90,63 @@ export class GameServer {
         type: 'building' as const,
       }));
 
-    // Send match_found to both players
+    // Survival: precompute the first wave's AI preview (deterministic from
+    // matchId — must match the WaveManager the MatchInstance creates).
+    let initialAIMechs: AIMechPreview[] | undefined;
+    if (isSurvival) {
+      const previewWm = new WaveManager({
+        matchId,
+        rng: new SeededRNG(SeededRNG.seedFromString(matchId)),
+        spawnPosition: spawn2,
+        startWave: SURVIVAL.START_WAVE,
+      });
+      initialAIMechs = previewWm.buildPreviews(previewWm.buildCurrentWaveSpawns());
+    }
+
+    // Send match_found to player 1. In survival co-op, the "opponent" slot
+    // describes the co-op partner (or is self when solo). Survival fields are
+    // optional and absent in PvP.
+    const survivalExtras1 = isSurvival
+      ? { gameMode: 'survival' as const, initialWave: SURVIVAL.START_WAVE, initialAIMechs }
+      : {};
     const match1Message: MatchFoundMessage = {
       type: 'match_found',
       matchId,
       mapId: map.id,
-      opponentId: player2.playerId,
-      opponentName: player2.playerName,
-      opponentLoadout: player2.loadout,
+      opponentId: player2?.playerId ?? player1.playerId,
+      opponentName: player2?.playerName ?? player1.playerName,
+      opponentLoadout: player2?.loadout ?? player1.loadout,
       yourPlayerId: player1.playerId,
       yourSpawnPosition: spawn1,
       opponentSpawnPosition: spawn2,
-      arenaBuildings: buildings
+      arenaBuildings: buildings,
+      ...survivalExtras1,
     };
-
-    const match2Message: MatchFoundMessage = {
-      type: 'match_found',
-      matchId,
-      mapId: map.id,
-      opponentId: player1.playerId,
-      opponentName: player1.playerName,
-      opponentLoadout: player1.loadout,
-      yourPlayerId: player2.playerId,
-      yourSpawnPosition: spawn2,
-      opponentSpawnPosition: spawn1,
-      arenaBuildings: buildings
-    };
-
-    console.log(`[GameServer] Match ${matchId} messages:`);
-    console.log(`  Player1 (${player1.playerName}): yourId=${match1Message.yourPlayerId}, opponentId=${match1Message.opponentId}`);
-    console.log(`  Player2 (${player2.playerName}): yourId=${match2Message.yourPlayerId}, opponentId=${match2Message.opponentId}`);
 
     if (player1.socket.readyState === 1) {
       player1.socket.send(JSON.stringify(match1Message));
     }
 
-    if (player2.socket.readyState === 1) {
-      player2.socket.send(JSON.stringify(match2Message));
+    if (player2) {
+      const survivalExtras2 = isSurvival
+        ? { gameMode: 'survival' as const, initialWave: SURVIVAL.START_WAVE, initialAIMechs }
+        : {};
+      const match2Message: MatchFoundMessage = {
+        type: 'match_found',
+        matchId,
+        mapId: map.id,
+        opponentId: player1.playerId,
+        opponentName: player1.playerName,
+        opponentLoadout: player1.loadout,
+        yourPlayerId: player2.playerId,
+        yourSpawnPosition: spawn2,
+        opponentSpawnPosition: spawn1,
+        arenaBuildings: buildings,
+        ...survivalExtras2,
+      };
+      if (player2.socket.readyState === 1) {
+        player2.socket.send(JSON.stringify(match2Message));
+      }
     }
 
     // Create match instance with map
@@ -134,11 +158,12 @@ export class GameServer {
         player1.playerName,
         player1.loadout,
         player1.socket,
-        player2.playerId,
-        player2.playerName,
-        player2.loadout,
-        player2.socket,
-        map
+        player2?.playerId ?? null,
+        player2?.playerName ?? null,
+        player2?.loadout ?? null,
+        player2?.socket ?? null,
+        map,
+        { gameMode }
       );
 
       // Set match end callback
@@ -151,9 +176,11 @@ export class GameServer {
 
       // Update player records
       const p1 = this.players.get(player1.playerId);
-      const p2 = this.players.get(player2.playerId);
       if (p1) p1.currentMatchId = matchId;
-      if (p2) p2.currentMatchId = matchId;
+      if (player2) {
+        const p2 = this.players.get(player2.playerId);
+        if (p2) p2.currentMatchId = matchId;
+      }
 
       // Start match after a short delay for loading
       setTimeout(() => {
@@ -171,7 +198,7 @@ export class GameServer {
       if (player1.socket.readyState === 1) {
         player1.socket.send(JSON.stringify(errorMessage));
       }
-      if (player2.socket.readyState === 1) {
+      if (player2 && player2.socket.readyState === 1) {
         player2.socket.send(JSON.stringify(errorMessage));
       }
     }
@@ -338,13 +365,14 @@ export class GameServer {
       return;
     }
 
-    // Add to queue
+    // Add to queue (gameMode absent => 'pvp', existing behavior unchanged)
     matchmakingService.addToQueue({
       playerId: player.playerId,
       playerName: player.playerName,
       loadout: message.loadout,
       queuedAt: Date.now(),
-      socket: player.socket
+      socket: player.socket,
+      gameMode: message.gameMode ?? 'pvp'
     });
   }
 

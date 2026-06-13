@@ -1,5 +1,18 @@
 <template>
   <div class="multiplayer-hud">
+    <!-- Survival wave + score banner (co-op survival only; absent in PvP) -->
+    <div v-if="survivalActive" class="survival-banner">
+      <div class="survival-wave">WAVE {{ wave }}</div>
+      <div class="survival-score">SCORE {{ score }}</div>
+      <div v-if="bestWave > 0" class="survival-best">BEST WAVE {{ bestWave }}</div>
+    </div>
+
+    <!-- Between-waves: WAVE CLEARED / repairing indicator (survival only) -->
+    <div v-if="survivalActive && betweenWaves" class="wave-transition">
+      <h2>WAVE {{ wave }} CLEARED</h2>
+      <p>Repairing… next wave incoming</p>
+    </div>
+
     <!-- Network Status -->
     <div class="network-status" :class="statusClass">
       <div class="status-indicator">
@@ -35,11 +48,27 @@ interface Props {
   latency: number; // Round-trip time in ms
   matchTime?: number; // Match time in seconds
   opponentName?: string;
+  // --- Co-op survival (optional; all absent/false in PvP) ---------------
+  /** Whether this is a survival match (shows the wave/score banner). */
+  survivalActive?: boolean;
+  /** Current survival wave (1-based). */
+  wave?: number;
+  /** Running survival score. */
+  score?: number;
+  /** Best survival wave reached (persisted). */
+  bestWave?: number;
+  /** True during the between-wave repair/staging interval. */
+  betweenWaves?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   matchTime: 0,
-  opponentName: ''
+  opponentName: '',
+  survivalActive: false,
+  wave: 1,
+  score: 0,
+  bestWave: 0,
+  betweenWaves: false
 });
 
 const statusText = computed(() => {
@@ -223,6 +252,85 @@ const formattedTime = computed(() => {
   color: #e2e8f0;
   font-size: 1rem;
   font-weight: 600;
+}
+
+/* Survival wave + score banner (reuses single-player BattleHUD look) */
+.survival-banner {
+  position: fixed;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 22px;
+  align-items: baseline;
+  padding: 8px 22px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 2px solid rgba(245, 158, 11, 0.5);
+  border-radius: 8px;
+  box-shadow: 0 0 16px rgba(245, 158, 11, 0.25);
+  pointer-events: none;
+}
+
+.survival-wave {
+  color: #fbbf24;
+  font-size: 22px;
+  font-weight: bold;
+  text-shadow: 0 0 12px rgba(245, 158, 11, 0.8);
+  letter-spacing: 0.05em;
+}
+
+.survival-score {
+  color: #fff;
+  font-size: 16px;
+  font-weight: bold;
+  text-shadow: 0 0 8px rgba(0, 0, 0, 0.9);
+}
+
+.survival-best {
+  color: #9ca3af;
+  font-size: 12px;
+  font-weight: bold;
+  text-shadow: 0 0 6px rgba(0, 0, 0, 0.9);
+}
+
+/* Between-wave transition overlay (reuses MechBattlePage look) */
+.wave-transition {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 200;
+  pointer-events: none;
+  animation: wave-pulse 1.5s ease-in-out infinite;
+}
+
+.wave-transition h2 {
+  color: #fbbf24;
+  font-size: 3rem;
+  text-shadow: 0 0 24px rgba(245, 158, 11, 0.8);
+  margin-bottom: 12px;
+}
+
+.wave-transition p {
+  color: #e5e7eb;
+  font-size: 1.3rem;
+}
+
+@keyframes wave-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.9;
+  }
 }
 
 /* Animations */

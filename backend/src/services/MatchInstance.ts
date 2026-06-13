@@ -11,17 +11,25 @@ import {
   MatchEndMessage,
   MatchStats,
   PlayerInput,
-  MechLoadout
+  MechLoadout,
+  GameMode,
+  AIMechState,
+  WaveStartedEvent,
+  WaveCompleteEvent
 } from '../shared/types/NetworkMessages';
 import {
   NETWORK,
   ARENA,
   MECH,
   PHYSICS,
-  COMBAT
+  COMBAT,
+  SURVIVAL
 } from '../shared/constants/GameConstants';
 import { MechEntity } from '../game/MechEntity';
 import { ProjectileSystem } from '../game/ProjectileSystem';
+import { SeededRNG } from '../game/SeededRNG';
+import { ServerEnemyAI, type AIThreat } from '../game/ServerEnemyAI';
+import { WaveManager, type WaveSpawn, type WaveHumanView } from '../game/WaveManager';
 import type { MapDefinition, AABB, DynamicElement, HazardZone } from '../shared/types/MapDefinition';
 import { computeAABB, getDynamicElementTransform, isHazardActive, isPointInHazard } from '../shared/types/MapDefinition';
 
@@ -40,10 +48,19 @@ interface PlayerData {
 
 export type MatchState = 'COUNTDOWN' | 'ACTIVE' | 'ENDING' | 'ENDED';
 
+/** A single server-controlled AI mech entity (survival mode). */
+interface AIData {
+  spawn: WaveSpawn;
+  mech: MechEntity;
+  ai: ServerEnemyAI;
+  maxHealth: number;
+  hasJumpJets: boolean;
+}
+
 export class MatchInstance {
   public readonly matchId: string;
   private player1: PlayerData;
-  private player2: PlayerData;
+  private player2: PlayerData | null;
   private matchState: MatchState = 'COUNTDOWN';
   private projectileSystem: ProjectileSystem;
   private tickInterval: NodeJS.Timeout | null = null;
@@ -52,6 +69,12 @@ export class MatchInstance {
   private countdownRemaining: number = 3;
   private onMatchEndCallback: ((matchId: string) => void) | null = null;
   private eventIdCounter = 0;
+
+  // --- Survival mode (only populated when gameMode === 'survival') ---------
+  private gameMode: GameMode = 'pvp';
+  private waveManager: WaveManager | null = null;
+  private survivalRng: SeededRNG | null = null;
+  private aiMechs: Map<string, AIData> = new Map();
 
   // Map data
   private map: MapDefinition | null = null;
@@ -67,13 +90,15 @@ export class MatchInstance {
     player1Name: string,
     player1Loadout: MechLoadout,
     player1Socket: any,
-    player2Id: string,
-    player2Name: string,
-    player2Loadout: MechLoadout,
+    player2Id: string | null,
+    player2Name: string | null,
+    player2Loadout: MechLoadout | null,
     player2Socket: any,
-    map?: MapDefinition
+    map?: MapDefinition,
+    options?: { gameMode?: GameMode }
   ) {
     this.matchId = matchId;
+    this.gameMode = options?.gameMode ?? 'pvp';
 
     // Setup map bounds
     if (map) {
@@ -114,23 +139,50 @@ export class MatchInstance {
       mech: mech1
     };
 
-    // Initialize player 2
-    const spawn2 = map ? [...map.spawnPoints[1].position] as [number, number, number] : this.generateSpawnPosition(Math.PI);
-    const mech2 = new MechEntity(player2Id, player2Name, player2Loadout, spawn2);
-    this.player2 = {
-      playerId: player2Id,
-      playerName: player2Name,
-      loadout: player2Loadout,
-      socket: player2Socket,
-      state: mech2.state,
-      lastInputSeq: 0,
-      lastInput: null,
-      connected: true,
-      stats: this.createInitialStats(),
-      mech: mech2
-    };
+    // Initialize player 2 (optional — survival co-op may have a single human)
+    if (player2Id && player2Name && player2Loadout) {
+      const spawn2 = map ? [...map.spawnPoints[1].position] as [number, number, number] : this.generateSpawnPosition(Math.PI);
+      const mech2 = new MechEntity(player2Id, player2Name, player2Loadout, spawn2);
+      this.player2 = {
+        playerId: player2Id,
+        playerName: player2Name,
+        loadout: player2Loadout,
+        socket: player2Socket,
+        state: mech2.state,
+        lastInputSeq: 0,
+        lastInput: null,
+        connected: true,
+        stats: this.createInitialStats(),
+        mech: mech2
+      };
+    } else {
+      this.player2 = null;
+    }
 
-    console.log(`[Match ${matchId}] Created: ${player1Name} vs ${player2Name} on ${map?.name ?? 'default arena'}`);
+    // Survival mode setup: deterministic RNG + wave manager. AI spawns at the
+    // opposite spawn point (the slot a second player would occupy).
+    if (this.gameMode === 'survival') {
+      this.survivalRng = new SeededRNG(SeededRNG.seedFromString(matchId));
+      const aiSpawn = map
+        ? [...map.spawnPoints[1].position] as [number, number, number]
+        : this.generateSpawnPosition(Math.PI);
+      this.waveManager = new WaveManager({
+        matchId,
+        rng: this.survivalRng,
+        spawnPosition: aiSpawn,
+        startWave: SURVIVAL.START_WAVE,
+      });
+    }
+
+    const opponentLabel = this.gameMode === 'survival'
+      ? 'SURVIVAL'
+      : (this.player2?.playerName ?? '???');
+    console.log(`[Match ${matchId}] Created: ${player1Name} vs ${opponentLabel} on ${map?.name ?? 'default arena'}`);
+  }
+
+  /** Living human players in this match (co-op survival may have 1 or 2). */
+  private getHumanPlayers(): PlayerData[] {
+    return this.player2 ? [this.player1, this.player2] : [this.player1];
   }
 
   /**
@@ -156,9 +208,53 @@ export class MatchInstance {
       } else {
         clearInterval(countdownInterval);
         this.matchState = 'ACTIVE';
+        if (this.gameMode === 'survival') {
+          this.spawnCurrentWave();
+        }
         this.startGameLoop();
       }
     }, 1000);
+  }
+
+  /**
+   * Survival: materialize the current wave's AI mech entities from the
+   * WaveManager descriptors and emit a wave_started event.
+   */
+  private spawnCurrentWave(): void {
+    if (!this.waveManager || !this.survivalRng) return;
+    const spawns = this.waveManager.buildCurrentWaveSpawns();
+    this.materializeSpawns(spawns);
+
+    const event: WaveStartedEvent = {
+      wave: this.waveManager.getWave(),
+      difficulty: this.waveManager.currentDifficulty(),
+      enemyCount: spawns.length,
+      aiLoadoutPreview: this.waveManager.buildPreviews(spawns),
+    };
+    this.emitEvent('wave_started', event);
+  }
+
+  /** Create AIData (MechEntity + ServerEnemyAI) for each spawn descriptor. */
+  private materializeSpawns(spawns: WaveSpawn[]): void {
+    for (const spawn of spawns) {
+      const mech = new MechEntity(spawn.id, spawn.name, spawn.loadout, spawn.position);
+      // Apply scaled max health for this wave.
+      mech.state.health = spawn.maxHealth;
+      const hasJumpJets = spawn.difficulty === 'easy' || spawn.difficulty === 'hard' || spawn.difficulty === 'boss';
+      const ai = new ServerEnemyAI({
+        difficulty: spawn.difficulty,
+        rng: new SeededRNG(spawn.aiSeed),
+        arenaHalf: Math.min(this.arenaHalfW, this.arenaHalfD),
+        moveSpeed: spawn.moveSpeed,
+      });
+      this.aiMechs.set(spawn.id, {
+        spawn,
+        mech,
+        ai,
+        maxHealth: spawn.maxHealth,
+        hasJumpJets,
+      });
+    }
   }
 
   /**
@@ -179,13 +275,13 @@ export class MatchInstance {
     const deltaTime = NETWORK.SNAPSHOT_INTERVAL / 1000;
     const matchElapsed = (this.serverTime - this.matchStartTime) / 1000;
 
-    // Update player physics based on last input
-    this.updatePlayerPhysics(this.player1);
-    this.updatePlayerPhysics(this.player2);
+    const humans = this.getHumanPlayers();
 
-    // Check building collisions for both players
-    this.checkBuildingCollisions(this.player1, deltaTime);
-    this.checkBuildingCollisions(this.player2, deltaTime);
+    // Update player physics based on last input
+    for (const p of humans) {
+      this.updatePlayerPhysics(p);
+      this.checkBuildingCollisions(p, deltaTime);
+    }
 
     // Process dynamic elements (conveyors, rotating arms, pistons)
     if (this.map) {
@@ -194,25 +290,182 @@ export class MatchInstance {
     }
 
     // Update cooldowns
-    this.player1.mech.updateCooldowns(deltaTime);
-    this.player2.mech.updateCooldowns(deltaTime);
+    for (const p of humans) {
+      p.mech.updateCooldowns(deltaTime);
+    }
+
+    // Survival: tick AI mechs (movement + firing) and wave state machine.
+    if (this.gameMode === 'survival') {
+      this.tickSurvival(deltaTime, humans);
+    }
 
     // Update projectiles
     this.projectileSystem.update(deltaTime);
 
-    // Check projectile collisions
-    const hits = this.projectileSystem.checkCollisions([
-      this.player1.mech,
-      this.player2.mech
-    ]);
+    // Check projectile collisions against all human + AI mechs
+    const collidableMechs: MechEntity[] = humans.map(p => p.mech);
+    for (const ai of this.aiMechs.values()) {
+      collidableMechs.push(ai.mech);
+    }
+    const hits = this.projectileSystem.checkCollisions(collidableMechs);
 
     // Process hits
     for (const hit of hits) {
       this.handleProjectileHit(hit.projectileId, hit.hitMechId, hit.position, hit.damage);
     }
 
+    // Survival: after combat, resolve wave-complete / defeat transitions.
+    if (this.gameMode === 'survival') {
+      this.resolveSurvivalState(deltaTime);
+    }
+
     // Send state snapshot to both players
     this.sendStateSnapshot();
+  }
+
+  /**
+   * Survival per-tick: step each AI's ServerEnemyAI (movement) and let it fire.
+   */
+  private tickSurvival(deltaTime: number, humans: PlayerData[]): void {
+    if (!this.waveManager) return;
+    if (this.aiMechs.size === 0) return;
+
+    // Build the threat list once (human-owned projectiles in flight).
+    const threats: AIThreat[] = this.projectileSystem.getProjectileStates()
+      .filter(p => !this.aiMechs.has(p.ownerId))
+      .map(p => ({ position: p.position, velocity: p.velocity }));
+
+    for (const ai of this.aiMechs.values()) {
+      if (ai.mech.state.health <= 0) continue;
+
+      // Choose target among living humans.
+      const targetView = ai.ai.selectTarget(
+        ai.mech.state,
+        humans.map(h => ({ id: h.playerId, state: h.state })),
+      );
+      if (!targetView) continue;
+
+      ai.mech.updateCooldowns(deltaTime);
+
+      const rightWeapon = ai.mech.loadout.rightWeapon;
+      const projectileSpeed = rightWeapon?.projectileSpeed ?? 100;
+
+      const decision = ai.ai.update(
+        ai.mech.state,
+        targetView.state,
+        deltaTime,
+        threats,
+        projectileSpeed,
+        this.floorY,
+        this.ceilingY,
+        ai.hasJumpJets,
+      );
+
+      if (decision.fire && decision.aimDirection && ai.mech.canFireWeapon('right')) {
+        this.handleAIWeaponFire(ai, decision.aimDirection, decision.muzzlePosition);
+      }
+    }
+  }
+
+  /**
+   * Survival: detect wave completion and defeat, drive between-wave staging.
+   */
+  private resolveSurvivalState(deltaTime: number): void {
+    if (!this.waveManager) return;
+    if (this.matchState !== 'ACTIVE') return;
+
+    const humans = this.getHumanPlayers();
+
+    // Defeat: all humans destroyed.
+    if (humans.every(h => h.state.health <= 0)) {
+      this.waveManager.markDefeat();
+      this.endSurvival();
+      return;
+    }
+
+    const phase = this.waveManager.getPhase();
+
+    if (phase === 'active') {
+      const aiHealths = Array.from(this.aiMechs.values()).map(a => a.mech.state.health);
+      if (this.aiMechs.size > 0 && this.waveManager.allAIDead(aiHealths)) {
+        // Build the WaveHumanView adapters for repair + scoring.
+        const humanViews: WaveHumanView[] = humans.map(h => ({
+          playerId: h.playerId,
+          getHealth: () => h.state.health,
+          getMaxHealth: () => MECH.MAX_HEALTH,
+          heal: (amount: number) => {
+            h.state.health = Math.min(MECH.MAX_HEALTH, h.state.health + amount);
+            h.state.power = MECH.MAX_POWER;
+            return h.state.health;
+          },
+        }));
+
+        const info = this.waveManager.completeWave(humanViews);
+        // Clear dead AI entities.
+        this.aiMechs.clear();
+
+        const event: WaveCompleteEvent = {
+          wave: info.wave,
+          waveScore: info.waveScore,
+          totalScore: info.totalScore,
+          repair: info.repair,
+          repairDurationMs: info.repairDurationMs,
+        };
+        this.emitEvent('wave_complete', event);
+      }
+    } else if (phase === 'between_waves') {
+      const spawns = this.waveManager.tickBetweenWaves(deltaTime * 1000);
+      if (spawns) {
+        this.materializeSpawns(spawns);
+        const event: WaveStartedEvent = {
+          wave: this.waveManager.getWave(),
+          difficulty: this.waveManager.currentDifficulty(),
+          enemyCount: spawns.length,
+          aiLoadoutPreview: this.waveManager.buildPreviews(spawns),
+        };
+        this.emitEvent('wave_started', event);
+      }
+    }
+  }
+
+  /** Survival: AI fires a weapon (mirrors handleWeaponFire for players). */
+  private handleAIWeaponFire(
+    ai: AIData,
+    aimDirection: { x: number; y: number; z: number },
+    muzzleOverride?: [number, number, number],
+  ): void {
+    const weaponConfig = ai.mech.loadout.rightWeapon;
+    if (!weaponConfig) return;
+
+    ai.mech.fireWeapon('right');
+
+    const muzzlePos = muzzleOverride ?? ai.mech.getMuzzlePosition('right');
+
+    const projectileId = this.projectileSystem.spawnProjectile(
+      ai.spawn.id,
+      muzzlePos,
+      [aimDirection.x, aimDirection.y, aimDirection.z],
+      weaponConfig.type,
+      weaponConfig.damage,
+    );
+
+    this.emitEvent('projectile_spawned', {
+      projectileId,
+      ownerId: ai.spawn.id,
+      position: muzzlePos,
+      weaponType: weaponConfig.type,
+      damage: weaponConfig.damage,
+    });
+  }
+
+  /** Broadcast a typed event with a generated id. */
+  private emitEvent(eventType: EventMessage['eventType'], data: any): void {
+    this.broadcast({
+      type: 'event',
+      eventId: this.generateEventId(),
+      eventType,
+      data,
+    });
   }
 
   /**
@@ -380,7 +633,7 @@ export class MatchInstance {
       switch (elem.type) {
         case 'conveyor': {
           // Check if either player is on the conveyor
-          for (const player of [this.player1, this.player2]) {
+          for (const player of this.getHumanPlayers()) {
             const state = player.state;
             const [cx, cy, cz] = elem.position;
             const [sw, sh, sl] = elem.size;
@@ -406,7 +659,7 @@ export class MatchInstance {
           const endX2 = rx - Math.sin(angle) * armLen;
           const endZ2 = rz - Math.cos(angle) * armLen;
 
-          for (const player of [this.player1, this.player2]) {
+          for (const player of this.getHumanPlayers()) {
             const state = player.state;
             // Simple distance-to-line-segment check
             if (Math.abs(state.position[1] - ry) < elem.size[1] + 3) {
@@ -437,7 +690,7 @@ export class MatchInstance {
 
           if (isSlamming || isExtended) {
             const [px, py, pz] = transform.position;
-            for (const player of [this.player1, this.player2]) {
+            for (const player of this.getHumanPlayers()) {
               const state = player.state;
               if (Math.abs(state.position[0] - px) < elem.size[0] / 2 + 2 &&
                   Math.abs(state.position[2] - pz) < elem.size[2] / 2 + 2 &&
@@ -468,7 +721,7 @@ export class MatchInstance {
       const state = isHazardActive(hazard, matchElapsed);
       if (!state.active) continue;
 
-      for (const player of [this.player1, this.player2]) {
+      for (const player of this.getHumanPlayers()) {
         if (isPointInHazard(hazard, player.state.position)) {
           const defeated = player.mech.takeDamage(hazard.damage);
           this.broadcastDamageEvent(player.playerId, 'environment', hazard.damage, player.state.health);
@@ -482,8 +735,14 @@ export class MatchInstance {
    * Handle a kill caused by environment (hazard/dynamic element)
    */
   private handleEnvironmentKill(defeated: PlayerData): void {
+    // In survival, defeat resolution is handled by resolveSurvivalState (all
+    // humans must be dead). A single environment kill doesn't end the run.
+    if (this.gameMode === 'survival') {
+      this.broadcastMechDestroyedEvent(defeated.playerId, 'environment', defeated.state.position);
+      return;
+    }
     const victor = defeated === this.player1 ? this.player2 : this.player1;
-    this.handleMechDestroyed(defeated, victor);
+    if (victor) this.handleMechDestroyed(defeated, victor);
   }
 
   /**
@@ -516,16 +775,40 @@ export class MatchInstance {
    * Send state snapshot to both players
    */
   private sendStateSnapshot(): void {
+    const players: Record<string, PlayerState> = {
+      [this.player1.playerId]: this.player1.state,
+    };
+    if (this.player2) {
+      players[this.player2.playerId] = this.player2.state;
+    }
+
     const snapshot: StateSnapshotMessage = {
       type: 'state_snapshot',
       serverTime: this.serverTime,
       lastProcessedSeq: 0, // Will be set per player
-      players: {
-        [this.player1.playerId]: this.player1.state,
-        [this.player2.playerId]: this.player2.state
-      },
+      players,
       projectiles: this.projectileSystem.getProjectileStates()
     };
+
+    // Survival: attach AI mechs + wave/score/staging state (optional fields;
+    // entirely absent in PvP so existing clients are unaffected).
+    if (this.gameMode === 'survival' && this.waveManager) {
+      const aiMechs: Record<string, AIMechState> = {};
+      for (const ai of this.aiMechs.values()) {
+        aiMechs[ai.spawn.id] = {
+          ...ai.mech.state,
+          id: ai.spawn.id,
+          difficulty: ai.spawn.difficulty,
+          wave: ai.spawn.wave,
+          name: ai.spawn.name,
+          loadout: ai.spawn.loadout,
+        };
+      }
+      snapshot.aiMechs = aiMechs;
+      snapshot.wave = this.waveManager.getWave();
+      snapshot.survivalScore = this.waveManager.getScore();
+      snapshot.betweenWaves = this.waveManager.isBetweenWaves();
+    }
 
     // Send to player 1 with their last seq
     if (this.player1.connected && this.player1.socket.readyState === 1) {
@@ -534,7 +817,7 @@ export class MatchInstance {
     }
 
     // Send to player 2 with their last seq
-    if (this.player2.connected && this.player2.socket.readyState === 1) {
+    if (this.player2 && this.player2.connected && this.player2.socket.readyState === 1) {
       const p2Snapshot = { ...snapshot, lastProcessedSeq: this.player2.lastInputSeq };
       this.player2.socket.send(JSON.stringify(p2Snapshot));
     }
@@ -580,25 +863,39 @@ export class MatchInstance {
     console.log(`[Match ${this.matchId}] Player ${player.playerName} disconnected`);
     player.connected = false;
 
+    // --- Survival: disconnects don't forfeit; end only when all humans gone ---
+    if (this.gameMode === 'survival') {
+      const anyConnected = this.getHumanPlayers().some(p => p.connected);
+      if (!anyConnected) {
+        if (this.matchState === 'ACTIVE') {
+          this.endSurvival();
+        } else {
+          this.cleanup();
+          if (this.onMatchEndCallback) this.onMatchEndCallback(this.matchId);
+        }
+      }
+      return;
+    }
+
     if (this.matchState === 'ACTIVE') {
       // Notify opponent of disconnection
       const opponent = playerId === this.player1.playerId ? this.player2 : this.player1;
 
-      if (opponent.connected && opponent.socket.readyState === 1) {
+      if (opponent && opponent.connected && opponent.socket.readyState === 1) {
         opponent.socket.send(JSON.stringify({
           type: 'opponent_disconnected'
         }));
       }
 
       // End match - opponent wins by forfeit
-      this.endMatch(opponent.playerId, 'disconnect');
+      if (opponent) this.endMatch(opponent.playerId, 'disconnect');
     } else if (this.matchState === 'COUNTDOWN') {
       // Cancel match during countdown
       console.log(`[Match ${this.matchId}] Match cancelled during countdown`);
 
       // Notify other player
       const opponent = playerId === this.player1.playerId ? this.player2 : this.player1;
-      if (opponent.connected && opponent.socket.readyState === 1) {
+      if (opponent && opponent.connected && opponent.socket.readyState === 1) {
         opponent.socket.send(JSON.stringify({
           type: 'error',
           code: 'MATCH_CANCELLED',
@@ -614,6 +911,41 @@ export class MatchInstance {
   }
 
   /**
+   * Survival end: broadcast a survival_defeat match_end with score + waves
+   * cleared, then clean up. Winner field carries no meaning in co-op (empty).
+   */
+  private endSurvival(): void {
+    if (this.matchState === 'ENDING' || this.matchState === 'ENDED') return;
+    this.matchState = 'ENDING';
+
+    const survivalScore = this.waveManager?.getScore() ?? 0;
+    // Highest wave fully cleared = current wave - 1 (current wave was in progress).
+    const wavesCleared = Math.max(0, (this.waveManager?.getWave() ?? 1) - 1);
+
+    console.log(`[Match ${this.matchId}] Survival ended. Score: ${survivalScore}, Waves cleared: ${wavesCleared}`);
+
+    for (const human of this.getHumanPlayers()) {
+      const msg: MatchEndMessage = {
+        type: 'match_end',
+        winnerId: '',
+        reason: 'survival_defeat',
+        stats: human.stats,
+        survivalScore,
+        wavesCleared,
+      };
+      if (human.connected && human.socket.readyState === 1) {
+        human.socket.send(JSON.stringify(msg));
+      }
+    }
+
+    setTimeout(() => {
+      this.matchState = 'ENDED';
+      this.cleanup();
+      if (this.onMatchEndCallback) this.onMatchEndCallback(this.matchId);
+    }, 2000);
+  }
+
+  /**
    * End the match
    */
   private endMatch(winnerId: string, reason: 'health_depleted' | 'disconnect' | 'forfeit'): void {
@@ -623,7 +955,7 @@ export class MatchInstance {
     console.log(`[Match ${this.matchId}] Match ending. Winner: ${winnerId}, Reason: ${reason}`);
 
     const winner = this.getPlayer(winnerId);
-    const loser = winnerId === this.player1.playerId ? this.player2 : this.player1;
+    const loser: PlayerData | null = winnerId === this.player1.playerId ? this.player2 : this.player1;
 
     if (!winner || !loser) return;
 
@@ -670,7 +1002,7 @@ export class MatchInstance {
       this.player1.socket.send(messageStr);
     }
 
-    if (this.player2.connected && this.player2.socket.readyState === 1) {
+    if (this.player2 && this.player2.connected && this.player2.socket.readyState === 1) {
       this.player2.socket.send(messageStr);
     }
   }
@@ -680,7 +1012,7 @@ export class MatchInstance {
    */
   private getPlayer(playerId: string): PlayerData | null {
     if (this.player1.playerId === playerId) return this.player1;
-    if (this.player2.playerId === playerId) return this.player2;
+    if (this.player2 && this.player2.playerId === playerId) return this.player2;
     return null;
   }
 
@@ -689,7 +1021,7 @@ export class MatchInstance {
    */
   public getOpponent(playerId: string): PlayerData | null {
     if (this.player1.playerId === playerId) return this.player2;
-    if (this.player2.playerId === playerId) return this.player1;
+    if (this.player2 && this.player2.playerId === playerId) return this.player1;
     return null;
   }
 
@@ -810,10 +1142,17 @@ export class MatchInstance {
     position: [number, number, number],
     damage: number
   ): void {
+    // --- Survival: the hit mech may be an AI, and/or the attacker may be one ---
+    if (this.gameMode === 'survival') {
+      this.handleSurvivalProjectileHit(projectileId, hitMechId, position, damage);
+      return;
+    }
+
     const hitPlayer = this.getPlayer(hitMechId);
     if (!hitPlayer) return;
 
     const attacker = hitPlayer === this.player1 ? this.player2 : this.player1;
+    if (!attacker) return;
 
     // Apply damage
     const defeated = hitPlayer.mech.takeDamage(damage);
@@ -855,6 +1194,79 @@ export class MatchInstance {
     if (defeated) {
       this.handleMechDestroyed(hitPlayer, attacker);
     }
+  }
+
+  /**
+   * Survival projectile-hit resolution. Damage applies to whichever mech (human
+   * or AI) was struck; mech_destroyed is emitted but the run only ends via
+   * resolveSurvivalState (all humans dead). AI deaths drive wave completion.
+   */
+  private handleSurvivalProjectileHit(
+    projectileId: string,
+    hitMechId: string,
+    position: [number, number, number],
+    damage: number,
+  ): void {
+    const hitHuman = this.getPlayer(hitMechId);
+    const hitAI = this.aiMechs.get(hitMechId);
+    const targetMech: MechEntity | null = hitHuman ? hitHuman.mech : (hitAI ? hitAI.mech : null);
+    if (!targetMech) return;
+
+    const defeated = targetMech.takeDamage(damage);
+
+    // Attribute stats to the human attacker if the projectile came from one.
+    const attacker = this.getPlayer(this.projectileOwnerId(projectileId, hitMechId));
+    if (attacker) {
+      attacker.stats.shotsHit++;
+      attacker.stats.damageDealt += damage;
+    }
+    if (hitHuman) hitHuman.stats.damageReceived += damage;
+
+    this.emitEvent('damage', {
+      targetId: hitMechId,
+      attackerId: attacker?.playerId ?? 'ai',
+      damage,
+      newHealth: targetMech.state.health,
+    });
+
+    this.emitEvent('projectile_hit', {
+      projectileId,
+      hitPlayerId: hitMechId,
+      position,
+      normal: [0, 1, 0],
+    });
+
+    if (defeated) {
+      this.broadcastMechDestroyedEvent(
+        hitMechId,
+        attacker?.playerId ?? 'ai',
+        targetMech.state.position,
+      );
+    }
+  }
+
+  /**
+   * Best-effort attacker lookup: the ProjectileSystem already removed the
+   * projectile by the time we resolve the hit, so we infer the attacker as the
+   * human that is NOT the hit mech. (Survival has at most 2 humans; AI-owned
+   * projectiles hitting humans simply yield no human attacker.)
+   */
+  private projectileOwnerId(_projectileId: string, hitMechId: string): string {
+    // If an AI was hit, the attacker must be a human (AI never shoots AI).
+    if (this.aiMechs.has(hitMechId)) {
+      // Prefer player1 unless they were the one hit (they weren't — it's an AI).
+      return this.player1.playerId;
+    }
+    return '';
+  }
+
+  /** Broadcast a mech_destroyed event (used by both PvP and survival). */
+  private broadcastMechDestroyedEvent(
+    playerId: string,
+    killerId: string,
+    position: [number, number, number],
+  ): void {
+    this.emitEvent('mech_destroyed', { playerId, killerId, position });
   }
 
   /**

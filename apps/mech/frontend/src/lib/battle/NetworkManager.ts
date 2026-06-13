@@ -16,7 +16,8 @@ import type {
   MatchmakingStatusMessage,
   ErrorMessage,
   PlayerInput,
-  MechLoadout
+  MechLoadout,
+  GameMode
 } from '@shared/types/NetworkMessages';
 
 type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'error';
@@ -302,12 +303,15 @@ export class NetworkManager {
   }
 
   /**
-   * Request to join matchmaking queue
+   * Request to join matchmaking queue.
+   * @param gameMode Optional desired mode. Omitted/'pvp' preserves existing
+   *                 1v1 behavior; 'survival' requests co-op survival.
    */
-  public requestMatch(loadout: MechLoadout): void {
+  public requestMatch(loadout: MechLoadout, gameMode?: GameMode): void {
     this.send({
       type: 'match_request',
-      loadout
+      loadout,
+      ...(gameMode ? { gameMode } : {})
     });
   }
 

@@ -223,6 +223,69 @@ export const MATCHMAKING = {
 } as const;
 
 // ============================================================================
+// Survival Mode Configuration
+// ============================================================================
+
+/**
+ * Co-op survival mode tuning. Mirrors the single-player values in
+ * apps/mech/frontend/src/composables/useMechBattle.ts so the server-driven
+ * waves escalate identically to the client-only survival run.
+ */
+export const SURVIVAL = {
+  /**
+   * Linear per-wave stat multiplier increment applied on top of the tier
+   * archetype. Wave N scale = 1 + (N - 1) * STAT_SCALE_PER_WAVE.
+   * Matches useMechBattle.statScaleForWave (0.12 per wave).
+   */
+  STAT_SCALE_PER_WAVE: 0.12,
+
+  /**
+   * Fraction of max health restored to each player during the between-wave
+   * repair. Matches useMechBattle.nextWave (0.35).
+   */
+  REPAIR_FRACTION: 0.35,
+
+  /**
+   * Number of waves between difficulty-tier steps. The difficulty tier steps
+   * up the ladder every DIFFICULTY_STEP_WAVES waves.
+   * Matches useMechBattle.difficultyForWave (floor((wave - 1) / 2)).
+   */
+  DIFFICULTY_STEP_WAVES: 2,
+
+  /** Starting wave number (1-based). */
+  START_WAVE: 1,
+
+  /** Base difficulty tier a survival run starts at. */
+  BASE_DIFFICULTY: 'medium' as const,
+
+  /** Ordered difficulty ladder; index advances with DIFFICULTY_STEP_WAVES. */
+  DIFFICULTY_ORDER: ['tutorial', 'easy', 'medium', 'hard', 'boss'] as const,
+
+  /** Between-wave staging/repair interval (ms) before the next wave spawns. */
+  BETWEEN_WAVE_DURATION: 3000,
+
+  /** Number of AI mechs spawned per wave (single AI per wave, like duel). */
+  ENEMIES_PER_WAVE: 1,
+} as const;
+
+/**
+ * Stat multiplier for a given survival wave (1-based).
+ * Wave 1 => 1.0, wave 2 => 1.12, etc.
+ */
+export function survivalStatScaleForWave(wave: number): number {
+  return 1 + (wave - 1) * SURVIVAL.STAT_SCALE_PER_WAVE;
+}
+
+/**
+ * Difficulty tier index for a survival wave, stepping up the ladder every
+ * DIFFICULTY_STEP_WAVES waves from a base tier, capped at the top tier.
+ */
+export function survivalDifficultyIndexForWave(baseIndex: number, wave: number): number {
+  const idx = baseIndex + Math.floor((wave - 1) / SURVIVAL.DIFFICULTY_STEP_WAVES);
+  return Math.min(SURVIVAL.DIFFICULTY_ORDER.length - 1, idx);
+}
+
+// ============================================================================
 // Utility Functions
 // ============================================================================
 

@@ -3,8 +3,15 @@
  * Implements FIFO queue for 1v1 matches
  */
 
-import { MechLoadout } from '../shared/types/NetworkMessages';
+import { MechLoadout, GameMode } from '../shared/types/NetworkMessages';
 import { MATCHMAKING } from '../shared/constants/GameConstants';
+
+/**
+ * How long a lone survival player waits for a co-op partner before a solo
+ * survival match is started. Backend-only tuning (not part of the shared
+ * deterministic sim), so it lives here rather than in shared GameConstants.
+ */
+const SURVIVAL_SOLO_GRACE_MS = 5000;
 
 export interface QueuedPlayer {
   playerId: string;
@@ -12,12 +19,17 @@ export interface QueuedPlayer {
   loadout: MechLoadout;
   queuedAt: number;
   socket: any; // WebSocket
+  /** Desired game mode. Absent => 'pvp' (existing behavior unchanged). */
+  gameMode?: GameMode;
 }
 
 export interface MatchPair {
   player1: QueuedPlayer;
-  player2: QueuedPlayer;
+  /** null for a solo survival match (co-op survival may start with one human). */
+  player2: QueuedPlayer | null;
   matchId: string;
+  /** Game mode for the created match. Absent => 'pvp'. */
+  gameMode: GameMode;
 }
 
 export class MatchmakingService {
@@ -110,32 +122,50 @@ export class MatchmakingService {
    * Uses simple FIFO - first two players get matched
    */
   private tryMatchPlayers(): MatchPair | null {
-    if (this.queue.length < 2) {
-      return null;
+    // --- PvP: classic FIFO pairing of two 'pvp' (or unspecified) players. ---
+    const pvpQueue = this.queue.filter(p => (p.gameMode ?? 'pvp') === 'pvp');
+    if (pvpQueue.length >= 2) {
+      const player1 = pvpQueue[0];
+      const player2 = pvpQueue[1];
+      this.dequeue(player1.playerId);
+      this.dequeue(player2.playerId);
+      const matchId = this.generateMatchId();
+      console.log(`[Matchmaking] PvP match found! ${player1.playerName} vs ${player2.playerName} (${matchId})`);
+      return { player1, player2, matchId, gameMode: 'pvp' };
     }
 
-    // Take first two players
-    const player1 = this.queue.shift()!;
-    const player2 = this.queue.shift()!;
+    // --- Survival: prefer co-op pairs; fall back to solo after a short grace. ---
+    const survivalQueue = this.queue.filter(p => p.gameMode === 'survival');
+    if (survivalQueue.length >= 2) {
+      const player1 = survivalQueue[0];
+      const player2 = survivalQueue[1];
+      this.dequeue(player1.playerId);
+      this.dequeue(player2.playerId);
+      const matchId = this.generateMatchId();
+      console.log(`[Matchmaking] Survival co-op match! ${player1.playerName} + ${player2.playerName} (${matchId})`);
+      return { player1, player2, matchId, gameMode: 'survival' };
+    }
+    if (survivalQueue.length === 1) {
+      const player1 = survivalQueue[0];
+      const waited = Date.now() - player1.queuedAt;
+      if (waited >= SURVIVAL_SOLO_GRACE_MS) {
+        this.dequeue(player1.playerId);
+        const matchId = this.generateMatchId();
+        console.log(`[Matchmaking] Survival solo match! ${player1.playerName} (${matchId})`);
+        return { player1, player2: null, matchId, gameMode: 'survival' };
+      }
+    }
 
-    // Clear their timeouts
-    const timeout1 = this.queueTimeouts.get(player1.playerId);
-    const timeout2 = this.queueTimeouts.get(player2.playerId);
-    if (timeout1) clearTimeout(timeout1);
-    if (timeout2) clearTimeout(timeout2);
-    this.queueTimeouts.delete(player1.playerId);
-    this.queueTimeouts.delete(player2.playerId);
+    return null;
+  }
 
-    // Generate match ID
-    const matchId = this.generateMatchId();
-
-    console.log(`[Matchmaking] Match found! ${player1.playerName} vs ${player2.playerName} (${matchId})`);
-
-    return {
-      player1,
-      player2,
-      matchId
-    };
+  /** Remove a queued player and clear their timeout (used during match creation). */
+  private dequeue(playerId: string): void {
+    const idx = this.queue.findIndex(p => p.playerId === playerId);
+    if (idx !== -1) this.queue.splice(idx, 1);
+    const timeout = this.queueTimeouts.get(playerId);
+    if (timeout) clearTimeout(timeout);
+    this.queueTimeouts.delete(playerId);
   }
 
   /**

@@ -27,7 +27,7 @@
         <h1>Select Battle Mode</h1>
         <p class="mode-description">Choose how you want to battle</p>
 
-        <div class="mode-options mode-options-3">
+        <div class="mode-options mode-options-4">
           <button @click="selectDuel" class="mode-btn single-player-btn">
             <div class="mode-icon">🤖</div>
             <h3>Practice vs AI</h3>
@@ -41,11 +41,18 @@
             <span v-if="survivalBestWave > 0" class="best-wave-badge">Best: Wave {{ survivalBestWave }}</span>
           </button>
 
-          <button @click="selectMultiplayer" class="mode-btn multiplayer-btn">
+          <button @click="selectMultiplayer('pvp')" class="mode-btn multiplayer-btn">
             <div class="mode-icon">⚔️</div>
-            <h3>Multiplayer Match</h3>
-            <p>Fight against real players online</p>
+            <h3>Duel (Online)</h3>
+            <p>Fight against a real player 1v1</p>
             <span class="coming-soon-badge">Phase 1</span>
+          </button>
+
+          <button @click="selectMultiplayer('survival')" class="mode-btn coop-btn">
+            <div class="mode-icon">🤝</div>
+            <h3>Survival (Co-op)</h3>
+            <p>Team up online vs escalating AI waves</p>
+            <span class="coming-soon-badge coop-badge">Co-op</span>
           </button>
         </div>
 
@@ -231,6 +238,7 @@
           :match-data="matchData"
           :auth-token="auth.token.value"
           :existing-network-manager="networkManager"
+          :best-wave="survivalBestWave"
           @battle-end="handleMultiplayerBattleEnd"
           @opponent-disconnected="handleOpponentDisconnected"
           @damage-dealt="handleDamageDealt"
@@ -391,6 +399,8 @@ const selectedGameMode = ref<'duel' | 'survival'>('duel')
 
 // Multiplayer state
 const battleMode = ref<'single-player' | 'multiplayer'>('single-player')
+// Desired online game mode for the current matchmaking request ('pvp' = duel).
+const onlineGameMode = ref<'pvp' | 'survival'>('pvp')
 const networkManager = new NetworkManager()
 const matchmakingStatus = ref<'queued' | 'searching' | 'found' | 'error'>('searching')
 const matchmakingError = ref('')
@@ -876,8 +886,9 @@ function convertRackToAbility(rack: any): AbilityConfig {
   }
 }
 
-async function selectMultiplayer() {
+async function selectMultiplayer(gameMode: 'pvp' | 'survival' = 'pvp') {
   battleMode.value = 'multiplayer'
+  onlineGameMode.value = gameMode
 
   // Check authentication
   if (!auth.isAuthenticated.value || !auth.token.value) {
@@ -913,9 +924,9 @@ async function selectMultiplayer() {
       ability: convertRackToAbility(builder.loadout.value.rack)
     }
 
-    // Request a match
-    networkManager.requestMatch(loadout)
-    console.log('[MechBattle] Match requested')
+    // Request a match (survival co-op or classic 1v1 duel).
+    networkManager.requestMatch(loadout, onlineGameMode.value)
+    console.log('[MechBattle] Match requested', { gameMode: onlineGameMode.value })
   } catch (error) {
     console.error('[MechBattle] Failed to connect to multiplayer:', error)
     matchmakingStatus.value = 'error'
@@ -1068,8 +1079,8 @@ function findAnotherMatch() {
   multiplayerOpponentMech.value = null
   battle.battleState.value.phase = 'mode-select'
 
-  // Automatically queue for another match
-  selectMultiplayer()
+  // Automatically queue for another match in the same online mode.
+  selectMultiplayer(onlineGameMode.value)
 }
 
 function returnToBuilder() {
@@ -1398,6 +1409,15 @@ function returnToBuilder() {
 /* Survival mode button + best-wave badge */
 .mode-options-3 {
   grid-template-columns: repeat(3, 1fr);
+}
+
+.mode-options-4 {
+  grid-template-columns: repeat(2, 1fr);
+  max-width: 760px;
+}
+
+.coop-badge {
+  background: linear-gradient(135deg, #0891b2, #0e7490);
 }
 
 .best-wave-badge {
@@ -1866,7 +1886,8 @@ function returnToBuilder() {
   }
 
   .mode-options,
-  .mode-options-3 {
+  .mode-options-3,
+  .mode-options-4 {
     grid-template-columns: 1fr;
   }
 
