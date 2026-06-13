@@ -236,7 +236,7 @@ export const useUIEffectsStore = defineStore('uiEffects', () => {
 
     const currentSize = (window as any).heartSize || 20
     heart.style.fontSize = currentSize + 'px'
-    ;(window as any).heartSize = currentSize + 1
+    ;(window as any).heartSize = Math.min(currentSize + 1, 60)
 
     // Mega heart logic
     const isMegaHeart = Math.random() < 0.002

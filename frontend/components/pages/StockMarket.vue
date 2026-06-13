@@ -46,6 +46,7 @@ const selectedStock = ref<Stock | null>(null)
 const tradeShares = ref<number>(1)
 const tradeType = ref<'buy' | 'sell'>('buy')
 const loading = ref<boolean>(false)
+const tradeError = ref<string>('')
 
 // Computed
 const selectedStockOwned = computed(() => {
@@ -95,12 +96,14 @@ const selectStock = (stock: Stock) => {
   selectedStock.value = stock
   tradeType.value = 'buy'
   tradeShares.value = 1
+  tradeError.value = ''
 }
 
 const executeTrade = async () => {
   if (!selectedStock.value || loading.value) return
 
   loading.value = true
+  tradeError.value = ''
   try {
     if (tradeType.value === 'buy') {
       await stocksRepository.buyStock(userId.value, selectedStock.value.name, tradeShares.value)
@@ -110,8 +113,10 @@ const executeTrade = async () => {
 
     await loadStocks()
     await loadPortfolio()
+    tradeError.value = ''
   } catch (error) {
     console.error('Error executing trade:', error)
+    tradeError.value = (error as any)?.message || 'Trade failed. Please try again.'
   } finally {
     loading.value = false
   }
@@ -159,6 +164,10 @@ const generateChartData = (history: { timestamp: number; price: number }[]) => {
   `
 }
 
+const chartSvg = computed(() =>
+  selectedStock.value ? generateChartData(selectedStock.value.priceHistory) : ''
+)
+
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(value)
 }
@@ -176,8 +185,8 @@ const formatEmoji = (emoji: string): string => {
 }
 
 // Use polling composables for automatic updates
-usePolling(loadStocks, { initialInterval: 5000 })
-usePolling(loadPortfolio, { initialInterval: 5000 })
+usePolling(loadStocks, { mode: 'adaptive', initialInterval: 5000, minInterval: 5000, maxInterval: 30000 })
+usePolling(loadPortfolio, { mode: 'adaptive', initialInterval: 5000, minInterval: 5000, maxInterval: 30000 })
 
 // Lifecycle
 onMounted(() => {
@@ -228,7 +237,7 @@ onMounted(() => {
           </h3>
 
           <!-- Price Chart -->
-          <div class="chart-container" v-html="generateChartData(selectedStock.priceHistory)"></div>
+          <div class="chart-container" v-html="chartSvg"></div>
 
           <div class="price-display">
             <div class="current-price">{{ formatCurrency(selectedStock.price) }}</div>
@@ -280,6 +289,8 @@ onMounted(() => {
             >
               {{ loading ? '...' : (tradeType === 'buy' ? 'Buy' : 'Sell') }}
             </button>
+
+            <p v-if="tradeError" class="trade-error" role="alert">{{ tradeError }}</p>
           </div>
         </div>
 
@@ -666,6 +677,23 @@ body.dark .owned-shares {
 .trade-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.trade-error {
+  margin: 0;
+  padding: 10px 12px;
+  background: rgba(255, 107, 107, 0.12);
+  border: 1px solid #ff6b6b;
+  border-radius: 10px;
+  color: #c53030;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+}
+
+body.dark .trade-error {
+  color: #ff8787;
+  background: rgba(255, 107, 107, 0.15);
 }
 
 /* Portfolio */

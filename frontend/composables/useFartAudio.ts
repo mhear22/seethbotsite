@@ -87,7 +87,6 @@ async function playFartWithProcessing(audioElement: HTMLAudioElement): Promise<v
 
     // Generate random parameters for this playback
     const params = generateFartParams()
-    console.log('🎵 Fart parameters:', params)
 
     // Create audio buffer from element
     const arrayBuffer = await audioElement.arrayBuffer()

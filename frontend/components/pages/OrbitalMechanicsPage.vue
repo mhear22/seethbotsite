@@ -169,6 +169,17 @@ let orthoCamera: THREE.OrthographicCamera | null = null
 
 const tempV = new THREE.Vector3()
 
+function handleVisibilityChange() {
+  if (document.hidden) {
+    if (animationId !== null) {
+      cancelAnimationFrame(animationId)
+      animationId = null
+    }
+  } else if (animationId === null) {
+    animate()
+  }
+}
+
 onMounted(() => {
   initScene()
   animate()
@@ -176,6 +187,7 @@ onMounted(() => {
   window.addEventListener('keydown', handleKeyDown)
   window.addEventListener('keyup', handleKeyUp)
   window.addEventListener('wheel', handleWheel, { passive: true })
+  document.addEventListener('visibilitychange', handleVisibilityChange)
 })
 
 onUnmounted(() => {
@@ -186,6 +198,7 @@ onUnmounted(() => {
   window.removeEventListener('keydown', handleKeyDown)
   window.removeEventListener('keyup', handleKeyUp)
   window.removeEventListener('wheel', handleWheel)
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
   cleanup()
 })
 

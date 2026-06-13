@@ -38,6 +38,10 @@ const searchQuery = ref('')
 const selectedIndex = ref(0)
 const isLoading = ref(false)
 
+// Focus management
+const searchModal = ref<HTMLElement | null>(null)
+const previouslyFocused = ref<HTMLElement | null>(null)
+
 // Pages data (from router config)
 const pages = [
   { name: 'Home', icon: '🏠', route: '/' },
@@ -216,10 +220,46 @@ const selectResult = (result: SearchResult) => {
   }
 }
 
+// Focus trap - keep focus within the modal while it is open
+const handleTab = (e: KeyboardEvent) => {
+  if (!props.isOpen || !searchModal.value) return
+
+  const focusableSelectors = [
+    'button:not([disabled])',
+    '[href]',
+    'input:not([disabled])',
+    'select:not([disabled])',
+    'textarea:not([disabled])',
+    '[tabindex]:not([tabindex="-1"])'
+  ]
+
+  const elements = Array.from(
+    searchModal.value.querySelectorAll<HTMLElement>(focusableSelectors.join(','))
+  )
+  if (elements.length === 0) return
+
+  const firstElement = elements[0]
+  const lastElement = elements[elements.length - 1]
+
+  if (e.shiftKey) {
+    // Shift + Tab: going backwards
+    if (document.activeElement === firstElement) {
+      e.preventDefault()
+      lastElement.focus()
+    }
+  } else {
+    // Tab: going forwards
+    if (document.activeElement === lastElement) {
+      e.preventDefault()
+      firstElement.focus()
+    }
+  }
+}
+
 // Keyboard navigation
 const handleKeyDown = (e: KeyboardEvent) => {
   const results = searchResults.value
-  
+
   if (e.key === 'ArrowDown') {
     e.preventDefault()
     selectedIndex.value = Math.min(selectedIndex.value + 1, results.length - 1)
@@ -231,12 +271,16 @@ const handleKeyDown = (e: KeyboardEvent) => {
     selectResult(results[selectedIndex.value])
   } else if (e.key === 'Escape') {
     emit('close')
+  } else if (e.key === 'Tab') {
+    handleTab(e)
   }
 }
 
 // Watch for modal open to load tickets and reset state
 watch(() => props.isOpen, (isOpen) => {
   if (isOpen) {
+    // Save the element that had focus so we can restore it on close
+    previouslyFocused.value = document.activeElement as HTMLElement | null
     searchQuery.value = ''
     selectedIndex.value = 0
     loadTickets()
@@ -245,6 +289,12 @@ watch(() => props.isOpen, (isOpen) => {
       const input = document.querySelector('.search-input') as HTMLInputElement
       input?.focus()
     }, 100)
+  } else {
+    // Restore focus to the element that opened the modal
+    if (previouslyFocused.value) {
+      previouslyFocused.value.focus()
+      previouslyFocused.value = null
+    }
   }
 })
 
@@ -262,7 +312,7 @@ onUnmounted(() => {
   <Teleport to="body">
     <Transition name="modal">
       <div v-if="isOpen" class="search-modal-overlay" @click="emit('close')" role="dialog" aria-modal="true" aria-labelledby="search-label">
-        <div class="search-modal" @click.stop role="search">
+        <div ref="searchModal" class="search-modal" @click.stop role="search">
           <div class="search-header">
             <div class="search-icon" aria-hidden="true">🔍</div>
             <input

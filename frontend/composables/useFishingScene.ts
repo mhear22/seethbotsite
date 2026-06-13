@@ -125,6 +125,12 @@ export function useFishingScene() {
   const animate = () => {
     if (!scene.value || !camera.value || !renderer.value || !hook) return
 
+    // Skip render work while the tab/page is hidden, but keep the loop alive
+    if (document.hidden) {
+      animationId = requestAnimationFrame(animate)
+      return
+    }
+
     animationId = requestAnimationFrame(animate)
 
     // Animate fishes

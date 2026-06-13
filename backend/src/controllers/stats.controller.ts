@@ -65,7 +65,7 @@ const router = Router();
  *       500:
  *         description: Server error
  */
-router.post('/record', (req: Request, res: Response) => {
+router.post('/record', async (req: Request, res: Response) => {
   try {
     const { userId, userName, gameType, statType, value, metadata } = req.body;
 
@@ -90,7 +90,7 @@ router.post('/record', (req: Request, res: Response) => {
       return res.status(400).json({ error: 'value is required and must be a number' });
     }
 
-    recordStat({
+    await recordStat({
       userId,
       userName,
       gameType,
@@ -101,7 +101,7 @@ router.post('/record', (req: Request, res: Response) => {
 
     // Update daily challenge progress automatically
     try {
-      updateChallengeProgress(userId, gameType, statType, value);
+      await updateChallengeProgress(userId, gameType, statType, value);
     } catch (error) {
       // Don't fail if challenge update fails
       console.warn('Could not update challenge progress:', error);
@@ -109,7 +109,7 @@ router.post('/record', (req: Request, res: Response) => {
 
     // Check for achievements automatically
     try {
-      checkAchievements(userId);
+      await checkAchievements(userId);
     } catch (error) {
       // Don't fail if achievement check fails
       console.warn('Could not check achievements:', error);
@@ -202,10 +202,7 @@ router.post('/highscore', async (req: Request, res: Response) => {
       details
     });
 
-    const existingScore = (await getLeaderboard({ gameType, limit: 100 }))
-      .find(entry => entry.userId === userId)?.score || 0;
-
-    const isNewRecord = score > existingScore || !wasUpdated;
+    const isNewRecord = wasUpdated;
 
     res.json({
       success: true,
@@ -364,7 +361,7 @@ router.post('/history', async (req: Request, res: Response) => {
  *       500:
  *         description: Server error
  */
-router.post('/user', (req: Request, res: Response) => {
+router.post('/user', async (req: Request, res: Response) => {
   try {
     const { userId, gameType } = req.body;
 
@@ -372,7 +369,7 @@ router.post('/user', (req: Request, res: Response) => {
       return res.status(400).json({ error: 'userId is required' });
     }
 
-    const stats = getUserStats({ userId, gameType });
+    const stats = await getUserStats({ userId, gameType });
 
     res.json({
       userId,
@@ -441,7 +438,7 @@ router.post('/user', (req: Request, res: Response) => {
  *       500:
  *         description: Server error
  */
-router.post('/leaderboard', (req: Request, res: Response) => {
+router.post('/leaderboard', async (req: Request, res: Response) => {
   try {
     const { gameType, limit } = req.body;
 
@@ -449,7 +446,7 @@ router.post('/leaderboard', (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Invalid gameType. Must be "clicker" or "fishing"' });
     }
 
-    const leaderboard = getLeaderboard({ gameType, limit });
+    const leaderboard = await getLeaderboard({ gameType, limit });
 
     res.json({
       gameType,
@@ -500,11 +497,11 @@ router.post('/leaderboard', (req: Request, res: Response) => {
  *       500:
  *         description: Server error
  */
-router.post('/global', (req: Request, res: Response) => {
+router.post('/global', async (req: Request, res: Response) => {
   try {
     const { gameType, statType, timeRange } = req.body;
 
-    const stats = getGlobalStats({
+    const stats = await getGlobalStats({
       gameType,
       statType,
       timeRange

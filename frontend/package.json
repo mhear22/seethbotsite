@@ -6,7 +6,7 @@
   "scripts": {
     "prebuild": "node ../scripts/validate-shared-files.js",
     "dev": "vite",
-    "build": "npm run generate:images && npm run generate:types || true && vite build",
+    "build": "npm run generate:images && (npm run generate:types || true) && vite build",
     "preview": "vite preview",
     "generate:types": "openapi-typescript ../backend/dist/openapi.json -o ./src/types/openapi.ts",
     "generate:images": "node scripts/generate-image-sizes.js",

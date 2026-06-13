@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, shallowRef, markRaw, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useAppStore } from '../../stores/useAppStore'
 import * as L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -25,9 +25,9 @@ const searchQuery = ref<string>('')
 
 // Leaflet map state
 const mapContainer = ref<HTMLDivElement | null>(null)
-const map = ref<L.Map | null>(null)
-const incomeLayer = ref<L.GeoJSON | null>(null)
-const electionLayer = ref<L.GeoJSON | null>(null)
+const map = shallowRef<L.Map | null>(null)
+const incomeLayer = shallowRef<L.GeoJSON | null>(null)
+const electionLayer = shallowRef<L.GeoJSON | null>(null)
 const mapMode = ref<'base' | 'income' | 'election'>('base')
 const incomeData = ref<any>(null)
 const incomeLoading = ref(false)
@@ -62,7 +62,7 @@ const getIncomeColor = (income: number): string => {
 const initMap = () => {
   if (!mapContainer.value || map.value) return
   
-  map.value = L.map(mapContainer.value).setView([-20.5, 145], 6)
+  map.value = markRaw(L.map(mapContainer.value).setView([-20.5, 145], 6))
   
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap contributors',
@@ -90,15 +90,16 @@ const loadIncomeData = async () => {
 const showIncomeOverlay = async () => {
   if (!map.value) return
   
+  // Reuse the cached layer if it has already been built
+  if (incomeLayer.value) {
+    incomeLayer.value.addTo(map.value)
+    return
+  }
+
   const data = await loadIncomeData()
   if (!data) return
-  
-  // Remove existing layer
-  if (incomeLayer.value) {
-    map.value.removeLayer(incomeLayer.value)
-  }
-  
-  incomeLayer.value = L.geoJSON(data, {
+
+  incomeLayer.value = markRaw(L.geoJSON(data, {
     style: (feature) => ({
       fillColor: getIncomeColor(feature?.properties?.median_income || 50000),
       weight: 1,
@@ -128,33 +129,33 @@ const showIncomeOverlay = async () => {
         }
       })
     }
-  }).addTo(map.value)
+  })).addTo(map.value)
 }
 
-// Hide income overlay
+// Hide income overlay (keep the cached layer for reuse on next toggle)
 const hideIncomeOverlay = () => {
   if (incomeLayer.value && map.value) {
     map.value.removeLayer(incomeLayer.value)
-    incomeLayer.value = null
   }
 }
 
 // Show election results overlay with donut popups
 const showElectionOverlay = async () => {
   if (!map.value) return
-  
+
+  // Reuse the cached layer if it has already been built
+  if (electionLayer.value) {
+    electionLayer.value.addTo(map.value)
+    return
+  }
+
   electionLoading.value = true
   try {
     // Load income data which has electorate boundaries
     const data = await loadIncomeData()
     if (!data) return
-    
-    // Remove existing layer
-    if (electionLayer.value) {
-      map.value.removeLayer(electionLayer.value)
-    }
-    
-    electionLayer.value = L.geoJSON(data, {
+
+    electionLayer.value = markRaw(L.geoJSON(data, {
       style: (feature) => {
         const name = feature?.properties?.name || ''
         // Match case-insensitive and also check formerName
@@ -257,7 +258,7 @@ const showElectionOverlay = async () => {
           }
         })
       }
-    }).addTo(map.value)
+    })).addTo(map.value)
   } catch (e) {
     console.error('Failed to load election overlay:', e)
   } finally {
@@ -265,11 +266,10 @@ const showElectionOverlay = async () => {
   }
 }
 
-// Hide election overlay
+// Hide election overlay (keep the cached layer for reuse on next toggle)
 const hideElectionOverlay = () => {
   if (electionLayer.value && map.value) {
     map.value.removeLayer(electionLayer.value)
-    electionLayer.value = null
   }
 }
 

@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt, { SignOptions } from 'jsonwebtoken';
+import { randomBytes } from 'crypto';
 
 /**
  * Simple API key authentication for seethbotsite
@@ -91,12 +92,7 @@ export const initializeApiKeys = () => {
  * Generate a random API key
  */
 export const generateApiKey = (): string => {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let key = '';
-  for (let i = 0; i < 32; i++) {
-    key += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return `sk_${key}`;
+  return `sk_${randomBytes(24).toString('base64url')}`;
 };
 
 /**
@@ -299,7 +295,7 @@ export const logAuthAttempt = (req: Request, res: Response, next: NextFunction) 
     if (keyInfo) {
       console.log(`[Auth] Valid API key used by ${ip} (${keyInfo.type})`);
     } else {
-      console.warn(`[Auth] Invalid API key attempted by ${ip}: ${apiKey.substring(0, 8)}...`);
+      console.warn(`[Auth] Invalid API key attempted by ${ip}`);
     }
   }
 

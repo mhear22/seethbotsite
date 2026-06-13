@@ -233,6 +233,7 @@ const loadCount = async () => {
 
 // Save stats periodically
 let saveInterval: ReturnType<typeof setInterval> | null = null
+let syncInterval: ReturnType<typeof setInterval> | null = null
 
 const handleClick = async (event: MouseEvent) => {
   if (isClicking.value) return
@@ -438,7 +439,7 @@ onMounted(async () => {
   }, 5000)
 
   // Sync any remaining clicks every 30 seconds
-  setInterval(() => {
+  syncInterval = setInterval(() => {
     syncClicksToPoints()
   }, 30000)
 })
@@ -449,6 +450,9 @@ onUnmounted(() => {
   }
   if (saveInterval) {
     clearInterval(saveInterval)
+  }
+  if (syncInterval) {
+    clearInterval(syncInterval)
   }
   // Sync any remaining clicks before unmount
   syncClicksToPoints()

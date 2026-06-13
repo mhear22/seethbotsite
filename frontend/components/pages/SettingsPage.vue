@@ -60,7 +60,6 @@ const saveSettings = () => {
   localStorage.setItem('swipeEnabled', swipeEnabled.value.toString())
 
   settingsSaved.value = true
-  settingsSaved.value = true
   setTimeout(() => {
     settingsSaved.value = false
   }, 2000)
@@ -134,37 +133,6 @@ const resetToDefaults = () => {
 
       <div class="settings-section">
         <LanguageSettings />
-      </div>
-
-      <div class="settings-section">
-        <h2 class="section-title">💖 Hearts & Eggs</h2>
-      </div>
-
-      <div class="settings-section">
-        <h2 class="section-title">🔊 Volume Control</h2>
-
-        <div class="setting-item volume-setting">
-          <label class="setting-label">
-            <span class="label-text">Master Volume</span>
-            <span class="label-desc">Adjust the volume for all sounds and music</span>
-          </label>
-        </div>
-
-        <VolumeSlider v-model="volume" />
-
-        <div class="setting-item">
-          <label class="setting-label">
-            <span class="label-text">Mute All</span>
-            <span class="label-desc">Toggle all sounds on/off</span>
-          </label>
-          <button
-            @click="appStore.toggleMute"
-            class="toggle-btn"
-            :class="{ active: appStore.isMuted }"
-          >
-            {{ appStore.isMuted ? '🔴 Muted' : '🟢 Sound On' }}
-          </button>
-        </div>
       </div>
 
       <div class="settings-section">

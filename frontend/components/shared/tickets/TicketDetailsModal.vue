@@ -95,7 +95,7 @@ const close = () => {
 
 <template>
   <Teleport to="body">
-    <div v-if="isOpen && ticket" class="modal-overlay" @click.self="close" role="dialog" aria-modal="true" :aria-labelledby="modal-title">
+    <div v-if="isOpen && ticket" class="modal-overlay" @click.self="close" role="dialog" aria-modal="true" aria-labelledby="modal-title">
       <div class="modal-container">
         <!-- Modal Header -->
         <div class="modal-header">

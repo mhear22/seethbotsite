@@ -232,8 +232,9 @@ const handleDeleteAccount = async () => {
         <h2>Sign In</h2>
 
         <div class="form-group">
-          <label>Email</label>
+          <label for="login-email">Email</label>
           <input
+            id="login-email"
             v-model="loginForm.email"
             type="email"
             placeholder="your@email.com"
@@ -243,15 +244,21 @@ const handleDeleteAccount = async () => {
         </div>
 
         <div class="form-group">
-          <label>Password</label>
+          <label for="login-password">Password</label>
           <input
+            id="login-password"
             v-model="loginForm.password"
             :type="showPassword ? 'text' : 'password'"
             placeholder="••••••••"
             @keyup.enter="handleLogin"
             :disabled="auth.loading.value"
           />
-          <button class="toggle-password" @click="showPassword = !showPassword">
+          <button
+            type="button"
+            class="toggle-password"
+            :aria-label="showPassword ? 'Hide password' : 'Show password'"
+            @click="showPassword = !showPassword"
+          >
             {{ showPassword ? '🙈' : '👁️' }}
           </button>
         </div>
@@ -262,7 +269,7 @@ const handleDeleteAccount = async () => {
 
         <p class="auth-switch">
           Don't have an account?
-          <a @click="setMode('register')">Create one</a>
+          <button type="button" class="link-button" @click="setMode('register')">Create one</button>
         </p>
       </div>
 
@@ -271,8 +278,9 @@ const handleDeleteAccount = async () => {
         <h2>Create Account</h2>
 
         <div class="form-group">
-          <label>Email</label>
+          <label for="register-email">Email</label>
           <input
+            id="register-email"
             v-model="registerForm.email"
             type="email"
             placeholder="your@email.com"
@@ -282,8 +290,9 @@ const handleDeleteAccount = async () => {
         </div>
 
         <div class="form-group">
-          <label>Display Name</label>
+          <label for="register-display-name">Display Name</label>
           <input
+            id="register-display-name"
             v-model="registerForm.displayName"
             type="text"
             placeholder="Your Name"
@@ -293,8 +302,9 @@ const handleDeleteAccount = async () => {
         </div>
 
         <div class="form-group">
-          <label>Password (min 8 characters)</label>
+          <label for="register-password">Password (min 8 characters)</label>
           <input
+            id="register-password"
             v-model="registerForm.password"
             :type="showPassword ? 'text' : 'password'"
             placeholder="••••••••"
@@ -303,15 +313,21 @@ const handleDeleteAccount = async () => {
         </div>
 
         <div class="form-group">
-          <label>Confirm Password</label>
+          <label for="register-confirm-password">Confirm Password</label>
           <input
+            id="register-confirm-password"
             v-model="registerForm.confirmPassword"
             :type="showPassword ? 'text' : 'password'"
             placeholder="••••••••"
             @keyup.enter="handleRegister"
             :disabled="auth.loading.value"
           />
-          <button class="toggle-password" @click="showPassword = !showPassword">
+          <button
+            type="button"
+            class="toggle-password"
+            :aria-label="showPassword ? 'Hide password' : 'Show password'"
+            @click="showPassword = !showPassword"
+          >
             {{ showPassword ? '🙈' : '👁️' }}
           </button>
         </div>
@@ -322,7 +338,7 @@ const handleDeleteAccount = async () => {
 
         <p class="auth-switch">
           Already have an account?
-          <a @click="setMode('login')">Sign in</a>
+          <button type="button" class="link-button" @click="setMode('login')">Sign in</button>
         </p>
       </div>
 
@@ -331,8 +347,9 @@ const handleDeleteAccount = async () => {
         <h2>Profile Settings</h2>
 
         <div class="form-group">
-          <label>Email</label>
+          <label for="profile-email">Email</label>
           <input
+            id="profile-email"
             :value="auth.user.value?.email"
             type="email"
             disabled
@@ -341,8 +358,9 @@ const handleDeleteAccount = async () => {
         </div>
 
         <div class="form-group">
-          <label>Display Name</label>
+          <label for="profile-display-name">Display Name</label>
           <input
+            id="profile-display-name"
             v-model="profileForm.displayName"
             type="text"
             @keyup.enter="handleUpdateProfile"
@@ -359,8 +377,9 @@ const handleDeleteAccount = async () => {
         <h3>Change Password</h3>
 
         <div class="form-group">
-          <label>Current Password</label>
+          <label for="current-password">Current Password</label>
           <input
+            id="current-password"
             v-model="changePasswordForm.oldPassword"
             :type="showPassword ? 'text' : 'password'"
             placeholder="••••••••"
@@ -369,8 +388,9 @@ const handleDeleteAccount = async () => {
         </div>
 
         <div class="form-group">
-          <label>New Password</label>
+          <label for="new-password">New Password</label>
           <input
+            id="new-password"
             v-model="changePasswordForm.newPassword"
             :type="showPassword ? 'text' : 'password'"
             placeholder="••••••••"
@@ -379,15 +399,21 @@ const handleDeleteAccount = async () => {
         </div>
 
         <div class="form-group">
-          <label>Confirm New Password</label>
+          <label for="confirm-new-password">Confirm New Password</label>
           <input
+            id="confirm-new-password"
             v-model="changePasswordForm.confirmNewPassword"
             :type="showPassword ? 'text' : 'password'"
             placeholder="••••••••"
             @keyup.enter="handleChangePassword"
             :disabled="auth.loading.value"
           />
-          <button class="toggle-password" @click="showPassword = !showPassword">
+          <button
+            type="button"
+            class="toggle-password"
+            :aria-label="showPassword ? 'Hide password' : 'Show password'"
+            @click="showPassword = !showPassword"
+          >
             {{ showPassword ? '🙈' : '👁️' }}
           </button>
         </div>
@@ -628,14 +654,18 @@ const handleDeleteAccount = async () => {
   font-size: 14px;
 }
 
-.auth-switch a {
+.auth-switch .link-button {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
   color: #4299e1;
   cursor: pointer;
   font-weight: 600;
   text-decoration: none;
 }
 
-.auth-switch a:hover {
+.auth-switch .link-button:hover {
   text-decoration: underline;
 }
 
@@ -659,5 +689,70 @@ const handleDeleteAccount = async () => {
   .auth-form {
     padding: 20px;
   }
+}
+
+/* Dark mode */
+.dark .auth-header h1 {
+  color: #f7fafc;
+}
+
+.dark .auth-header p {
+  color: #a0aec0;
+}
+
+.dark .auth-tabs button {
+  background: #2d3748;
+  border-color: #4a5568;
+  color: #e2e8f0;
+}
+
+.dark .auth-tabs button:hover {
+  border-color: #63b3ed;
+  color: #90cdf4;
+}
+
+.dark .auth-tabs button.active {
+  background: #4299e1;
+  border-color: #4299e1;
+  color: white;
+}
+
+.dark .auth-form {
+  background: #2d3748;
+  border-color: #4a5568;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.dark .auth-form h2,
+.dark .auth-form h3 {
+  color: #f7fafc;
+}
+
+.dark .form-group label {
+  color: #e2e8f0;
+}
+
+.dark .form-group input {
+  background: #1a202c;
+  color: #f7fafc;
+  border-color: #4a5568;
+}
+
+.dark .form-group input::placeholder {
+  color: #718096;
+}
+
+.dark .form-group input:disabled,
+.dark .disabled-input {
+  background: #2d3748;
+  color: #718096;
+}
+
+.dark .toggle-password:hover {
+  background: #4a5568;
+}
+
+.dark .auth-divider {
+  border-top-color: #4a5568;
 }
 </style>

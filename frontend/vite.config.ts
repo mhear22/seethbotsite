@@ -2,7 +2,7 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import path from 'path'
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './'),
@@ -44,6 +44,9 @@ export default defineConfig({
       },
     },
   },
+  esbuild: {
+    pure: mode === 'production' ? ['console.log', 'console.debug', 'console.info'] : []
+  },
   build: {
     outDir: 'dist',
     emptyOutDir: true,
@@ -52,9 +55,10 @@ export default defineConfig({
         manualChunks: {
           'vue-vendor': ['vue', 'vue-router', 'pinia'],
           'three': ['three'],
+          'leaflet': ['leaflet'],
           'api': ['openapi-fetch']
         }
       }
     }
   }
-})
+}))

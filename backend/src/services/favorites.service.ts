@@ -157,13 +157,15 @@ export async function reorderFavorites(userId: number, favoriteIds: number[]): P
     throw new Error('One or more favorites not found or access denied');
   }
 
-  // Update order indices
-  for (const [index, id] of favoriteIds.entries()) {
-    await prisma.favorite.update({
-      where: { id },
-      data: { order_index: index }
-    });
-  }
+  // Update order indices atomically in a single transaction
+  await prisma.$transaction(
+    favoriteIds.map((id, index) =>
+      prisma.favorite.update({
+        where: { id },
+        data: { order_index: index }
+      })
+    )
+  );
 
   return getFavoritesByUserId(userId);
 }

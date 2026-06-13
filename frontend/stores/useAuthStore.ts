@@ -12,7 +12,13 @@ import { useSettingsPersistence } from '../composables/useSettingsPersistence'
 
 const API_BASE = '/api'
 const TOKEN_KEY = 'auth_token'
-const REFRESH_TIMER_KEY = 'auth_refresh_timer'
+
+// Maximum value for setTimeout delay (just under 32-bit signed int max)
+const MAX_TIMEOUT_MS = 2147483646
+// Refresh the token this many ms before it expires
+const REFRESH_LEAD_MS = 30_000
+// Delay before retrying a failed token refresh
+const REFRESH_RETRY_MS = 5 * 60 * 1000
 
 export interface Session {
   id: number
@@ -141,16 +147,13 @@ export const useAuthStore = defineStore('auth', () => {
     const timeUntilExpiry = expiryDate.getTime() - now.getTime()
 
     // Refresh 30 seconds before expiry
-    const refreshDelay = 
-    Math.min(2147483646, Math.max(1000, timeUntilExpiry - 30000))
+    const refreshDelay =
+    Math.min(MAX_TIMEOUT_MS, Math.max(1000, timeUntilExpiry - REFRESH_LEAD_MS))
 
     refreshTimer = setTimeout(async () => {
       console.log('Refreshing token...')
       await refreshToken()
     }, refreshDelay)
-
-    // Store timer reference for cleanup
-    localStorage.setItem(REFRESH_TIMER_KEY, Date.now().toString())
   }
 
   /**
@@ -203,7 +206,7 @@ export const useAuthStore = defineStore('auth', () => {
         if (refreshRetryTimer) {
           clearTimeout(refreshRetryTimer)
         }
-        refreshRetryTimer = setTimeout(() => refreshToken(), 5 * 60 * 1000)
+        refreshRetryTimer = setTimeout(() => refreshToken(), REFRESH_RETRY_MS)
         return false
       }
     } catch (err) {
@@ -213,7 +216,7 @@ export const useAuthStore = defineStore('auth', () => {
       if (refreshRetryTimer) {
         clearTimeout(refreshRetryTimer)
       }
-      refreshRetryTimer = setTimeout(() => refreshToken(), 5 * 60 * 1000)
+      refreshRetryTimer = setTimeout(() => refreshToken(), REFRESH_RETRY_MS)
       return false
     }
   }
@@ -568,7 +571,6 @@ export const useAuthStore = defineStore('auth', () => {
     }
     
     localStorage.removeItem(TOKEN_KEY)
-    localStorage.removeItem(REFRESH_TIMER_KEY)
   }
 
   /**

@@ -717,7 +717,7 @@ router.get('/tickets/search', async (req: Request, res: Response) => {
     };
 
     // Search tickets
-    const tickets = ticketsFilterService.searchTickets(filters, q.trim());
+    const tickets = await ticketsFilterService.searchTickets(filters, q.trim());
 
     res.json({
       tickets,

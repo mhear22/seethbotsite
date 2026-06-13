@@ -23,15 +23,21 @@ interface PatchNote {
 
 const latestPatchNote = ref<PatchNote | null>(null)
 const patchNoteLoading = ref(true)
+const patchNoteError = ref(false)
 
 const loadLatestPatchNote = async () => {
+  patchNoteError.value = false
+  patchNoteLoading.value = true
   try {
     const response = await fetch('/api/patch-notes/latest')
     if (response.ok) {
       latestPatchNote.value = await response.json()
+    } else {
+      patchNoteError.value = true
     }
   } catch (error) {
     console.error('Failed to load latest patch note:', error)
+    patchNoteError.value = true
   } finally {
     patchNoteLoading.value = false
   }
@@ -154,6 +160,15 @@ const featureCategories = [
         <p v-if="latestPatchNote.changes.length > 5" class="more-changes">
           +{{ latestPatchNote.changes.length - 5 }} more change{{ latestPatchNote.changes.length - 5 !== 1 ? 's' : '' }}
         </p>
+      </div>
+    </section>
+    <section v-else-if="patchNoteError" class="patch-note-section">
+      <div class="patch-note-header">
+        <h2 class="patch-note-title">📝 Latest Update</h2>
+      </div>
+      <div class="patch-note-card patch-note-error">
+        <p class="patch-note-error-text">Could not load the latest update.</p>
+        <button type="button" class="patch-note-retry" @click="loadLatestPatchNote">Retry</button>
       </div>
     </section>
 
@@ -644,6 +659,44 @@ const featureCategories = [
 
 .dark .more-changes {
   color: #ffb6c1;
+}
+
+.patch-note-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  text-align: center;
+}
+
+.patch-note-error-text {
+  color: #666;
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+.dark .patch-note-error-text {
+  color: #aaa;
+}
+
+.patch-note-retry {
+  background: #ff91a4;
+  color: white;
+  border: none;
+  padding: 0.5rem 1.25rem;
+  border-radius: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.patch-note-retry:hover {
+  opacity: 0.85;
+}
+
+.dark .patch-note-retry {
+  background: #ffb6c1;
+  color: #1a1a2e;
 }
 
 /* Animations */

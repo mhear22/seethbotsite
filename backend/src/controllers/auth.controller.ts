@@ -236,7 +236,7 @@ router.post('/auth/login', authRateLimiter, async (req: Request, res: Response) 
  *       401:
  *         description: Invalid or expired token
  */
-router.post('/auth/refresh', async (req: Request, res: Response) => {
+router.post('/auth/refresh', authRateLimiter, async (req: Request, res: Response) => {
   try {
     const { token } = req.body;
 
@@ -380,13 +380,36 @@ router.post('/auth/logout', requireAuth, async (req: Request, res: Response) => 
  *       401:
  *         description: Not authenticated
  */
-router.get('/auth/sessions', requireAuth, (req: Request, res: Response) => {
+router.get('/auth/sessions', requireAuth, async (req: Request, res: Response) => {
   try {
-    const sessions = getUserSessions(req.user!.id);
+    const sessions = await getUserSessions(req.user!.id);
     res.json({ sessions });
   } catch (error) {
     console.error('Error getting sessions:', error);
     res.status(500).json({ error: 'Failed to get sessions' });
+  }
+});
+
+/**
+ * @openapi
+ * /api/auth/sessions/all:
+ *   delete:
+ *     tags: [Authentication]
+ *     summary: Delete all sessions
+ *     description: Logs out from all devices. Requires JWT token.
+ *     responses:
+ *       200:
+ *         description: All sessions deleted successfully
+ *       401:
+ *         description: Not authenticated
+ */
+router.delete('/auth/sessions/all', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const count = await deleteAllSessions(req.user!.id);
+    res.json({ message: 'Logged out from all devices', count });
+  } catch (error) {
+    console.error('Error deleting all sessions:', error);
+    res.status(500).json({ error: 'Failed to delete all sessions' });
   }
 });
 
@@ -433,29 +456,6 @@ router.delete('/auth/sessions/:id', requireAuth, async (req: Request, res: Respo
 
 /**
  * @openapi
- * /api/auth/sessions/all:
- *   delete:
- *     tags: [Authentication]
- *     summary: Delete all sessions
- *     description: Logs out from all devices. Requires JWT token.
- *     responses:
- *       200:
- *         description: All sessions deleted successfully
- *       401:
- *         description: Not authenticated
- */
-router.delete('/auth/sessions/all', requireAuth, async (req: Request, res: Response) => {
-  try {
-    const count = await deleteAllSessions(req.user!.id);
-    res.json({ message: 'Logged out from all devices', count });
-  } catch (error) {
-    console.error('Error deleting all sessions:', error);
-    res.status(500).json({ error: 'Failed to delete all sessions' });
-  }
-});
-
-/**
- * @openapi
  * /api/auth/profile:
  *   patch:
  *     tags: [Authentication]
@@ -476,7 +476,7 @@ router.delete('/auth/sessions/all', requireAuth, async (req: Request, res: Respo
  *       401:
  *         description: Not authenticated
  */
-router.patch('/auth/profile', requireAuth, (req: Request, res: Response) => {
+router.patch('/auth/profile', requireAuth, async (req: Request, res: Response) => {
   try {
     const { displayName } = req.body;
 
@@ -484,7 +484,7 @@ router.patch('/auth/profile', requireAuth, (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Display name is required' });
     }
 
-    const user = updateUserField(req.user!.id, 'display_name', displayName);
+    const user = await updateUserField(req.user!.id, 'display_name', displayName);
     res.json({ success: true, user });
   } catch (error) {
     console.error('Error updating profile:', error);
@@ -609,11 +609,11 @@ router.delete('/auth/account', requireAuth, async (req: Request, res: Response) 
  *       401:
  *         description: Not authenticated
  */
-router.patch('/auth/avatar', requireAuth, (req: Request, res: Response) => {
+router.patch('/auth/avatar', requireAuth, async (req: Request, res: Response) => {
   try {
     const { avatarUrl } = req.body;
     const sanitized = avatarUrl ? sanitizeString(avatarUrl, 500) : null;
-    const user = updateUserField(req.user!.id, 'avatar_url', sanitized);
+    const user = await updateUserField(req.user!.id, 'avatar_url', sanitized);
     res.json({ success: true, user });
   } catch (error) {
     console.error('Error updating avatar:', error);
@@ -644,11 +644,11 @@ router.patch('/auth/avatar', requireAuth, (req: Request, res: Response) => {
  *       401:
  *         description: Not authenticated
  */
-router.patch('/auth/banner', requireAuth, (req: Request, res: Response) => {
+router.patch('/auth/banner', requireAuth, async (req: Request, res: Response) => {
   try {
     const { bannerUrl } = req.body;
     const sanitized = bannerUrl ? sanitizeString(bannerUrl, 500) : null;
-    const user = updateUserField(req.user!.id, 'banner_url', sanitized);
+    const user = await updateUserField(req.user!.id, 'banner_url', sanitized);
     res.json({ success: true, user });
   } catch (error) {
     console.error('Error updating banner:', error);
@@ -680,11 +680,11 @@ router.patch('/auth/banner', requireAuth, (req: Request, res: Response) => {
  *       401:
  *         description: Not authenticated
  */
-router.patch('/auth/bio', requireAuth, (req: Request, res: Response) => {
+router.patch('/auth/bio', requireAuth, async (req: Request, res: Response) => {
   try {
     const { bio } = req.body;
     const sanitized = bio ? sanitizeString(bio, 500) : null;
-    const user = updateUserField(req.user!.id, 'bio', sanitized);
+    const user = await updateUserField(req.user!.id, 'bio', sanitized);
     res.json({ success: true, user });
   } catch (error) {
     console.error('Error updating bio:', error);
@@ -716,11 +716,11 @@ router.patch('/auth/bio', requireAuth, (req: Request, res: Response) => {
  *       401:
  *         description: Not authenticated
  */
-router.patch('/auth/status', requireAuth, (req: Request, res: Response) => {
+router.patch('/auth/status', requireAuth, async (req: Request, res: Response) => {
   try {
     const { status } = req.body;
     const sanitized = status ? sanitizeString(status, 100) : null;
-    const user = updateUserField(req.user!.id, 'status', sanitized);
+    const user = await updateUserField(req.user!.id, 'status', sanitized);
     res.json({ success: true, user });
   } catch (error) {
     console.error('Error updating status:', error);
@@ -752,11 +752,11 @@ router.patch('/auth/status', requireAuth, (req: Request, res: Response) => {
  *       401:
  *         description: Not authenticated
  */
-router.patch('/auth/privacy', requireAuth, (req: Request, res: Response) => {
+router.patch('/auth/privacy', requireAuth, async (req: Request, res: Response) => {
   try {
     const { showEmail, showJoinedDate } = req.body;
 
-    const user = updateUserPrivacy(
+    const user = await updateUserPrivacy(
       req.user!.id,
       typeof showEmail === 'boolean' ? showEmail : true,
       typeof showJoinedDate === 'boolean' ? showJoinedDate : true
@@ -787,7 +787,7 @@ router.patch('/auth/privacy', requireAuth, (req: Request, res: Response) => {
  *       404:
  *         description: User not found
  */
-router.get('/profile/:id', (req: Request, res: Response) => {
+router.get('/profile/:id', async (req: Request, res: Response) => {
   try {
     const userId = parseInt(req.params.id);
 
@@ -795,7 +795,7 @@ router.get('/profile/:id', (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Invalid user ID' });
     }
 
-    const user = getUserById(userId);
+    const user = await getUserById(userId);
 
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
@@ -861,9 +861,9 @@ router.get('/profile/:id', (req: Request, res: Response) => {
  *       401:
  *         description: Not authenticated
  */
-router.get('/auth/theme', requireAuth, (req: Request, res: Response) => {
+router.get('/auth/theme', requireAuth, async (req: Request, res: Response) => {
   try {
-    const preferences = getUserThemePreferences(req.user!.id);
+    const preferences = await getUserThemePreferences(req.user!.id);
     res.json({ success: true, preferences });
   } catch (error) {
     console.error('Error getting theme preferences:', error);
@@ -935,7 +935,7 @@ router.get('/auth/theme', requireAuth, (req: Request, res: Response) => {
  *       401:
  *         description: Not authenticated
  */
-router.put('/auth/theme', requireAuth, (req: Request, res: Response) => {
+router.put('/auth/theme', requireAuth, async (req: Request, res: Response) => {
   try {
     const { preferences } = req.body;
 
@@ -943,7 +943,7 @@ router.put('/auth/theme', requireAuth, (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Theme preferences are required' });
     }
 
-    const updatedPreferences = updateUserThemePreferences(req.user!.id, preferences);
+    const updatedPreferences = await updateUserThemePreferences(req.user!.id, preferences);
     res.json({ success: true, preferences: updatedPreferences });
   } catch (error: any) {
     if (error.message === 'Invalid theme preferences') {

@@ -735,11 +735,14 @@ export async function getAchievementProgress(userId: string): Promise<any> {
  * Helper function to get time range SQL condition
  */
 function getTimeRangeCondition(timeRange: 'hour' | 'day' | 'week' | 'month') {
-  const timeMap: Record<string, string> = {
-    hour: "AND recorded_at >= datetime('now', '-1 hour')",
-    day: "AND recorded_at >= datetime('now', '-1 day')",
-    week: "AND recorded_at >= datetime('now', '-7 days')",
-    month: "AND recorded_at >= datetime('now', '-1 month')",
-  };
-  return Prisma.sql([timeMap[timeRange]]);
+  switch (timeRange) {
+    case 'hour':
+      return Prisma.sql`AND recorded_at >= NOW() - INTERVAL '1 hour'`;
+    case 'day':
+      return Prisma.sql`AND recorded_at >= NOW() - INTERVAL '1 day'`;
+    case 'week':
+      return Prisma.sql`AND recorded_at >= NOW() - INTERVAL '7 days'`;
+    case 'month':
+      return Prisma.sql`AND recorded_at >= NOW() - INTERVAL '1 month'`;
+  }
 }

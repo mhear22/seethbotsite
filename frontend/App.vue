@@ -77,7 +77,7 @@ onMounted(() => {
 
   // Only spawn hearts if not in performance mode (Ticket #perf) - MEMORY LEAK FIX
   const spawnHeart = () => {
-    if (!appStore.performanceMode) {
+    if (!appStore.performanceMode && !document.hidden) {
       appStore.createHeart()
     }
     heartSpawnTimeout = setTimeout(spawnHeart, appStore.heartSpawnRate)

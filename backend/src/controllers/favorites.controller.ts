@@ -174,69 +174,6 @@ router.post('/', async (req: Request, res: Response) => {
 
 /**
  * @openapi
- * /api/favorites/{id}:
- *   delete:
- *     tags: [Favorites]
- *     summary: Remove favorite
- *     description: Removes a favorite by ID
- *     security:
- *       - BearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *         description: Favorite ID
- *     responses:
- *       200:
- *         description: Favorite removed successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *       400:
- *         description: Bad request (not found or access denied)
- *       401:
- *         description: Unauthorized
- */
-router.delete('/:id', async (req: Request, res: Response) => {
-  const authResult = await requireAuth(req, res);
-  if (!authResult) return;
-
-  const { user } = authResult;
-  const favoriteId = parseInt(req.params.id);
-
-  if (isNaN(favoriteId)) {
-    return res.status(400).json({
-      error: 'Bad request',
-      message: 'Invalid favorite ID'
-    });
-  }
-
-  try {
-    const removed = await removeFavorite(favoriteId, user.id);
-    if (removed) {
-      res.json({ message: 'Favorite removed successfully' });
-    } else {
-      res.status(404).json({
-        error: 'Not found',
-        message: 'Favorite not found'
-      });
-    }
-  } catch (error: any) {
-    res.status(400).json({
-      error: 'Bad request',
-      message: error.message || 'Failed to remove favorite'
-    });
-  }
-});
-
-/**
- * @openapi
  * /api/favorites/item:
  *   delete:
  *     tags: [Favorites]
@@ -302,6 +239,132 @@ router.delete('/item', async (req: Request, res: Response) => {
     res.status(400).json({
       error: 'Bad request',
       message: error.message || 'Failed to remove favorite'
+    });
+  }
+});
+
+/**
+ * @openapi
+ * /api/favorites/{id}:
+ *   delete:
+ *     tags: [Favorites]
+ *     summary: Remove favorite
+ *     description: Removes a favorite by ID
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Favorite ID
+ *     responses:
+ *       200:
+ *         description: Favorite removed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *       400:
+ *         description: Bad request (not found or access denied)
+ *       401:
+ *         description: Unauthorized
+ */
+router.delete('/:id', async (req: Request, res: Response) => {
+  const authResult = await requireAuth(req, res);
+  if (!authResult) return;
+
+  const { user } = authResult;
+  const favoriteId = parseInt(req.params.id);
+
+  if (isNaN(favoriteId)) {
+    return res.status(400).json({
+      error: 'Bad request',
+      message: 'Invalid favorite ID'
+    });
+  }
+
+  try {
+    const removed = await removeFavorite(favoriteId, user.id);
+    if (removed) {
+      res.json({ message: 'Favorite removed successfully' });
+    } else {
+      res.status(404).json({
+        error: 'Not found',
+        message: 'Favorite not found'
+      });
+    }
+  } catch (error: any) {
+    res.status(400).json({
+      error: 'Bad request',
+      message: error.message || 'Failed to remove favorite'
+    });
+  }
+});
+
+/**
+ * @openapi
+ * /api/favorites/reorder:
+ *   put:
+ *     tags: [Favorites]
+ *     summary: Reorder favorites
+ *     description: Updates the order of favorites based on the provided array of IDs
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - favorite_ids
+ *             properties:
+ *               favorite_ids:
+ *                 type: array
+ *                 items:
+ *                   type: integer
+ *                 description: Array of favorite IDs in the desired order
+ *     responses:
+ *       200:
+ *         description: Favorites reordered successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 favorites:
+ *                   type: array
+ *       400:
+ *         description: Bad request
+ *       401:
+ *         description: Unauthorized
+ */
+router.put('/reorder', async (req: Request, res: Response) => {
+  const authResult = await requireAuth(req, res);
+  if (!authResult) return;
+
+  const { user } = authResult;
+  const { favorite_ids } = req.body;
+
+  if (!Array.isArray(favorite_ids)) {
+    return res.status(400).json({
+      error: 'Bad request',
+      message: 'favorite_ids must be an array'
+    });
+  }
+
+  try {
+    const favorites = await reorderFavorites(user.id, favorite_ids);
+    res.json({ favorites });
+  } catch (error: any) {
+    res.status(400).json({
+      error: 'Bad request',
+      message: error.message || 'Failed to reorder favorites'
     });
   }
 });
@@ -394,69 +457,6 @@ router.put('/:id', async (req: Request, res: Response) => {
     res.status(400).json({
       error: 'Bad request',
       message: error.message || 'Failed to update favorite'
-    });
-  }
-});
-
-/**
- * @openapi
- * /api/favorites/reorder:
- *   put:
- *     tags: [Favorites]
- *     summary: Reorder favorites
- *     description: Updates the order of favorites based on the provided array of IDs
- *     security:
- *       - BearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - favorite_ids
- *             properties:
- *               favorite_ids:
- *                 type: array
- *                 items:
- *                   type: integer
- *                 description: Array of favorite IDs in the desired order
- *     responses:
- *       200:
- *         description: Favorites reordered successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 favorites:
- *                   type: array
- *       400:
- *         description: Bad request
- *       401:
- *         description: Unauthorized
- */
-router.put('/reorder', async (req: Request, res: Response) => {
-  const authResult = await requireAuth(req, res);
-  if (!authResult) return;
-
-  const { user } = authResult;
-  const { favorite_ids } = req.body;
-
-  if (!Array.isArray(favorite_ids)) {
-    return res.status(400).json({
-      error: 'Bad request',
-      message: 'favorite_ids must be an array'
-    });
-  }
-
-  try {
-    const favorites = await reorderFavorites(user.id, favorite_ids);
-    res.json({ favorites });
-  } catch (error: any) {
-    res.status(400).json({
-      error: 'Bad request',
-      message: error.message || 'Failed to reorder favorites'
     });
   }
 });
