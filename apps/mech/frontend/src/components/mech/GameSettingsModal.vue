@@ -312,6 +312,11 @@ function captureKey(event: KeyboardEvent, action: 'forward' | 'backward' | 'left
   width: 90%;
   max-width: 500px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  /* Cap the panel to the viewport and let the body scroll inside it so tall
+     content (keybind grid, sliders) never overflows the panel. */
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
 }
 
 .modal-header {
@@ -320,6 +325,7 @@ function captureKey(event: KeyboardEvent, action: 'forward' | 'backward' | 'left
   align-items: center;
   padding: 24px 28px;
   border-bottom: 1px solid rgba(59, 130, 246, 0.2);
+  flex-shrink: 0;
 }
 
 .modal-header h2 {
@@ -350,6 +356,7 @@ function captureKey(event: KeyboardEvent, action: 'forward' | 'backward' | 'left
 .modal-tabs {
   display: flex;
   border-bottom: 1px solid rgba(59, 130, 246, 0.2);
+  flex-shrink: 0;
 }
 
 .tab-btn {
@@ -377,6 +384,10 @@ function captureKey(event: KeyboardEvent, action: 'forward' | 'backward' | 'left
 
 .modal-body {
   padding: 28px;
+  /* Scrollable region between the pinned header/tabs and footer. */
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .setting-group {
@@ -566,6 +577,7 @@ function captureKey(event: KeyboardEvent, action: 'forward' | 'backward' | 'left
   gap: 12px;
   padding: 20px 28px;
   border-top: 1px solid rgba(59, 130, 246, 0.2);
+  flex-shrink: 0;
 }
 
 .reset-btn,

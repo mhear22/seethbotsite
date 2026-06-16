@@ -1,6 +1,7 @@
 <template>
   <div class="mech-builder-page">
     <div class="flow-navigation" role="navigation" aria-label="Mech flow navigation">
+      <button type="button" class="flow-pill action" @click="goHome">← Menu</button>
       <span class="flow-pill current">Builder</span>
       <button
         type="button"
@@ -377,6 +378,10 @@ function shareBuild() {
     console.error('Failed to copy:', err)
     alert('Build code: ' + code)
   })
+}
+
+function goHome() {
+  router.push({ name: 'mech-home' })
 }
 
 function goToBattle() {

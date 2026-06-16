@@ -6,7 +6,8 @@
       role="navigation"
       aria-label="Mech flow navigation"
     >
-      <button type="button" class="flow-pill action" @click="returnToBuilder">← Builder</button>
+      <button type="button" class="flow-pill action" @click="goHome">← Menu</button>
+      <button type="button" class="flow-pill action" @click="returnToBuilder">Builder</button>
       <span class="flow-pill current">Battle</span>
     </div>
 
@@ -1099,6 +1100,11 @@ function findAnotherMatch() {
 function returnToBuilder() {
   battle.resetBattle()
   router.push({ name: 'mech-builder' })
+}
+
+function goHome() {
+  battle.resetBattle()
+  router.push({ name: 'mech-home' })
 }
 </script>
 

@@ -13,7 +13,8 @@ const AuthRedirectPage = {
 const routes = [
   {
     path: '/',
-    redirect: { name: 'mech-builder' }
+    name: 'mech-home',
+    component: () => import('./components/pages/HomePage.vue')
   },
   {
     path: '/builder',
