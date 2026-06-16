@@ -46,14 +46,15 @@ const deltaRows = computed(() => {
   left: 50%;
   transform: translateX(-50%) translateY(4px);
   min-width: 160px;
-  background: #1e293b;
-  border: 1px solid #475569;
-  border-radius: 8px;
+  background: var(--mech-surface-raised);
+  backdrop-filter: var(--mech-blur);
+  border: 1px solid var(--mech-border-strong);
+  border-radius: var(--mech-radius-sm);
   padding: 10px 12px;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--mech-shadow-md);
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.15s ease, transform 0.15s ease;
+  transition: opacity var(--mech-transition-fast), transform var(--mech-transition-fast);
   z-index: 30;
 }
 
@@ -66,9 +67,9 @@ const deltaRows = computed(() => {
 .delta-title {
   font-size: 11px;
   font-weight: 700;
-  color: #94a3b8;
+  color: var(--mech-text-dim);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: var(--mech-tracking-wide);
   margin-bottom: 6px;
 }
 
@@ -86,24 +87,24 @@ const deltaRows = computed(() => {
 }
 
 .delta-label {
-  color: #cbd5e0;
+  color: var(--mech-text-dim);
 }
 
 .delta-value {
   font-weight: 700;
-  color: #e2e8f0;
+  color: var(--mech-text);
 }
 
 .delta-row.positive .delta-value {
-  color: #34d399;
+  color: var(--mech-success);
 }
 
 .delta-row.negative .delta-value {
-  color: #f87171;
+  color: var(--mech-danger);
 }
 
 .delta-empty {
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--mech-text-dim);
 }
 </style>

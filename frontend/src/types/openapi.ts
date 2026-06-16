@@ -4,7 +4,7 @@
  */
 
 export interface paths {
-    "/api/activity-feed": {
+    "/api/version": {
         parameters: {
             query?: never;
             header?: never;
@@ -12,163 +12,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get global activity feed
-         * @description Returns recent activities from all users
-         */
-        get: {
-            parameters: {
-                query?: {
-                    /** @description Number of activities to return */
-                    limit?: number;
-                    /** @description Offset for pagination */
-                    offset?: number;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Activity feed retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            activities?: {
-                                id?: number;
-                                userId?: string;
-                                userName?: string;
-                                userAvatar?: string;
-                                activityType?: string;
-                                description?: string;
-                                metadata?: Record<string, never>;
-                                pointsChange?: number;
-                                gameType?: string;
-                                /** Format: date-time */
-                                recordedAt?: string;
-                            }[];
-                            timestamp?: string;
-                        };
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/activity-feed/user/{userId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get activity feed for a specific user
-         * @description Returns activities for a specific user
-         */
-        get: {
-            parameters: {
-                query?: {
-                    /** @description Number of activities to return */
-                    limit?: number;
-                    /** @description Offset for pagination */
-                    offset?: number;
-                    /** @description Filter by activity type */
-                    type?: "points_earned" | "points_bulk" | "achievement_unlocked" | "high_score" | "challenge_completed" | "game_played" | "ranking_change" | "session_end";
-                    /** @description Filter by game type */
-                    gameType?: "clicker" | "fishing";
-                };
-                header?: never;
-                path: {
-                    /** @description User ID */
-                    userId: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description User activity feed retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/activity-feed/stats/{userId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get activity statistics for a user
-         * @description Returns aggregated statistics for a user's activities
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description User ID */
-                    userId: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description User activity statistics retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            totalActivities?: number;
-                            pointsEarned?: number;
-                            achievementsUnlocked?: number;
-                            gamesPlayed?: number;
-                        };
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/activity-feed/types": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get available activity types
-         * @description Returns list of all available activity types
+         * Get version and build information
+         * @description Returns git hash, branch, build time, version, and build count information
          */
         get: {
             parameters: {
@@ -179,63 +24,50 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Activity types retrieved successfully */
+                /** @description Version information retrieved successfully */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
                         "application/json": {
-                            types?: string[];
-                        };
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/analytics/summary": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get analytics summary
-         * @description Returns overall analytics stats including total clicks and active users
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Analytics summary retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /** @description Total page views recorded */
-                            totalClicks?: number;
-                            /** @description Number of currently active users (within 15 minutes) */
-                            activeUsers?: number;
+                            /**
+                             * @description Git commit hash
+                             * @example 1ab857e
+                             */
+                            gitHash?: string;
+                            /**
+                             * @description Git branch name
+                             * @example main
+                             */
+                            gitBranch?: string;
                             /**
                              * Format: date-time
-                             * @description When the summary was generated
+                             * @description ISO 8601 build timestamp
+                             * @example 2026-02-03T10:30:00.000Z
                              */
-                            timestamp?: string;
+                            buildTime?: string;
+                            /**
+                             * @description Application version
+                             * @example 1.0.0
+                             */
+                            version?: string;
+                            /**
+                             * @description Deployment environment
+                             * @example production
+                             */
+                            environment?: string;
+                            /**
+                             * @description Total number of builds
+                             * @example 42
+                             */
+                            buildCount?: number;
+                            /**
+                             * Format: date-time
+                             * @description Current server time
+                             * @example 2026-02-03T10:30:00.000Z
+                             */
+                            currentTimestamp?: string;
                         };
                     };
                 };
@@ -249,7 +81,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/analytics/top-pages": {
+    "/api/tickets/settings/ignore-mode": {
         parameters: {
             query?: never;
             header?: never;
@@ -257,45 +89,115 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get top pages by views
-         * @description Returns the most visited pages with their view counts
+         * Get ticket processing ignore mode
+         * @description Returns whether ticket processing is paused (ignoring all tickets)
          */
         get: {
             parameters: {
-                query?: {
-                    /** @description Maximum number of pages to return */
-                    limit?: number;
-                };
+                query?: never;
                 header?: never;
                 path?: never;
                 cookie?: never;
             };
             requestBody?: never;
             responses: {
-                /** @description Top pages retrieved successfully */
+                /** @description Ignore mode status retrieved successfully */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
                         "application/json": {
-                            pages?: {
-                                /** @description The page path */
-                                path?: string;
-                                /** @description Number of views for this page */
-                                views?: number;
-                            }[];
-                            /** Format: date-time */
-                            timestamp?: string;
+                            /** @example false */
+                            ignoreMode?: boolean;
                         };
                     };
                 };
-                /** @description Server error */
-                500: {
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update ticket processing ignore mode
+         * @description Sets whether ticket processing is paused
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        ignoreMode: boolean;
+                    };
+                };
+            };
+            responses: {
+                /** @description Ignore mode updated successfully */
+                200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content?: never;
+                };
+                /** @description Bad request - invalid ignoreMode value */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/tickets/next-task": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get next task and update last collection time
+         * @description Returns the next pending ticket to work on (excluding those collected in the last hour) and updates the last collection timestamp. Designed for heartbeat automation.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Next task retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            ticket?: {
+                                id?: number;
+                                title?: string;
+                                description?: string;
+                                status?: string;
+                                ticketType?: string;
+                                priority?: string;
+                                created_at?: string;
+                                updated_at?: string;
+                            } | null;
+                            /** @example 2024-02-04T00:00:00.000Z */
+                            lastCollection?: string;
+                        };
+                    };
                 };
             };
         };
@@ -307,7 +209,147 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/analytics/track": {
+    "/api/tickets/settings/last-collection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get last ticket collection timestamp
+         * @description Returns the timestamp of the last ticket collection
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Last collection timestamp retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example 2024-02-04T00:00:00.000Z */
+                            lastCollection?: string | null;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update last ticket collection timestamp
+         * @description Updates the timestamp of the last ticket collection. No authentication required.
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** Format: date-time */
+                        lastCollection: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Last collection updated successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/tickets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get all tickets
+         * @description Returns all tickets with optional filtering by status, type, priority, tags, and category. Sorted by relevance by default (older pending tickets first).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            tickets?: {
+                                id?: number;
+                                title?: string;
+                                description?: string;
+                                /** @enum {string} */
+                                status?: "pending" | "needs-info" | "completed" | "declined";
+                                /** @enum {string} */
+                                ticketType?: "feature" | "bug" | "feedback";
+                                /** @enum {string} */
+                                priority?: "high" | "medium" | "low";
+                                response?: string;
+                                created_at?: string;
+                                updated_at?: string;
+                                /** @description Relevance score (0-100), higher = more relevant */
+                                relevanceScore?: number;
+                                /** @description Number of days since ticket creation */
+                                daysSinceCreation?: number;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Create a new ticket
+         * @description Creates a new ticket with title and description. Optionally includes type, priority, tags, category, and creator_id for ticket ownership tracking.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: never;
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tickets/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -316,49 +358,48 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        post?: never;
         /**
-         * Record a page view
-         * @description Records a page view for analytics tracking
+         * Delete a ticket
+         * @description Deletes a ticket. No authentication required. Optionally provide creator_id to verify ownership.
          */
-        post: {
+        delete: {
             parameters: {
                 query?: never;
-                header?: never;
-                path?: never;
+                header?: {
+                    /** @description Creator ID for authorization (alternative to API key) */
+                    "X-Creator-ID"?: string;
+                };
+                path: {
+                    id: number;
+                };
                 cookie?: never;
             };
-            requestBody: {
+            requestBody?: {
                 content: {
                     "application/json": {
-                        /** @description The page path that was viewed */
-                        path: string;
-                        /** @description User ID (optional, for session tracking) */
-                        userId?: string;
+                        /** @description Creator ID for authorization (alternative to API key) */
+                        creator_id?: string;
                     };
                 };
             };
             responses: {
-                /** @description Page view recorded successfully */
+                /** @description Ticket deleted successfully */
                 200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            success?: boolean;
-                            message?: string;
-                        };
-                    };
-                };
-                /** @description Bad request */
-                400: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content?: never;
                 };
-                /** @description Server error */
-                500: {
+                /** @description Unauthorized - creator_id does not match */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Ticket not found */
+                404: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -366,13 +407,25 @@ export interface paths {
                 };
             };
         };
-        delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Update a ticket
+         * @description Update ticket fields including status, response, title, description, tags, and category. No authentication required.
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: never;
+        };
         trace?: never;
     };
-    "/api/archive/opinions": {
+    "/api/tickets/estimated-wait-time": {
         parameters: {
             query?: never;
             header?: never;
@@ -380,86 +433,45 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get archived opinions
-         * @description Returns all archived opinions sorted by creation date (newest first)
+         * Get estimated wait time for new tickets
+         * @description Returns the average completion time based on the last 10 completed tickets. Used to estimate how long new tickets might take to process.
          */
         get: {
             parameters: {
-                query?: {
-                    /** @description Maximum number of opinions to return */
-                    limit?: number;
-                    /** @description Filter by opinion type */
-                    type?: "random" | "build" | "all";
-                };
+                query?: never;
                 header?: never;
                 path?: never;
                 cookie?: never;
             };
             requestBody?: never;
             responses: {
-                /** @description Opinions retrieved successfully */
+                /** @description Estimated wait time retrieved successfully */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
                         "application/json": {
-                            opinions?: {
-                                id?: string;
-                                text?: string;
-                                /** @enum {string} */
-                                type?: "random" | "build";
-                                /** Format: date-time */
-                                createdAt?: string;
-                            }[];
-                            total?: number;
+                            /** @description Estimated wait time in minutes (null if insufficient data) */
+                            estimatedWaitTimeMinutes?: number;
+                            /** @description Number of completed tickets used for calculation */
+                            sampleSize?: number;
+                            /** @description Average completion time in hours (null if insufficient data) */
+                            averageCompletionTimeHours?: number;
                         };
                     };
                 };
             };
         };
         put?: never;
-        /**
-         * Save an opinion to the archive
-         * @description Archives an opinion (random or build opinion)
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        /** @description The opinion text */
-                        text: string;
-                        /**
-                         * @description Type of opinion
-                         * @enum {string}
-                         */
-                        type: "random" | "build";
-                    };
-                };
-            };
-            responses: {
-                /** @description Opinion archived successfully */
-                201: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/archive/rankings": {
+    "/api/tickets/stats": {
         parameters: {
             query?: never;
             header?: never;
@@ -467,96 +479,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get archived rankings snapshots
-         * @description Returns all archived rankings snapshots sorted by timestamp (newest first)
-         */
-        get: {
-            parameters: {
-                query?: {
-                    /** @description Maximum number of snapshots to return */
-                    limit?: number;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Rankings snapshots retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            snapshots?: {
-                                id?: string;
-                                /** Format: date-time */
-                                timestamp?: string;
-                                rankings?: {
-                                    avatar?: string;
-                                    name?: string;
-                                    score?: number;
-                                    isCurrentUser?: boolean;
-                                }[];
-                            }[];
-                            total?: number;
-                        };
-                    };
-                };
-            };
-        };
-        put?: never;
-        /**
-         * Save a rankings snapshot to the archive
-         * @description Archives a current rankings snapshot
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        /** @description Current leaderboard rankings */
-                        rankings: {
-                            avatar?: string;
-                            name?: string;
-                            score?: number;
-                            isCurrentUser?: boolean;
-                        }[];
-                    };
-                };
-            };
-            responses: {
-                /** @description Rankings snapshot archived successfully */
-                201: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/archive/stats": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get archive statistics
-         * @description Returns statistics about archived data
+         * Get ticketing statistics
+         * @description Returns ticket statistics including total count, status breakdown, and date ranges
          */
         get: {
             parameters: {
@@ -574,13 +498,29 @@ export interface paths {
                     };
                     content: {
                         "application/json": {
-                            opinions?: {
-                                total?: number;
-                                random?: number;
-                                build?: number;
+                            /** @example 42 */
+                            totalTickets?: number;
+                            byStatus?: {
+                                pending?: number;
+                                "needs-info"?: number;
+                                completed?: number;
+                                declined?: number;
                             };
-                            rankings?: {
-                                total?: number;
+                            oldestTicket?: {
+                                id?: number;
+                                title?: string;
+                                created_at?: string;
+                            };
+                            newestTicket?: {
+                                id?: number;
+                                title?: string;
+                                created_at?: string;
+                            };
+                            dates?: {
+                                oldestCreated?: string;
+                                newestCreated?: string;
+                                oldestCompleted?: string;
+                                newestCompleted?: string;
                             };
                         };
                     };
@@ -595,261 +535,162 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/auth/register": {
+    "/api/tickets/tags": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
-        put?: never;
         /**
-         * Register a new user
-         * @description Creates a new user account with email and password. Returns user info and JWT token.
+         * Get all tags used across tickets
+         * @description Returns a list of all unique tags used in tickets, sorted by usage count
          */
-        post: {
+        get: {
             parameters: {
                 query?: never;
                 header?: never;
                 path?: never;
                 cookie?: never;
             };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        /**
-                         * Format: email
-                         * @description User's email address
-                         */
-                        email: string;
-                        /**
-                         * Format: password
-                         * @description User's password (minimum 8 characters)
-                         */
-                        password: string;
-                        /** @description Optional display name */
-                        displayName?: string;
-                        /** @description Device name for session tracking */
-                        deviceName?: string;
-                        /** @description Device type (e.g., mobile, desktop, tablet) */
-                        deviceType?: string;
-                    };
-                };
-            };
+            requestBody?: never;
             responses: {
-                /** @description User registered successfully */
-                201: {
+                /** @description Tags retrieved successfully */
+                200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
                         "application/json": {
-                            user?: {
-                                id?: number;
-                                email?: string;
-                                display_name?: string;
-                                created_at?: string;
-                                updated_at?: string;
-                            };
-                            /** @description JWT authentication token */
-                            token?: string;
+                            tags?: {
+                                /** @example ui */
+                                name?: string;
+                                /** @example 5 */
+                                count?: number;
+                            }[];
                         };
                     };
                 };
-                /** @description Bad request - invalid input or email already registered */
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tickets/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get all categories used across tickets
+         * @description Returns a list of all unique categories used in tickets, sorted by usage count
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Categories retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            categories?: {
+                                /** @example ui */
+                                name?: string;
+                                /** @example 3 */
+                                count?: number;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tickets/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search tickets by term
+         * @description Search tickets by a search term that matches title or description. Supports optional filtering by status, type, priority, tag, and category.
+         */
+        get: {
+            parameters: {
+                query: {
+                    /** @description Search term to match in title or description */
+                    q: string;
+                    /** @description Filter by status */
+                    status?: "all" | "pending" | "needs-info" | "completed" | "declined";
+                    /** @description Filter by type */
+                    type?: "all" | "feature" | "bug" | "feedback";
+                    /** @description Filter by priority */
+                    priority?: "all" | "high" | "medium" | "low";
+                    /** @description Filter by tag */
+                    tag?: string;
+                    /** @description Filter by category */
+                    category?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Search results retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            tickets?: {
+                                id?: number;
+                                title?: string;
+                                description?: string;
+                                status?: string;
+                                type?: string;
+                                priority?: string;
+                                created_at?: string;
+                                updated_at?: string;
+                            }[];
+                            /** @description The search term used */
+                            query?: string;
+                        };
+                    };
+                };
+                /** @description Bad request - missing search term */
                 400: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content?: never;
                 };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/auth/login": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Login with email and password
-         * @description Authenticates a user and returns user info with JWT token.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        /** Format: email */
-                        email: string;
-                        /** Format: password */
-                        password: string;
-                        /** @description Device name for session tracking */
-                        deviceName?: string;
-                        /** @description Device type (e.g., mobile, desktop, tablet) */
-                        deviceType?: string;
-                    };
-                };
-            };
-            responses: {
-                /** @description Login successful */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            user?: {
-                                id?: number;
-                                email?: string;
-                                display_name?: string;
-                                created_at?: string;
-                                updated_at?: string;
-                            };
-                            /** @description JWT authentication token */
-                            token?: string;
-                        };
-                    };
-                };
-                /** @description Invalid credentials */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/auth/refresh": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Refresh access token
-         * @description Get a new JWT token using an existing valid token. Useful for extending sessions without re-login.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        /** @description Current valid JWT token */
-                        token: string;
-                    };
-                };
-            };
-            responses: {
-                /** @description Token refreshed successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            user?: {
-                                id?: number;
-                                email?: string;
-                                display_name?: string;
-                                created_at?: string;
-                                updated_at?: string;
-                            };
-                            /** @description New JWT authentication token */
-                            token?: string;
-                        };
-                    };
-                };
-                /** @description Invalid or expired token */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/auth/me": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get current user info
-         * @description Returns the authenticated user's information. Requires JWT token.
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description User info retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            user?: {
-                                id?: number;
-                                email?: string;
-                                display_name?: string;
-                                created_at?: string;
-                                updated_at?: string;
-                            };
-                            session?: {
-                                id?: number;
-                                device_name?: string;
-                                device_type?: string;
-                                created_at?: string;
-                                last_used_at?: string;
-                            };
-                        };
-                    };
-                };
-                /** @description Not authenticated */
-                401: {
+                /** @description Internal server error */
+                500: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -865,51 +706,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/auth/logout": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Logout current session
-         * @description Invalidates the current JWT token. Requires JWT token.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Logout successful */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Not authenticated */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/auth/sessions": {
+    "/api/themes": {
         parameters: {
             query?: never;
             header?: never;
@@ -917,610 +714,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get all sessions for current user
-         * @description Returns all active sessions for the authenticated user. Requires JWT token.
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Sessions retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            sessions?: {
-                                id?: number;
-                                device_name?: string;
-                                device_type?: string;
-                                created_at?: string;
-                                last_used_at?: string;
-                            }[];
-                        };
-                    };
-                };
-                /** @description Not authenticated */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/auth/sessions/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * Delete a specific session
-         * @description Logs out from a specific device. Requires JWT token.
-         */
-        delete: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    id: number;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Session deleted successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Not authenticated */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Session not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/auth/sessions/all": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * Delete all sessions
-         * @description Logs out from all devices. Requires JWT token.
-         */
-        delete: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description All sessions deleted successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Not authenticated */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/auth/profile": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /**
-         * Update user profile
-         * @description Updates the authenticated user's display name. Requires JWT token.
-         */
-        patch: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        displayName?: string;
-                    };
-                };
-            };
-            responses: {
-                /** @description Profile updated successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Not authenticated */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        trace?: never;
-    };
-    "/api/auth/password": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /**
-         * Change user password
-         * @description Changes the authenticated user's password. Requires JWT token.
-         */
-        patch: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        /** Format: password */
-                        oldPassword: string;
-                        /** Format: password */
-                        newPassword: string;
-                    };
-                };
-            };
-            responses: {
-                /** @description Password changed successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Not authenticated or invalid old password */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        trace?: never;
-    };
-    "/api/auth/account": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * Delete user account
-         * @description Permanently deletes the user account. Requires JWT token and password confirmation.
-         */
-        delete: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        /** Format: password */
-                        password: string;
-                    };
-                };
-            };
-            responses: {
-                /** @description Account deleted successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Not authenticated or invalid password */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/auth/avatar": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /**
-         * Update user avatar
-         * @description Updates the authenticated user's avatar URL. Requires JWT token.
-         */
-        patch: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        avatarUrl?: string | null;
-                    };
-                };
-            };
-            responses: {
-                /** @description Avatar updated successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Not authenticated */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        trace?: never;
-    };
-    "/api/auth/banner": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /**
-         * Update user banner
-         * @description Updates the authenticated user's banner URL. Requires JWT token.
-         */
-        patch: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        bannerUrl?: string | null;
-                    };
-                };
-            };
-            responses: {
-                /** @description Banner updated successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Not authenticated */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        trace?: never;
-    };
-    "/api/auth/bio": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /**
-         * Update user bio
-         * @description Updates the authenticated user's bio. Requires JWT token.
-         */
-        patch: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        bio?: string | null;
-                    };
-                };
-            };
-            responses: {
-                /** @description Bio updated successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Not authenticated */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        trace?: never;
-    };
-    "/api/auth/status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /**
-         * Update user status
-         * @description Updates the authenticated user's status message. Requires JWT token.
-         */
-        patch: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        status?: string | null;
-                    };
-                };
-            };
-            responses: {
-                /** @description Status updated successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Not authenticated */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        trace?: never;
-    };
-    "/api/auth/privacy": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /**
-         * Update user privacy settings
-         * @description Updates the authenticated user's privacy settings. Requires JWT token.
-         */
-        patch: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        showEmail?: boolean;
-                        showJoinedDate?: boolean;
-                    };
-                };
-            };
-            responses: {
-                /** @description Privacy settings updated successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Not authenticated */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        trace?: never;
-    };
-    "/api/profile/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get user profile by ID
-         * @description Returns public profile information for a user.
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    id: number;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Profile retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description User not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/auth/theme": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get user's theme preferences
-         * @description Returns the authenticated user's theme preferences. Requires JWT token.
+         * Get my theme preferences
+         * @description Returns the authenticated user's theme preferences. Creates default preferences if none exist.
          */
         get: {
             parameters: {
@@ -1538,21 +733,392 @@ export interface paths {
                     };
                     content: {
                         "application/json": {
-                            success?: boolean;
                             preferences?: {
-                                preset?: string;
-                                customColors?: {
-                                    primary?: string;
-                                    background?: string;
-                                    text?: string;
-                                    accent?: string;
-                                    cardBackground?: string;
-                                };
-                                options?: {
-                                    darkMode?: boolean;
-                                    highContrast?: boolean;
-                                    reduceMotion?: boolean;
-                                };
+                                id?: number;
+                                user_id?: number;
+                                /** @example dark */
+                                theme_name?: string;
+                                /** @example #ec4899 */
+                                primary_color?: string;
+                                /** @example #8b5cf6 */
+                                secondary_color?: string;
+                                /** @example #1a1a2e */
+                                background_color?: string;
+                                /** @example #ffffff */
+                                text_color?: string;
+                                /** @example #f97316 */
+                                accent_color?: string;
+                                custom_settings?: Record<string, never> | null;
+                                /** Format: date-time */
+                                created_at?: string;
+                                /** Format: date-time */
+                                updated_at?: string;
+                            };
+                        };
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        /**
+         * Update theme preferences
+         * @description Creates or updates the authenticated user's theme preferences
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /**
+                         * @example dark
+                         * @enum {string}
+                         */
+                        theme_name?: "dark" | "light" | "sunset" | "ocean" | "forest" | "neon" | "custom";
+                        /** @example #ec4899 */
+                        primary_color?: string;
+                        /** @example #8b5cf6 */
+                        secondary_color?: string;
+                        /** @example #1a1a2e */
+                        background_color?: string;
+                        /** @example #ffffff */
+                        text_color?: string;
+                        /** @example #f97316 */
+                        accent_color?: string;
+                        /**
+                         * @example {
+                         *       "darkMode": true,
+                         *       "highContrast": false
+                         *     }
+                         */
+                        custom_settings?: Record<string, never> | null;
+                    };
+                };
+            };
+            responses: {
+                /** @description Theme preferences updated successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            preferences?: Record<string, never>;
+                        };
+                    };
+                };
+                /** @description Bad request (invalid colors) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/themes/presets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List available theme presets
+         * @description Returns all available theme presets that can be applied
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Theme presets retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            presets?: {
+                                name?: string;
+                                label?: string;
+                                primary_color?: string;
+                                secondary_color?: string;
+                                background_color?: string;
+                                text_color?: string;
+                                accent_color?: string;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/themes/presets/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get specific theme preset
+         * @description Returns a specific theme preset by name
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Preset name (dark, light, sunset, ocean, forest, neon) */
+                    name: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Theme preset retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            preset?: Record<string, never>;
+                        };
+                    };
+                };
+                /** @description Preset not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sync/upload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload local changes to server
+         * @description Uploads local data changes from a device to the server for synchronization.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description Unique identifier for the device */
+                        deviceId: string;
+                        /** @description Human-readable device name */
+                        deviceName?: string;
+                        /** @description Device type (mobile, desktop, tablet, etc.) */
+                        deviceType?: string;
+                        /** @description Platform (iOS, Android, Windows, macOS, etc.) */
+                        platform?: string;
+                        /** @description Sync data containing tickets, settings, etc. */
+                        data?: Record<string, never>;
+                        /**
+                         * @description Strategy for resolving conflicts
+                         * @default last-write-wins
+                         * @enum {string}
+                         */
+                        conflictResolution?: "last-write-wins" | "user-prompted" | "merge";
+                    };
+                };
+            };
+            responses: {
+                /** @description Upload successful */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            success?: boolean;
+                            conflicts_found?: number;
+                            conflicts_resolved?: number;
+                            items_synced?: number;
+                            sync_log_id?: number;
+                        };
+                    };
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sync/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download latest server state
+         * @description Downloads latest server data for synchronization.
+         */
+        get: {
+            parameters: {
+                query: {
+                    /** @description Unique identifier for the device */
+                    deviceId: string;
+                    /** @description Only return data changed since this timestamp (optional) */
+                    since?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Download successful */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            success?: boolean;
+                            data?: {
+                                tickets?: unknown[];
+                                settings?: unknown[];
+                                version?: number;
+                                timestamp?: string;
+                            };
+                        };
+                    };
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sync/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get sync status and conflicts
+         * @description Returns current sync status for user's account.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Status retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            success?: boolean;
+                            status?: {
+                                last_sync_time?: string | null;
+                                total_devices?: number;
+                                recent_syncs?: unknown[];
+                                conflicts_pending?: number;
                             };
                         };
                     };
@@ -1566,11 +1132,28 @@ export interface paths {
                 };
             };
         };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sync/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
         /**
-         * Update user's theme preferences
-         * @description Updates the authenticated user's theme preferences. Requires JWT token.
+         * Resolve sync conflicts
+         * @description Manually resolve conflicts found during sync.
          */
-        put: {
+        post: {
             parameters: {
                 query?: never;
                 header?: never;
@@ -1580,30 +1163,20 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
-                        /** @description Theme preset name (e.g., "dark", "light") */
-                        preset: string;
-                        customColors: {
-                            /** @description Hex color code (#RRGGBB) */
-                            primary: string;
-                            /** @description Hex color code (#RRGGBB) */
-                            background: string;
-                            /** @description Hex color code (#RRGGBB) */
-                            text: string;
-                            /** @description Hex color code (#RRGGBB) */
-                            accent: string;
-                            /** @description Hex color code (#RRGGBB) */
-                            cardBackground: string;
-                        };
-                        options: {
-                            darkMode: boolean;
-                            highContrast: boolean;
-                            reduceMotion: boolean;
-                        };
+                        conflicts: {
+                            /** @description Conflict ID (e.g., "ticket-123") */
+                            id: string;
+                            /**
+                             * @description Which version to keep
+                             * @enum {string}
+                             */
+                            resolution: "local" | "remote";
+                        }[];
                     };
                 };
             };
             responses: {
-                /** @description Theme preferences updated successfully */
+                /** @description Conflicts resolved successfully */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -1611,11 +1184,11 @@ export interface paths {
                     content: {
                         "application/json": {
                             success?: boolean;
-                            preferences?: Record<string, never>;
+                            resolved_count?: number;
                         };
                     };
                 };
-                /** @description Invalid theme preferences */
+                /** @description Bad request */
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -1631,14 +1204,13 @@ export interface paths {
                 };
             };
         };
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/birdsounds/random": {
+    "/api/stocks": {
         parameters: {
             query?: never;
             header?: never;
@@ -1646,8 +1218,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get a random bird sound
-         * @description Returns a random bird recording from the Macaulay Library (Cornell Lab of Ornithology)
+         * Get all stocks
+         * @description Returns a list of all available stocks in the market
          */
         get: {
             parameters: {
@@ -1658,36 +1230,27 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description A random bird sound */
+                /** @description List of all stocks */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
                         "application/json": {
-                            /** @description Common name of the bird species */
-                            commonName?: string;
-                            /** @description Scientific name of the bird species */
-                            sciName?: string;
-                            /** @description Location where the recording was made */
-                            location?: string;
-                            /** @description URL to the audio file */
-                            mediaUrl?: string;
-                            /** @description URL to a thumbnail image */
-                            thumbnailUrl?: string;
-                            /** @description Type of bird sound (e.g., Call, Song) */
-                            behaviors?: string;
-                            /** @description Quality rating of the recording */
-                            rating?: string;
+                            stocks?: components["schemas"]["Stock"][];
+                            /** Format: date-time */
+                            timestamp?: string;
                         };
                     };
                 };
-                /** @description Error fetching bird sound */
+                /** @description Server error */
                 500: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
                 };
             };
         };
@@ -1699,7 +1262,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/birdsounds/search": {
+    "/api/stocks/{name}": {
         parameters: {
             query?: never;
             header?: never;
@@ -1707,239 +1270,215 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Search for bird sounds
-         * @description Search for bird recordings by species name
+         * Get specific stock by name
+         * @description Returns detailed information about a specific stock
          */
         get: {
-            parameters: {
-                query: {
-                    /** @description Bird species name to search for */
-                    query: string;
-                    /** @description Maximum number of results to return */
-                    maxResults?: number;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description List of matching bird sounds */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /** @description Total number of results */
-                            count?: number;
-                            results?: {
-                                commonName?: string;
-                                sciName?: string;
-                                location?: string;
-                                mediaUrl?: string;
-                                thumbnailUrl?: string;
-                                behaviors?: string;
-                                rating?: string;
-                            }[];
-                        };
-                    };
-                };
-                /** @description Missing query parameter */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Error searching bird sounds */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/characters": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get all characters sorted by ELO rating */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description List of all characters */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        put?: never;
-        /** Create a new character */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        name: string;
-                        image_url?: string;
-                    };
-                };
-            };
-            responses: {
-                /** @description Character created successfully */
-                201: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/characters/random-pair": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get two random characters for comparison */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Two random characters */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/characters/vote": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Vote for a character and update ELO ratings */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        winner_id: number;
-                        loser_id: number;
-                    };
-                };
-            };
-            responses: {
-                /** @description ELO ratings updated successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/characters/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** Delete a character */
-        delete: {
             parameters: {
                 query?: never;
                 header?: never;
                 path: {
-                    id: number;
+                    /**
+                     * @description Name of the stock
+                     * @example Cam
+                     */
+                    name: string;
                 };
                 cookie?: never;
             };
             requestBody?: never;
             responses: {
-                /** @description Character deleted successfully */
+                /** @description Stock details retrieved successfully */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": {
+                            stock?: components["schemas"]["Stock"];
+                            /** Format: date-time */
+                            timestamp?: string;
+                        };
+                    };
+                };
+                /** @description Stock not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example Stock not found */
+                            error?: string;
+                        };
+                    };
+                };
+                /** @description Server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
                 };
             };
         };
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/clicks": {
+    "/api/stocks/buy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Buy stock shares
+         * @description Purchase shares of a stock. Requires authentication.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @example user123 */
+                        userId: string;
+                        /** @example Cam */
+                        stockName: string;
+                        /** @example 10 */
+                        shares: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description Shares purchased successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example true */
+                            success?: boolean;
+                            /** @example Successfully bought 10 shares */
+                            message?: string;
+                            /** @example 105.5 */
+                            newPrice?: number;
+                            /** @example 8945 */
+                            newCash?: number;
+                            /** Format: date-time */
+                            timestamp?: string;
+                        };
+                    };
+                };
+                400: components["responses"]["ValidationError"];
+                401: components["responses"]["UnauthorizedError"];
+                403: components["responses"]["ForbiddenError"];
+                /** @description Server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stocks/sell": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sell stock shares
+         * @description Sell shares of a stock. Requires authentication.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @example user123 */
+                        userId: string;
+                        /** @example Cam */
+                        stockName: string;
+                        /** @example 5 */
+                        shares: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description Shares sold successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example true */
+                            success?: boolean;
+                            /** @example Successfully sold 5 shares */
+                            message?: string;
+                            /** @example 98.75 */
+                            newPrice?: number;
+                            /** @example 9443.75 */
+                            newCash?: number;
+                            /** Format: date-time */
+                            timestamp?: string;
+                        };
+                    };
+                };
+                400: components["responses"]["ValidationError"];
+                401: components["responses"]["UnauthorizedError"];
+                403: components["responses"]["ForbiddenError"];
+                /** @description Server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portfolio/{userId}": {
         parameters: {
             query?: never;
             header?: never;
@@ -1947,27 +1486,34 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get click count
-         * @description Returns the current click counter value
+         * Get user portfolio
+         * @description Returns the portfolio and total value for a specific user
          */
         get: {
             parameters: {
                 query?: never;
                 header?: never;
-                path?: never;
+                path: {
+                    /**
+                     * @description User ID
+                     * @example user123
+                     */
+                    userId: string;
+                };
                 cookie?: never;
             };
             requestBody?: never;
             responses: {
-                /** @description Click count retrieved successfully */
+                /** @description Portfolio retrieved successfully */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
                         "application/json": {
-                            /** @example 42 */
-                            count?: number;
+                            portfolio?: components["schemas"]["UserPortfolio"];
+                            /** @example 15234.5 */
+                            portfolioValue?: number;
                             /** Format: date-time */
                             timestamp?: string;
                         };
@@ -1992,7 +1538,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/clicks/increment": {
+    "/api/stats/record": {
         parameters: {
             query?: never;
             header?: never;
@@ -2002,118 +1548,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Increment click counter
-         * @description Increments the click counter by 1. Requires authentication.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Counter incremented successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /** @example 43 */
-                            count?: number;
-                            /** Format: date-time */
-                            timestamp?: string;
-                        };
-                    };
-                };
-                401: components["responses"]["UnauthorizedError"];
-                403: components["responses"]["ForbiddenError"];
-                /** @description Server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["Error"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/clicks/reset": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Reset click counter
-         * @description Resets the click counter to 0. Requires authentication.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Counter reset successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /** @example 0 */
-                            count?: number;
-                            /** Format: date-time */
-                            timestamp?: string;
-                        };
-                    };
-                };
-                401: components["responses"]["UnauthorizedError"];
-                403: components["responses"]["ForbiddenError"];
-                /** @description Server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["Error"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/clicks/add-points": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Add points to rankings based on clicks
-         * @description Adds points to user's rankings based on their clicker activity
+         * Record a game stat event
+         * @description Records a game stat (click, fish caught, score, etc.)
          */
         post: {
             parameters: {
@@ -2126,9 +1562,1501 @@ export interface paths {
                 content: {
                     "application/json": {
                         /** @description User ID */
-                        userId?: string;
-                        /** @description Number of clicks to convert to points */
-                        clicks?: number;
+                        userId: string;
+                        /** @description User name (optional) */
+                        userName?: string;
+                        /** @enum {string} */
+                        gameType: "clicker" | "fishing";
+                        /** @enum {string} */
+                        statType: "click" | "fish_caught" | "score" | "session_end";
+                        value: number;
+                        /** @description Additional metadata */
+                        metadata?: Record<string, never>;
+                    };
+                };
+            };
+            responses: {
+                /** @description Stat recorded successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            success?: boolean;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stats/highscore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Update high score for a user
+         * @description Updates or inserts a high score for a user in a game
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description User ID */
+                        userId: string;
+                        /** @description User name (optional) */
+                        userName?: string;
+                        /** @enum {string} */
+                        gameType: "clicker" | "fishing";
+                        score: number;
+                        /** @description Additional details about the high score */
+                        details?: Record<string, never>;
+                    };
+                };
+            };
+            responses: {
+                /** @description High score updated successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            success?: boolean;
+                            isNewRecord?: boolean;
+                            score?: number;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stats/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Get stats history for a user
+         * @description Retrieves stats history for a user, optionally filtered by game type and stat type
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        userId: string;
+                        /** @enum {string} */
+                        gameType?: "clicker" | "fishing";
+                        statType?: string;
+                        /** @default 100 */
+                        limit?: number;
+                        /** @default 0 */
+                        offset?: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description Stats history retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            history?: {
+                                id?: number;
+                                userId?: string;
+                                gameType?: string;
+                                statType?: string;
+                                value?: number;
+                                metadata?: Record<string, never>;
+                                /** Format: date-time */
+                                recordedAt?: string;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stats/user": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Get aggregated stats for a user
+         * @description Retrieves aggregated statistics for a user
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        userId: string;
+                        /** @enum {string} */
+                        gameType?: "clicker" | "fishing";
+                    };
+                };
+            };
+            responses: {
+                /** @description User stats retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            userId?: string;
+                            gameType?: string;
+                            totalClicks?: number;
+                            totalFishCaught?: number;
+                            highScore?: number;
+                            totalSessions?: number;
+                        };
+                    };
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description User not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stats/leaderboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Get leaderboard for a game type
+         * @description Retrieves the leaderboard for a specific game type
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        gameType: "clicker" | "fishing";
+                        /** @default 10 */
+                        limit?: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description Leaderboard retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            gameType?: string;
+                            leaderboard?: {
+                                rank?: number;
+                                userId?: string;
+                                userName?: string;
+                                gameType?: string;
+                                score?: number;
+                                recordedAt?: string;
+                                updatedAt?: string;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stats/global": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Get global stats across all users
+         * @description Retrieves aggregated global statistics
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        gameType?: "clicker" | "fishing";
+                        statType?: string;
+                        /** @enum {string} */
+                        timeRange?: "hour" | "day" | "week" | "month";
+                    };
+                };
+            };
+            responses: {
+                /** @description Global stats retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            total?: number;
+                            uniqueUsers?: number;
+                            timeRange?: string;
+                        };
+                    };
+                };
+                /** @description Server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/shop/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get all shop items
+         * @description Returns a list of all available shop items with their costs
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Shop items retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            items?: {
+                                id?: number;
+                                name?: string;
+                                description?: string;
+                                price?: number;
+                                icon?: string;
+                                category?: string;
+                                effect?: string;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/shop/inventory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get user's inventory
+         * @description Returns a list of items a user has purchased
+         */
+        get: {
+            parameters: {
+                query: {
+                    userId: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description User inventory retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            inventory?: {
+                                id?: number;
+                                itemId?: number;
+                                itemName?: string;
+                                itemIcon?: string;
+                                purchasedAt?: string;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/shop/purchase": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Purchase an item from the shop
+         * @description Purchase an item using coolness points
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /**
+                         * @description User ID making the purchase
+                         * @example user123
+                         */
+                        userId: string;
+                        /**
+                         * @description ID of the item to purchase
+                         * @example 1
+                         */
+                        itemId: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description Purchase successful */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            success?: boolean;
+                            item?: Record<string, never>;
+                            newPoints?: number;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Bad request or insufficient points */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Item not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search across all content
+         * @description Search for movies, shop items, quotes, and advice
+         */
+        get: {
+            parameters: {
+                query: {
+                    /**
+                     * @description Search query
+                     * @example matrix
+                     */
+                    q: string;
+                    /**
+                     * @description Comma-separated list of types to search (movie,shop_item,quote,advice)
+                     * @example movie,shop_item
+                     */
+                    types?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Search results */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            query?: string;
+                            results?: {
+                                /** @enum {string} */
+                                type?: "movie" | "shop_item" | "quote" | "advice";
+                                id?: string;
+                                title?: string;
+                                description?: string;
+                                relevance?: number;
+                                metadata?: Record<string, never>;
+                            }[];
+                            count?: number;
+                            /** Format: date-time */
+                            timestamp?: string;
+                        };
+                    };
+                };
+                /** @description Bad request (missing query) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error?: string;
+                        };
+                    };
+                };
+                /** @description Server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error?: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/reactions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add or toggle a reaction
+         * @description Adds a reaction if it doesn't exist, removes it if it does (toggle behavior)
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /**
+                         * @description Type of target to react to
+                         * @example message
+                         * @enum {string}
+                         */
+                        targetType: "message" | "post" | "comment";
+                        /**
+                         * @description ID of the target
+                         * @example 123
+                         */
+                        targetId: number;
+                        /**
+                         * @description Emoji reaction
+                         * @example 👍
+                         */
+                        emoji: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Reaction toggled successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            success?: boolean;
+                            /** @description true if reaction was added, false if removed */
+                            added?: boolean;
+                            /** @description true if reaction was removed, false if added */
+                            removed?: boolean;
+                        };
+                    };
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/reactions/force": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Force add a reaction
+         * @description Adds a reaction without toggling. Returns null if reaction already exists.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /**
+                         * @example message
+                         * @enum {string}
+                         */
+                        targetType: "message" | "post" | "comment";
+                        /** @example 123 */
+                        targetId: number;
+                        /** @example 👍 */
+                        emoji: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Reaction added successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/reactions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove a reaction by ID
+         * @description Removes a reaction using its ID
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Reaction ID */
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Reaction removed successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Reaction not found or doesn't belong to user */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/reactions/{targetType}/{targetId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get reactions for a target
+         * @description Returns all reactions for a specific target, aggregated by emoji
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description If true, returns individual reactions instead of aggregated counts */
+                    detailed?: boolean;
+                };
+                header?: never;
+                path: {
+                    /** @description Type of target */
+                    targetType: "message" | "post" | "comment";
+                    /** @description ID of the target */
+                    targetId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Reactions retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            reactions?: {
+                                emoji?: string;
+                                count?: number;
+                                user_ids?: number[];
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/reactions/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Check if current user has reacted to a target
+         * @description Returns true if the authenticated user has reacted with the specified emoji
+         */
+        get: {
+            parameters: {
+                query: {
+                    targetType: "message" | "post" | "comment";
+                    targetId: number;
+                    emoji: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Check completed */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            has_reacted?: boolean;
+                        };
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/reactions/user": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get all reactions by the current user
+         * @description Returns all reactions made by the authenticated user
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Reactions retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/rankings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get user rankings and leaderboard
+         * @description Returns the current leaderboard with dynamic point tracking
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description User rankings retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            rankings?: {
+                                /** @example 🥔 */
+                                avatar?: string;
+                                /** @example Cam */
+                                name?: string;
+                                /** @example 10000 */
+                                score?: number;
+                                /** @example false */
+                                isCurrentUser?: boolean;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/quote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a random Northernlion quote
+         * @description Returns a random quote from the Northernlion quote database
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Random quote retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example It's gonna be a long one. */
+                            quote?: string;
+                            /** @example northernlion-db */
+                            source?: string;
+                            /** @example 5 */
+                            index?: number;
+                            /** @example 48 */
+                            totalQuotes?: number;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/advice": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get random advice
+         * @description Returns a random piece of advice from the adviceslip.com API (ticket
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Advice retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            advice?: {
+                                id?: string;
+                                advice?: string;
+                            };
+                            /** @example adviceslip-api */
+                            source?: string;
+                            /** Format: date-time */
+                            timestamp?: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/profiles/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get my profile
+         * @description Returns the authenticated user's profile
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Profile retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            profile?: {
+                                id?: number;
+                                user_id?: number;
+                                display_name?: string | null;
+                                bio?: string | null;
+                                avatar_url?: string | null;
+                                profile_banner_url?: string | null;
+                                status_message?: string | null;
+                                location?: string | null;
+                                website?: string | null;
+                                social_links?: Record<string, never> | null;
+                                is_public?: boolean;
+                                /** Format: date-time */
+                                created_at?: string;
+                                /** Format: date-time */
+                                updated_at?: string;
+                            };
+                        };
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Profile not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        /**
+         * Update my profile
+         * @description Creates or updates the authenticated user's profile
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        display_name?: string | null;
+                        bio?: string | null;
+                        profile_banner_url?: string | null;
+                        status_message?: string | null;
+                        location?: string | null;
+                        website?: string | null;
+                        social_links?: Record<string, never> | null;
+                        is_public?: boolean;
+                    };
+                };
+            };
+            responses: {
+                /** @description Profile updated successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            profile?: Record<string, never>;
+                        };
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Partially update my profile
+         * @description Updates specific fields of the authenticated user's profile
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        display_name?: string;
+                        bio?: string;
+                        profile_banner_url?: string;
+                        status_message?: string;
+                        location?: string;
+                        website?: string;
+                        social_links?: Record<string, never>;
+                        is_public?: boolean;
+                    };
+                };
+            };
+            responses: {
+                /** @description Profile updated successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            profile?: Record<string, never>;
+                        };
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Profile not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/profiles/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get public profile
+         * @description Returns a user's public profile by user ID
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description User ID */
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Profile retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            profile?: Record<string, never>;
+                        };
+                    };
+                };
+                /** @description Profile not found or private */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/profiles/avatar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload avatar
+         * @description Uploads an avatar image for the authenticated user
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "multipart/form-data": {
+                        /** Format: binary */
+                        avatar: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Avatar uploaded successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            avatar_url?: string;
+                        };
+                    };
+                };
+                /** @description Bad request (invalid file) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        /**
+         * Delete avatar
+         * @description Removes the authenticated user's avatar image
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Avatar deleted successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/points/add": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add points for a user interaction
+         * @description Adds points for a user when they interact with the bot
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /**
+                         * @description Unique user identifier (Discord ID or username)
+                         * @example temer3
+                         */
+                        userId: string;
+                        /**
+                         * @description Reason for adding points (shown in message)
+                         * @example good interaction
+                         */
+                        reason: string;
                     };
                 };
             };
@@ -2146,13 +3074,6 @@ export interface paths {
                         };
                     };
                 };
-                /** @description Server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
             };
         };
         delete?: never;
@@ -2161,172 +3082,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/discord/configured": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Check if Discord integration is configured
-         * @description Returns whether Discord OAuth credentials are properly configured.
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Configuration status */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            configured?: boolean;
-                            message?: string;
-                        };
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/discord/link/start": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Start Discord account linking
-         * @description Generates a Discord OAuth authorization URL for linking accounts. Requires JWT token.
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Authorization URL generated */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /** @description URL to redirect user to for Discord authorization */
-                            authorizationUrl?: string;
-                        };
-                    };
-                };
-                /** @description Not authenticated */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Discord not configured */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/discord/callback": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Discord OAuth callback
-         * @description Handles the OAuth callback from Discord. Links the Discord account to the user.
-         */
-        get: {
-            parameters: {
-                query: {
-                    /** @description OAuth authorization code from Discord */
-                    code: string;
-                    /** @description State parameter for CSRF protection */
-                    state: string;
-                    /** @description Error code if authorization was denied */
-                    error?: string;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Discord account linked successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            success?: boolean;
-                            user?: {
-                                id?: number;
-                                discord_id?: string;
-                                discord_username?: string;
-                            };
-                        };
-                    };
-                };
-                /** @description Invalid state or authorization error */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Failed to link Discord account */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/discord/unlink": {
+    "/api/points/status": {
         parameters: {
             query?: never;
             header?: never;
@@ -2336,8 +3092,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Unlink Discord account
-         * @description Removes the Discord account link from the authenticated user. Requires JWT token.
+         * Get a user's current score and status
+         * @description Returns a user's current points, base points, and cooldown status
          */
         post: {
             parameters: {
@@ -2346,218 +3102,209 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @example temer3 */
+                        userId: string;
+                    };
+                };
+            };
             responses: {
-                /** @description Discord account unlinked successfully */
+                /** @description User status retrieved successfully */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
                         "application/json": {
-                            success?: boolean;
-                            message?: string;
-                            user?: Record<string, never>;
-                        };
-                    };
-                };
-                /** @description Not authenticated */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/discord/avatar": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Discord avatar URL
-         * @description Returns the full Discord avatar URL for the authenticated user. Requires JWT token.
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Discord avatar URL */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            success?: boolean;
-                            avatarUrl?: string | null;
-                        };
-                    };
-                };
-                /** @description Not authenticated or Discord not linked */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/discord/sync-avatar": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Sync Discord avatar to profile
-         * @description Updates the user's profile avatar with their Discord avatar. Requires JWT token.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Avatar synced successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            success?: boolean;
-                            user?: {
-                                avatar_url?: string;
-                            };
-                        };
-                    };
-                };
-                /** @description Discord not linked */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Not authenticated */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/export/rankings": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Export rankings data
-         * @description Exports current rankings data in JSON or CSV format
-         */
-        get: {
-            parameters: {
-                query?: {
-                    /** @description Export format (json or csv) */
-                    format?: "json" | "csv";
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Rankings data exported successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            rank?: number;
-                            name?: string;
                             avatar?: string;
-                            score?: number;
-                            isCurrentUser?: boolean;
+                            name?: string;
+                            points?: number;
+                            basePoints?: number;
+                            onCooldown?: boolean;
+                            lastInteraction?: number;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/points/leaderboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get current leaderboard
+         * @description Returns top 50 users sorted by points with ranks
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Leaderboard retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            leaderboard?: {
+                                avatar?: string;
+                                name?: string;
+                                score?: number;
+                                rank?: number;
+                                isCurrentUser?: boolean;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/points/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reset a user to their base score
+         * @description Admin function to reset a user to their base score
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @example temer3 */
+                        userId: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description User reset successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            success?: boolean;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/patch-notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get all patch notes
+         * @description Returns all patch notes sorted by creation date (newest first)
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Patch notes retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @description Unique patch note ID */
+                            id?: string;
+                            /**
+                             * @description Version string
+                             * @example 1.0.0
+                             */
+                            version?: string;
+                            /**
+                             * @description Build number from build-info.json
+                             * @example 7
+                             */
+                            buildNumber?: number;
+                            /**
+                             * Format: date-time
+                             * @description Build timestamp from build-info.json
+                             * @example 2026-02-04T20:28:36.818Z
+                             */
+                            buildTime?: string;
+                            /**
+                             * @description Patch note title
+                             * @example Initial Release
+                             */
+                            title?: string;
+                            /** @description List of changes in this patch */
+                            changes?: {
+                                /**
+                                 * @description Type of change
+                                 * @enum {string}
+                                 */
+                                type?: "added" | "improved" | "fixed" | "removed";
+                                /** @description Description of the change */
+                                description?: string;
+                            }[];
+                            /**
+                             * Format: date-time
+                             * @description When this patch note was created
+                             */
+                            createdAt?: string;
                         }[];
-                        "text/csv": string;
                     };
-                };
-                /** @description Invalid format parameter */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
                 };
             };
         };
         put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/export/stats": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
         /**
-         * Export user stats data
-         * @description Exports user statistics data in JSON or CSV format
+         * Create a new patch note
+         * @description Creates a new patch note (admin only)
          */
         post: {
             parameters: {
@@ -2569,1539 +3316,35 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
-                        /** @description User ID */
-                        userId: string;
                         /**
-                         * @description Game type filter (optional)
-                         * @enum {string}
+                         * @description Version string
+                         * @example 1.1.0
                          */
-                        gameType?: "clicker" | "fishing";
-                    };
-                };
-            };
-            responses: {
-                /** @description Stats data exported successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": Record<string, never>;
-                        "text/csv": string;
-                    };
-                };
-                /** @description Invalid request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/export/clicks": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Export clicks stats history
-         * @description Exports click statistics history in JSON or CSV format
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        /** @description User ID */
-                        userId: string;
+                        version: string;
                         /**
-                         * @description Maximum number of records to export
-                         * @default 100
+                         * @description Patch note title
+                         * @example New Features
                          */
-                        limit?: number;
-                        /**
-                         * @default json
-                         * @enum {string}
-                         */
-                        format?: "json" | "csv";
+                        title: string;
+                        /** @description List of changes */
+                        changes: {
+                            /** @enum {string} */
+                            type: "added" | "improved" | "fixed" | "removed";
+                            description: string;
+                        }[];
                     };
                 };
             };
             responses: {
-                /** @description Clicks data exported successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": unknown[];
-                        "text/csv": string;
-                    };
-                };
-                /** @description Invalid request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/export/history": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Export full stats history
-         * @description Exports complete statistics history in JSON or CSV format
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        /** @description User ID */
-                        userId: string;
-                        /**
-                         * @description Game type filter (optional)
-                         * @enum {string}
-                         */
-                        gameType?: "clicker" | "fishing";
-                        /** @description Stat type filter (optional) */
-                        statType?: string;
-                        /**
-                         * @description Maximum number of records to export
-                         * @default 500
-                         */
-                        limit?: number;
-                        /**
-                         * @default json
-                         * @enum {string}
-                         */
-                        format?: "json" | "csv";
-                    };
-                };
-            };
-            responses: {
-                /** @description History data exported successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": unknown[];
-                        "text/csv": string;
-                    };
-                };
-                /** @description Invalid request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/export/leaderboard": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Export leaderboard data
-         * @description Exports game leaderboard in JSON or CSV format
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        /** @enum {string} */
-                        gameType: "clicker" | "fishing";
-                        /** @default 50 */
-                        limit?: number;
-                        /**
-                         * @default json
-                         * @enum {string}
-                         */
-                        format?: "json" | "csv";
-                    };
-                };
-            };
-            responses: {
-                /** @description Leaderboard data exported successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": unknown[];
-                        "text/csv": string;
-                    };
-                };
-                /** @description Invalid request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/farts/stats": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get overall fart statistics
-         * @description Returns overall fart statistics including total farts, users, and volume metrics
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Overall fart statistics */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /** @example 1234 */
-                            totalFarts?: number;
-                            /** @example 42 */
-                            totalUsers?: number;
-                            /** @example 567.89 */
-                            totalVolume?: number;
-                            /** @example 0.46 */
-                            avgVolume?: number;
-                            /** @example 56 */
-                            todayFarts?: number;
-                            /** Format: date-time */
-                            timestamp?: string;
-                        };
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/farts/stats/{userId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get user fart statistics
-         * @description Returns fart statistics for a specific user
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    userId: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description User fart statistics */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description User not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/farts/record": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Record a fart event
-         * @description Records a fart event with parameters and updates statistics
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        /** @default anonymous */
-                        userId?: string;
-                        /** @default 0.5 */
-                        volume?: number;
-                        parameters?: {
-                            bassGain?: number;
-                            bassFrequency?: number;
-                            distortionAmount?: number;
-                            volumeMultiplier?: number;
-                            playbackRate?: number;
-                        };
-                    };
-                };
-            };
-            responses: {
-                /** @description Fart recorded successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/farts/leaderboard": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get fart leaderboard
-         * @description Returns top farters ranked by total farts
-         */
-        get: {
-            parameters: {
-                query?: {
-                    limit?: number;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Leaderboard data */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/farts/history/{userId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get user fart history
-         * @description Returns recent fart events for a specific user
-         */
-        get: {
-            parameters: {
-                query?: {
-                    limit?: number;
-                };
-                header?: never;
-                path: {
-                    userId: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description User fart history */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/farts/processing-stats": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get processing statistics
-         * @description Returns audio processing statistics and trends
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Processing statistics */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/farts/daily": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get daily fart statistics
-         * @description Returns daily fart trends and statistics
-         */
-        get: {
-            parameters: {
-                query?: {
-                    days?: number;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Daily statistics */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/favorites": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get my favorites
-         * @description Returns the authenticated user's favorites sorted by order
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Favorites retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            favorites?: {
-                                id?: number;
-                                user_id?: number;
-                                /** @enum {string} */
-                                item_type?: "page" | "panel" | "feature";
-                                item_id?: string;
-                                display_name?: string;
-                                order_index?: number;
-                                /** Format: date-time */
-                                created_at?: string;
-                                /** Format: date-time */
-                                updated_at?: string;
-                            }[];
-                        };
-                    };
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        put?: never;
-        /**
-         * Add to favorites
-         * @description Adds an item to the authenticated user's favorites
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        /** @enum {string} */
-                        item_type: "page" | "panel" | "feature";
-                        item_id: string;
-                        display_name: string;
-                    };
-                };
-            };
-            responses: {
-                /** @description Favorite added successfully */
-                201: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            favorite?: Record<string, never>;
-                        };
-                    };
-                };
-                /** @description Bad request (item already favorited or invalid input) */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/favorites/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Update favorite
-         * @description Updates a favorite's display name or order
-         */
-        put: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Favorite ID */
-                    id: number;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        display_name?: string;
-                        order_index?: number;
-                    };
-                };
-            };
-            responses: {
-                /** @description Favorite updated successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            favorite?: Record<string, never>;
-                        };
-                    };
-                };
-                /** @description Bad request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Favorite not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        post?: never;
-        /**
-         * Remove favorite
-         * @description Removes a favorite by ID
-         */
-        delete: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Favorite ID */
-                    id: number;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Favorite removed successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            message?: string;
-                        };
-                    };
-                };
-                /** @description Bad request (not found or access denied) */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/favorites/item": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * Remove favorite by item
-         * @description Removes a favorite by item type and item ID
-         */
-        delete: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        /** @enum {string} */
-                        item_type: "page" | "panel" | "feature";
-                        item_id: string;
-                    };
-                };
-            };
-            responses: {
-                /** @description Favorite removed successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            message?: string;
-                        };
-                    };
-                };
-                /** @description Bad request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/favorites/reorder": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Reorder favorites
-         * @description Updates the order of favorites based on the provided array of IDs
-         */
-        put: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        /** @description Array of favorite IDs in the desired order */
-                        favorite_ids: number[];
-                    };
-                };
-            };
-            responses: {
-                /** @description Favorites reordered successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            favorites?: unknown[];
-                        };
-                    };
-                };
-                /** @description Bad request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/favorites/check": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Check if item is favorited
-         * @description Checks if an item is in the authenticated user's favorites
-         */
-        get: {
-            parameters: {
-                query: {
-                    item_type: "page" | "panel" | "feature";
-                    item_id: string;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Check completed */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            favorited?: boolean;
-                        };
-                    };
-                };
-                /** @description Bad request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/phrenology": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Predict properties from name (phrenology)
-         * @description Uses genderize.io, agify.io, and nationalize.io APIs to predict gender, age, and nationality from a given name. Also includes 2 baselessly attributed random properties.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        /** @example Emily */
-                        name: string;
-                    };
-                };
-            };
-            responses: {
-                /** @description Phrenology prediction result */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /** @example Emily */
-                            name?: string;
-                            /**
-                             * @example female
-                             * @enum {string}
-                             */
-                            gender?: "male" | "female" | "unknown";
-                            /** @example 0.99 */
-                            genderProbability?: number;
-                            /** @example 12345 */
-                            genderCount?: number;
-                            /** @example 28 */
-                            age?: number | null;
-                            /** @example 5432 */
-                            ageCount?: number;
-                            nationalities?: {
-                                /** @example US */
-                                country_id?: string;
-                                /** @example 0.5 */
-                                probability?: number;
-                            }[];
-                            /** @example 321 */
-                            nationalityCount?: number;
-                            phrenology?: {
-                                /** @example Cranial Bumpiness */
-                                name?: string;
-                                /** @example 7.5/10 */
-                                value?: string;
-                            }[];
-                        };
-                    };
-                };
-                400: components["responses"]["ValidationError"];
-                /** @description Server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["Error"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/gender": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Detect gender from name (deprecated)
-         * @description Attempts to detect gender from a given name. This endpoint is deprecated in favor of /api/phrenology.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        /** @example Emily */
-                        name: string;
-                        /**
-                         * @description Optional country code
-                         * @example 0
-                         */
-                        country?: number;
-                    };
-                };
-            };
-            responses: {
-                /** @description Gender detection result */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @example female
-                             * @enum {string}
-                             */
-                            gender?: "male" | "female" | "unisex" | "not_found";
-                            /** @example 0.99 */
-                            probability?: number;
-                            /** @example Emily */
-                            name?: string;
-                            /** @example 0 */
-                            country?: number;
-                        };
-                    };
-                };
-                400: components["responses"]["ValidationError"];
-                /** @description Server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["Error"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/health": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Check API health status
-         * @description Returns the current health status of the API and when it was last checked by the bot
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description API is healthy */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /** @example ok */
-                            status?: string;
-                            /**
-                             * Format: date-time
-                             * @description Current server time
-                             */
-                            timestamp?: string;
-                            /**
-                             * Format: date-time
-                             * @description Last time the bot performed a health check
-                             */
-                            lastChecked?: string;
-                        };
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/health/check": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Update health check timestamp
-         * @description Records that the bot has performed a health check
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Health check timestamp updated */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /** @example updated */
-                            status?: string;
-                            /** Format: date-time */
-                            lastChecked?: string;
-                        };
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/holidays/today": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get holidays for today in all countries
-         * @description Returns a list of holidays occurring today across all countries
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description List of holidays */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            holidays?: {
-                                name?: string;
-                                name_local?: string;
-                                language?: string;
-                                iso?: string;
-                                country?: string;
-                                date?: string;
-                                weekday?: {
-                                    date?: string;
-                                    type?: string;
-                                };
-                            }[];
-                        };
-                    };
-                };
-                /** @description API key not configured or error fetching holidays */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/messages/conversations": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get all conversations for current user
-         * @description Returns all conversations the authenticated user is participating in.
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Conversations retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            conversations?: {
-                                id?: number;
-                                /** @enum {string} */
-                                type?: "direct" | "group";
-                                created_at?: string;
-                                updated_at?: string;
-                                participants?: Record<string, never>[];
-                                last_message?: Record<string, never>;
-                                unread_count?: number;
-                            }[];
-                        };
-                    };
-                };
-                /** @description Not authenticated */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        put?: never;
-        /**
-         * Create a new direct message conversation
-         * @description Creates a new direct message conversation between the authenticated user and another user.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        /** @description ID of the user to message */
-                        userId: number;
-                    };
-                };
-            };
-            responses: {
-                /** @description Conversation created successfully */
-                201: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            conversation?: {
-                                id?: number;
-                                type?: string;
-                                created_at?: string;
-                                updated_at?: string;
-                            };
-                        };
-                    };
-                };
-                /** @description Invalid request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Not authenticated */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/messages/conversations/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get a specific conversation
-         * @description Returns details of a specific conversation, including participants and unread count.
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    id: number;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Conversation retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Not authenticated */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Conversation not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/messages/conversations/{id}/messages": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get messages in a conversation
-         * @description Returns paginated messages from a conversation.
-         */
-        get: {
-            parameters: {
-                query?: {
-                    limit?: number;
-                    offset?: number;
-                };
-                header?: never;
-                path: {
-                    id: number;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Messages retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Not authenticated */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Conversation not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        put?: never;
-        /**
-         * Send a message to a conversation
-         * @description Sends a new message to the specified conversation.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    id: number;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        content: string;
-                    };
-                };
-            };
-            responses: {
-                /** @description Message sent successfully */
+                /** @description Patch note created successfully */
                 201: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content?: never;
                 };
-                /** @description Invalid request */
+                /** @description Invalid request body */
                 400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Not authenticated */
-                401: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -4115,7 +3358,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/messages/{id}": {
+    "/api/patch-notes/latest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get the latest patch note
+         * @description Returns the most recent patch note
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Latest patch note retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            id?: string;
+                            version?: string;
+                            buildNumber?: number;
+                            buildTime?: string;
+                            title?: string;
+                            changes?: unknown[];
+                            createdAt?: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/patch-notes/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -4123,95 +3413,31 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /**
-         * Edit a message
-         * @description Edits a message sent by the authenticated user.
-         */
-        put: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    id: number;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        content: string;
-                    };
-                };
-            };
-            responses: {
-                /** @description Message edited successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Not authenticated */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Not authorized to edit this message */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Message not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
+        put?: never;
         post?: never;
         /**
-         * Delete a message
-         * @description Soft-deletes a message sent by the authenticated user.
+         * Delete a patch note
+         * @description Deletes a patch note by ID (admin only)
          */
         delete: {
             parameters: {
                 query?: never;
                 header?: never;
                 path: {
-                    id: number;
+                    id: string;
                 };
                 cookie?: never;
             };
             requestBody?: never;
             responses: {
-                /** @description Message deleted successfully */
+                /** @description Patch note deleted successfully */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content?: never;
                 };
-                /** @description Not authenticated */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Not authorized to delete this message */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Message not found */
+                /** @description Patch note not found */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -4220,449 +3446,6 @@ export interface paths {
                 };
             };
         };
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/messages/conversations/{id}/read": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Mark conversation as read
-         * @description Marks all messages in the conversation as read for the current user.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    id: number;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Conversation marked as read */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Not authenticated */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Conversation not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/mining/start": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Start GPU mining for new stocks
-         * @description Starts a simulated GPU mining process that will discover a new stock when complete. Mining takes approximately 30 seconds.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        /** @description The user ID starting the mining operation */
-                        userId: string;
-                    };
-                };
-            };
-            responses: {
-                /** @description Mining started successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            message?: string;
-                            /** @description Estimated mining time in seconds */
-                            estimatedTime?: number;
-                        };
-                    };
-                };
-                /** @description User is already mining */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/mining/progress": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get mining progress
-         * @description Returns the current progress of an ongoing mining operation
-         */
-        get: {
-            parameters: {
-                query: {
-                    /** @description The user ID to check progress for */
-                    userId: string;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Mining progress retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /** @description Mining progress percentage (0-100) */
-                            progress?: number;
-                            /** @description Time elapsed since mining started (seconds) */
-                            elapsed?: number;
-                            /** @description Whether mining is complete */
-                            complete?: boolean;
-                        };
-                    };
-                };
-                /** @description No mining operation found for this user */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/mining/claim": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Claim mined stock
-         * @description Claims a newly discovered stock after mining is complete. Returns the discovered stock.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        /** @description The user ID claiming the stock */
-                        userId: string;
-                    };
-                };
-            };
-            responses: {
-                /** @description Stock claimed successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /** @description The newly discovered stock */
-                            stock?: Record<string, never>;
-                            message?: string;
-                        };
-                    };
-                };
-                /** @description Mining not complete or not started */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/mining/stats": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get mining statistics
-         * @description Returns statistics about the mining system
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Mining statistics retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /** @description Number of users currently mining */
-                            activeMiners?: number;
-                            /** @description Total number of stocks in the market */
-                            totalStocksDiscovered?: number;
-                            /** @description Number of stocks that can still be discovered */
-                            availableStocks?: number;
-                        };
-                    };
-                };
-                /** @description Server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/models/status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get status of all AI models
-         * @description Returns the current status of all tracked AI models (GLM 5, GLM 4.7, etc.)
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Model status information */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            models?: {
-                                [key: string]: {
-                                    name?: string;
-                                    provider?: string;
-                                    /** @enum {string} */
-                                    status?: "operational" | "degraded" | "down" | "unknown";
-                                    /** Format: date-time */
-                                    lastChecked?: string;
-                                    /** @description Response time in milliseconds */
-                                    responseTime?: number;
-                                    errorCount?: number;
-                                    lastError?: string;
-                                };
-                            };
-                            /** Format: date-time */
-                            updatedAt?: string;
-                        };
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/models/status/{modelId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get status of a specific AI model */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    modelId: "glm-5" | "glm-4.7";
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Model status information */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Model not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/models/status/{modelId}/update": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Update status of a specific AI model */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    modelId: "glm-5" | "glm-4.7";
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        /** @enum {string} */
-                        status: "operational" | "degraded" | "down" | "unknown";
-                        /** @description Response time in milliseconds */
-                        responseTime?: number;
-                        /** @description Error message if status is degraded or down */
-                        error?: string;
-                    };
-                };
-            };
-            responses: {
-                /** @description Model status updated */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -5281,7 +4064,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/patch-notes": {
+    "/api/models/status": {
         parameters: {
             query?: never;
             header?: never;
@@ -5289,8 +4072,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get all patch notes
-         * @description Returns all patch notes sorted by creation date (newest first)
+         * Get status of all AI models
+         * @description Returns the current status of all tracked AI models (GLM 5, GLM 4.7, etc.)
          */
         get: {
             parameters: {
@@ -5301,147 +4084,29 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Patch notes retrieved successfully */
+                /** @description Model status information */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
                         "application/json": {
-                            /** @description Unique patch note ID */
-                            id?: string;
-                            /**
-                             * @description Version string
-                             * @example 1.0.0
-                             */
-                            version?: string;
-                            /**
-                             * @description Build number from build-info.json
-                             * @example 7
-                             */
-                            buildNumber?: number;
-                            /**
-                             * Format: date-time
-                             * @description Build timestamp from build-info.json
-                             * @example 2026-02-04T20:28:36.818Z
-                             */
-                            buildTime?: string;
-                            /**
-                             * @description Patch note title
-                             * @example Initial Release
-                             */
-                            title?: string;
-                            /** @description List of changes in this patch */
-                            changes?: {
-                                /**
-                                 * @description Type of change
-                                 * @enum {string}
-                                 */
-                                type?: "added" | "improved" | "fixed" | "removed";
-                                /** @description Description of the change */
-                                description?: string;
-                            }[];
-                            /**
-                             * Format: date-time
-                             * @description When this patch note was created
-                             */
-                            createdAt?: string;
-                        }[];
-                    };
-                };
-            };
-        };
-        put?: never;
-        /**
-         * Create a new patch note
-         * @description Creates a new patch note (admin only)
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        /**
-                         * @description Version string
-                         * @example 1.1.0
-                         */
-                        version: string;
-                        /**
-                         * @description Patch note title
-                         * @example New Features
-                         */
-                        title: string;
-                        /** @description List of changes */
-                        changes: {
-                            /** @enum {string} */
-                            type: "added" | "improved" | "fixed" | "removed";
-                            description: string;
-                        }[];
-                    };
-                };
-            };
-            responses: {
-                /** @description Patch note created successfully */
-                201: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Invalid request body */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/patch-notes/latest": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get the latest patch note
-         * @description Returns the most recent patch note
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Latest patch note retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            id?: string;
-                            version?: string;
-                            buildNumber?: number;
-                            buildTime?: string;
-                            title?: string;
-                            changes?: unknown[];
-                            createdAt?: string;
+                            models?: {
+                                [key: string]: {
+                                    name?: string;
+                                    provider?: string;
+                                    /** @enum {string} */
+                                    status?: "operational" | "degraded" | "down" | "unknown";
+                                    /** Format: date-time */
+                                    lastChecked?: string;
+                                    /** @description Response time in milliseconds */
+                                    responseTime?: number;
+                                    errorCount?: number;
+                                    lastError?: string;
+                                };
+                            };
+                            /** Format: date-time */
+                            updatedAt?: string;
                         };
                     };
                 };
@@ -5455,7 +4120,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/patch-notes/{id}": {
+    "/api/models/status/{modelId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get status of a specific AI model */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    modelId: "glm-5" | "glm-4.7";
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Model status information */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Model not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models/status/{modelId}/update": {
         parameters: {
             query?: never;
             header?: never;
@@ -5464,30 +4172,645 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post?: never;
-        /**
-         * Delete a patch note
-         * @description Deletes a patch note by ID (admin only)
-         */
-        delete: {
+        /** Update status of a specific AI model */
+        post: {
             parameters: {
                 query?: never;
                 header?: never;
                 path: {
-                    id: string;
+                    modelId: "glm-5" | "glm-4.7";
                 };
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        status: "operational" | "degraded" | "down" | "unknown";
+                        /** @description Response time in milliseconds */
+                        responseTime?: number;
+                        /** @description Error message if status is degraded or down */
+                        error?: string;
+                    };
+                };
+            };
             responses: {
-                /** @description Patch note deleted successfully */
+                /** @description Model status updated */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content?: never;
                 };
-                /** @description Patch note not found */
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/mining/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start GPU mining for new stocks
+         * @description Starts a simulated GPU mining process that will discover a new stock when complete. Mining takes approximately 30 seconds.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description The user ID starting the mining operation */
+                        userId: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Mining started successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            message?: string;
+                            /** @description Estimated mining time in seconds */
+                            estimatedTime?: number;
+                        };
+                    };
+                };
+                /** @description User is already mining */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/mining/progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get mining progress
+         * @description Returns the current progress of an ongoing mining operation
+         */
+        get: {
+            parameters: {
+                query: {
+                    /** @description The user ID to check progress for */
+                    userId: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Mining progress retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @description Mining progress percentage (0-100) */
+                            progress?: number;
+                            /** @description Time elapsed since mining started (seconds) */
+                            elapsed?: number;
+                            /** @description Whether mining is complete */
+                            complete?: boolean;
+                        };
+                    };
+                };
+                /** @description No mining operation found for this user */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/mining/claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Claim mined stock
+         * @description Claims a newly discovered stock after mining is complete. Returns the discovered stock.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description The user ID claiming the stock */
+                        userId: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Stock claimed successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @description The newly discovered stock */
+                            stock?: Record<string, never>;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Mining not complete or not started */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/mining/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get mining statistics
+         * @description Returns statistics about the mining system
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Mining statistics retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @description Number of users currently mining */
+                            activeMiners?: number;
+                            /** @description Total number of stocks in the market */
+                            totalStocksDiscovered?: number;
+                            /** @description Number of stocks that can still be discovered */
+                            availableStocks?: number;
+                        };
+                    };
+                };
+                /** @description Server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/messages/conversations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get all conversations for current user
+         * @description Returns all conversations the authenticated user is participating in.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Conversations retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            conversations?: {
+                                id?: number;
+                                /** @enum {string} */
+                                type?: "direct" | "group";
+                                created_at?: string;
+                                updated_at?: string;
+                                participants?: Record<string, never>[];
+                                last_message?: Record<string, never>;
+                                unread_count?: number;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Create a new direct message conversation
+         * @description Creates a new direct message conversation between the authenticated user and another user.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description ID of the user to message */
+                        userId: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description Conversation created successfully */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            conversation?: {
+                                id?: number;
+                                type?: string;
+                                created_at?: string;
+                                updated_at?: string;
+                            };
+                        };
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/messages/conversations/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a specific conversation
+         * @description Returns details of a specific conversation, including participants and unread count.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Conversation retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conversation not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/messages/conversations/{id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get messages in a conversation
+         * @description Returns paginated messages from a conversation.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    limit?: number;
+                    offset?: number;
+                };
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Messages retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conversation not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Send a message to a conversation
+         * @description Sends a new message to the specified conversation.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        content: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Message sent successfully */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/messages/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Edit a message
+         * @description Edits a message sent by the authenticated user.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        content: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Message edited successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authorized to edit this message */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Message not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        /**
+         * Delete a message
+         * @description Soft-deletes a message sent by the authenticated user.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Message deleted successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authorized to delete this message */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Message not found */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -5501,7 +4824,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/points/add": {
+    "/api/messages/conversations/{id}/read": {
         parameters: {
             query?: never;
             header?: never;
@@ -5511,8 +4834,216 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Add points for a user interaction
-         * @description Adds points for a user when they interact with the bot
+         * Mark conversation as read
+         * @description Marks all messages in the conversation as read for the current user.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Conversation marked as read */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Conversation not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/holidays/today": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get holidays for today in all countries
+         * @description Returns a list of holidays occurring today across all countries
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description List of holidays */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            holidays?: {
+                                name?: string;
+                                name_local?: string;
+                                language?: string;
+                                iso?: string;
+                                country?: string;
+                                date?: string;
+                                weekday?: {
+                                    date?: string;
+                                    type?: string;
+                                };
+                            }[];
+                        };
+                    };
+                };
+                /** @description API key not configured or error fetching holidays */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Check API health status
+         * @description Returns the current health status of the API and when it was last checked by the bot
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description API is healthy */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example ok */
+                            status?: string;
+                            /**
+                             * Format: date-time
+                             * @description Current server time
+                             */
+                            timestamp?: string;
+                            /**
+                             * Format: date-time
+                             * @description Last time the bot performed a health check
+                             */
+                            lastChecked?: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/health/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Update health check timestamp
+         * @description Records that the bot has performed a health check
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Health check timestamp updated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example updated */
+                            status?: string;
+                            /** Format: date-time */
+                            lastChecked?: string;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/phrenology": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Predict properties from name (phrenology)
+         * @description Uses genderize.io, agify.io, and nationalize.io APIs to predict gender, age, and nationality from a given name. Also includes 2 baselessly attributed random properties.
          */
         post: {
             parameters: {
@@ -5524,16 +5055,1712 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
+                        /** @example Emily */
+                        name: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Phrenology prediction result */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example Emily */
+                            name?: string;
+                            /**
+                             * @example female
+                             * @enum {string}
+                             */
+                            gender?: "male" | "female" | "unknown";
+                            /** @example 0.99 */
+                            genderProbability?: number;
+                            /** @example 12345 */
+                            genderCount?: number;
+                            /** @example 28 */
+                            age?: number | null;
+                            /** @example 5432 */
+                            ageCount?: number;
+                            nationalities?: {
+                                /** @example US */
+                                country_id?: string;
+                                /** @example 0.5 */
+                                probability?: number;
+                            }[];
+                            /** @example 321 */
+                            nationalityCount?: number;
+                            phrenology?: {
+                                /** @example Cranial Bumpiness */
+                                name?: string;
+                                /** @example 7.5/10 */
+                                value?: string;
+                            }[];
+                        };
+                    };
+                };
+                400: components["responses"]["ValidationError"];
+                /** @description Server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/gender": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Detect gender from name (deprecated)
+         * @description Attempts to detect gender from a given name. This endpoint is deprecated in favor of /api/phrenology.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @example Emily */
+                        name: string;
                         /**
-                         * @description Unique user identifier (Discord ID or username)
-                         * @example temer3
+                         * @description Optional country code
+                         * @example 0
                          */
+                        country?: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description Gender detection result */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @example female
+                             * @enum {string}
+                             */
+                            gender?: "male" | "female" | "unisex" | "not_found";
+                            /** @example 0.99 */
+                            probability?: number;
+                            /** @example Emily */
+                            name?: string;
+                            /** @example 0 */
+                            country?: number;
+                        };
+                    };
+                };
+                400: components["responses"]["ValidationError"];
+                /** @description Server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/favorites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get my favorites
+         * @description Returns the authenticated user's favorites sorted by order
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Favorites retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            favorites?: {
+                                id?: number;
+                                user_id?: number;
+                                /** @enum {string} */
+                                item_type?: "page" | "panel" | "feature";
+                                item_id?: string;
+                                display_name?: string;
+                                order_index?: number;
+                                /** Format: date-time */
+                                created_at?: string;
+                                /** Format: date-time */
+                                updated_at?: string;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Add to favorites
+         * @description Adds an item to the authenticated user's favorites
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        item_type: "page" | "panel" | "feature";
+                        item_id: string;
+                        display_name: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Favorite added successfully */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            favorite?: Record<string, never>;
+                        };
+                    };
+                };
+                /** @description Bad request (item already favorited or invalid input) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/favorites/item": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove favorite by item
+         * @description Removes a favorite by item type and item ID
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        item_type: "page" | "panel" | "feature";
+                        item_id: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Favorite removed successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/favorites/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Update favorite
+         * @description Updates a favorite's display name or order
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Favorite ID */
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        display_name?: string;
+                        order_index?: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description Favorite updated successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            favorite?: Record<string, never>;
+                        };
+                    };
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Favorite not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        /**
+         * Remove favorite
+         * @description Removes a favorite by ID
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Favorite ID */
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Favorite removed successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Bad request (not found or access denied) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/favorites/reorder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Reorder favorites
+         * @description Updates the order of favorites based on the provided array of IDs
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description Array of favorite IDs in the desired order */
+                        favorite_ids: number[];
+                    };
+                };
+            };
+            responses: {
+                /** @description Favorites reordered successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            favorites?: unknown[];
+                        };
+                    };
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/favorites/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Check if item is favorited
+         * @description Checks if an item is in the authenticated user's favorites
+         */
+        get: {
+            parameters: {
+                query: {
+                    item_type: "page" | "panel" | "feature";
+                    item_id: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Check completed */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            favorited?: boolean;
+                        };
+                    };
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/farts/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get overall fart statistics
+         * @description Returns overall fart statistics including total farts, users, and volume metrics
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Overall fart statistics */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example 1234 */
+                            totalFarts?: number;
+                            /** @example 42 */
+                            totalUsers?: number;
+                            /** @example 567.89 */
+                            totalVolume?: number;
+                            /** @example 0.46 */
+                            avgVolume?: number;
+                            /** @example 56 */
+                            todayFarts?: number;
+                            /** Format: date-time */
+                            timestamp?: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/farts/stats/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get user fart statistics
+         * @description Returns fart statistics for a specific user
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    userId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description User fart statistics */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description User not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/farts/record": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record a fart event
+         * @description Records a fart event with parameters and updates statistics
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @default anonymous */
+                        userId?: string;
+                        /** @default 0.5 */
+                        volume?: number;
+                        parameters?: {
+                            bassGain?: number;
+                            bassFrequency?: number;
+                            distortionAmount?: number;
+                            volumeMultiplier?: number;
+                            playbackRate?: number;
+                        };
+                    };
+                };
+            };
+            responses: {
+                /** @description Fart recorded successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/farts/leaderboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get fart leaderboard
+         * @description Returns top farters ranked by total farts
+         */
+        get: {
+            parameters: {
+                query?: {
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Leaderboard data */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/farts/history/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get user fart history
+         * @description Returns recent fart events for a specific user
+         */
+        get: {
+            parameters: {
+                query?: {
+                    limit?: number;
+                };
+                header?: never;
+                path: {
+                    userId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description User fart history */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/farts/processing-stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get processing statistics
+         * @description Returns audio processing statistics and trends
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Processing statistics */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/farts/daily": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get daily fart statistics
+         * @description Returns daily fart trends and statistics
+         */
+        get: {
+            parameters: {
+                query?: {
+                    days?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Daily statistics */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/export/rankings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export rankings data
+         * @description Exports current rankings data in JSON or CSV format
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Export format (json or csv) */
+                    format?: "json" | "csv";
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Rankings data exported successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            rank?: number;
+                            name?: string;
+                            avatar?: string;
+                            score?: number;
+                            isCurrentUser?: boolean;
+                        }[];
+                        "text/csv": string;
+                    };
+                };
+                /** @description Invalid format parameter */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/export/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Export user stats data
+         * @description Exports user statistics data in JSON or CSV format
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description User ID */
                         userId: string;
                         /**
-                         * @description Reason for adding points (shown in message)
-                         * @example good interaction
+                         * @description Game type filter (optional)
+                         * @enum {string}
                          */
-                        reason: string;
+                        gameType?: "clicker" | "fishing";
+                    };
+                };
+            };
+            responses: {
+                /** @description Stats data exported successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": Record<string, never>;
+                        "text/csv": string;
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/export/clicks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Export clicks stats history
+         * @description Exports click statistics history in JSON or CSV format
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description User ID */
+                        userId: string;
+                        /**
+                         * @description Maximum number of records to export
+                         * @default 100
+                         */
+                        limit?: number;
+                        /**
+                         * @default json
+                         * @enum {string}
+                         */
+                        format?: "json" | "csv";
+                    };
+                };
+            };
+            responses: {
+                /** @description Clicks data exported successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": unknown[];
+                        "text/csv": string;
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/export/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Export full stats history
+         * @description Exports complete statistics history in JSON or CSV format
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description User ID */
+                        userId: string;
+                        /**
+                         * @description Game type filter (optional)
+                         * @enum {string}
+                         */
+                        gameType?: "clicker" | "fishing";
+                        /** @description Stat type filter (optional) */
+                        statType?: string;
+                        /**
+                         * @description Maximum number of records to export
+                         * @default 500
+                         */
+                        limit?: number;
+                        /**
+                         * @default json
+                         * @enum {string}
+                         */
+                        format?: "json" | "csv";
+                    };
+                };
+            };
+            responses: {
+                /** @description History data exported successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": unknown[];
+                        "text/csv": string;
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/export/leaderboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Export leaderboard data
+         * @description Exports game leaderboard in JSON or CSV format
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        gameType: "clicker" | "fishing";
+                        /** @default 50 */
+                        limit?: number;
+                        /**
+                         * @default json
+                         * @enum {string}
+                         */
+                        format?: "json" | "csv";
+                    };
+                };
+            };
+            responses: {
+                /** @description Leaderboard data exported successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": unknown[];
+                        "text/csv": string;
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/discord/configured": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Check if Discord integration is configured
+         * @description Returns whether Discord OAuth credentials are properly configured.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Configuration status */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            configured?: boolean;
+                            message?: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/discord/link/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Start Discord account linking
+         * @description Generates a Discord OAuth authorization URL for linking accounts. Requires JWT token.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Authorization URL generated */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @description URL to redirect user to for Discord authorization */
+                            authorizationUrl?: string;
+                        };
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Discord not configured */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/discord/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Discord OAuth callback
+         * @description Handles the OAuth callback from Discord. Links the Discord account to the user.
+         */
+        get: {
+            parameters: {
+                query: {
+                    /** @description OAuth authorization code from Discord */
+                    code: string;
+                    /** @description State parameter for CSRF protection */
+                    state: string;
+                    /** @description Error code if authorization was denied */
+                    error?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Discord account linked successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            success?: boolean;
+                            user?: {
+                                id?: number;
+                                discord_id?: string;
+                                discord_username?: string;
+                            };
+                        };
+                    };
+                };
+                /** @description Invalid state or authorization error */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Failed to link Discord account */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/discord/unlink": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Unlink Discord account
+         * @description Removes the Discord account link from the authenticated user. Requires JWT token.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Discord account unlinked successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            success?: boolean;
+                            message?: string;
+                            user?: Record<string, never>;
+                        };
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/discord/avatar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Discord avatar URL
+         * @description Returns the full Discord avatar URL for the authenticated user. Requires JWT token.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Discord avatar URL */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            success?: boolean;
+                            avatarUrl?: string | null;
+                        };
+                    };
+                };
+                /** @description Not authenticated or Discord not linked */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/discord/sync-avatar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sync Discord avatar to profile
+         * @description Updates the user's profile avatar with their Discord avatar. Requires JWT token.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Avatar synced successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            success?: boolean;
+                            user?: {
+                                avatar_url?: string;
+                            };
+                        };
+                    };
+                };
+                /** @description Discord not linked */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/clicks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get click count
+         * @description Returns the current click counter value
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Click count retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example 42 */
+                            count?: number;
+                            /** Format: date-time */
+                            timestamp?: string;
+                        };
+                    };
+                };
+                /** @description Server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/clicks/increment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Increment click counter
+         * @description Increments the click counter by 1. Requires authentication.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Counter incremented successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example 43 */
+                            count?: number;
+                            /** Format: date-time */
+                            timestamp?: string;
+                        };
+                    };
+                };
+                401: components["responses"]["UnauthorizedError"];
+                403: components["responses"]["ForbiddenError"];
+                /** @description Server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/clicks/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reset click counter
+         * @description Resets the click counter to 0. Requires authentication.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Counter reset successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @example 0 */
+                            count?: number;
+                            /** Format: date-time */
+                            timestamp?: string;
+                        };
+                    };
+                };
+                401: components["responses"]["UnauthorizedError"];
+                403: components["responses"]["ForbiddenError"];
+                /** @description Server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/clicks/add-points": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add points to rankings based on clicks
+         * @description Adds points to user's rankings based on their clicker activity
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description User ID */
+                        userId?: string;
+                        /** @description Number of clicks to convert to points */
+                        clicks?: number;
                     };
                 };
             };
@@ -5551,6 +6778,13 @@ export interface paths {
                         };
                     };
                 };
+                /** @description Server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
             };
         };
         delete?: never;
@@ -5559,19 +6793,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/points/status": {
+    "/api/characters": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Get all characters sorted by ELO rating */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description List of all characters */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
         put?: never;
-        /**
-         * Get a user's current score and status
-         * @description Returns a user's current points, base points, and cooldown status
-         */
+        /** Create a new character */
         post: {
             parameters: {
                 query?: never;
@@ -5582,27 +6831,18 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
-                        /** @example temer3 */
-                        userId: string;
+                        name: string;
+                        image_url?: string;
                     };
                 };
             };
             responses: {
-                /** @description User status retrieved successfully */
-                200: {
+                /** @description Character created successfully */
+                201: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content: {
-                        "application/json": {
-                            avatar?: string;
-                            name?: string;
-                            points?: number;
-                            basePoints?: number;
-                            onCooldown?: boolean;
-                            lastInteraction?: number;
-                        };
-                    };
+                    content?: never;
                 };
             };
         };
@@ -5612,17 +6852,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/points/leaderboard": {
+    "/api/characters/random-pair": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /**
-         * Get current leaderboard
-         * @description Returns top 50 users sorted by points with ranks
-         */
+        /** Get two random characters for comparison */
         get: {
             parameters: {
                 query?: never;
@@ -5632,22 +6869,12 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Leaderboard retrieved successfully */
+                /** @description Two random characters */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content: {
-                        "application/json": {
-                            leaderboard?: {
-                                avatar?: string;
-                                name?: string;
-                                score?: number;
-                                rank?: number;
-                                isCurrentUser?: boolean;
-                            }[];
-                        };
-                    };
+                    content?: never;
                 };
             };
         };
@@ -5659,7 +6886,362 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/points/reset": {
+    "/api/characters/vote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Vote for a character and update ELO ratings */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        winner_id: number;
+                        loser_id: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description ELO ratings updated successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/characters/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a character */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Character deleted successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bus-tracker/vehicles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get live vehicle positions for SEQ */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Transit mode (default Bus) */
+                    mode?: "Bus" | "Rail" | "Tram" | "Ferry";
+                    /** @description Filter by route ID */
+                    route?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Array of vehicle positions */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bus-tracker/trip-updates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get live trip updates (delays) for SEQ */
+        get: {
+            parameters: {
+                query?: {
+                    mode?: "Bus" | "Rail" | "Tram" | "Ferry";
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Array of trip updates with delays */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bus-tracker/routes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get unique route IDs with active vehicles */
+        get: {
+            parameters: {
+                query?: {
+                    mode?: "Bus" | "Rail" | "Tram" | "Ferry";
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Array of unique route IDs currently in service */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bus-tracker/alerts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get service alerts for SEQ */
+        get: {
+            parameters: {
+                query?: {
+                    mode?: "Bus" | "Rail" | "Tram" | "Ferry";
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Array of service alerts */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/birdsounds/random": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a random bird sound
+         * @description Returns a random bird recording from the Macaulay Library (Cornell Lab of Ornithology)
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description A random bird sound */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @description Common name of the bird species */
+                            commonName?: string;
+                            /** @description Scientific name of the bird species */
+                            sciName?: string;
+                            /** @description Location where the recording was made */
+                            location?: string;
+                            /** @description URL to the audio file */
+                            mediaUrl?: string;
+                            /** @description URL to a thumbnail image */
+                            thumbnailUrl?: string;
+                            /** @description Type of bird sound (e.g., Call, Song) */
+                            behaviors?: string;
+                            /** @description Quality rating of the recording */
+                            rating?: string;
+                        };
+                    };
+                };
+                /** @description Error fetching bird sound */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/birdsounds/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search for bird sounds
+         * @description Search for bird recordings by species name
+         */
+        get: {
+            parameters: {
+                query: {
+                    /** @description Bird species name to search for */
+                    query: string;
+                    /** @description Maximum number of results to return */
+                    maxResults?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description List of matching bird sounds */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @description Total number of results */
+                            count?: number;
+                            results?: {
+                                commonName?: string;
+                                sciName?: string;
+                                location?: string;
+                                mediaUrl?: string;
+                                thumbnailUrl?: string;
+                                behaviors?: string;
+                                rating?: string;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Missing query parameter */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Error searching bird sounds */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/register": {
         parameters: {
             query?: never;
             header?: never;
@@ -5669,8 +7251,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Reset a user to their base score
-         * @description Admin function to reset a user to their base score
+         * Register a new user
+         * @description Creates a new user account with email and password. Returns user info and JWT token.
          */
         post: {
             parameters: {
@@ -5682,23 +7264,51 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
-                        /** @example temer3 */
-                        userId: string;
+                        /**
+                         * Format: email
+                         * @description User's email address
+                         */
+                        email: string;
+                        /**
+                         * Format: password
+                         * @description User's password (minimum 8 characters)
+                         */
+                        password: string;
+                        /** @description Optional display name */
+                        displayName?: string;
+                        /** @description Device name for session tracking */
+                        deviceName?: string;
+                        /** @description Device type (e.g., mobile, desktop, tablet) */
+                        deviceType?: string;
                     };
                 };
             };
             responses: {
-                /** @description User reset successfully */
-                200: {
+                /** @description User registered successfully */
+                201: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
                         "application/json": {
-                            success?: boolean;
-                            message?: string;
+                            user?: {
+                                id?: number;
+                                email?: string;
+                                display_name?: string;
+                                created_at?: string;
+                                updated_at?: string;
+                            };
+                            /** @description JWT authentication token */
+                            token?: string;
                         };
                     };
+                };
+                /** @description Bad request - invalid input or email already registered */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
                 };
             };
         };
@@ -5708,7 +7318,139 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/profiles/me": {
+    "/api/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Login with email and password
+         * @description Authenticates a user and returns user info with JWT token.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** Format: email */
+                        email: string;
+                        /** Format: password */
+                        password: string;
+                        /** @description Device name for session tracking */
+                        deviceName?: string;
+                        /** @description Device type (e.g., mobile, desktop, tablet) */
+                        deviceType?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Login successful */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            user?: {
+                                id?: number;
+                                email?: string;
+                                display_name?: string;
+                                created_at?: string;
+                                updated_at?: string;
+                            };
+                            /** @description JWT authentication token */
+                            token?: string;
+                        };
+                    };
+                };
+                /** @description Invalid credentials */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refresh access token
+         * @description Get a new JWT token using an existing valid token. Useful for extending sessions without re-login.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description Current valid JWT token */
+                        token: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Token refreshed successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            user?: {
+                                id?: number;
+                                email?: string;
+                                display_name?: string;
+                                created_at?: string;
+                                updated_at?: string;
+                            };
+                            /** @description New JWT authentication token */
+                            token?: string;
+                        };
+                    };
+                };
+                /** @description Invalid or expired token */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/me": {
         parameters: {
             query?: never;
             header?: never;
@@ -5716,8 +7458,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get my profile
-         * @description Returns the authenticated user's profile
+         * Get current user info
+         * @description Returns the authenticated user's information. Requires JWT token.
          */
         get: {
             parameters: {
@@ -5728,41 +7470,229 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Profile retrieved successfully */
+                /** @description User info retrieved successfully */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
                         "application/json": {
-                            profile?: {
+                            user?: {
                                 id?: number;
-                                user_id?: number;
-                                display_name?: string | null;
-                                bio?: string | null;
-                                avatar_url?: string | null;
-                                profile_banner_url?: string | null;
-                                status_message?: string | null;
-                                location?: string | null;
-                                website?: string | null;
-                                social_links?: Record<string, never> | null;
-                                is_public?: boolean;
-                                /** Format: date-time */
+                                email?: string;
+                                display_name?: string;
                                 created_at?: string;
-                                /** Format: date-time */
                                 updated_at?: string;
+                            };
+                            session?: {
+                                id?: number;
+                                device_name?: string;
+                                device_type?: string;
+                                created_at?: string;
+                                last_used_at?: string;
                             };
                         };
                     };
                 };
-                /** @description Unauthorized */
+                /** @description Not authenticated */
                 401: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content?: never;
                 };
-                /** @description Profile not found */
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Logout current session
+         * @description Invalidates the current JWT token. Requires JWT token.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Logout successful */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get all sessions for current user
+         * @description Returns all active sessions for the authenticated user. Requires JWT token.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Sessions retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            sessions?: {
+                                id?: number;
+                                device_name?: string;
+                                device_type?: string;
+                                created_at?: string;
+                                last_used_at?: string;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/sessions/all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete all sessions
+         * @description Logs out from all devices. Requires JWT token.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description All sessions deleted successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/sessions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete a specific session
+         * @description Logs out from a specific device. Requires JWT token.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Session deleted successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Session not found */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -5771,59 +7701,27 @@ export interface paths {
                 };
             };
         };
-        /**
-         * Update my profile
-         * @description Creates or updates the authenticated user's profile
-         */
-        put: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        display_name?: string | null;
-                        bio?: string | null;
-                        profile_banner_url?: string | null;
-                        status_message?: string | null;
-                        location?: string | null;
-                        website?: string | null;
-                        social_links?: Record<string, never> | null;
-                        is_public?: boolean;
-                    };
-                };
-            };
-            responses: {
-                /** @description Profile updated successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            profile?: Record<string, never>;
-                        };
-                    };
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
+        get?: never;
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
         head?: never;
         /**
-         * Partially update my profile
-         * @description Updates specific fields of the authenticated user's profile
+         * Update user profile
+         * @description Updates the authenticated user's display name. Requires JWT token.
          */
         patch: {
             parameters: {
@@ -5835,14 +7733,7 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
-                        display_name?: string;
-                        bio?: string;
-                        profile_banner_url?: string;
-                        status_message?: string;
-                        location?: string;
-                        website?: string;
-                        social_links?: Record<string, never>;
-                        is_public?: boolean;
+                        displayName?: string;
                     };
                 };
             };
@@ -5852,21 +7743,10 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content: {
-                        "application/json": {
-                            profile?: Record<string, never>;
-                        };
-                    };
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
                     content?: never;
                 };
-                /** @description Profile not found */
-                404: {
+                /** @description Not authenticated */
+                401: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -5876,7 +7756,362 @@ export interface paths {
         };
         trace?: never;
     };
-    "/api/profiles/{id}": {
+    "/api/auth/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change user password
+         * @description Changes the authenticated user's password. Requires JWT token.
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** Format: password */
+                        oldPassword: string;
+                        /** Format: password */
+                        newPassword: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Password changed successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated or invalid old password */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/auth/account": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete user account
+         * @description Permanently deletes the user account. Requires JWT token and password confirmation.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** Format: password */
+                        password: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Account deleted successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated or invalid password */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/avatar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update user avatar
+         * @description Updates the authenticated user's avatar URL. Requires JWT token.
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        avatarUrl?: string | null;
+                    };
+                };
+            };
+            responses: {
+                /** @description Avatar updated successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/auth/banner": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update user banner
+         * @description Updates the authenticated user's banner URL. Requires JWT token.
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        bannerUrl?: string | null;
+                    };
+                };
+            };
+            responses: {
+                /** @description Banner updated successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/auth/bio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update user bio
+         * @description Updates the authenticated user's bio. Requires JWT token.
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        bio?: string | null;
+                    };
+                };
+            };
+            responses: {
+                /** @description Bio updated successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/auth/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update user status
+         * @description Updates the authenticated user's status message. Requires JWT token.
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        status?: string | null;
+                    };
+                };
+            };
+            responses: {
+                /** @description Status updated successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/auth/privacy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update user privacy settings
+         * @description Updates the authenticated user's privacy settings. Requires JWT token.
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        showEmail?: boolean;
+                        showJoinedDate?: boolean;
+                    };
+                };
+            };
+            responses: {
+                /** @description Privacy settings updated successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not authenticated */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/profile/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -5884,15 +8119,14 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get public profile
-         * @description Returns a user's public profile by user ID
+         * Get user profile by ID
+         * @description Returns public profile information for a user.
          */
         get: {
             parameters: {
                 query?: never;
                 header?: never;
                 path: {
-                    /** @description User ID */
                     id: number;
                 };
                 cookie?: never;
@@ -5901,1139 +8135,6 @@ export interface paths {
             responses: {
                 /** @description Profile retrieved successfully */
                 200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            profile?: Record<string, never>;
-                        };
-                    };
-                };
-                /** @description Profile not found or private */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/profiles/avatar": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Upload avatar
-         * @description Uploads an avatar image for the authenticated user
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "multipart/form-data": {
-                        /** Format: binary */
-                        avatar: string;
-                    };
-                };
-            };
-            responses: {
-                /** @description Avatar uploaded successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            avatar_url?: string;
-                        };
-                    };
-                };
-                /** @description Bad request (invalid file) */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        /**
-         * Delete avatar
-         * @description Removes the authenticated user's avatar image
-         */
-        delete: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Avatar deleted successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            message?: string;
-                        };
-                    };
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/quote": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get a random Northernlion quote
-         * @description Returns a random quote from the Northernlion quote database
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Random quote retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /** @example It's gonna be a long one. */
-                            quote?: string;
-                            /** @example northernlion-db */
-                            source?: string;
-                            /** @example 5 */
-                            index?: number;
-                            /** @example 48 */
-                            totalQuotes?: number;
-                        };
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/advice": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get random advice
-         * @description Returns a random piece of advice from the adviceslip.com API (ticket
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Advice retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            advice?: {
-                                id?: string;
-                                advice?: string;
-                            };
-                            /** @example adviceslip-api */
-                            source?: string;
-                            /** Format: date-time */
-                            timestamp?: string;
-                        };
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/rankings": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get user rankings and leaderboard
-         * @description Returns the current leaderboard with dynamic point tracking
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description User rankings retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            rankings?: {
-                                /** @example 🥔 */
-                                avatar?: string;
-                                /** @example Cam */
-                                name?: string;
-                                /** @example 10000 */
-                                score?: number;
-                                /** @example false */
-                                isCurrentUser?: boolean;
-                            }[];
-                        };
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/reactions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Add or toggle a reaction
-         * @description Adds a reaction if it doesn't exist, removes it if it does (toggle behavior)
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        /**
-                         * @description Type of target to react to
-                         * @example message
-                         * @enum {string}
-                         */
-                        targetType: "message" | "post" | "comment";
-                        /**
-                         * @description ID of the target
-                         * @example 123
-                         */
-                        targetId: number;
-                        /**
-                         * @description Emoji reaction
-                         * @example 👍
-                         */
-                        emoji: string;
-                    };
-                };
-            };
-            responses: {
-                /** @description Reaction toggled successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            success?: boolean;
-                            /** @description true if reaction was added, false if removed */
-                            added?: boolean;
-                            /** @description true if reaction was removed, false if added */
-                            removed?: boolean;
-                        };
-                    };
-                };
-                /** @description Bad request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/reactions/force": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Force add a reaction
-         * @description Adds a reaction without toggling. Returns null if reaction already exists.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        /**
-                         * @example message
-                         * @enum {string}
-                         */
-                        targetType: "message" | "post" | "comment";
-                        /** @example 123 */
-                        targetId: number;
-                        /** @example 👍 */
-                        emoji: string;
-                    };
-                };
-            };
-            responses: {
-                /** @description Reaction added successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/reactions/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * Remove a reaction by ID
-         * @description Removes a reaction using its ID
-         */
-        delete: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Reaction ID */
-                    id: number;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Reaction removed successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Reaction not found or doesn't belong to user */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/reactions/{targetType}/{targetId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get reactions for a target
-         * @description Returns all reactions for a specific target, aggregated by emoji
-         */
-        get: {
-            parameters: {
-                query?: {
-                    /** @description If true, returns individual reactions instead of aggregated counts */
-                    detailed?: boolean;
-                };
-                header?: never;
-                path: {
-                    /** @description Type of target */
-                    targetType: "message" | "post" | "comment";
-                    /** @description ID of the target */
-                    targetId: number;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Reactions retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            reactions?: {
-                                emoji?: string;
-                                count?: number;
-                                user_ids?: number[];
-                            }[];
-                        };
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/reactions/check": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Check if current user has reacted to a target
-         * @description Returns true if the authenticated user has reacted with the specified emoji
-         */
-        get: {
-            parameters: {
-                query: {
-                    targetType: "message" | "post" | "comment";
-                    targetId: number;
-                    emoji: string;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Check completed */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            has_reacted?: boolean;
-                        };
-                    };
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/reactions/user": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get all reactions by the current user
-         * @description Returns all reactions made by the authenticated user
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Reactions retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/search": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Search across all content
-         * @description Search for movies, shop items, quotes, and advice
-         */
-        get: {
-            parameters: {
-                query: {
-                    /**
-                     * @description Search query
-                     * @example matrix
-                     */
-                    q: string;
-                    /**
-                     * @description Comma-separated list of types to search (movie,shop_item,quote,advice)
-                     * @example movie,shop_item
-                     */
-                    types?: string;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Search results */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            query?: string;
-                            results?: {
-                                /** @enum {string} */
-                                type?: "movie" | "shop_item" | "quote" | "advice";
-                                id?: string;
-                                title?: string;
-                                description?: string;
-                                relevance?: number;
-                                metadata?: Record<string, never>;
-                            }[];
-                            count?: number;
-                            /** Format: date-time */
-                            timestamp?: string;
-                        };
-                    };
-                };
-                /** @description Bad request (missing query) */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            error?: string;
-                        };
-                    };
-                };
-                /** @description Server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            error?: string;
-                        };
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/shop/items": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get all shop items
-         * @description Returns a list of all available shop items with their costs
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Shop items retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            items?: {
-                                id?: number;
-                                name?: string;
-                                description?: string;
-                                price?: number;
-                                icon?: string;
-                                category?: string;
-                                effect?: string;
-                            }[];
-                        };
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/shop/inventory": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get user's inventory
-         * @description Returns a list of items a user has purchased
-         */
-        get: {
-            parameters: {
-                query: {
-                    userId: string;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description User inventory retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            inventory?: {
-                                id?: number;
-                                itemId?: number;
-                                itemName?: string;
-                                itemIcon?: string;
-                                purchasedAt?: string;
-                            }[];
-                        };
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/shop/purchase": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Purchase an item from the shop
-         * @description Purchase an item using coolness points
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        /**
-                         * @description User ID making the purchase
-                         * @example user123
-                         */
-                        userId: string;
-                        /**
-                         * @description ID of the item to purchase
-                         * @example 1
-                         */
-                        itemId: number;
-                    };
-                };
-            };
-            responses: {
-                /** @description Purchase successful */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            success?: boolean;
-                            item?: Record<string, never>;
-                            newPoints?: number;
-                            message?: string;
-                        };
-                    };
-                };
-                /** @description Bad request or insufficient points */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Item not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/stats/record": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Record a game stat event
-         * @description Records a game stat (click, fish caught, score, etc.)
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        /** @description User ID */
-                        userId: string;
-                        /** @description User name (optional) */
-                        userName?: string;
-                        /** @enum {string} */
-                        gameType: "clicker" | "fishing";
-                        /** @enum {string} */
-                        statType: "click" | "fish_caught" | "score" | "session_end";
-                        value: number;
-                        /** @description Additional metadata */
-                        metadata?: Record<string, never>;
-                    };
-                };
-            };
-            responses: {
-                /** @description Stat recorded successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            success?: boolean;
-                            message?: string;
-                        };
-                    };
-                };
-                /** @description Bad request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/stats/highscore": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Update high score for a user
-         * @description Updates or inserts a high score for a user in a game
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        /** @description User ID */
-                        userId: string;
-                        /** @description User name (optional) */
-                        userName?: string;
-                        /** @enum {string} */
-                        gameType: "clicker" | "fishing";
-                        score: number;
-                        /** @description Additional details about the high score */
-                        details?: Record<string, never>;
-                    };
-                };
-            };
-            responses: {
-                /** @description High score updated successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            success?: boolean;
-                            isNewRecord?: boolean;
-                            score?: number;
-                            message?: string;
-                        };
-                    };
-                };
-                /** @description Bad request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/stats/history": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Get stats history for a user
-         * @description Retrieves stats history for a user, optionally filtered by game type and stat type
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        userId: string;
-                        /** @enum {string} */
-                        gameType?: "clicker" | "fishing";
-                        statType?: string;
-                        /** @default 100 */
-                        limit?: number;
-                        /** @default 0 */
-                        offset?: number;
-                    };
-                };
-            };
-            responses: {
-                /** @description Stats history retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            history?: {
-                                id?: number;
-                                userId?: string;
-                                gameType?: string;
-                                statType?: string;
-                                value?: number;
-                                metadata?: Record<string, never>;
-                                /** Format: date-time */
-                                recordedAt?: string;
-                            }[];
-                        };
-                    };
-                };
-                /** @description Bad request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/stats/user": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Get aggregated stats for a user
-         * @description Retrieves aggregated statistics for a user
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        userId: string;
-                        /** @enum {string} */
-                        gameType?: "clicker" | "fishing";
-                    };
-                };
-            };
-            responses: {
-                /** @description User stats retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            userId?: string;
-                            gameType?: string;
-                            totalClicks?: number;
-                            totalFishCaught?: number;
-                            highScore?: number;
-                            totalSessions?: number;
-                        };
-                    };
-                };
-                /** @description Bad request */
-                400: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -7046,196 +8147,6 @@ export interface paths {
                     };
                     content?: never;
                 };
-                /** @description Server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/stats/leaderboard": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Get leaderboard for a game type
-         * @description Retrieves the leaderboard for a specific game type
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        /** @enum {string} */
-                        gameType: "clicker" | "fishing";
-                        /** @default 10 */
-                        limit?: number;
-                    };
-                };
-            };
-            responses: {
-                /** @description Leaderboard retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            gameType?: string;
-                            leaderboard?: {
-                                rank?: number;
-                                userId?: string;
-                                userName?: string;
-                                gameType?: string;
-                                score?: number;
-                                recordedAt?: string;
-                                updatedAt?: string;
-                            }[];
-                        };
-                    };
-                };
-                /** @description Bad request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/stats/global": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Get global stats across all users
-         * @description Retrieves aggregated global statistics
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        /** @enum {string} */
-                        gameType?: "clicker" | "fishing";
-                        statType?: string;
-                        /** @enum {string} */
-                        timeRange?: "hour" | "day" | "week" | "month";
-                    };
-                };
-            };
-            responses: {
-                /** @description Global stats retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            total?: number;
-                            uniqueUsers?: number;
-                            timeRange?: string;
-                        };
-                    };
-                };
-                /** @description Server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/stocks": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get all stocks
-         * @description Returns a list of all available stocks in the market
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description List of all stocks */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            stocks?: components["schemas"]["Stock"][];
-                            /** Format: date-time */
-                            timestamp?: string;
-                        };
-                    };
-                };
-                /** @description Server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["Error"];
-                    };
-                };
             };
         };
         put?: never;
@@ -7246,7 +8157,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/stocks/{name}": {
+    "/api/auth/theme": {
         parameters: {
             query?: never;
             header?: never;
@@ -7254,554 +8165,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get specific stock by name
-         * @description Returns detailed information about a specific stock
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /**
-                     * @description Name of the stock
-                     * @example Cam
-                     */
-                    name: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Stock details retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            stock?: components["schemas"]["Stock"];
-                            /** Format: date-time */
-                            timestamp?: string;
-                        };
-                    };
-                };
-                /** @description Stock not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /** @example Stock not found */
-                            error?: string;
-                        };
-                    };
-                };
-                /** @description Server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["Error"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/stocks/buy": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Buy stock shares
-         * @description Purchase shares of a stock. Requires authentication.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        /** @example user123 */
-                        userId: string;
-                        /** @example Cam */
-                        stockName: string;
-                        /** @example 10 */
-                        shares: number;
-                    };
-                };
-            };
-            responses: {
-                /** @description Shares purchased successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /** @example true */
-                            success?: boolean;
-                            /** @example Successfully bought 10 shares */
-                            message?: string;
-                            /** @example 105.5 */
-                            newPrice?: number;
-                            /** @example 8945 */
-                            newCash?: number;
-                            /** Format: date-time */
-                            timestamp?: string;
-                        };
-                    };
-                };
-                400: components["responses"]["ValidationError"];
-                401: components["responses"]["UnauthorizedError"];
-                403: components["responses"]["ForbiddenError"];
-                /** @description Server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["Error"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/stocks/sell": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Sell stock shares
-         * @description Sell shares of a stock. Requires authentication.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        /** @example user123 */
-                        userId: string;
-                        /** @example Cam */
-                        stockName: string;
-                        /** @example 5 */
-                        shares: number;
-                    };
-                };
-            };
-            responses: {
-                /** @description Shares sold successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /** @example true */
-                            success?: boolean;
-                            /** @example Successfully sold 5 shares */
-                            message?: string;
-                            /** @example 98.75 */
-                            newPrice?: number;
-                            /** @example 9443.75 */
-                            newCash?: number;
-                            /** Format: date-time */
-                            timestamp?: string;
-                        };
-                    };
-                };
-                400: components["responses"]["ValidationError"];
-                401: components["responses"]["UnauthorizedError"];
-                403: components["responses"]["ForbiddenError"];
-                /** @description Server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["Error"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/portfolio/{userId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get user portfolio
-         * @description Returns the portfolio and total value for a specific user
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /**
-                     * @description User ID
-                     * @example user123
-                     */
-                    userId: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Portfolio retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            portfolio?: components["schemas"]["UserPortfolio"];
-                            /** @example 15234.5 */
-                            portfolioValue?: number;
-                            /** Format: date-time */
-                            timestamp?: string;
-                        };
-                    };
-                };
-                /** @description Server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["Error"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/sync/upload": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Upload local changes to server
-         * @description Uploads local data changes from a device to the server for synchronization.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        /** @description Unique identifier for the device */
-                        deviceId: string;
-                        /** @description Human-readable device name */
-                        deviceName?: string;
-                        /** @description Device type (mobile, desktop, tablet, etc.) */
-                        deviceType?: string;
-                        /** @description Platform (iOS, Android, Windows, macOS, etc.) */
-                        platform?: string;
-                        /** @description Sync data containing tickets, settings, etc. */
-                        data?: Record<string, never>;
-                        /**
-                         * @description Strategy for resolving conflicts
-                         * @default last-write-wins
-                         * @enum {string}
-                         */
-                        conflictResolution?: "last-write-wins" | "user-prompted" | "merge";
-                    };
-                };
-            };
-            responses: {
-                /** @description Upload successful */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            success?: boolean;
-                            conflicts_found?: number;
-                            conflicts_resolved?: number;
-                            items_synced?: number;
-                            sync_log_id?: number;
-                        };
-                    };
-                };
-                /** @description Bad request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Not authenticated */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/sync/download": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Download latest server state
-         * @description Downloads latest server data for synchronization.
-         */
-        get: {
-            parameters: {
-                query: {
-                    /** @description Unique identifier for the device */
-                    deviceId: string;
-                    /** @description Only return data changed since this timestamp (optional) */
-                    since?: string;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Download successful */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            success?: boolean;
-                            data?: {
-                                tickets?: unknown[];
-                                settings?: unknown[];
-                                version?: number;
-                                timestamp?: string;
-                            };
-                        };
-                    };
-                };
-                /** @description Bad request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Not authenticated */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/sync/status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get sync status and conflicts
-         * @description Returns current sync status for user's account.
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Status retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            success?: boolean;
-                            status?: {
-                                last_sync_time?: string | null;
-                                total_devices?: number;
-                                recent_syncs?: unknown[];
-                                conflicts_pending?: number;
-                            };
-                        };
-                    };
-                };
-                /** @description Not authenticated */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/sync/resolve": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Resolve sync conflicts
-         * @description Manually resolve conflicts found during sync.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        conflicts: {
-                            /** @description Conflict ID (e.g., "ticket-123") */
-                            id: string;
-                            /**
-                             * @description Which version to keep
-                             * @enum {string}
-                             */
-                            resolution: "local" | "remote";
-                        }[];
-                    };
-                };
-            };
-            responses: {
-                /** @description Conflicts resolved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            success?: boolean;
-                            resolved_count?: number;
-                        };
-                    };
-                };
-                /** @description Bad request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Not authenticated */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/themes": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get my theme preferences
-         * @description Returns the authenticated user's theme preferences. Creates default preferences if none exist.
+         * Get user's theme preferences
+         * @description Returns the authenticated user's theme preferences. Requires JWT token.
          */
         get: {
             parameters: {
@@ -7819,31 +8184,26 @@ export interface paths {
                     };
                     content: {
                         "application/json": {
+                            success?: boolean;
                             preferences?: {
-                                id?: number;
-                                user_id?: number;
-                                /** @example dark */
-                                theme_name?: string;
-                                /** @example #ec4899 */
-                                primary_color?: string;
-                                /** @example #8b5cf6 */
-                                secondary_color?: string;
-                                /** @example #1a1a2e */
-                                background_color?: string;
-                                /** @example #ffffff */
-                                text_color?: string;
-                                /** @example #f97316 */
-                                accent_color?: string;
-                                custom_settings?: Record<string, never> | null;
-                                /** Format: date-time */
-                                created_at?: string;
-                                /** Format: date-time */
-                                updated_at?: string;
+                                preset?: string;
+                                customColors?: {
+                                    primary?: string;
+                                    background?: string;
+                                    text?: string;
+                                    accent?: string;
+                                    cardBackground?: string;
+                                };
+                                options?: {
+                                    darkMode?: boolean;
+                                    highContrast?: boolean;
+                                    reduceMotion?: boolean;
+                                };
                             };
                         };
                     };
                 };
-                /** @description Unauthorized */
+                /** @description Not authenticated */
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -7853,8 +8213,8 @@ export interface paths {
             };
         };
         /**
-         * Update theme preferences
-         * @description Creates or updates the authenticated user's theme preferences
+         * Update user's theme preferences
+         * @description Updates the authenticated user's theme preferences. Requires JWT token.
          */
         put: {
             parameters: {
@@ -7866,28 +8226,25 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
-                        /**
-                         * @example dark
-                         * @enum {string}
-                         */
-                        theme_name?: "dark" | "light" | "sunset" | "ocean" | "forest" | "neon" | "custom";
-                        /** @example #ec4899 */
-                        primary_color?: string;
-                        /** @example #8b5cf6 */
-                        secondary_color?: string;
-                        /** @example #1a1a2e */
-                        background_color?: string;
-                        /** @example #ffffff */
-                        text_color?: string;
-                        /** @example #f97316 */
-                        accent_color?: string;
-                        /**
-                         * @example {
-                         *       "darkMode": true,
-                         *       "highContrast": false
-                         *     }
-                         */
-                        custom_settings?: Record<string, never> | null;
+                        /** @description Theme preset name (e.g., "dark", "light") */
+                        preset: string;
+                        customColors: {
+                            /** @description Hex color code (#RRGGBB) */
+                            primary: string;
+                            /** @description Hex color code (#RRGGBB) */
+                            background: string;
+                            /** @description Hex color code (#RRGGBB) */
+                            text: string;
+                            /** @description Hex color code (#RRGGBB) */
+                            accent: string;
+                            /** @description Hex color code (#RRGGBB) */
+                            cardBackground: string;
+                        };
+                        options: {
+                            darkMode: boolean;
+                            highContrast: boolean;
+                            reduceMotion: boolean;
+                        };
                     };
                 };
             };
@@ -7899,18 +8256,19 @@ export interface paths {
                     };
                     content: {
                         "application/json": {
+                            success?: boolean;
                             preferences?: Record<string, never>;
                         };
                     };
                 };
-                /** @description Bad request (invalid colors) */
+                /** @description Invalid theme preferences */
                 400: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content?: never;
                 };
-                /** @description Unauthorized */
+                /** @description Not authenticated */
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -7926,7 +8284,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/themes/presets": {
+    "/api/archive/opinions": {
         parameters: {
             query?: never;
             header?: never;
@@ -7934,142 +8292,39 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List available theme presets
-         * @description Returns all available theme presets that can be applied
+         * Get archived opinions
+         * @description Returns all archived opinions sorted by creation date (newest first)
          */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description Maximum number of opinions to return */
+                    limit?: number;
+                    /** @description Filter by opinion type */
+                    type?: "random" | "build" | "all";
+                };
                 header?: never;
                 path?: never;
                 cookie?: never;
             };
             requestBody?: never;
             responses: {
-                /** @description Theme presets retrieved successfully */
+                /** @description Opinions retrieved successfully */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
                         "application/json": {
-                            presets?: {
-                                name?: string;
-                                label?: string;
-                                primary_color?: string;
-                                secondary_color?: string;
-                                background_color?: string;
-                                text_color?: string;
-                                accent_color?: string;
+                            opinions?: {
+                                id?: string;
+                                text?: string;
+                                /** @enum {string} */
+                                type?: "random" | "build";
+                                /** Format: date-time */
+                                createdAt?: string;
                             }[];
-                        };
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/themes/presets/{name}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get specific theme preset
-         * @description Returns a specific theme preset by name
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Preset name (dark, light, sunset, ocean, forest, neon) */
-                    name: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Theme preset retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            preset?: Record<string, never>;
-                        };
-                    };
-                };
-                /** @description Preset not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/tickets": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get all tickets
-         * @description Returns all tickets with optional filtering by status, type, priority, tags, and category. Sorted by relevance by default (older pending tickets first).
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            tickets?: {
-                                id?: number;
-                                title?: string;
-                                description?: string;
-                                /** @enum {string} */
-                                status?: "pending" | "needs-info" | "completed" | "declined";
-                                /** @enum {string} */
-                                ticketType?: "feature" | "bug" | "feedback";
-                                /** @enum {string} */
-                                priority?: "high" | "medium" | "low";
-                                response?: string;
-                                created_at?: string;
-                                updated_at?: string;
-                                /** @description Relevance score (0-100), higher = more relevant */
-                                relevanceScore?: number;
-                                /** @description Number of days since ticket creation */
-                                daysSinceCreation?: number;
-                            }[];
+                            total?: number;
                         };
                     };
                 };
@@ -8077,8 +8332,8 @@ export interface paths {
         };
         put?: never;
         /**
-         * Create a new ticket
-         * @description Creates a new ticket with title and description. Optionally includes type, priority, tags, category, and creator_id for ticket ownership tracking.
+         * Save an opinion to the archive
+         * @description Archives an opinion (random or build opinion)
          */
         post: {
             parameters: {
@@ -8087,8 +8342,28 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
-            responses: never;
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description The opinion text */
+                        text: string;
+                        /**
+                         * @description Type of opinion
+                         * @enum {string}
+                         */
+                        type: "random" | "build";
+                    };
+                };
+            };
+            responses: {
+                /** @description Opinion archived successfully */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
         };
         delete?: never;
         options?: never;
@@ -8096,83 +8371,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/tickets/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * Delete a ticket
-         * @description Deletes a ticket. No authentication required. Optionally provide creator_id to verify ownership.
-         */
-        delete: {
-            parameters: {
-                query?: never;
-                header?: {
-                    /** @description Creator ID for authorization (alternative to API key) */
-                    "X-Creator-ID"?: string;
-                };
-                path: {
-                    id: number;
-                };
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": {
-                        /** @description Creator ID for authorization (alternative to API key) */
-                        creator_id?: string;
-                    };
-                };
-            };
-            responses: {
-                /** @description Ticket deleted successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Unauthorized - creator_id does not match */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Ticket not found */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        options?: never;
-        head?: never;
-        /**
-         * Update a ticket
-         * @description Update ticket fields including status, response, title, description, tags, and category. No authentication required.
-         */
-        patch: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: never;
-        };
-        trace?: never;
-    };
-    "/api/tickets/settings/ignore-mode": {
+    "/api/archive/rankings": {
         parameters: {
             query?: never;
             header?: never;
@@ -8180,42 +8379,51 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get ticket processing ignore mode
-         * @description Returns whether ticket processing is paused (ignoring all tickets)
+         * Get archived rankings snapshots
+         * @description Returns all archived rankings snapshots sorted by timestamp (newest first)
          */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description Maximum number of snapshots to return */
+                    limit?: number;
+                };
                 header?: never;
                 path?: never;
                 cookie?: never;
             };
             requestBody?: never;
             responses: {
-                /** @description Ignore mode status retrieved successfully */
+                /** @description Rankings snapshots retrieved successfully */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
                         "application/json": {
-                            /** @example false */
-                            ignoreMode?: boolean;
+                            snapshots?: {
+                                id?: string;
+                                /** Format: date-time */
+                                timestamp?: string;
+                                rankings?: {
+                                    avatar?: string;
+                                    name?: string;
+                                    score?: number;
+                                    isCurrentUser?: boolean;
+                                }[];
+                            }[];
+                            total?: number;
                         };
                     };
                 };
             };
         };
         put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
         /**
-         * Update ticket processing ignore mode
-         * @description Sets whether ticket processing is paused
+         * Save a rankings snapshot to the archive
+         * @description Archives a current rankings snapshot
          */
-        patch: {
+        post: {
             parameters: {
                 query?: never;
                 header?: never;
@@ -8225,82 +8433,33 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
-                        ignoreMode: boolean;
+                        /** @description Current leaderboard rankings */
+                        rankings: {
+                            avatar?: string;
+                            name?: string;
+                            score?: number;
+                            isCurrentUser?: boolean;
+                        }[];
                     };
                 };
             };
             responses: {
-                /** @description Ignore mode updated successfully */
-                200: {
+                /** @description Rankings snapshot archived successfully */
+                201: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content?: never;
                 };
-                /** @description Bad request - invalid ignoreMode value */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
             };
         };
-        trace?: never;
-    };
-    "/api/tickets/next-task": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get next task and update last collection time
-         * @description Returns the next pending ticket to work on (excluding those collected in the last hour) and updates the last collection timestamp. Designed for heartbeat automation.
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Next task retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            ticket?: {
-                                id?: number;
-                                title?: string;
-                                description?: string;
-                                status?: string;
-                                ticketType?: string;
-                                priority?: string;
-                                created_at?: string;
-                                updated_at?: string;
-                            } | null;
-                            /** @example 2024-02-04T00:00:00.000Z */
-                            lastCollection?: string;
-                        };
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/tickets/settings/last-collection": {
+    "/api/archive/stats": {
         parameters: {
             query?: never;
             header?: never;
@@ -8308,124 +8467,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get last ticket collection timestamp
-         * @description Returns the timestamp of the last ticket collection
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Last collection timestamp retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /** @example 2024-02-04T00:00:00.000Z */
-                            lastCollection?: string | null;
-                        };
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /**
-         * Update last ticket collection timestamp
-         * @description Updates the timestamp of the last ticket collection. No authentication required.
-         */
-        patch: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        /** Format: date-time */
-                        lastCollection: string;
-                    };
-                };
-            };
-            responses: {
-                /** @description Last collection updated successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        trace?: never;
-    };
-    "/api/tickets/estimated-wait-time": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get estimated wait time for new tickets
-         * @description Returns the average completion time based on the last 10 completed tickets. Used to estimate how long new tickets might take to process.
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Estimated wait time retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /** @description Estimated wait time in minutes (null if insufficient data) */
-                            estimatedWaitTimeMinutes?: number;
-                            /** @description Number of completed tickets used for calculation */
-                            sampleSize?: number;
-                            /** @description Average completion time in hours (null if insufficient data) */
-                            averageCompletionTimeHours?: number;
-                        };
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/tickets/stats": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get ticketing statistics
-         * @description Returns ticket statistics including total count, status breakdown, and date ranges
+         * Get archive statistics
+         * @description Returns statistics about archived data
          */
         get: {
             parameters: {
@@ -8443,29 +8486,13 @@ export interface paths {
                     };
                     content: {
                         "application/json": {
-                            /** @example 42 */
-                            totalTickets?: number;
-                            byStatus?: {
-                                pending?: number;
-                                "needs-info"?: number;
-                                completed?: number;
-                                declined?: number;
+                            opinions?: {
+                                total?: number;
+                                random?: number;
+                                build?: number;
                             };
-                            oldestTicket?: {
-                                id?: number;
-                                title?: string;
-                                created_at?: string;
-                            };
-                            newestTicket?: {
-                                id?: number;
-                                title?: string;
-                                created_at?: string;
-                            };
-                            dates?: {
-                                oldestCreated?: string;
-                                newestCreated?: string;
-                                oldestCompleted?: string;
-                                newestCompleted?: string;
+                            rankings?: {
+                                total?: number;
                             };
                         };
                     };
@@ -8480,7 +8507,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/tickets/tags": {
+    "/api/analytics/summary": {
         parameters: {
             query?: never;
             header?: never;
@@ -8488,8 +8515,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get all tags used across tickets
-         * @description Returns a list of all unique tags used in tickets, sorted by usage count
+         * Get analytics summary
+         * @description Returns overall analytics stats including total clicks and active users
          */
         get: {
             parameters: {
@@ -8500,19 +8527,22 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Tags retrieved successfully */
+                /** @description Analytics summary retrieved successfully */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
                         "application/json": {
-                            tags?: {
-                                /** @example ui */
-                                name?: string;
-                                /** @example 5 */
-                                count?: number;
-                            }[];
+                            /** @description Total page views recorded */
+                            totalClicks?: number;
+                            /** @description Number of currently active users (within 15 minutes) */
+                            activeUsers?: number;
+                            /**
+                             * Format: date-time
+                             * @description When the summary was generated
+                             */
+                            timestamp?: string;
                         };
                     };
                 };
@@ -8526,7 +8556,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/tickets/categories": {
+    "/api/analytics/top-pages": {
         parameters: {
             query?: never;
             header?: never;
@@ -8534,70 +8564,14 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get all categories used across tickets
-         * @description Returns a list of all unique categories used in tickets, sorted by usage count
+         * Get top pages by views
+         * @description Returns the most visited pages with their view counts
          */
         get: {
             parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Categories retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            categories?: {
-                                /** @example ui */
-                                name?: string;
-                                /** @example 3 */
-                                count?: number;
-                            }[];
-                        };
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/tickets/search": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Search tickets by term
-         * @description Search tickets by a search term that matches title or description. Supports optional filtering by status, type, priority, tag, and category.
-         */
-        get: {
-            parameters: {
-                query: {
-                    /** @description Search term to match in title or description */
-                    q: string;
-                    /** @description Filter by status */
-                    status?: "all" | "pending" | "needs-info" | "completed" | "declined";
-                    /** @description Filter by type */
-                    type?: "all" | "feature" | "bug" | "feedback";
-                    /** @description Filter by priority */
-                    priority?: "all" | "high" | "medium" | "low";
-                    /** @description Filter by tag */
-                    tag?: string;
-                    /** @description Filter by category */
-                    category?: string;
+                query?: {
+                    /** @description Maximum number of pages to return */
+                    limit?: number;
                 };
                 header?: never;
                 path?: never;
@@ -8605,36 +8579,25 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Search results retrieved successfully */
+                /** @description Top pages retrieved successfully */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
                         "application/json": {
-                            tickets?: {
-                                id?: number;
-                                title?: string;
-                                description?: string;
-                                status?: string;
-                                type?: string;
-                                priority?: string;
-                                created_at?: string;
-                                updated_at?: string;
+                            pages?: {
+                                /** @description The page path */
+                                path?: string;
+                                /** @description Number of views for this page */
+                                views?: number;
                             }[];
-                            /** @description The search term used */
-                            query?: string;
+                            /** Format: date-time */
+                            timestamp?: string;
                         };
                     };
                 };
-                /** @description Bad request - missing search term */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Internal server error */
+                /** @description Server error */
                 500: {
                     headers: {
                         [name: string]: unknown;
@@ -8651,7 +8614,72 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/version": {
+    "/api/analytics/track": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record a page view
+         * @description Records a page view for analytics tracking
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description The page path that was viewed */
+                        path: string;
+                        /** @description User ID (optional, for session tracking) */
+                        userId?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Page view recorded successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            success?: boolean;
+                            message?: string;
+                        };
+                    };
+                };
+                /** @description Bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/activity-feed": {
         parameters: {
             query?: never;
             header?: never;
@@ -8659,8 +8687,163 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get version and build information
-         * @description Returns git hash, branch, build time, version, and build count information
+         * Get global activity feed
+         * @description Returns recent activities from all users
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Number of activities to return */
+                    limit?: number;
+                    /** @description Offset for pagination */
+                    offset?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Activity feed retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            activities?: {
+                                id?: number;
+                                userId?: string;
+                                userName?: string;
+                                userAvatar?: string;
+                                activityType?: string;
+                                description?: string;
+                                metadata?: Record<string, never>;
+                                pointsChange?: number;
+                                gameType?: string;
+                                /** Format: date-time */
+                                recordedAt?: string;
+                            }[];
+                            timestamp?: string;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/activity-feed/user/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get activity feed for a specific user
+         * @description Returns activities for a specific user
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Number of activities to return */
+                    limit?: number;
+                    /** @description Offset for pagination */
+                    offset?: number;
+                    /** @description Filter by activity type */
+                    type?: "points_earned" | "points_bulk" | "achievement_unlocked" | "high_score" | "challenge_completed" | "game_played" | "ranking_change" | "session_end";
+                    /** @description Filter by game type */
+                    gameType?: "clicker" | "fishing";
+                };
+                header?: never;
+                path: {
+                    /** @description User ID */
+                    userId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description User activity feed retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/activity-feed/stats/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get activity statistics for a user
+         * @description Returns aggregated statistics for a user's activities
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description User ID */
+                    userId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description User activity statistics retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            totalActivities?: number;
+                            pointsEarned?: number;
+                            achievementsUnlocked?: number;
+                            gamesPlayed?: number;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/activity-feed/types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get available activity types
+         * @description Returns list of all available activity types
          */
         get: {
             parameters: {
@@ -8671,50 +8854,14 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Version information retrieved successfully */
+                /** @description Activity types retrieved successfully */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
                         "application/json": {
-                            /**
-                             * @description Git commit hash
-                             * @example 1ab857e
-                             */
-                            gitHash?: string;
-                            /**
-                             * @description Git branch name
-                             * @example main
-                             */
-                            gitBranch?: string;
-                            /**
-                             * Format: date-time
-                             * @description ISO 8601 build timestamp
-                             * @example 2026-02-03T10:30:00.000Z
-                             */
-                            buildTime?: string;
-                            /**
-                             * @description Application version
-                             * @example 1.0.0
-                             */
-                            version?: string;
-                            /**
-                             * @description Deployment environment
-                             * @example production
-                             */
-                            environment?: string;
-                            /**
-                             * @description Total number of builds
-                             * @example 42
-                             */
-                            buildCount?: number;
-                            /**
-                             * Format: date-time
-                             * @description Current server time
-                             * @example 2026-02-03T10:30:00.000Z
-                             */
-                            currentTimestamp?: string;
+                            types?: string[];
                         };
                     };
                 };

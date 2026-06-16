@@ -97,26 +97,29 @@ function cancelMatchmaking() {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.9);
+  background: var(--mech-overlay);
+  backdrop-filter: var(--mech-blur);
   z-index: 1000;
+  font-family: var(--mech-font);
 }
 
 .matchmaking-card {
-  background: linear-gradient(145deg, #1e293b 0%, #334155 100%);
-  border: 2px solid #475569;
-  border-radius: 16px;
+  background: var(--mech-surface);
+  border: 1px solid var(--mech-border-strong);
+  border-radius: var(--mech-radius-lg);
   padding: 3rem;
   max-width: 500px;
   width: 90%;
   text-align: center;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--mech-shadow-lg);
 }
 
 .matchmaking-header h2 {
   font-size: 2rem;
-  color: #e2e8f0;
+  color: var(--mech-text);
   margin: 0 0 2rem 0;
   font-weight: 700;
+  letter-spacing: var(--mech-tracking-wide);
 }
 
 .spinner-container {
@@ -128,10 +131,11 @@ function cancelMatchmaking() {
 .spinner {
   width: 80px;
   height: 80px;
-  border: 6px solid #334155;
-  border-top-color: #60a5fa;
+  border: 6px solid var(--mech-border);
+  border-top-color: var(--mech-accent);
   border-radius: 50%;
   animation: spin 1s linear infinite;
+  box-shadow: var(--mech-shadow-accent);
 }
 
 @keyframes spin {
@@ -143,20 +147,21 @@ function cancelMatchmaking() {
 .queue-info {
   margin: 1.5rem 0;
   padding: 1rem;
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: 8px;
+  background: var(--mech-surface-2);
+  border: 1px solid var(--mech-border);
+  border-radius: var(--mech-radius-md);
 }
 
 .queue-position {
   font-size: 1.1rem;
-  color: #93c5fd;
+  color: var(--mech-accent);
   margin: 0.5rem 0;
   font-weight: 600;
 }
 
 .queue-time {
   font-size: 0.95rem;
-  color: #cbd5e1;
+  color: var(--mech-text-dim);
   margin: 0.5rem 0;
 }
 
@@ -167,12 +172,12 @@ function cancelMatchmaking() {
 
 .status-messages p {
   font-size: 1.05rem;
-  color: #cbd5e1;
+  color: var(--mech-text-dim);
   margin: 0.5rem 0;
 }
 
 .error-message {
-  color: #f87171 !important;
+  color: var(--mech-danger) !important;
   font-weight: 600;
 }
 
@@ -181,18 +186,23 @@ function cancelMatchmaking() {
   padding: 0.75rem 2rem;
   font-size: 1.1rem;
   font-weight: 600;
-  color: #e2e8f0;
-  background: linear-gradient(145deg, #ef4444 0%, #dc2626 100%);
+  letter-spacing: var(--mech-tracking-wide);
+  color: #fff;
+  background: var(--mech-danger-grad);
   border: none;
-  border-radius: 8px;
+  border-radius: var(--mech-radius-md);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all var(--mech-transition);
 }
 
 .cancel-button:hover {
-  background: linear-gradient(145deg, #dc2626 0%, #b91c1c 100%);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+  box-shadow: 0 6px 18px var(--mech-danger-glow);
+}
+
+.cancel-button:focus-visible {
+  outline: 2px solid var(--mech-accent);
+  outline-offset: 3px;
 }
 
 .cancel-button:active {

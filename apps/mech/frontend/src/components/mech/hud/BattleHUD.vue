@@ -279,7 +279,7 @@ const damageNumberStyle = (dmg: DamageNumberEvent) => {
   height: 100%;
   pointer-events: none;
   z-index: 100;
-  font-family: 'Courier New', monospace;
+  font-family: var(--mech-font-mono);
 }
 
 /* Health Bars */
@@ -300,10 +300,12 @@ const damageNumberStyle = (dmg: DamageNumberEvent) => {
 }
 
 .bar-label {
-  color: #fff;
-  font-size: 14px;
+  color: var(--mech-text);
+  font-size: 13px;
   font-weight: bold;
-  margin-bottom: 5px;
+  letter-spacing: var(--mech-tracking-wide);
+  text-transform: uppercase;
+  margin-bottom: 6px;
   text-shadow: 0 0 10px rgba(0, 0, 0, 0.8);
 }
 
@@ -311,9 +313,10 @@ const damageNumberStyle = (dmg: DamageNumberEvent) => {
   position: relative;
   width: 100%;
   height: 30px;
-  background: rgba(0, 0, 0, 0.6);
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-radius: 4px;
+  background: var(--mech-surface);
+  backdrop-filter: var(--mech-blur);
+  border: 1px solid var(--mech-border-strong);
+  border-radius: var(--mech-radius-sm);
   overflow: hidden;
 }
 
@@ -323,13 +326,13 @@ const damageNumberStyle = (dmg: DamageNumberEvent) => {
 }
 
 .bar-fill.player-fill {
-  background: linear-gradient(90deg, #10b981, #34d399);
-  box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+  background: var(--mech-success-grad);
+  box-shadow: 0 0 12px var(--mech-success-glow);
 }
 
 .bar-fill.enemy-fill {
-  background: linear-gradient(90deg, #ef4444, #f87171);
-  box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+  background: var(--mech-danger-grad);
+  box-shadow: 0 0 12px var(--mech-danger-glow);
 }
 
 .bar-text {
@@ -353,30 +356,31 @@ const damageNumberStyle = (dmg: DamageNumberEvent) => {
   gap: 22px;
   align-items: baseline;
   padding: 8px 22px;
-  background: rgba(0, 0, 0, 0.55);
-  border: 2px solid rgba(245, 158, 11, 0.5);
-  border-radius: 8px;
-  box-shadow: 0 0 16px rgba(245, 158, 11, 0.25);
+  background: var(--mech-surface);
+  backdrop-filter: var(--mech-blur);
+  border: 1px solid var(--mech-warn-glow);
+  border-radius: var(--mech-radius-sm);
+  box-shadow: 0 0 18px var(--mech-warn-glow);
   pointer-events: none;
 }
 
 .survival-wave {
-  color: #fbbf24;
+  color: var(--mech-warn);
   font-size: 22px;
   font-weight: bold;
-  text-shadow: 0 0 12px rgba(245, 158, 11, 0.8);
-  letter-spacing: 0.05em;
+  text-shadow: 0 0 12px var(--mech-warn-glow);
+  letter-spacing: var(--mech-tracking-wide);
 }
 
 .survival-score {
-  color: #fff;
+  color: var(--mech-text);
   font-size: 16px;
   font-weight: bold;
   text-shadow: 0 0 8px rgba(0, 0, 0, 0.9);
 }
 
 .survival-best {
-  color: #9ca3af;
+  color: var(--mech-text-dim);
   font-size: 12px;
   font-weight: bold;
   text-shadow: 0 0 6px rgba(0, 0, 0, 0.9);
@@ -492,18 +496,19 @@ const damageNumberStyle = (dmg: DamageNumberEvent) => {
 }
 
 .power-label {
-  color: #60a5fa;
+  color: var(--mech-accent);
   font-size: 12px;
   font-weight: bold;
   margin-bottom: 5px;
   text-align: center;
-  text-shadow: 0 0 10px rgba(96, 165, 250, 0.8);
+  letter-spacing: var(--mech-tracking-wide);
+  text-shadow: 0 0 10px var(--mech-accent-glow);
   transition: color 0.2s;
 }
 
 .power-label.low {
-  color: #ff4444;
-  text-shadow: 0 0 10px rgba(255, 68, 68, 0.8);
+  color: var(--mech-danger-strong);
+  text-shadow: 0 0 10px var(--mech-danger-glow);
   animation: pulse 1s infinite;
 }
 
@@ -516,16 +521,17 @@ const damageNumberStyle = (dmg: DamageNumberEvent) => {
   position: relative;
   width: 100%;
   height: 20px;
-  background: rgba(0, 0, 0, 0.6);
-  border: 2px solid rgba(96, 165, 250, 0.5);
-  border-radius: 4px;
+  background: var(--mech-surface);
+  backdrop-filter: var(--mech-blur);
+  border: 1px solid var(--mech-border-accent);
+  border-radius: var(--mech-radius-sm);
   overflow: hidden;
 }
 
 .power-fill {
   height: 100%;
-  background: linear-gradient(90deg, #2563eb, #60a5fa);
-  box-shadow: 0 0 10px rgba(37, 99, 235, 0.5);
+  background: var(--mech-accent-grad);
+  box-shadow: 0 0 10px var(--mech-accent-glow);
   transition: width 0.2s ease;
 }
 
@@ -561,16 +567,17 @@ const damageNumberStyle = (dmg: DamageNumberEvent) => {
 .fuel-bar-container {
   width: 100%;
   height: 20px;
-  background: rgba(0, 0, 0, 0.6);
-  border: 2px solid rgba(0, 255, 0, 0.5);
-  border-radius: 4px;
+  background: var(--mech-surface);
+  backdrop-filter: var(--mech-blur);
+  border: 1px solid rgba(0, 255, 0, 0.4);
+  border-radius: var(--mech-radius-sm);
   overflow: hidden;
 }
 
 .fuel-fill {
   height: 100%;
-  background: linear-gradient(90deg, #10b981, #34d399);
-  box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+  background: var(--mech-success-grad);
+  box-shadow: 0 0 10px var(--mech-success-glow);
   transition: width 0.2s ease;
 }
 
@@ -594,23 +601,24 @@ const damageNumberStyle = (dmg: DamageNumberEvent) => {
 }
 
 .ability-label.ready {
-  color: #fbbf24;
-  text-shadow: 0 0 10px rgba(251, 191, 36, 0.6);
+  color: var(--mech-warn);
+  text-shadow: 0 0 10px var(--mech-warn-glow);
 }
 
 .ability-bar-container {
   width: 100%;
   height: 8px;
-  background: rgba(0, 0, 0, 0.6);
-  border: 1px solid rgba(251, 191, 36, 0.3);
-  border-radius: 4px;
+  background: var(--mech-surface);
+  backdrop-filter: var(--mech-blur);
+  border: 1px solid var(--mech-warn-glow);
+  border-radius: var(--mech-radius-sm);
   overflow: hidden;
 }
 
 .ability-fill {
   height: 100%;
-  background: linear-gradient(90deg, #f59e0b, #fbbf24);
-  box-shadow: 0 0 8px rgba(245, 158, 11, 0.4);
+  background: var(--mech-warn-grad);
+  box-shadow: 0 0 8px var(--mech-warn-glow);
   transition: width 0.1s linear;
 }
 
@@ -641,9 +649,10 @@ const damageNumberStyle = (dmg: DamageNumberEvent) => {
 .dash-bar-container {
   width: 100%;
   height: 8px;
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--mech-surface);
+  backdrop-filter: var(--mech-blur);
   border: 1px solid rgba(0, 255, 255, 0.3);
-  border-radius: 4px;
+  border-radius: var(--mech-radius-sm);
   overflow: hidden;
 }
 
@@ -662,8 +671,10 @@ const damageNumberStyle = (dmg: DamageNumberEvent) => {
   width: 120px;
   height: 120px;
   border-radius: 50%;
-  background: rgba(0, 10, 20, 0.7);
-  border: 2px solid rgba(0, 255, 255, 0.4);
+  background: rgba(6, 12, 24, 0.72);
+  backdrop-filter: var(--mech-blur);
+  border: 1px solid rgba(0, 255, 255, 0.4);
+  box-shadow: 0 0 18px rgba(0, 255, 255, 0.18), var(--mech-shadow-sm);
   overflow: hidden;
   display: flex;
   align-items: center;
@@ -705,9 +716,9 @@ const damageNumberStyle = (dmg: DamageNumberEvent) => {
   position: absolute;
   width: 6px;
   height: 6px;
-  background: #3b82f6;
+  background: var(--mech-accent);
   border-radius: 50%;
-  box-shadow: 0 0 6px #3b82f6;
+  box-shadow: 0 0 6px var(--mech-accent);
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
@@ -717,9 +728,9 @@ const damageNumberStyle = (dmg: DamageNumberEvent) => {
   position: absolute;
   width: 6px;
   height: 6px;
-  background: #ef4444;
+  background: var(--mech-danger-strong);
   border-radius: 50%;
-  box-shadow: 0 0 6px #ef4444;
+  box-shadow: 0 0 6px var(--mech-danger-strong);
   top: 50%;
   left: 50%;
   /* transform is set dynamically */
@@ -730,14 +741,16 @@ const damageNumberStyle = (dmg: DamageNumberEvent) => {
   position: absolute;
   bottom: 20px;
   left: 20px;
-  background: rgba(0, 0, 0, 0.6);
-  padding: 15px;
-  border-radius: 8px;
-  border: 2px solid rgba(255, 255, 255, 0.2);
+  background: var(--mech-surface);
+  backdrop-filter: var(--mech-blur);
+  padding: 14px 16px;
+  border-radius: var(--mech-radius-md);
+  border: 1px solid var(--mech-border-strong);
+  box-shadow: var(--mech-shadow-sm);
 }
 
 .control-item {
-  color: #e5e7eb;
+  color: var(--mech-text);
   font-size: 13px;
   margin: 5px 0;
   text-shadow: 0 0 5px rgba(0, 0, 0, 0.8);

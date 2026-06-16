@@ -14,6 +14,8 @@ import type { MechLoadout } from '../../composables/useMechBuilder'
 import type { GraphicsSettings } from '../../composables/useGameSettings'
 import type { TownState } from '../../composables/useStoryMode'
 import { TOWN_DECAY_RADIUS, WORLD_HALF_EXTENT } from '../../composables/useStoryMode'
+import { terrainHeight, type TerrainParams } from './TerrainNoise'
+import { createOverworldSkyMaterial, updateOverworldSky, SUN_DIRECTION } from './OverworldSky'
 
 /** XZ distance within which the E-key opens a town's quest-giver dialogue. */
 export const QUEST_GIVER_RADIUS = 14
@@ -73,6 +75,7 @@ export interface StoryFrameInfo {
  * teardown.
  */
 export class StoryWorld {
+  private canvas: HTMLCanvasElement
   private scene: THREE.Scene
   private renderer: THREE.WebGLRenderer
   private camera: CameraController
@@ -98,6 +101,22 @@ export class StoryWorld {
   private onQuestComplete?: (quest: QuestDef) => void
   private onPlayerDefeated?: () => void
 
+  /** Animated sky shader material (drives drifting clouds); driven each frame. */
+  private skyMaterial: THREE.ShaderMaterial | null = null
+  /**
+   * Terrain shaping parameters. The inner `flatRadius` is kept clear of the
+   * outermost town ring so every town sits on flat ground at y=0 (the mech
+   * physics clamps to y=0, so the play area must read flat).
+   */
+  private readonly terrain: TerrainParams = {
+    halfExtent: WORLD_HALF_EXTENT,
+    maxHeight: 70,
+    hillScale: 90,
+    // Outer town ring sits at 0.78 * halfExtent; keep terrain flat well past it.
+    flatRadius: WORLD_HALF_EXTENT * 0.9,
+    flatFalloff: WORLD_HALF_EXTENT * 0.6,
+  }
+
   private animationId: number | null = null
   private lastTime: number = 0
   private elapsed: number = 0
@@ -117,6 +136,7 @@ export class StoryWorld {
 
     // --- Scene + renderer (mirrors BattleScene setup; honours graphics settings) ---
     const gfx = config.graphics
+    this.canvas = config.canvas
     this.scene = markRaw(new THREE.Scene())
     this.renderer = markRaw(new THREE.WebGLRenderer({
       canvas: config.canvas,
@@ -323,6 +343,10 @@ export class StoryWorld {
     this.playerMech.update(deltaTime)
     this.playerMech.updatePower(deltaTime)
 
+    // Re-anchor the camera to the mech's new position this frame so the view
+    // tracks the mech as it moves (movement above shifts playerMech.position).
+    this.camera.reanchor()
+
     // --- Active encounter combat (firing, AI, projectiles, VFX) ---
     this.particleSystem.update(deltaTime)
     if (this.combat.active) {
@@ -427,13 +451,32 @@ export class StoryWorld {
     return this.inputManager
   }
 
-  /** Pause/resume free-roam + decay + combat (used while a UI panel is open). */
+  /**
+   * Pause/resume free-roam + decay + combat (used while a UI panel is open).
+   * Also flips the InputManager interactive flag so that, while paused for a
+   * menu, the cursor is freed (pointer lock released) and won't be re-acquired
+   * on click — letting the player interact with the overlay. On resume the
+   * player must click the canvas to re-engage mouse-look (handled by
+   * InputManager's mousedown), or the host may call requestPointerLock().
+   */
   setPaused(paused: boolean): void {
     this.paused = paused
+    this.inputManager.setInteractive(!paused)
   }
 
   isPaused(): boolean {
     return this.paused
+  }
+
+  /**
+   * Re-acquire pointer lock on the canvas (mouse-look). Safe to call after a
+   * menu closes if the host wants to auto-re-engage look without the player
+   * needing to click first. No-op while a menu still suppresses input.
+   */
+  requestPointerLock(): void {
+    if (this.inputManager.isInteractive()) {
+      this.canvas.requestPointerLock()
+    }
   }
 
   /** Whether a combat/object encounter is currently running. */

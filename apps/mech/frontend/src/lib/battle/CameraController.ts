@@ -130,6 +130,35 @@ export class CameraController {
     this.target.rotation.y = this.mouseRotation.x
   }
 
+  /**
+   * Reposition the camera to the current target + rotation WITHOUT advancing
+   * any time-based state (mouse velocity, shake, FOV). Call after the target's
+   * position has moved within the same frame so the view tracks the mech.
+   */
+  reanchor() {
+    const yaw = this.mouseRotation.x
+    const pitch = this.mouseRotation.y
+    const distance = this.currentDistance
+
+    const aimDir = new THREE.Vector3(
+      Math.sin(yaw) * Math.cos(pitch),
+      Math.sin(pitch),
+      Math.cos(yaw) * Math.cos(pitch)
+    )
+    const rightDir = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw))
+
+    const anchor = this.target.position.clone()
+    anchor.y += 3
+
+    const desiredPosition = anchor.clone()
+      .sub(aimDir.clone().multiplyScalar(distance))
+      .add(rightDir.clone().multiplyScalar(this.SHOULDER_RIGHT))
+    desiredPosition.y += this.SHOULDER_UP
+
+    this.camera.position.copy(desiredPosition)
+    this.camera.lookAt(this.camera.position.clone().add(aimDir))
+  }
+
   triggerShake(intensity: number) {
     this.shakeIntensity = Math.max(this.shakeIntensity, intensity)
   }

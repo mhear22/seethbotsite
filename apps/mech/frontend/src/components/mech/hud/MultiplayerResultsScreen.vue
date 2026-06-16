@@ -150,41 +150,43 @@ const opponentAccuracy = computed(() => {
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  backdrop-filter: blur(10px);
+  backdrop-filter: var(--mech-blur);
+  font-family: var(--mech-font);
 }
 
 .results-screen.victory {
-  background: linear-gradient(135deg, rgba(6, 95, 70, 0.95), rgba(4, 120, 87, 0.95));
+  background: linear-gradient(135deg, rgba(4, 47, 42, 0.95), rgba(6, 78, 59, 0.95));
 }
 
 .results-screen.defeat {
-  background: linear-gradient(135deg, rgba(127, 29, 29, 0.95), rgba(153, 27, 27, 0.95));
+  background: linear-gradient(135deg, rgba(42, 13, 13, 0.95), rgba(76, 20, 20, 0.95));
 }
 
 .results-content {
   max-width: 900px;
   width: 90%;
   text-align: center;
-  padding: 40px;
+  padding: var(--mech-space-7);
 }
 
 /* Result Title */
 .result-title {
   font-size: 4rem;
   font-weight: 900;
-  margin-bottom: 30px;
+  margin-bottom: var(--mech-space-6);
   text-transform: uppercase;
+  letter-spacing: var(--mech-tracking-wide);
   animation: titlePulse 2s ease-in-out infinite;
 }
 
 .result-title.victory {
-  color: #10b981;
-  text-shadow: 0 0 40px rgba(16, 185, 129, 0.8);
+  color: var(--mech-success);
+  text-shadow: 0 0 40px var(--mech-success-glow);
 }
 
 .result-title.defeat {
-  color: #ef4444;
-  text-shadow: 0 0 40px rgba(239, 68, 68, 0.8);
+  color: var(--mech-danger);
+  text-shadow: 0 0 40px var(--mech-danger-glow);
 }
 
 @keyframes titlePulse {
@@ -200,28 +202,29 @@ const opponentAccuracy = computed(() => {
 
 /* Match Summary */
 .match-summary {
-  background: rgba(0, 0, 0, 0.5);
-  border-radius: 12px;
-  padding: 20px;
-  margin-bottom: 30px;
+  background: var(--mech-surface);
+  border: 1px solid var(--mech-border);
+  border-radius: var(--mech-radius-md);
+  padding: var(--mech-space-5);
+  margin-bottom: var(--mech-space-6);
   display: flex;
   justify-content: center;
-  gap: 40px;
+  gap: var(--mech-space-7);
 }
 
 .summary-item {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: var(--mech-space-1);
 }
 
 .summary-label {
-  color: #9ca3af;
+  color: var(--mech-text-dim);
   font-size: 0.9rem;
 }
 
 .summary-value {
-  color: #fff;
+  color: var(--mech-text);
   font-size: 1.2rem;
   font-weight: 700;
 }
@@ -230,40 +233,43 @@ const opponentAccuracy = computed(() => {
 .stats-container {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
-  gap: 30px;
-  background: rgba(0, 0, 0, 0.5);
-  border-radius: 12px;
-  padding: 30px;
-  margin-bottom: 30px;
+  gap: var(--mech-space-6);
+  background: var(--mech-surface);
+  border: 1px solid var(--mech-border);
+  border-radius: var(--mech-radius-md);
+  padding: var(--mech-space-6);
+  margin-bottom: var(--mech-space-6);
 }
 
 .stats-column h3 {
-  color: #fff;
+  color: var(--mech-text);
   font-size: 1.3rem;
-  margin-bottom: 20px;
+  margin-bottom: var(--mech-space-5);
+  letter-spacing: var(--mech-tracking-wide);
 }
 
 .stat-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--mech-space-3);
 }
 
 .stat-item {
   display: flex;
   justify-content: space-between;
-  padding: 10px;
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: 8px;
+  padding: var(--mech-space-3);
+  background: var(--mech-surface-2);
+  border: 1px solid var(--mech-border);
+  border-radius: var(--mech-radius-sm);
 }
 
 .stat-label {
-  color: #cbd5e1;
+  color: var(--mech-text-dim);
   font-size: 0.95rem;
 }
 
 .stat-value {
-  color: #fff;
+  color: var(--mech-text);
   font-size: 1.1rem;
   font-weight: 700;
 }
@@ -272,16 +278,16 @@ const opponentAccuracy = computed(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  color: var(--mech-text);
   font-size: 2rem;
   font-weight: 900;
-  opacity: 0.3;
+  opacity: 0.35;
 }
 
 /* Action Buttons */
 .button-group {
   display: flex;
-  gap: 20px;
+  gap: var(--mech-space-4);
   justify-content: center;
 }
 
@@ -289,32 +295,36 @@ const opponentAccuracy = computed(() => {
   padding: 15px 40px;
   font-size: 1.1rem;
   font-weight: 700;
+  letter-spacing: var(--mech-tracking-wide);
   border: none;
-  border-radius: 8px;
+  border-radius: var(--mech-radius-md);
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all var(--mech-transition);
+}
+
+.action-btn:focus-visible {
+  outline: 2px solid var(--mech-accent);
+  outline-offset: 3px;
 }
 
 .rematch-btn {
-  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  background: var(--mech-accent-grad);
   color: #fff;
 }
 
 .rematch-btn:hover {
-  background: linear-gradient(135deg, #2563eb, #1d4ed8);
-  box-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
+  box-shadow: 0 8px 24px var(--mech-accent-glow);
   transform: translateY(-2px);
 }
 
 .menu-btn {
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
-  border: 2px solid rgba(255, 255, 255, 0.3);
+  background: var(--mech-surface-raised);
+  color: var(--mech-text);
+  border: 1px solid var(--mech-border-strong);
 }
 
 .menu-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
-  border-color: rgba(255, 255, 255, 0.5);
+  border-color: var(--mech-border-accent);
   transform: translateY(-2px);
 }
 

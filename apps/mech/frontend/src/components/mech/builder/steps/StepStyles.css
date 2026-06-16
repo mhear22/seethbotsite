@@ -1,19 +1,20 @@
-/* Step content styles */
+/* Step content styles — dark sci-fi theme using shared design tokens */
 .step-content {
-  padding: 20px;
+  padding: var(--mech-space-5);
 }
 
 .step-content h2 {
-  margin: 0 0 8px 0;
-  color: #2d3748;
+  margin: 0 0 var(--mech-space-2) 0;
+  color: var(--mech-text);
   font-size: 28px;
+  letter-spacing: var(--mech-tracking-wide);
   display: flex;
   align-items: center;
 }
 
 .step-description {
-  margin: 0 0 24px 0;
-  color: #718096;
+  margin: 0 0 var(--mech-space-5) 0;
+  color: var(--mech-text-dim);
   font-size: 16px;
 }
 
@@ -21,7 +22,7 @@
 .split-layout {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 20px;
+  gap: var(--mech-space-5);
   min-height: 500px;
 }
 
@@ -29,50 +30,50 @@
 .parts-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--mech-space-3);
   max-height: 600px;
   overflow-y: auto;
-  padding-right: 8px;
+  padding-right: var(--mech-space-2);
 }
 
 .part-list-item {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 16px;
-  background: white;
-  border: 2px solid #e2e8f0;
-  border-radius: 8px;
+  gap: var(--mech-space-4);
+  padding: var(--mech-space-4);
+  background: var(--mech-surface-2);
+  border: 1px solid var(--mech-border-strong);
+  border-radius: var(--mech-radius-sm);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all var(--mech-transition);
 }
 
 .part-list-item:hover {
-  border-color: #4299e1;
+  border-color: var(--mech-border-accent);
   transform: translateX(4px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--mech-shadow-sm);
 }
 
 .part-list-item.selected {
-  border-color: #4299e1;
-  background: #ebf8ff;
-  box-shadow: 0 4px 12px rgba(66, 153, 225, 0.2);
+  border-color: var(--mech-accent);
+  background: var(--mech-accent-soft);
+  box-shadow: 0 0 18px var(--mech-accent-glow);
 }
 
 .part-list-item.rarity-common {
-  border-left: 4px solid #a0aec0;
+  border-left: 4px solid var(--mech-text-muted);
 }
 
 .part-list-item.rarity-uncommon {
-  border-left: 4px solid #48bb78;
+  border-left: 4px solid var(--mech-success-strong);
 }
 
 .part-list-item.rarity-rare {
-  border-left: 4px solid #4299e1;
+  border-left: 4px solid var(--mech-accent);
 }
 
 .part-list-item.rarity-legendary {
-  border-left: 4px solid #ed8936;
+  border-left: 4px solid var(--mech-warn-strong);
 }
 
 .part-list-info {
@@ -81,14 +82,14 @@
 
 .part-name {
   font-weight: 600;
-  color: #2d3748;
+  color: var(--mech-text);
   font-size: 16px;
   margin-bottom: 4px;
 }
 
 .part-manufacturer {
   font-size: 13px;
-  color: #718096;
+  color: var(--mech-text-dim);
 }
 
 /* Part details */
@@ -99,66 +100,69 @@
 }
 
 .details-card {
-  background: white;
-  border: 2px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 24px;
+  background: var(--mech-surface);
+  border: 1px solid var(--mech-border-strong);
+  border-radius: var(--mech-radius-md);
+  padding: var(--mech-space-5);
 }
 
 .details-header {
   display: flex;
-  gap: 16px;
-  margin-bottom: 16px;
+  gap: var(--mech-space-4);
+  margin-bottom: var(--mech-space-4);
   align-items: flex-start;
 }
 
 .details-header h3 {
-  margin: 0 0 8px 0;
-  color: #2d3748;
+  margin: 0 0 var(--mech-space-2) 0;
+  color: var(--mech-text);
   font-size: 24px;
 }
 
 .part-rarity {
   display: inline-block;
   padding: 2px 8px;
-  border-radius: 4px;
+  border-radius: var(--mech-radius-sm);
   font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;
+  letter-spacing: var(--mech-tracking-wide);
   margin-bottom: 4px;
+  background: var(--mech-surface-2);
+  color: var(--mech-text-dim);
 }
 
 .part-description {
-  color: #4a5568;
+  color: var(--mech-text-dim);
   font-size: 14px;
   line-height: 1.6;
-  margin-bottom: 16px;
+  margin-bottom: var(--mech-space-4);
 }
 
 .part-stats-detail {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-bottom: 16px;
-  padding: 12px;
-  background: #f7fafc;
-  border-radius: 8px;
+  gap: var(--mech-space-2);
+  margin-bottom: var(--mech-space-4);
+  padding: var(--mech-space-3);
+  background: var(--mech-surface-2);
+  border-radius: var(--mech-radius-sm);
 }
 
 .stat-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--mech-space-2);
   font-size: 14px;
-  color: #2d3748;
+  color: var(--mech-text);
   font-weight: 500;
 }
 
 .part-pros-cons {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: var(--mech-space-3);
+  margin-bottom: var(--mech-space-4);
 }
 
 .pros,
@@ -169,30 +173,30 @@
 }
 
 .pro-item {
-  color: #38a169;
+  color: var(--mech-success);
   font-size: 13px;
 }
 
 .con-item {
-  color: #e53e3e;
+  color: var(--mech-danger);
   font-size: 13px;
 }
 
 .modified-stats {
-  border-top: 1px solid #e2e8f0;
-  padding-top: 16px;
+  border-top: 1px solid var(--mech-border);
+  padding-top: var(--mech-space-4);
 }
 
 .modified-stats h4 {
-  margin: 0 0 12px 0;
-  color: #2d3748;
+  margin: 0 0 var(--mech-space-3) 0;
+  color: var(--mech-text);
   font-size: 16px;
 }
 
 .stats-preview {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
+  gap: var(--mech-space-3);
 }
 
 .stat-item {
@@ -200,31 +204,31 @@
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  padding: 8px;
-  background: #f7fafc;
-  border-radius: 6px;
+  padding: var(--mech-space-2);
+  background: var(--mech-surface-2);
+  border-radius: var(--mech-radius-sm);
 }
 
 .stat-item span {
   font-weight: 600;
-  color: #2d3748;
+  color: var(--mech-text);
   font-size: 14px;
 }
 
 .stat-item span.negative {
-  color: #e53e3e;
+  color: var(--mech-danger);
 }
 
 .no-selection {
-  background: white;
-  border: 2px dashed #cbd5e0;
-  border-radius: 12px;
-  padding: 60px 24px;
+  background: var(--mech-surface-2);
+  border: 1px dashed var(--mech-border-strong);
+  border-radius: var(--mech-radius-md);
+  padding: 60px var(--mech-space-5);
   text-align: center;
 }
 
 .no-selection p {
-  color: #a0aec0;
+  color: var(--mech-text-muted);
   font-size: 16px;
   margin: 0;
 }
@@ -235,87 +239,15 @@
 }
 
 .parts-list::-webkit-scrollbar-track {
-  background: #f7fafc;
+  background: rgba(0, 0, 0, 0.25);
   border-radius: 4px;
 }
 
 .parts-list::-webkit-scrollbar-thumb {
-  background: #cbd5e0;
+  background: var(--mech-border-strong);
   border-radius: 4px;
 }
 
 .parts-list::-webkit-scrollbar-thumb:hover {
-  background: #a0aec0;
-}
-
-/* Dark mode */
-.dark .step-content h2 {
-  color: #e2e8f0;
-}
-
-.dark .step-description {
-  color: #cbd5e0;
-}
-
-.dark .part-list-item {
-  background: #2d3748;
-  border-color: #4a5568;
-}
-
-.dark .part-list-item:hover {
-  border-color: #4299e1;
-}
-
-.dark .part-list-item.selected {
-  background: #2c5282;
-}
-
-.dark .part-name {
-  color: #e2e8f0;
-}
-
-.dark .part-manufacturer {
-  color: #cbd5e0;
-}
-
-.dark .details-card {
-  background: #2d3748;
-  border-color: #4a5568;
-}
-
-.dark .details-header h3 {
-  color: #e2e8f0;
-}
-
-.dark .part-description {
-  color: #cbd5e0;
-}
-
-.dark .part-stats-detail {
-  background: #1a202c;
-}
-
-.dark .stat-row {
-  color: #e2e8f0;
-}
-
-.dark .modified-stats h4 {
-  color: #e2e8f0;
-}
-
-.dark .stat-item {
-  background: #1a202c;
-}
-
-.dark .stat-item span {
-  color: #e2e8f0;
-}
-
-.dark .no-selection {
-  background: #2d3748;
-  border-color: #4a5568;
-}
-
-.dark .no-selection p {
-  color: #718096;
+  background: var(--mech-accent-glow);
 }

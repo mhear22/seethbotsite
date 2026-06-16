@@ -146,36 +146,36 @@ defineEmits<{
 .arm-slots-display {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin-bottom: 20px;
-  padding: 16px;
-  background: #f7fafc;
-  border-radius: 8px;
+  gap: var(--mech-space-3);
+  margin-bottom: var(--mech-space-5);
+  padding: var(--mech-space-4);
+  background: var(--mech-surface-2);
+  border-radius: var(--mech-radius-sm);
 }
 
 .arm-slot-mini {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--mech-space-2);
 }
 
 .arm-slot-mini h4 {
   margin: 0;
   font-size: 14px;
-  color: #2d3748;
+  color: var(--mech-text);
   font-weight: 600;
 }
 
 .selected-arm-mini {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--mech-space-2);
   padding: 8px 12px;
-  background: white;
-  border: 2px solid #4299e1;
-  border-radius: 6px;
+  background: var(--mech-surface-raised);
+  border: 1px solid var(--mech-border-accent);
+  border-radius: var(--mech-radius-sm);
   font-size: 13px;
-  color: #2d3748;
+  color: var(--mech-text);
 }
 
 .selected-arm-mini span {
@@ -184,10 +184,10 @@ defineEmits<{
 }
 
 .remove-btn-mini {
-  background: #e53e3e;
-  color: white;
+  background: var(--mech-danger-strong);
+  color: #fff;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--mech-radius-sm);
   width: 20px;
   height: 20px;
   display: flex;
@@ -196,44 +196,24 @@ defineEmits<{
   cursor: pointer;
   font-size: 12px;
   line-height: 1;
-  transition: background 0.2s;
+  transition: all var(--mech-transition);
 }
 
 .remove-btn-mini:hover {
-  background: #c53030;
+  filter: brightness(1.15);
 }
 
 .empty-slot-mini {
-  padding: 12px;
-  background: white;
-  border: 2px dashed #cbd5e0;
-  border-radius: 6px;
+  padding: var(--mech-space-3);
+  background: var(--mech-surface-raised);
+  border: 1px dashed var(--mech-border-strong);
+  border-radius: var(--mech-radius-sm);
   text-align: center;
-  color: #a0aec0;
+  color: var(--mech-text-muted);
   font-size: 13px;
 }
 
 .in-synergy {
-  box-shadow: 0 0 0 2px #ed8936;
-}
-
-/* Dark mode */
-.dark .arm-slots-display {
-  background: #1a202c;
-}
-
-.dark .arm-slot-mini h4 {
-  color: #e2e8f0;
-}
-
-.dark .selected-arm-mini {
-  background: #2d3748;
-  color: #e2e8f0;
-}
-
-.dark .empty-slot-mini {
-  background: #2d3748;
-  border-color: #4a5568;
-  color: #718096;
+  box-shadow: 0 0 0 2px var(--mech-warn-strong);
 }
 </style>

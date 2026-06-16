@@ -142,28 +142,28 @@ defineProps<{
 
 <style scoped>
 .review-step {
-  padding: 20px;
+  padding: var(--mech-space-5);
 }
 
 .review-layout {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 24px;
+  gap: var(--mech-space-5);
 }
 
 .mech-visual {
   grid-column: 1 / -1;
-  background: white;
-  border: 2px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 24px;
+  background: var(--mech-surface);
+  border: 1px solid var(--mech-border-strong);
+  border-radius: var(--mech-radius-md);
+  padding: var(--mech-space-5);
 }
 
 .preview-3d-container {
   width: 100%;
   height: 400px;
-  margin-bottom: 24px;
-  border-radius: 8px;
+  margin-bottom: var(--mech-space-5);
+  border-radius: var(--mech-radius-sm);
   overflow: hidden;
 }
 
@@ -171,7 +171,7 @@ defineProps<{
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: var(--mech-space-3);
 }
 
 .mech-part {
@@ -179,81 +179,87 @@ defineProps<{
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  padding: 12px;
-  background: #f7fafc;
-  border: 2px solid #cbd5e0;
-  border-radius: 8px;
+  padding: var(--mech-space-3);
+  background: var(--mech-surface-2);
+  border: 1px solid var(--mech-border-strong);
+  border-radius: var(--mech-radius-sm);
   min-width: 120px;
   position: relative;
   cursor: help;
+  transition: border-color var(--mech-transition);
+}
+
+.mech-part:hover {
+  border-color: var(--mech-border-accent);
 }
 
 .mech-arms-row {
   display: flex;
-  gap: 24px;
+  gap: var(--mech-space-5);
 }
 
 .part-label {
   font-size: 14px;
   font-weight: 600;
-  color: #2d3748;
+  color: var(--mech-text);
   text-align: center;
 }
 
 .stats-summary {
-  background: white;
-  border: 2px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 24px;
+  background: var(--mech-surface);
+  border: 1px solid var(--mech-border-strong);
+  border-radius: var(--mech-radius-md);
+  padding: var(--mech-space-5);
 }
 
 .stats-summary h3 {
-  margin: 0 0 16px 0;
-  color: #2d3748;
+  margin: 0 0 var(--mech-space-4) 0;
+  color: var(--mech-text);
   font-size: 20px;
+  letter-spacing: var(--mech-tracking-wide);
 }
 
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 16px;
-  margin-bottom: 20px;
+  gap: var(--mech-space-4);
+  margin-bottom: var(--mech-space-5);
 }
 
 .stat-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 16px;
-  background: #f7fafc;
-  border-radius: 8px;
+  gap: var(--mech-space-2);
+  padding: var(--mech-space-4);
+  background: var(--mech-surface-2);
+  border-radius: var(--mech-radius-sm);
 }
 
 .stat-label {
   font-size: 13px;
-  color: #718096;
+  color: var(--mech-text-dim);
   font-weight: 500;
 }
 
 .stat-value {
   font-size: 24px;
   font-weight: 700;
-  color: #2d3748;
+  color: var(--mech-text);
 }
 
 .stat-value.negative {
-  color: #e53e3e;
+  color: var(--mech-danger);
 }
 
 .build-score {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-radius: 8px;
-  color: white;
+  padding: var(--mech-space-4);
+  background: var(--mech-purple-grad);
+  border-radius: var(--mech-radius-sm);
+  color: #fff;
 }
 
 .score-label {
@@ -267,38 +273,39 @@ defineProps<{
 }
 
 .synergies-section {
-  background: white;
-  border: 2px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 24px;
+  background: var(--mech-surface);
+  border: 1px solid var(--mech-border-strong);
+  border-radius: var(--mech-radius-md);
+  padding: var(--mech-space-5);
 }
 
 .synergies-section h3 {
-  margin: 0 0 16px 0;
-  color: #2d3748;
+  margin: 0 0 var(--mech-space-4) 0;
+  color: var(--mech-text);
   font-size: 20px;
+  letter-spacing: var(--mech-tracking-wide);
 }
 
 .no-synergies {
   text-align: center;
-  padding: 40px;
-  color: #a0aec0;
+  padding: var(--mech-space-7);
+  color: var(--mech-text-muted);
   font-size: 16px;
 }
 
 .synergy-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--mech-space-3);
 }
 
 .synergy-card {
   display: flex;
-  gap: 16px;
-  padding: 16px;
-  background: #fff5e6;
-  border: 2px solid #ed8936;
-  border-radius: 8px;
+  gap: var(--mech-space-4);
+  padding: var(--mech-space-4);
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid var(--mech-warn-glow);
+  border-radius: var(--mech-radius-sm);
 }
 
 .synergy-info {
@@ -308,133 +315,59 @@ defineProps<{
 .synergy-name {
   font-weight: 700;
   font-size: 16px;
-  color: #c05621;
+  color: var(--mech-warn);
   margin-bottom: 4px;
 }
 
 .synergy-description {
   font-size: 14px;
-  color: #744210;
-  margin-bottom: 8px;
+  color: var(--mech-text-dim);
+  margin-bottom: var(--mech-space-2);
 }
 
 .synergy-effect {
   font-size: 13px;
   font-style: italic;
-  color: #975a16;
-  margin-bottom: 8px;
+  color: var(--mech-warn);
+  margin-bottom: var(--mech-space-2);
 }
 
 .synergy-bonuses {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--mech-space-2);
 }
 
 .synergy-bonuses span {
   padding: 4px 8px;
-  background: #fed7aa;
-  border-radius: 4px;
+  background: rgba(245, 158, 11, 0.18);
+  border-radius: var(--mech-radius-sm);
   font-size: 12px;
   font-weight: 600;
-  color: #7c2d12;
+  color: var(--mech-warn);
 }
 
 .warnings-section {
   grid-column: 1 / -1;
-  background: #fff5f5;
-  border: 2px solid #fc8181;
-  border-radius: 12px;
-  padding: 24px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid var(--mech-danger-glow);
+  border-radius: var(--mech-radius-md);
+  padding: var(--mech-space-5);
 }
 
 .warnings-section h3 {
-  margin: 0 0 16px 0;
-  color: #c53030;
+  margin: 0 0 var(--mech-space-4) 0;
+  color: var(--mech-danger);
   font-size: 20px;
 }
 
 .warning-item {
-  padding: 12px;
-  background: white;
-  border-left: 4px solid #e53e3e;
-  border-radius: 4px;
-  margin-bottom: 8px;
-  color: #742a2a;
+  padding: var(--mech-space-3);
+  background: var(--mech-surface-2);
+  border-left: 4px solid var(--mech-danger-strong);
+  border-radius: var(--mech-radius-sm);
+  margin-bottom: var(--mech-space-2);
+  color: var(--mech-danger);
   font-size: 14px;
-}
-
-/* Dark mode */
-.dark .mech-visual,
-.dark .stats-summary,
-.dark .synergies-section {
-  background: #2d3748;
-  border-color: #4a5568;
-}
-
-.dark .mech-part {
-  background: #1a202c;
-  border-color: #4a5568;
-}
-
-.dark .part-label {
-  color: #e2e8f0;
-}
-
-.dark .stats-summary h3,
-.dark .synergies-section h3 {
-  color: #e2e8f0;
-}
-
-.dark .stat-item {
-  background: #1a202c;
-}
-
-.dark .stat-label {
-  color: #cbd5e0;
-}
-
-.dark .stat-value {
-  color: #e2e8f0;
-}
-
-.dark .no-synergies {
-  color: #718096;
-}
-
-.dark .synergy-card {
-  background: #744210;
-  border-color: #ed8936;
-}
-
-.dark .synergy-name {
-  color: #fed7aa;
-}
-
-.dark .synergy-description {
-  color: #feebc8;
-}
-
-.dark .synergy-effect {
-  color: #fed7aa;
-}
-
-.dark .synergy-bonuses span {
-  background: #975a16;
-  color: #feebc8;
-}
-
-.dark .warnings-section {
-  background: #742a2a;
-  border-color: #fc8181;
-}
-
-.dark .warnings-section h3 {
-  color: #feb2b2;
-}
-
-.dark .warning-item {
-  background: #2d3748;
-  color: #feb2b2;
 }
 </style>

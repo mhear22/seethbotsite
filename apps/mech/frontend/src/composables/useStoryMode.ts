@@ -556,10 +556,17 @@ export function useStoryMode() {
     if (!town) return
     if (town.questIndex < town.questChain.length) {
       town.questIndex += 1
-      town.standing = Math.min(
-        HAPPY_STANDING_THRESHOLD,
-        town.standing + standingPerQuest(town.questChain.length),
-      )
+      // Finishing the LAST quest in the chain snaps standing exactly to the
+      // happy threshold — per-quest steps are 100/3 = 33.33 and would otherwise
+      // sum to 99.99 (< 100), so isHappy would never fire and the finale would
+      // never unlock. Mid-chain quests use the proportional step.
+      town.standing =
+        town.questIndex >= town.questChain.length
+          ? HAPPY_STANDING_THRESHOLD
+          : Math.min(
+              HAPPY_STANDING_THRESHOLD,
+              town.standing + standingPerQuest(town.questChain.length),
+            )
       run.value!.stats.questsCompleted += 1
     }
     if (isHappy(town)) town.cleared = true

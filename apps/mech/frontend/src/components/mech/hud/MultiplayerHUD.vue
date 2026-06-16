@@ -117,11 +117,12 @@ const formattedTime = computed(() => {
 
 /* Network Status */
 .network-status {
-  background: rgba(0, 0, 0, 0.7);
-  border: 2px solid rgba(255, 255, 255, 0.2);
-  border-radius: 12px;
+  background: var(--mech-surface);
+  border: 1px solid var(--mech-border-strong);
+  border-radius: var(--mech-radius-md);
   padding: 12px 16px;
-  backdrop-filter: blur(8px);
+  backdrop-filter: var(--mech-blur);
+  box-shadow: var(--mech-shadow-sm);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -142,23 +143,23 @@ const formattedTime = computed(() => {
 }
 
 .status-dot.status-connected {
-  background: #10b981;
-  box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+  background: var(--mech-success-strong);
+  box-shadow: 0 0 10px var(--mech-success-glow);
 }
 
 .status-dot.status-connecting {
-  background: #f59e0b;
-  box-shadow: 0 0 10px rgba(245, 158, 11, 0.5);
+  background: var(--mech-warn-strong);
+  box-shadow: 0 0 10px var(--mech-warn-glow);
 }
 
 .status-dot.status-disconnected,
 .status-dot.status-error {
-  background: #ef4444;
-  box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+  background: var(--mech-danger-strong);
+  box-shadow: 0 0 10px var(--mech-danger-glow);
 }
 
 .status-text {
-  color: #e2e8f0;
+  color: var(--mech-text);
   font-size: 0.9rem;
   font-weight: 600;
 }
@@ -169,8 +170,8 @@ const formattedTime = computed(() => {
   align-items: center;
   gap: 6px;
   padding: 6px 10px;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.3);
+  border-radius: var(--mech-radius-sm);
+  background: var(--mech-surface-2);
 }
 
 .latency-icon {
@@ -180,40 +181,41 @@ const formattedTime = computed(() => {
 .latency-value {
   font-size: 0.95rem;
   font-weight: 700;
-  font-family: 'Courier New', monospace;
+  font-family: var(--mech-font-mono);
 }
 
 .latency-display.latency-good {
-  border-left: 3px solid #10b981;
+  border-left: 3px solid var(--mech-success-strong);
 }
 
 .latency-display.latency-good .latency-value {
-  color: #10b981;
+  color: var(--mech-success);
 }
 
 .latency-display.latency-ok {
-  border-left: 3px solid #f59e0b;
+  border-left: 3px solid var(--mech-warn-strong);
 }
 
 .latency-display.latency-ok .latency-value {
-  color: #f59e0b;
+  color: var(--mech-warn);
 }
 
 .latency-display.latency-poor {
-  border-left: 3px solid #ef4444;
+  border-left: 3px solid var(--mech-danger-strong);
 }
 
 .latency-display.latency-poor .latency-value {
-  color: #ef4444;
+  color: var(--mech-danger);
 }
 
 /* Match Timer */
 .match-timer {
-  background: rgba(0, 0, 0, 0.7);
-  border: 2px solid rgba(255, 255, 255, 0.2);
-  border-radius: 12px;
+  background: var(--mech-surface);
+  border: 1px solid var(--mech-border-strong);
+  border-radius: var(--mech-radius-md);
   padding: 12px 16px;
-  backdrop-filter: blur(8px);
+  backdrop-filter: var(--mech-blur);
+  box-shadow: var(--mech-shadow-sm);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -225,31 +227,33 @@ const formattedTime = computed(() => {
 }
 
 .timer-value {
-  color: #60a5fa;
+  color: var(--mech-accent);
   font-size: 1.2rem;
   font-weight: 700;
-  font-family: 'Courier New', monospace;
+  font-family: var(--mech-font-mono);
 }
 
 /* Opponent Info */
 .opponent-info {
-  background: rgba(0, 0, 0, 0.7);
-  border: 2px solid rgba(239, 68, 68, 0.4);
-  border-radius: 12px;
+  background: var(--mech-surface);
+  border: 1px solid var(--mech-danger-glow);
+  border-radius: var(--mech-radius-md);
   padding: 12px 16px;
-  backdrop-filter: blur(8px);
+  backdrop-filter: var(--mech-blur);
+  box-shadow: var(--mech-shadow-sm);
   text-align: center;
 }
 
 .opponent-label {
-  color: #ef4444;
+  color: var(--mech-danger);
   font-size: 0.8rem;
   font-weight: 700;
+  letter-spacing: var(--mech-tracking-caps);
   margin-bottom: 4px;
 }
 
 .opponent-name {
-  color: #e2e8f0;
+  color: var(--mech-text);
   font-size: 1rem;
   font-weight: 600;
 }
@@ -264,30 +268,31 @@ const formattedTime = computed(() => {
   gap: 22px;
   align-items: baseline;
   padding: 8px 22px;
-  background: rgba(0, 0, 0, 0.55);
-  border: 2px solid rgba(245, 158, 11, 0.5);
-  border-radius: 8px;
-  box-shadow: 0 0 16px rgba(245, 158, 11, 0.25);
+  background: var(--mech-surface);
+  backdrop-filter: var(--mech-blur);
+  border: 1px solid var(--mech-warn-glow);
+  border-radius: var(--mech-radius-sm);
+  box-shadow: 0 0 18px var(--mech-warn-glow);
   pointer-events: none;
 }
 
 .survival-wave {
-  color: #fbbf24;
+  color: var(--mech-warn);
   font-size: 22px;
   font-weight: bold;
-  text-shadow: 0 0 12px rgba(245, 158, 11, 0.8);
-  letter-spacing: 0.05em;
+  text-shadow: 0 0 12px var(--mech-warn-glow);
+  letter-spacing: var(--mech-tracking-wide);
 }
 
 .survival-score {
-  color: #fff;
+  color: var(--mech-text);
   font-size: 16px;
   font-weight: bold;
   text-shadow: 0 0 8px rgba(0, 0, 0, 0.9);
 }
 
 .survival-best {
-  color: #9ca3af;
+  color: var(--mech-text-dim);
   font-size: 12px;
   font-weight: bold;
   text-shadow: 0 0 6px rgba(0, 0, 0, 0.9);
@@ -311,14 +316,15 @@ const formattedTime = computed(() => {
 }
 
 .wave-transition h2 {
-  color: #fbbf24;
+  color: var(--mech-warn);
   font-size: 3rem;
-  text-shadow: 0 0 24px rgba(245, 158, 11, 0.8);
+  letter-spacing: var(--mech-tracking-wide);
+  text-shadow: 0 0 24px var(--mech-warn-glow);
   margin-bottom: 12px;
 }
 
 .wave-transition p {
-  color: #e5e7eb;
+  color: var(--mech-text);
   font-size: 1.3rem;
 }
 

@@ -1,0 +1,1 @@
+The server is configured with a public base URL of /mech/ - did you mean to visit /mech/models/rack/repair-drone.glb instead?

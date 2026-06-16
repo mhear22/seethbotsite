@@ -31,6 +31,12 @@ export class InputManager {
   private static readonly MOVE_DEADZONE = 0.35
 
   private canvas: HTMLCanvasElement
+  /**
+   * When false the manager stops reading keyboard/mouse input AND will not
+   * re-acquire pointer lock on click — used while a UI menu/overlay is open so
+   * the cursor stays free to click menu items. Re-enable with setInteractive(true).
+   */
+  private interactive = true
   private keyBindings: {
     forward: string
     backward: string
@@ -75,6 +81,9 @@ export class InputManager {
       this.keys.set(e.code, false)
     }
     this.handleMouseDown = (e: MouseEvent) => {
+      // While a menu/overlay is open, leave the cursor free so it can click
+      // menu items — don't capture the button or re-acquire pointer lock.
+      if (!this.interactive) return
       this.mouseButtons.set(e.button, true)
       if (document.pointerLockElement !== this.canvas) {
         this.canvas.requestPointerLock()
@@ -108,6 +117,24 @@ export class InputManager {
   }
 
   getInputState(): InputState {
+    // While a menu/overlay is open, report fully-neutral input so the world
+    // (movement, firing, mouse-look) ignores keys/mouse held during the menu.
+    if (!this.interactive) {
+      return {
+        forward: false,
+        backward: false,
+        left: false,
+        right: false,
+        jump: false,
+        shootLeft: false,
+        shootRight: false,
+        dash: false,
+        useAbility: false,
+        mouseX: 0,
+        mouseY: 0,
+      }
+    }
+
     // Transfer accumulated movement to current frame
     this.mouseMovement.x = this.mouseAccumulator.x
     this.mouseMovement.y = this.mouseAccumulator.y
@@ -165,6 +192,29 @@ export class InputManager {
     this.virtualMove = { x: 0, y: 0 }
     this.virtualLook = { x: 0, y: 0 }
     this.virtualButtons.clear()
+  }
+
+  /**
+   * Enable/disable input capture. When disabled the manager reports neutral
+   * input, ignores held keys/mouse, releases pointer lock, and will NOT
+   * re-acquire it on click — so an open menu's cursor stays free. Re-enabling
+   * does not auto-lock: the player must click the canvas to re-engage mouse-look.
+   */
+  setInteractive(interactive: boolean) {
+    this.interactive = interactive
+    if (!interactive) {
+      // Drop any held buttons/keys and free the cursor for the menu.
+      this.mouseButtons.clear()
+      this.keys.clear()
+      this.resetMouseMovement()
+      if (document.pointerLockElement === this.canvas) {
+        document.exitPointerLock()
+      }
+    }
+  }
+
+  isInteractive(): boolean {
+    return this.interactive
   }
 
   cleanup() {

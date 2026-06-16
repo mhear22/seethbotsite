@@ -218,6 +218,12 @@ export const routes: RouteRecordRaw[] = [
     meta: { public: true }
   },
   {
+    path: '/mii',
+    name: 'mii',
+    component: () => import('../components/pages/MiiPage.vue'),
+    meta: { public: true }
+  },
+  {
     path: '/:pathMatch(.*)*',
     name: 'not-found',
     component: () => import('../components/pages/NotFoundPage.vue'),

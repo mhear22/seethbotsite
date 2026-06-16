@@ -118,7 +118,7 @@ defineEmits<{
 <style scoped src="./StepStyles.css"></style>
 <style scoped>
 .skip-item {
-  border: 2px dashed #cbd5e0 !important;
+  border: 1px dashed var(--mech-border-strong) !important;
 }
 
 .skip-icon {
@@ -128,31 +128,20 @@ defineEmits<{
   align-items: center;
   justify-content: center;
   font-size: 32px;
-  color: #a0aec0;
+  color: var(--mech-text-muted);
 }
 
 .special-ability {
-  margin-bottom: 16px;
-  padding: 12px;
-  background: #fff5e6;
-  border-left: 4px solid #ed8936;
-  border-radius: 4px;
+  margin-bottom: var(--mech-space-4);
+  padding: var(--mech-space-3);
+  background: rgba(245, 158, 11, 0.12);
+  border-left: 4px solid var(--mech-warn-strong);
+  border-radius: var(--mech-radius-sm);
   font-size: 14px;
-  color: #744210;
+  color: var(--mech-warn);
 }
 
 .special-ability strong {
-  color: #c05621;
-}
-
-/* Dark mode */
-.dark .special-ability {
-  background: #744210;
-  border-left-color: #ed8936;
-  color: #feebc8;
-}
-
-.dark .special-ability strong {
-  color: #fed7aa;
+  color: var(--mech-warn);
 }
 </style>

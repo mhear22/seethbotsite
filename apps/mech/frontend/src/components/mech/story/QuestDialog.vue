@@ -13,7 +13,15 @@
           “You’ve done right by us, friend. {{ townName }} is happy — even if it’s a bit… dented.”
         </p>
         <div class="qd-actions">
-          <button class="qd-btn ghost" type="button" @click="$emit('close')">Leave</button>
+          <button
+            v-for="(opt, i) in options"
+            :key="opt.id"
+            class="qd-btn ghost"
+            :class="{ selected: i === selected }"
+            type="button"
+            @click="activate(opt)"
+            @mouseenter="selected = i"
+          >{{ opt.label }}</button>
         </div>
       </template>
 
@@ -43,21 +51,25 @@
         </p>
 
         <div class="qd-actions">
-          <button class="qd-btn primary" type="button" @click="$emit('accept', quest)">
-            Accept Quest
-          </button>
-          <button class="qd-btn ghost" type="button" @click="$emit('open-garage')">
-            Visit Garage
-          </button>
-          <button class="qd-btn ghost" type="button" @click="$emit('close')">Maybe later</button>
+          <button
+            v-for="(opt, i) in options"
+            :key="opt.id"
+            class="qd-btn"
+            :class="[opt.id === 'accept' ? 'primary' : 'ghost', { selected: i === selected }]"
+            type="button"
+            @click="activate(opt)"
+            @mouseenter="selected = i"
+          >{{ opt.label }}</button>
         </div>
       </template>
+
+      <p class="qd-nav-hint">W/S or ↑/↓ to choose · Enter/E to select · Esc to close</p>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
 import {
   questTypeLabel,
   questObjective,
@@ -70,7 +82,7 @@ const props = defineProps<{
   quest: QuestDef | null
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   (e: 'accept', quest: QuestDef): void
   (e: 'open-garage'): void
   (e: 'close'): void
@@ -79,6 +91,63 @@ defineEmits<{
 const chainLength = QUESTS_PER_CHAIN
 const typeLabel = computed(() => (props.quest ? questTypeLabel(props.quest.type) : ''))
 const objective = computed(() => (props.quest ? questObjective(props.quest, 0) : ''))
+
+/** Keyboard/mouse-navigable option list (varies by whether a quest is offered). */
+type DialogOption = { id: 'accept' | 'garage' | 'close'; label: string }
+const options = computed<DialogOption[]>(() =>
+  props.quest
+    ? [
+        { id: 'accept', label: 'Accept Quest' },
+        { id: 'garage', label: 'Visit Garage' },
+        { id: 'close', label: 'Maybe later' },
+      ]
+    : [{ id: 'close', label: 'Leave' }],
+)
+
+const selected = ref(0)
+// Keep the selection in range if the option set changes (quest -> no quest).
+watch(options, (opts) => {
+  if (selected.value >= opts.length) selected.value = 0
+})
+
+function activate(opt: DialogOption) {
+  if (opt.id === 'accept' && props.quest) emit('accept', props.quest)
+  else if (opt.id === 'garage') emit('open-garage')
+  else emit('close')
+}
+
+function handleKey(e: KeyboardEvent) {
+  const opts = options.value
+  switch (e.code) {
+    case 'KeyW':
+    case 'ArrowUp':
+      e.preventDefault()
+      e.stopPropagation()
+      selected.value = (selected.value - 1 + opts.length) % opts.length
+      break
+    case 'KeyS':
+    case 'ArrowDown':
+      e.preventDefault()
+      e.stopPropagation()
+      selected.value = (selected.value + 1) % opts.length
+      break
+    case 'Enter':
+    case 'KeyE':
+      e.preventDefault()
+      e.stopPropagation()
+      activate(opts[selected.value])
+      break
+    case 'Escape':
+      e.preventDefault()
+      e.stopPropagation()
+      emit('close')
+      break
+  }
+}
+
+// Capture phase so menu navigation wins over the page's global roam handler.
+onMounted(() => window.addEventListener('keydown', handleKey, true))
+onUnmounted(() => window.removeEventListener('keydown', handleKey, true))
 </script>
 
 <style scoped>
@@ -230,5 +299,19 @@ const objective = computed(() => (props.quest ? questObjective(props.quest, 0) :
 
 .qd-btn.ghost:hover {
   background: rgba(255, 255, 255, 0.16);
+}
+
+/* Keyboard-selected option: a clear outline so it reads as "highlighted". */
+.qd-btn.selected {
+  outline: 2px solid #fcd34d;
+  outline-offset: 2px;
+  box-shadow: 0 0 16px rgba(252, 211, 77, 0.45);
+}
+
+.qd-nav-hint {
+  margin: 14px 0 0;
+  text-align: center;
+  font-size: 0.72rem;
+  color: #94a3b8;
 }
 </style>

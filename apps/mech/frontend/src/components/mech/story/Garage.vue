@@ -30,10 +30,11 @@
       <!-- Catalogue for the active slot -->
       <div class="g-catalogue">
         <div
-          v-for="entry in slotCatalogue"
+          v-for="(entry, i) in slotCatalogue"
           :key="entry.part.id"
           class="g-part"
-          :class="{ equipped: isEquipped(entry.part.id), [entry.part.rarity]: true }"
+          :class="{ equipped: isEquipped(entry.part.id), selected: i === selectedPart, [entry.part.rarity]: true }"
+          @mouseenter="selectedPart = i"
         >
           <div class="part-main">
             <span class="part-name">{{ entry.part.name }}</span>
@@ -68,6 +69,10 @@
 
       <p v-if="message" class="g-message" :class="{ error: messageError }">{{ message }}</p>
 
+      <p class="g-nav-hint">
+        A/D or ←/→ switch slot · W/S or ↑/↓ pick part · Enter/E buy &amp; equip · Esc close
+      </p>
+
       <div class="g-actions">
         <button class="g-done" type="button" @click="$emit('close')">Done</button>
       </div>
@@ -76,7 +81,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import type { MechLoadout } from '../../../composables/useMechBuilder'
 import type { MechPart } from '../../../shared/types/MechTypes'
 import {
@@ -109,6 +114,8 @@ const SLOTS: Array<{ key: ShopSlot; label: string }> = [
 ]
 
 const activeSlot = ref<ShopSlot>('leftArm')
+/** Index of the keyboard-highlighted part within the active slot's catalogue. */
+const selectedPart = ref(0)
 
 const catalogue = buildShopCatalogue()
 
@@ -129,6 +136,71 @@ function isEquipped(partId: string): boolean {
 function emitEquip(part: MechPart): void {
   emit('equip', { part, slot: activeSlot.value })
 }
+
+// Reset the part highlight whenever the slot (and thus catalogue) changes.
+watch(activeSlot, () => {
+  selectedPart.value = 0
+})
+
+function cycleSlot(dir: number): void {
+  const i = SLOTS.findIndex((s) => s.key === activeSlot.value)
+  const next = (i + dir + SLOTS.length) % SLOTS.length
+  activeSlot.value = SLOTS[next].key
+}
+
+/** Buy & equip the highlighted part if it's affordable and not already equipped. */
+function confirmSelected(): void {
+  const entry = slotCatalogue.value[selectedPart.value]
+  if (!entry) return
+  if (isEquipped(entry.part.id)) return
+  if (props.money < entry.price) return
+  emitEquip(entry.part)
+}
+
+function handleKey(e: KeyboardEvent) {
+  const list = slotCatalogue.value
+  switch (e.code) {
+    case 'KeyW':
+    case 'ArrowUp':
+      e.preventDefault()
+      e.stopPropagation()
+      if (list.length) selectedPart.value = (selectedPart.value - 1 + list.length) % list.length
+      break
+    case 'KeyS':
+    case 'ArrowDown':
+      e.preventDefault()
+      e.stopPropagation()
+      if (list.length) selectedPart.value = (selectedPart.value + 1) % list.length
+      break
+    case 'KeyA':
+    case 'ArrowLeft':
+      e.preventDefault()
+      e.stopPropagation()
+      cycleSlot(-1)
+      break
+    case 'KeyD':
+    case 'ArrowRight':
+      e.preventDefault()
+      e.stopPropagation()
+      cycleSlot(1)
+      break
+    case 'Enter':
+    case 'KeyE':
+      e.preventDefault()
+      e.stopPropagation()
+      confirmSelected()
+      break
+    case 'Escape':
+      e.preventDefault()
+      e.stopPropagation()
+      emit('close')
+      break
+  }
+}
+
+// Capture phase so menu navigation wins over the page's global roam handler.
+onMounted(() => window.addEventListener('keydown', handleKey, true))
+onUnmounted(() => window.removeEventListener('keydown', handleKey, true))
 </script>
 
 <style scoped>
@@ -253,6 +325,13 @@ function emitEquip(part: MechPart): void {
   background: rgba(16, 185, 129, 0.1);
 }
 
+/* Keyboard-highlighted part: clear amber outline so the selection is visible. */
+.g-part.selected {
+  outline: 2px solid #fcd34d;
+  outline-offset: 1px;
+  box-shadow: 0 0 16px rgba(252, 211, 77, 0.4);
+}
+
 .g-part.rare { border-left: 3px solid #60a5fa; }
 .g-part.legendary { border-left: 3px solid #fbbf24; }
 .g-part.uncommon { border-left: 3px solid #34d399; }
@@ -349,6 +428,13 @@ function emitEquip(part: MechPart): void {
 
 .g-message.error {
   color: #fca5a5;
+}
+
+.g-nav-hint {
+  margin: 10px 0 0;
+  text-align: center;
+  font-size: 0.72rem;
+  color: #94a3b8;
 }
 
 .g-actions {
