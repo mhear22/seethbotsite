@@ -1,279 +1,571 @@
 /**
  * Procedural Core Part Models
- * Max dimensions: 2.2 x 2.0 x 1.8 units
- * Origin at bottom (where legs connect), models extend upward ~2.0
+ * Max dimensions: ~2.4 x 2.0 x 1.8 units (pauldrons reach toward the arm
+ * sockets at core-local x=±1.3, y≈1.0; head clearance to local y≈2.0).
+ * Origin at bottom (where legs connect); the silhouette rises to ~y 2.0.
+ *
+ * Built to the shared "Gundam / real-robot" art bible via ./detailing:
+ *   - tiered, sloped, chamfered chest plates with a central red vent,
+ *   - a raised collar / neck guard with exposed steel neck,
+ *   - a layered, narrowing abdomen and an armoured waist with hip flares,
+ *   - prominent multi-tiered, angular shoulder pauldrons (the centerpiece).
+ * Charcoal dominates; steel reads only on neck / joints / exhausts; gold is
+ * thin edge piping; red is sparse punctuation; sensors glow amber.
+ *
+ * Local convention matches MechModelLoader: core attaches at world y=2.8, so
+ * the arm sockets (world y=3.8, x=±1.3) live at core-local y≈1.0, x≈1.3 — the
+ * pauldrons cap over those joints without floating or clipping the head.
  */
 
 import * as THREE from 'three'
 import { MATERIALS, createEnergyMaterial } from './materials'
+import {
+  PALETTE,
+  armorMat,
+  frameMat,
+  accentRedMat,
+  trimGoldMat,
+  glowEyeMat,
+  chamferBox,
+  panelPlate,
+  trimStripe,
+  edgeLine,
+  ventSlats,
+  riveting,
+  bolt,
+} from './detailing'
 
-export function createDieselGenerator(): THREE.Group {
+/* ------------------------------------------------------------------ */
+/* Shared core silhouette builder                                      */
+/* ------------------------------------------------------------------ */
+
+interface CoreOpts {
+  /** Dominant armor material for the big plates. */
+  armor: THREE.MeshStandardMaterial
+  /** Slightly lighter tier material for raised / overlapping plates. */
+  armorTier: THREE.MeshStandardMaterial
+  /** Steel for neck / joints / exposed mechanicals. */
+  steel: THREE.MeshStandardMaterial
+  /** Glow color for the central reactor / sensors. */
+  glow: number
+}
+
+/**
+ * Builds the shared core skeleton: inner frame, sloped/tapered torso shell,
+ * tiered overlapping chest plates, a raised collar with exposed steel neck, a
+ * narrowing layered abdomen, an armoured waist with hip flares, a panelled
+ * back, and prominent multi-tiered angular shoulder pauldrons.
+ *
+ * Returns the group plus the shared materials so each generator can drop in its
+ * own signature chest detail (red vent vs. fusion core vs. turbine vs. caps).
+ */
+function buildCoreBase(opts: CoreOpts): {
+  group: THREE.Group
+  armor: THREE.MeshStandardMaterial
+  armorTier: THREE.MeshStandardMaterial
+  steel: THREE.MeshStandardMaterial
+  trimMat: THREE.MeshStandardMaterial
+  redMat: THREE.MeshStandardMaterial
+} {
   const group = new THREE.Group()
+  const { armor, armorTier, steel } = opts
+  const trimMat = trimGoldMat()
+  const redMat = accentRedMat()
 
-  // Main torso body (compact, narrower at waist)
-  const bodyGeom = new THREE.BoxGeometry(1.6, 1.6, 1.3)
-  const body = new THREE.Mesh(bodyGeom, MATERIALS.powerGen)
-  body.position.set(0, 0.9, 0)
-  group.add(body)
+  /* --- Inner frame block (mostly hidden, gives the silhouette mass) --- */
+  const frameBlock = new THREE.Mesh(chamferBox(1.32, 1.5, 1.02, 0.07), steel)
+  frameBlock.position.set(0, 0.95, -0.03)
+  group.add(frameBlock)
 
-  // Chest plate (angled armor)
-  const chestGeom = new THREE.BoxGeometry(1.5, 0.8, 0.2)
-  const chest = new THREE.Mesh(chestGeom, MATERIALS.powerGen)
-  chest.position.set(0, 1.3, 0.7)
-  chest.rotation.x = -0.15
-  group.add(chest)
+  /* --- Main torso armor shell ----------------------------------------- *
+   * Upper chest block (wider, leaning slightly back at the top so the
+   * pectorals read as a sloped wedge rather than a flat slab).            */
+  const chestBlock = new THREE.Mesh(chamferBox(1.46, 0.78, 1.12, 0.1), armor)
+  chestBlock.position.set(0, 1.28, 0.0)
+  chestBlock.rotation.x = -0.06
+  group.add(chestBlock)
 
-  // Central chest vent
-  const ventGeom = new THREE.BoxGeometry(0.5, 0.6, 0.08)
-  const vent = new THREE.Mesh(ventGeom, new THREE.MeshStandardMaterial({
-    color: 0x222222,
-    metalness: 0.6,
-  }))
-  vent.position.set(0, 1.2, 0.78)
-  group.add(vent)
+  // Lower torso (narrower — gives the inverted-trapezoid real-robot taper).
+  const lowerTorso = new THREE.Mesh(chamferBox(1.18, 0.62, 1.0, 0.09), armor)
+  lowerTorso.position.set(0, 0.82, 0.0)
+  group.add(lowerTorso)
 
-  // Chest grille bars
-  for (let i = 0; i < 4; i++) {
-    const grilleGeom = new THREE.BoxGeometry(0.4, 0.06, 0.04)
-    const grille = new THREE.Mesh(grilleGeom, new THREE.MeshStandardMaterial({
-      color: 0x333333,
-    }))
-    grille.position.set(0, 0.95 + i * 0.14, 0.82)
-    group.add(grille)
+  // Slim steel sternum spine where the two pecs meet (exposed mechanical).
+  const sternum = new THREE.Mesh(chamferBox(0.16, 0.78, 0.12, 0.03), steel)
+  sternum.position.set(0, 1.26, 0.62)
+  group.add(sternum)
+
+  /* --- Tiered chest plates (two overlapping, sloped pectoral plates) --- */
+  for (const side of [-1, 1]) {
+    const pec = panelPlate(0.6, 0.78, 0.2, {
+      baseMat: armor,
+      topMat: armorTier,
+      bevel: 0.06,
+      inset: 0.1,
+      raise: 0.05,
+      trim: true,
+    })
+    // Splay outward + lean back at the top for a sharp, layered chest.
+    pec.position.set(side * 0.42, 1.3, 0.56)
+    pec.rotation.y = side * 0.16
+    pec.rotation.x = -0.1
+    pec.rotation.z = side * -0.04
+    group.add(pec)
+
+    // Thin gold edge highlight down the inner chest seam.
+    const seam = edgeLine(0.66, { thickness: 0.02, mat: trimMat })
+    seam.rotation.z = Math.PI / 2
+    seam.position.set(side * 0.12, 1.3, 0.69)
+    group.add(seam)
+
+    // A short diagonal panel-line slash across each pec (etched detail).
+    const slash = edgeLine(0.34, { thickness: 0.016, mat: trimMat })
+    slash.rotation.z = side * -0.7
+    slash.position.set(side * 0.5, 1.46, 0.69)
+    group.add(slash)
+
+    // Two rivets anchoring the outer pec corner.
+    const pecRivets = riveting(2, 0.16, { radius: 0.022 })
+    pecRivets.rotation.z = Math.PI / 2
+    pecRivets.position.set(side * 0.66, 1.18, 0.66)
+    group.add(pecRivets)
   }
 
-  // Shoulder mounts
-  for (let side of [-1, 1]) {
-    const shoulderGeom = new THREE.BoxGeometry(0.3, 0.4, 0.8)
-    const shoulder = new THREE.Mesh(shoulderGeom, MATERIALS.powerGen)
-    shoulder.position.set(side * 0.95, 1.5, 0)
-    group.add(shoulder)
+  /* --- Raised collar / neck guard ------------------------------------- */
+  const collar = new THREE.Mesh(chamferBox(0.92, 0.28, 0.72, 0.06), armorTier)
+  collar.position.set(0, 1.68, 0.04)
+  collar.rotation.x = -0.14
+  group.add(collar)
 
-    // Side vent stacks
-    for (let i = 0; i < 2; i++) {
-      const stackGeom = new THREE.CylinderGeometry(0.1, 0.1, 0.3, 8)
-      const stack = new THREE.Mesh(stackGeom, new THREE.MeshStandardMaterial({
-        color: 0x444444,
-        metalness: 0.8,
-      }))
-      stack.position.set(side * 1.0, 0.8 + i * 0.45, 0.4)
-      group.add(stack)
+  // Sloped collar wings rising toward the shoulders (frame the neck).
+  for (const side of [-1, 1]) {
+    const wing = new THREE.Mesh(chamferBox(0.34, 0.22, 0.5, 0.05), armor)
+    wing.position.set(side * 0.5, 1.74, 0.0)
+    wing.rotation.z = side * -0.35
+    wing.rotation.y = side * 0.2
+    group.add(wing)
+  }
+
+  // Exposed steel neck column.
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.26, 0.36, 12), steel)
+  neck.position.set(0, 1.76, -0.02)
+  group.add(neck)
+  // Neck collar ring (steel detail at the base of the column).
+  const neckRing = new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.03, 8, 16), steel)
+  neckRing.rotation.x = Math.PI / 2
+  neckRing.position.set(0, 1.62, -0.02)
+  group.add(neckRing)
+
+  // Collar gold trim across the front face.
+  const collarTrim = trimStripe(0.8, 0.22, { thickness: 0.018, mat: trimMat })
+  collarTrim.position.set(0, 1.68, 0.42)
+  collarTrim.rotation.x = -0.14
+  group.add(collarTrim)
+
+  /* --- Layered abdomen (stacked, narrowing, slightly forward plates) --- */
+  const abMats = [armorTier, armor, armorTier, armor]
+  const abWidths = [1.12, 1.0, 0.86, 0.72]
+  let abY = 0.6
+  for (let i = 0; i < abWidths.length; i++) {
+    const seg = new THREE.Mesh(
+      chamferBox(abWidths[i], 0.18, 0.94 - i * 0.05, 0.045),
+      abMats[i]
+    )
+    // Each plate sits slightly proud of the one below and tips forward → the
+    // overlapping "stacked plate" abdomen of the reference.
+    seg.position.set(0, abY, 0.07 + i * 0.012)
+    seg.rotation.x = 0.06
+    group.add(seg)
+    // Thin gold under-edge on the two larger plates only (sparse trim).
+    if (i < 2) {
+      const lip = edgeLine(abWidths[i] * 0.7, { thickness: 0.014, mat: trimMat })
+      lip.position.set(0, abY - 0.085, 0.07 + i * 0.012 + 0.46)
+      group.add(lip)
     }
+    abY -= 0.2
   }
 
-  // Exhaust pipes (back-mounted, shorter)
-  for (let i = 0; i < 2; i++) {
-    const pipeGeom = new THREE.CylinderGeometry(0.08, 0.1, 0.6, 8)
-    const pipe = new THREE.Mesh(pipeGeom, new THREE.MeshStandardMaterial({
-      color: 0x444444,
-      metalness: 0.8,
-      roughness: 0.3,
-    }))
-    pipe.position.set((i - 0.5) * 0.6, 1.6, -0.5)
-    group.add(pipe)
-  }
-
-  // Waist / lower torso (narrower)
-  const waistGeom = new THREE.BoxGeometry(1.2, 0.4, 1.0)
-  const waist = new THREE.Mesh(waistGeom, new THREE.MeshStandardMaterial({
-    color: 0x444444,
-    metalness: 0.7,
-  }))
-  waist.position.set(0, 0.2, 0)
+  /* --- Waist (steel block + armored hip flares) ----------------------- */
+  const waist = new THREE.Mesh(chamferBox(0.96, 0.3, 0.82, 0.06), steel)
+  waist.position.set(0, 0.16, 0)
   group.add(waist)
 
-  // Back armor plate
-  const backGeom = new THREE.BoxGeometry(1.4, 1.4, 0.15)
-  const back = new THREE.Mesh(backGeom, MATERIALS.powerGen)
-  back.position.set(0, 0.9, -0.65)
+  // Central waist buckle (small gold-trimmed plate — sparse accent).
+  const buckle = new THREE.Mesh(chamferBox(0.26, 0.2, 0.1, 0.03), armorTier)
+  buckle.position.set(0, 0.2, 0.42)
+  group.add(buckle)
+  const buckleTrim = trimStripe(0.24, 0.18, { thickness: 0.014, mat: trimMat })
+  buckleTrim.position.set(0, 0.2, 0.48)
+  group.add(buckleTrim)
+
+  for (const side of [-1, 1]) {
+    const hip = new THREE.Mesh(chamferBox(0.34, 0.46, 0.5, 0.06), armor)
+    hip.position.set(side * 0.66, 0.28, 0.05)
+    hip.rotation.z = side * 0.22
+    group.add(hip)
+    // Steel hip-joint disc peeking from under the flare.
+    const hipJoint = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.16, 12), steel)
+    hipJoint.rotation.z = Math.PI / 2
+    hipJoint.position.set(side * 0.5, 0.18, 0.05)
+    group.add(hipJoint)
+  }
+
+  /* --- Back armor plate (panelled) ------------------------------------ */
+  const back = new THREE.Mesh(chamferBox(1.26, 1.3, 0.16, 0.08), armor)
+  back.position.set(0, 1.05, -0.62)
   group.add(back)
+  // Vertical spine ridge + panel trim on the back.
+  const spine = new THREE.Mesh(chamferBox(0.18, 1.1, 0.1, 0.03), armorTier)
+  spine.position.set(0, 1.05, -0.72)
+  group.add(spine)
+  const backTrim = trimStripe(1.1, 1.12, { thickness: 0.016, mat: trimMat })
+  backTrim.position.set(0, 1.05, -0.71)
+  group.add(backTrim)
+
+  /* --- Multi-tiered angular shoulder pauldrons (centerpiece) ---------- *
+   * Three stacked, rotated/tapered tiers + a steel pivot, capping the arm
+   * socket (core-local x≈1.3, y≈1.0). Sloped outward & up for a wide,        *
+   * aggressive silhouette.                                                  */
+  for (const side of [-1, 1]) {
+    const pauldron = new THREE.Group()
+
+    // Tier 1 — big outer cap, tapered (narrower at the bottom front face).
+    const cap = new THREE.Mesh(chamferBox(0.66, 0.5, 0.94, 0.1), armor)
+    cap.position.set(0, 0.14, 0)
+    cap.rotation.x = -0.06
+    pauldron.add(cap)
+
+    // Tier 2 — raised, lighter middle plate facing outward (±X), gold-trimmed.
+    const midTier = panelPlate(0.56, 0.36, 0.78, {
+      baseMat: armorTier,
+      topMat: armorTier,
+      bevel: 0.06,
+      inset: 0.08,
+      raise: 0.045,
+      trim: true,
+    })
+    midTier.rotation.y = Math.PI / 2 // trimmed plate faces ±X
+    midTier.position.set(side * 0.35, 0.2, 0)
+    pauldron.add(midTier)
+
+    // Tier 3 — angled forward "fang" plate jutting off the leading edge.
+    const fang = new THREE.Mesh(chamferBox(0.3, 0.34, 0.5, 0.05), armorTier)
+    fang.position.set(0, 0.12, 0.46)
+    fang.rotation.x = 0.4
+    pauldron.add(fang)
+
+    // Tier 4 — lower skirt plate under the cap (small, angled).
+    const skirt = new THREE.Mesh(chamferBox(0.52, 0.3, 0.8, 0.06), armor)
+    skirt.position.set(0, -0.22, 0)
+    skirt.rotation.z = side * 0.12
+    pauldron.add(skirt)
+
+    // Steel pivot joint into the torso.
+    const pivot = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.52, 12), steel)
+    pivot.rotation.z = Math.PI / 2
+    pivot.position.set(side * -0.08, -0.06, 0)
+    pauldron.add(pivot)
+    // Pivot end cap (lighter steel disc — reads as a bolted hub).
+    const pivotCap = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.06, 12), steel)
+    pivotCap.rotation.z = Math.PI / 2
+    pivotCap.position.set(side * -0.32, -0.06, 0)
+    pauldron.add(pivotCap)
+    const pivotBolt = bolt(0.05, { mat: trimMat })
+    pivotBolt.rotation.set(0, side * Math.PI / 2, 0)
+    pivotBolt.position.set(side * -0.36, -0.06, 0)
+    pauldron.add(pivotBolt)
+
+    // Edge rivets along the cap's leading top edge.
+    const rivets = riveting(3, 0.24, { radius: 0.026 })
+    rivets.rotation.y = Math.PI / 2
+    rivets.position.set(side * 0.36, 0.36, 0.28)
+    pauldron.add(rivets)
+
+    // Thin gold trim line wrapping the cap's outer top edge.
+    const capEdge = edgeLine(0.84, { thickness: 0.018, mat: trimMat })
+    capEdge.position.set(side * 0.34, 0.38, 0.0)
+    capEdge.rotation.set(0, Math.PI / 2, 0)
+    pauldron.add(capEdge)
+
+    pauldron.position.set(side * 1.02, 1.34, 0)
+    pauldron.rotation.z = side * -0.14 // slope outward / up for a sharp line
+    pauldron.rotation.y = side * 0.06
+    group.add(pauldron)
+  }
+
+  return { group, armor, armorTier, steel, trimMat, redMat }
+}
+
+/* ------------------------------------------------------------------ */
+/* Generators                                                          */
+/* ------------------------------------------------------------------ */
+
+export function createDieselGenerator(): THREE.Group {
+  const armor = armorMat(PALETTE.armorDark)
+  const armorTier = armorMat(PALETTE.armorMid)
+  const steel = frameMat()
+  const { group, redMat, trimMat } = buildCoreBase({
+    armor,
+    armorTier,
+    steel,
+    glow: PALETTE.glowAmber,
+  })
+
+  // Central red chest vent (the signature accent), recessed behind gold trim.
+  const chestVent = ventSlats(5, 0.48, 0.64, { depth: 0.08, slatMat: redMat })
+  chestVent.position.set(0, 1.16, 0.64)
+  group.add(chestVent)
+  const ventTrim = trimStripe(0.56, 0.72, { thickness: 0.02, mat: trimMat })
+  ventTrim.position.set(0, 1.16, 0.69)
+  group.add(ventTrim)
+  // Corner bolts framing the vent.
+  for (const cx of [-1, 1]) {
+    const b = bolt(0.03, { mat: trimMat })
+    b.position.set(cx * 0.27, 1.16, 0.7)
+    group.add(b)
+  }
+
+  // Twin back-mounted exhaust stacks (steel, exposed mechanical) with hot tips.
+  const exhaustMat = frameMat(PALETTE.frameSteelLight)
+  for (let i = 0; i < 2; i++) {
+    const pipe = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.1, 0.12, 0.72, 12),
+      exhaustMat
+    )
+    pipe.position.set((i - 0.5) * 0.6, 1.64, -0.66)
+    group.add(pipe)
+    // Stack collar ring.
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.02, 8, 14), exhaustMat)
+    ring.rotation.x = Math.PI / 2
+    ring.position.set((i - 0.5) * 0.6, 1.84, -0.66)
+    group.add(ring)
+    // Hot tip glow.
+    const tip = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.08, 0.08, 0.06, 12),
+      createEnergyMaterial(PALETTE.accentRed)
+    )
+    tip.position.set((i - 0.5) * 0.6, 2.0, -0.66)
+    group.add(tip)
+  }
+
+  // Side intake stacks on the lower flanks (red slats facing outward).
+  for (const side of [-1, 1]) {
+    const intake = ventSlats(3, 0.18, 0.4, { depth: 0.05, slatMat: redMat })
+    intake.rotation.y = (side * Math.PI) / 2
+    intake.position.set(side * 0.76, 0.84, 0.28)
+    group.add(intake)
+  }
+
+  // Twin amber pilot sensors flanking the vent (tasteful glow punctuation).
+  for (const side of [-1, 1]) {
+    const pilot = new THREE.Mesh(
+      new THREE.SphereGeometry(0.045, 10, 10),
+      glowEyeMat(PALETTE.glowAmber)
+    )
+    pilot.position.set(side * 0.34, 1.5, 0.66)
+    group.add(pilot)
+  }
 
   return group
 }
 
 export function createFusionReactor(): THREE.Group {
-  const group = new THREE.Group()
+  const armor = armorMat(PALETTE.armorMid)
+  const armorTier = armorMat(PALETTE.armorDark)
+  const steel = frameMat(PALETTE.frameSteelLight)
+  const { group, trimMat } = buildCoreBase({
+    armor,
+    armorTier,
+    steel,
+    glow: PALETTE.glowAmber,
+  })
 
-  // Main torso housing (compact)
-  const bodyGeom = new THREE.BoxGeometry(1.7, 1.6, 1.3)
-  const body = new THREE.Mesh(bodyGeom, MATERIALS.voltTech)
-  body.position.set(0, 0.9, 0)
-  group.add(body)
-
-  // Chest core (glowing fusion reactor)
-  const coreGeom = new THREE.SphereGeometry(0.4, 16, 16)
-  const core = new THREE.Mesh(coreGeom, createEnergyMaterial(0x00ffff))
-  core.position.set(0, 1.1, 0.35)
+  // Glowing amber fusion core set into the chest between the pec plates.
+  const coreGlow = glowEyeMat(PALETTE.glowAmber)
+  const core = new THREE.Mesh(new THREE.SphereGeometry(0.25, 20, 20), coreGlow)
+  core.position.set(0, 1.18, 0.6)
   group.add(core)
 
-  // Core containment ring
-  const ringGeom = new THREE.TorusGeometry(0.5, 0.04, 8, 24)
-  const ring = new THREE.Mesh(ringGeom, MATERIALS.voltTech)
-  ring.position.set(0, 1.1, 0.35)
-  group.add(ring)
-
-  // Vertical containment rings
+  // Steel containment rings around the core (two crossed + a gold front ring).
   for (let i = 0; i < 2; i++) {
-    const vringGeom = new THREE.TorusGeometry(0.45, 0.03, 8, 24)
-    const vring = new THREE.Mesh(vringGeom, MATERIALS.voltTech)
-    vring.position.set(0, 1.1, 0.35)
-    vring.rotation.y = (i * Math.PI) / 2
-    group.add(vring)
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.035, 8, 24), steel)
+    ring.position.set(0, 1.18, 0.58)
+    ring.rotation.y = (i * Math.PI) / 2
+    group.add(ring)
   }
+  const ringFront = new THREE.Mesh(new THREE.TorusGeometry(0.37, 0.03, 8, 28), trimMat)
+  ringFront.position.set(0, 1.18, 0.66)
+  group.add(ringFront)
 
-  // Chest frame around core
-  const frameGeom = new THREE.BoxGeometry(1.2, 1.0, 0.2)
-  const frame = new THREE.Mesh(frameGeom, MATERIALS.voltTech)
-  frame.position.set(0, 1.1, 0.65)
-  group.add(frame)
-
-  // Energy conduit lines
+  // Three steel containment struts radiating from the core to the pecs.
   for (let i = 0; i < 3; i++) {
-    const conduitGeom = new THREE.CylinderGeometry(0.04, 0.04, 1.2, 6)
-    const conduit = new THREE.Mesh(conduitGeom, createEnergyMaterial(0x00aaff))
-    conduit.position.set(-0.4 + i * 0.4, 0.9, 0.6)
-    group.add(conduit)
+    const ang = (i / 3) * Math.PI * 2 + Math.PI / 6
+    const strut = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.045, 0.03), steel)
+    strut.position.set(0, 1.18, 0.64)
+    strut.rotation.z = ang
+    group.add(strut)
   }
 
-  // Side power pods / shoulders
-  for (let side of [-1, 1]) {
-    const podGeom = new THREE.BoxGeometry(0.35, 1.2, 1.0)
-    const pod = new THREE.Mesh(podGeom, MATERIALS.voltTech)
-    pod.position.set(side * 1.0, 1.0, 0)
-    group.add(pod)
+  // Amber sensor strip just under the collar.
+  const sensor = new THREE.Mesh(
+    new THREE.BoxGeometry(0.5, 0.04, 0.03),
+    glowEyeMat(PALETTE.glowAmber)
+  )
+  sensor.position.set(0, 1.56, 0.6)
+  group.add(sensor)
 
-    // Energy emitters
-    for (let i = 0; i < 2; i++) {
-      const emitterGeom = new THREE.CylinderGeometry(0.08, 0.08, 0.1, 8)
-      const emitter = new THREE.Mesh(emitterGeom, createEnergyMaterial(0x00aaff))
-      emitter.position.set(side * 1.1, 0.7 + i * 0.5, 0.4)
-      group.add(emitter)
-    }
-  }
-
-  // Waist
-  const waistGeom = new THREE.BoxGeometry(1.3, 0.35, 1.0)
-  const waist = new THREE.Mesh(waistGeom, new THREE.MeshStandardMaterial({
-    color: 0x222233,
-    metalness: 0.6,
-  }))
-  waist.position.set(0, 0.18, 0)
-  group.add(waist)
-
-  // Back reactor vent
-  const ventGeom = new THREE.BoxGeometry(1.2, 1.2, 0.1)
-  const vent = new THREE.Mesh(ventGeom, new THREE.MeshStandardMaterial({
-    color: 0x222233,
-    metalness: 0.6,
-  }))
-  vent.position.set(0, 1.0, -0.65)
-  group.add(vent)
+  // Back reactor cooling vent (amber-lit slats behind steel framing).
+  const backVent = ventSlats(5, 1.0, 0.9, {
+    depth: 0.06,
+    slatMat: createEnergyMaterial(PALETTE.glowAmber),
+  })
+  backVent.position.set(0, 1.05, -0.72)
+  backVent.rotation.y = Math.PI
+  group.add(backVent)
 
   return group
 }
 
 export function createGasTurbine(): THREE.Group {
-  const group = new THREE.Group()
+  const armor = armorMat(PALETTE.armorDark)
+  const armorTier = armorMat(PALETTE.armorMid)
+  const steel = frameMat(PALETTE.frameSteelLight)
+  const { group, redMat, trimMat } = buildCoreBase({
+    armor,
+    armorTier,
+    steel,
+    glow: PALETTE.glowAmber,
+  })
 
-  // Main turbine housing (cylindrical torso)
-  const housingGeom = new THREE.CylinderGeometry(0.6, 0.7, 1.6, 12)
-  const housing = new THREE.Mesh(housingGeom, MATERIALS.swiftDrive)
-  housing.position.set(0, 0.9, 0)
-  group.add(housing)
-
-  // Front intake
-  const intakeGeom = new THREE.CircleGeometry(0.5, 16)
-  const intake = new THREE.Mesh(intakeGeom, MATERIALS.swiftDrive)
-  intake.position.set(0, 0.9, 0.7)
-  group.add(intake)
-
-  // Shoulder nacelles
-  for (let side of [-1, 1]) {
-    const nacelleGeom = new THREE.CylinderGeometry(0.2, 0.25, 0.8, 8)
-    const nacelle = new THREE.Mesh(nacelleGeom, MATERIALS.swiftDrive)
-    nacelle.rotation.x = Math.PI / 2
-    nacelle.position.set(side * 0.8, 1.2, -0.1)
-    group.add(nacelle)
-
-    // Exhaust nozzle
-    const nozzleGeom = new THREE.ConeGeometry(0.2, 0.3, 8)
-    const nozzle = new THREE.Mesh(nozzleGeom, createEnergyMaterial(0xff4400))
-    nozzle.rotation.x = Math.PI / 2
-    nozzle.position.set(side * 0.8, 1.2, -0.6)
-    group.add(nozzle)
+  // Central turbine intake recessed in the chest (steel ring + dark hub).
+  const intakeRing = new THREE.Mesh(new THREE.TorusGeometry(0.31, 0.05, 10, 22), steel)
+  intakeRing.position.set(0, 1.18, 0.62)
+  group.add(intakeRing)
+  // Dark recessed throat behind the blades.
+  const throat = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.28, 0.24, 0.12, 16),
+    armorMat(PALETTE.ventBlack)
+  )
+  throat.rotation.x = Math.PI / 2
+  throat.position.set(0, 1.18, 0.54)
+  group.add(throat)
+  const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.09, 0.16, 12), steel)
+  hub.rotation.x = Math.PI / 2
+  hub.position.set(0, 1.18, 0.62)
+  group.add(hub)
+  // Turbine blades (thin steel fins).
+  for (let i = 0; i < 9; i++) {
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.045, 0.02), steel)
+    blade.position.set(0, 1.18, 0.6)
+    blade.rotation.z = (i / 9) * Math.PI * 2
+    group.add(blade)
   }
+  const intakeTrim = trimStripe(0.62, 0.62, { thickness: 0.018, mat: trimMat })
+  intakeTrim.position.set(0, 1.18, 0.68)
+  group.add(intakeTrim)
 
-  // Waist connector
-  const waistGeom = new THREE.CylinderGeometry(0.5, 0.55, 0.3, 12)
-  const waist = new THREE.Mesh(waistGeom, MATERIALS.swiftDrive)
-  waist.position.set(0, 0.15, 0)
-  group.add(waist)
+  // Shoulder-flank exhaust nacelles with red-hot nozzles.
+  for (const side of [-1, 1]) {
+    const nacelle = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.17, 0.21, 0.6, 12),
+      steel
+    )
+    nacelle.rotation.x = Math.PI / 2
+    nacelle.position.set(side * 0.82, 1.0, -0.45)
+    group.add(nacelle)
+    // Nacelle banding (steel ring detail).
+    const band = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.022, 8, 16), steel)
+    band.rotation.x = Math.PI / 2
+    band.position.set(side * 0.82, 1.0, -0.3)
+    group.add(band)
 
-  // Fuel lines
-  for (let i = 0; i < 2; i++) {
-    const lineGeom = new THREE.CylinderGeometry(0.025, 0.025, 1.4, 6)
-    const line = new THREE.Mesh(lineGeom, new THREE.MeshStandardMaterial({
-      color: 0x333333,
-    }))
-    line.position.set(0.55, 0.9, (i - 0.5) * 0.4)
-    group.add(line)
+    const nozzle = new THREE.Mesh(
+      new THREE.ConeGeometry(0.2, 0.28, 12),
+      createEnergyMaterial(PALETTE.accentRed)
+    )
+    nozzle.rotation.x = -Math.PI / 2
+    nozzle.position.set(side * 0.82, 1.0, -0.78)
+    group.add(nozzle)
+
+    // Red intake slats on the flank.
+    const slats = ventSlats(3, 0.22, 0.34, { depth: 0.05, slatMat: redMat })
+    slats.rotation.y = (side * Math.PI) / 2
+    slats.position.set(side * 0.76, 0.78, 0.32)
+    group.add(slats)
   }
 
   return group
 }
 
 export function createCapacitorBank(): THREE.Group {
-  const group = new THREE.Group()
+  const armor = armorMat(PALETTE.armorMid)
+  const armorTier = armorMat(PALETTE.armorDark)
+  const steel = frameMat()
+  const { group, trimMat } = buildCoreBase({
+    armor,
+    armorTier,
+    steel,
+    glow: PALETTE.glowAmber,
+  })
 
-  // Central housing (compact)
-  const housingGeom = new THREE.BoxGeometry(1.6, 1.6, 1.4)
-  const housing = new THREE.Mesh(housingGeom, MATERIALS.voltTech)
-  housing.position.set(0, 0.9, 0)
+  // Exposed capacitor cylinders glowing amber, set behind a dark chest cutout.
+  const capGlow = glowEyeMat(PALETTE.glowAmber)
+  const housing = new THREE.Mesh(
+    chamferBox(0.62, 0.66, 0.12, 0.04),
+    armorMat(PALETTE.ventBlack)
+  )
+  housing.position.set(0, 1.16, 0.6)
   group.add(housing)
-
-  // Capacitor cylinders (2x2 grid visible on chest)
-  for (let row of [-1, 1]) {
-    for (let col of [-1, 1]) {
-      const capGeom = new THREE.CylinderGeometry(0.15, 0.15, 1.2, 12)
-      const cap = new THREE.Mesh(capGeom, createEnergyMaterial(0x00aaff))
-      cap.position.set(col * 0.35, 0.9, row * 0.35)
+  for (const col of [-1, 1]) {
+    for (const row of [-1, 1]) {
+      const cap = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.1, 0.1, 0.5, 12),
+        capGlow
+      )
+      cap.position.set(col * 0.16, 1.16 + row * 0.14, 0.66)
       group.add(cap)
+      // Steel terminal cap on each capacitor.
+      const term = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.11, 0.11, 0.04, 12),
+        frameMat(PALETTE.frameSteelLight)
+      )
+      term.position.set(col * 0.16, 1.16 + row * 0.14 + (row > 0 ? 0.26 : -0.26), 0.66)
+      group.add(term)
     }
   }
+  const capTrim = trimStripe(0.66, 0.7, { thickness: 0.02, mat: trimMat })
+  capTrim.position.set(0, 1.16, 0.67)
+  group.add(capTrim)
 
-  // Power terminals on top
+  // Power terminals on the collar (steel + amber pilot lights).
+  const termMat = frameMat(PALETTE.frameSteelLight)
   for (let i = 0; i < 2; i++) {
-    const termGeom = new THREE.BoxGeometry(0.25, 0.15, 0.25)
-    const term = new THREE.Mesh(termGeom, new THREE.MeshStandardMaterial({
-      color: 0xcccccc,
-      metalness: 0.9,
-    }))
-    term.position.set((i - 0.5) * 0.8, 1.8, 0)
+    const term = new THREE.Mesh(chamferBox(0.2, 0.16, 0.2, 0.03), termMat)
+    term.position.set((i - 0.5) * 0.7, 1.84, -0.1)
     group.add(term)
+    const pilot = new THREE.Mesh(
+      new THREE.SphereGeometry(0.045, 10, 10),
+      glowEyeMat(PALETTE.glowAmber)
+    )
+    pilot.position.set((i - 0.5) * 0.7, 1.94, -0.05)
+    group.add(pilot)
   }
 
-  // Side panels / shoulders
-  for (let side of [-1, 1]) {
-    const panelGeom = new THREE.BoxGeometry(0.25, 1.0, 1.0)
-    const panel = new THREE.Mesh(panelGeom, MATERIALS.voltTech)
-    panel.position.set(side * 0.95, 1.0, 0)
-    group.add(panel)
-  }
-
-  // Waist
-  const waistGeom = new THREE.BoxGeometry(1.2, 0.35, 1.0)
-  const waist = new THREE.Mesh(waistGeom, MATERIALS.voltTech)
-  waist.position.set(0, 0.15, 0)
-  group.add(waist)
-
-  // Status lights
+  // Status sensor strip on the right side flank.
   for (let i = 0; i < 3; i++) {
     const light = new THREE.Mesh(
       new THREE.SphereGeometry(0.04, 8, 8),
-      createEnergyMaterial(0x00ff00)
+      glowEyeMat(PALETTE.glowAmber)
     )
-    light.position.set(0.8, 1.4, (i - 1) * 0.3)
+    light.position.set(0.8, 1.3 + i * 0.14, 0.32)
     group.add(light)
+  }
+
+  // Capacitor side rails use the manufacturer preset (keeps MATERIALS wired in).
+  for (const side of [-1, 1]) {
+    const rail = new THREE.Mesh(chamferBox(0.12, 0.9, 0.5, 0.04), MATERIALS.voltTech)
+    rail.position.set(side * 0.7, 1.05, -0.12)
+    group.add(rail)
   }
 
   return group
