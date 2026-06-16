@@ -11,6 +11,7 @@ import { Terrain } from './Terrain'
 import { StoryCombat } from './StoryCombat'
 import type { QuestDef } from './quests'
 import type { MechLoadout } from '../../composables/useMechBuilder'
+import type { GraphicsSettings } from '../../composables/useGameSettings'
 import type { TownState } from '../../composables/useStoryMode'
 import { TOWN_DECAY_RADIUS, WORLD_HALF_EXTENT } from '../../composables/useStoryMode'
 
@@ -23,6 +24,8 @@ export interface StoryWorldConfig {
   playerMech: MechEntity
   /** Town data from the run; used to place + initialise Town visuals. */
   towns: TownState[]
+  /** Graphics quality (shadow/AA/render-scale); honours the user's settings. */
+  graphics?: GraphicsSettings
   /**
    * Called once per frame with the player's current world position, the nearest
    * town, its centre distance, and the dt — so the host can drive decay/HUD.
@@ -79,6 +82,9 @@ export class StoryWorld {
   private particleSystem: ParticleSystem
   private combat: StoryCombat
   private terrain!: Terrain
+  /** Shadow-map resolution + whether shadows are on (from graphics settings). */
+  private shadowMapSize = 2048
+  private shadowsEnabled = true
 
   /** Backing field for the player mech. Replaced in place by applyLoadout(). */
   private _playerMech: MechEntity
@@ -109,14 +115,28 @@ export class StoryWorld {
     this.onQuestComplete = config.onQuestComplete
     this.onPlayerDefeated = config.onPlayerDefeated
 
-    // --- Scene + renderer (mirrors BattleScene setup) ---
+    // --- Scene + renderer (mirrors BattleScene setup; honours graphics settings) ---
+    const gfx = config.graphics
     this.scene = markRaw(new THREE.Scene())
-    this.renderer = markRaw(new THREE.WebGLRenderer({ canvas: config.canvas, antialias: true }))
+    this.renderer = markRaw(new THREE.WebGLRenderer({
+      canvas: config.canvas,
+      antialias: gfx?.antialias ?? true,
+    }))
     this.renderer.setSize(window.innerWidth, window.innerHeight)
-    this.renderer.setPixelRatio(window.devicePixelRatio)
+    this.renderer.setPixelRatio(window.devicePixelRatio * (gfx?.renderScale ?? 1.0))
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
     this.renderer.toneMappingExposure = 1.0
-    this.renderer.shadowMap.enabled = true
+
+    // Shadow quality from settings (off disables the shadow pass entirely).
+    const shadowQuality = gfx?.shadowQuality ?? 'high'
+    if (shadowQuality === 'off') {
+      this.renderer.shadowMap.enabled = false
+      this.shadowsEnabled = false
+    } else {
+      this.renderer.shadowMap.enabled = true
+      const shadowMapSizes: Record<string, number> = { low: 512, medium: 1024, high: 2048 }
+      this.shadowMapSize = shadowMapSizes[shadowQuality] ?? 2048
+    }
 
     // --- Systems ---
     this.inputManager = new InputManager(config.canvas)
@@ -200,14 +220,14 @@ export class StoryWorld {
 
     const sun = new THREE.DirectionalLight(0xfff4e0, 0.9)
     sun.position.set(120, 200, 80)
-    sun.castShadow = true
+    sun.castShadow = this.shadowsEnabled
     sun.shadow.camera.left = -WORLD_HALF_EXTENT
     sun.shadow.camera.right = WORLD_HALF_EXTENT
     sun.shadow.camera.top = WORLD_HALF_EXTENT
     sun.shadow.camera.bottom = -WORLD_HALF_EXTENT
     sun.shadow.camera.far = 1200
-    sun.shadow.mapSize.width = 2048
-    sun.shadow.mapSize.height = 2048
+    sun.shadow.mapSize.width = this.shadowMapSize
+    sun.shadow.mapSize.height = this.shadowMapSize
     this.scene.add(sun)
 
     this.scene.add(new THREE.HemisphereLight(0xbfe3ff, 0x4a7a3a, 0.4))

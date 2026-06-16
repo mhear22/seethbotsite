@@ -17,9 +17,12 @@ export function useIsTouch(): Ref<boolean> {
   const mql = hasWindow && window.matchMedia ? window.matchMedia('(pointer: coarse)') : null
 
   const evaluate = () => {
-    const coarse = mql ? mql.matches : false
-    const touchCapable = hasWindow && ('ontouchstart' in window || (navigator.maxTouchPoints ?? 0) > 0)
-    isTouch.value = coarse || touchCapable
+    // Gate strictly on the PRIMARY pointer being coarse. A touch-capable laptop
+    // / 2-in-1 reports pointer:coarse = false (its primary pointer is the mouse),
+    // so the touch overlay never mounts there — desktop behaviour is preserved.
+    // (We deliberately do NOT use ontouchstart / maxTouchPoints, which are true
+    // on those hybrid devices.)
+    isTouch.value = mql ? mql.matches : false
   }
 
   evaluate()

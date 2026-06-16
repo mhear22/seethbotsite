@@ -223,7 +223,10 @@ export class Terrain {
     })
     const mesh = new THREE.Mesh(geo, mat)
     mesh.receiveShadow = true
-    mesh.castShadow = true
+    // The ground does not cast — a near-flat heightfield self-shadowing under a
+    // high sun adds nothing visible but would push ~180k tris through the shadow
+    // pass. Mechs/towns still cast onto it (receiveShadow stays on).
+    mesh.castShadow = false
     mesh.name = 'terrain'
     return mesh
   }

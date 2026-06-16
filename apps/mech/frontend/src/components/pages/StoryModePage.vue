@@ -115,6 +115,7 @@ import { MechEntity } from '../../lib/battle/MechEntity'
 import { StoryWorld, type StoryFrameInfo } from '../../lib/story/StoryWorld'
 import { useStoryMode, computeCombatStats } from '../../composables/useStoryMode'
 import { useAudio } from '../../composables/useAudio'
+import { useGameSettings } from '../../composables/useGameSettings'
 import {
   questTypeLabel,
   questObjective,
@@ -134,6 +135,7 @@ const router = useRouter()
 const route = useRoute()
 const story = useStoryMode()
 const audio = useAudio()
+const gameSettings = useGameSettings()
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 const roaming = ref(false)
@@ -288,6 +290,7 @@ async function beginRoaming() {
     canvas,
     playerMech,
     towns: story.run.value.towns,
+    graphics: gameSettings.settings.value.graphics,
     onFrame: handleFrame,
     onQuestComplete: handleQuestComplete,
     onPlayerDefeated: handlePlayerDefeated,

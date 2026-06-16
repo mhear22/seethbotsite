@@ -129,17 +129,21 @@ export function ventMat(): THREE.MeshStandardMaterial {
  * @param h     height (Y)
  * @param d     depth  (Z)
  * @param bevel chamfer size in world units (default min(w,h,d) * 0.12).
- *              Clamped so it never exceeds ~45% of the smallest dimension.
- * @returns a centered BufferGeometry
+ *              Clamped so it never exceeds ~22% of the smallest dimension
+ *              (the extrude bevel adds the chamfer outward on every axis, so a
+ *              larger value would invert the rounded-rect half-extents).
+ * @returns a centered BufferGeometry whose outer bounds are exactly w x h x d
  */
 export function chamferBox(w: number, h: number, d: number, bevel?: number): THREE.BufferGeometry {
-  const b = Math.min(bevel ?? Math.min(w, h, d) * 0.12, Math.min(w, h, d) * 0.45)
+  const b = Math.min(bevel ?? Math.min(w, h, d) * 0.12, Math.min(w, h, d) * 0.22)
   const safeB = Math.max(b, 1e-4)
 
-  // 2D rounded rect in the X/Y plane, centered, inset by the bevel so the final
-  // outer dimensions are exactly w x h.
-  const hw = w / 2 - safeB
-  const hh = h / 2 - safeB
+  // 2D rounded-rect in the X/Y plane, centered. The straight edges sit two
+  // bevels inside the target half-extent: the rounded corners add one bevel
+  // outward (to ±(w/2 - safeB)), and the extrude bevelSize below adds the final
+  // bevel, bringing the outer silhouette to exactly w x h.
+  const hw = w / 2 - 2 * safeB
+  const hh = h / 2 - 2 * safeB
   const shape = new THREE.Shape()
   shape.moveTo(-hw, -hh - safeB)
   shape.lineTo(hw, -hh - safeB)
@@ -160,8 +164,9 @@ export function chamferBox(w: number, h: number, d: number, bevel?: number): THR
     bevelSegments: 1,
     curveSegments: 1,
   })
-  // ExtrudeGeometry extrudes +Z from z=0; recenter on origin.
-  geom.translate(0, 0, -depth / 2 - safeB)
+  // ExtrudeGeometry spans z in [-safeB, depth+safeB] (bevel caps both ends),
+  // so its centre sits at depth/2; shift by -depth/2 to centre on the origin.
+  geom.translate(0, 0, -depth / 2)
   geom.computeVertexNormals()
   return geom
 }
