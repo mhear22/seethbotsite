@@ -2,7 +2,7 @@
   <div class="story-mode-page">
     <!-- Back navigation (hidden once roaming for an immersive view) -->
     <div v-if="!roaming" class="flow-navigation">
-      <button type="button" class="flow-pill action" @click="returnToBattle">← Modes</button>
+      <button type="button" class="flow-pill action" @click="returnToBattle">← Menu</button>
       <span class="flow-pill current">Story Mode</span>
     </div>
 
@@ -62,7 +62,14 @@
         WASD move · Mouse look · Shift dash · Space jump · LMB/RMB fire · E interact
       </div>
 
-      <button type="button" class="story-exit" @click="exitToIntro">Exit to Menu</button>
+      <button type="button" class="story-exit" @click="returnToBattle">Exit to Menu</button>
+
+      <!-- On-screen controls (touch devices only; self-gates). Hidden while a panel is open. -->
+      <TouchControls
+        v-if="!showDialog && !showGarage && !showCredits"
+        :input="touchInput"
+        context="story"
+      />
 
       <!-- Quest-giver dialogue -->
       <QuestDialog
@@ -102,7 +109,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import * as THREE from 'three'
 import { MechEntity } from '../../lib/battle/MechEntity'
 import { StoryWorld, type StoryFrameInfo } from '../../lib/story/StoryWorld'
@@ -120,8 +127,11 @@ import TownHud from '../mech/story/TownHud.vue'
 import QuestDialog from '../mech/story/QuestDialog.vue'
 import Garage from '../mech/story/Garage.vue'
 import StoryCredits from '../mech/story/StoryCredits.vue'
+import TouchControls from '../mech/TouchControls.vue'
+import type { InputManager } from '../../lib/battle/InputManager'
 
 const router = useRouter()
+const route = useRoute()
 const story = useStoryMode()
 const audio = useAudio()
 
@@ -156,6 +166,9 @@ const showCredits = ref(false)
 // only auto-start one boss encounter per town entry.
 let finaleAnnounced = false
 let pendingFinaleTownId: string | null = null
+
+// Input manager for the on-screen touch controls (set once the world is live).
+const touchInput = ref<InputManager | null>(null)
 
 // Toast.
 const toast = ref('')
@@ -208,6 +221,10 @@ const dialogQuest = computed<QuestDef | null>(() =>
 onMounted(() => {
   hasSave.value = story.hasSavedRun()
   window.addEventListener('keydown', handleKey)
+  // Arriving from the home menu's "Continue" entry jumps straight into the run.
+  if (route.query.start === 'continue' && hasSave.value) {
+    continueRun()
+  }
 })
 
 onUnmounted(() => {
@@ -276,6 +293,7 @@ async function beginRoaming() {
     onPlayerDefeated: handlePlayerDefeated,
   })
   world.start()
+  touchInput.value = world.getInputManager()
 }
 
 function handleFrame(info: StoryFrameInfo) {
@@ -473,7 +491,7 @@ function finishRun() {
   showCredits.value = false
   story.clearSavedRun()
   teardownWorld()
-  router.push({ name: 'mech-battle' })
+  router.push({ name: 'mech-home' })
 }
 
 // --- Garage ---
@@ -514,17 +532,12 @@ function teardownWorld() {
     world.cleanup()
     world = null
   }
-}
-
-function exitToIntro() {
-  teardownWorld()
-  roaming.value = false
-  hasSave.value = story.hasSavedRun()
+  touchInput.value = null
 }
 
 function returnToBattle() {
   teardownWorld()
-  router.push({ name: 'mech-battle' })
+  router.push({ name: 'mech-home' })
 }
 </script>
 
@@ -705,6 +718,13 @@ function returnToBattle() {
   background: rgba(0, 0, 0, 0.35);
   padding: 6px 14px;
   border-radius: 999px;
+}
+
+/* The keyboard/mouse hint is meaningless on touch — the on-screen controls speak for themselves. */
+@media (pointer: coarse) {
+  .story-controls-hint {
+    display: none;
+  }
 }
 
 .story-exit {

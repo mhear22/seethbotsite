@@ -2,6 +2,8 @@
   <div class="battle-canvas-wrapper">
     <canvas ref="canvasRef" class="battle-canvas"></canvas>
     <div v-if="showFPS" class="fps-counter">{{ fps }} FPS</div>
+    <!-- On-screen controls (touch devices only; self-gates). -->
+    <TouchControls :input="touchInput" context="battle" />
   </div>
 </template>
 
@@ -9,8 +11,10 @@
 import { ref, computed, onMounted, onUnmounted, markRaw, watch } from 'vue'
 import { BattleScene } from '../../lib/battle/BattleScene'
 import type { MechEntity } from '../../lib/battle/MechEntity'
+import type { InputManager } from '../../lib/battle/InputManager'
 import { useGameSettings } from '../../composables/useGameSettings'
 import { useBattleEffects } from '../../composables/useBattleEffects'
+import TouchControls from './TouchControls.vue'
 
 import type { AIDifficulty } from '../../composables/useGameSettings'
 
@@ -46,6 +50,7 @@ const emit = defineEmits<{
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 let battleScene: BattleScene | null = null
+const touchInput = ref<InputManager | null>(null)
 const gameSettings = useGameSettings()
 const battleEffects = useBattleEffects()
 const fps = ref(0)
@@ -81,6 +86,7 @@ onMounted(() => {
   }))
 
   battleScene.start()
+  touchInput.value = battleScene.getInputManager()
 
   // Survival waves swap in a fresh enemy without remounting (which would dispose
   // the persistent player mech). When the enemyMech prop identity changes, hand
@@ -135,6 +141,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  touchInput.value = null
   if (battleScene) {
     battleScene.cleanup()
     battleScene = null

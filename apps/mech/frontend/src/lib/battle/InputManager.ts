@@ -13,11 +13,23 @@ export interface InputState {
   mouseY: number
 }
 
+/** Virtual action buttons a touch/gamepad overlay can drive. */
+export type VirtualButton = 'shootLeft' | 'shootRight' | 'jump' | 'dash' | 'useAbility'
+
 export class InputManager {
   private keys: Map<string, boolean> = new Map()
   private mouseButtons: Map<number, boolean> = new Map()
   private mouseMovement = { x: 0.0, y: 0.0 }
   private mouseAccumulator = { x: 0.0, y: 0.0 } // Accumulated raw movement
+
+  // --- Virtual input (on-screen touch controls / gamepad) ---
+  // These default to neutral so on desktop, where nothing drives them, the
+  // physical keyboard/mouse/pointer-lock path is completely unchanged.
+  private virtualMove = { x: 0, y: 0 }      // joystick vector: x = strafe (+right), y = +forward
+  private virtualLook = { x: 0, y: 0 }      // look delta accumulated this frame (no pointer lock needed)
+  private virtualButtons: Map<VirtualButton, boolean> = new Map()
+  private static readonly MOVE_DEADZONE = 0.35
+
   private canvas: HTMLCanvasElement
   private keyBindings: {
     forward: string
@@ -100,18 +112,24 @@ export class InputManager {
     this.mouseMovement.x = this.mouseAccumulator.x
     this.mouseMovement.y = this.mouseAccumulator.y
 
+    const dz = InputManager.MOVE_DEADZONE
+    const vm = this.virtualMove
+    const vb = this.virtualButtons
+
     return {
-      forward: this.keys.get(this.keyBindings.forward) || false,
-      backward: this.keys.get(this.keyBindings.backward) || false,
-      left: this.keys.get(this.keyBindings.left) || false,
-      right: this.keys.get(this.keyBindings.right) || false,
-      jump: this.keys.get(this.keyBindings.jump) || false,
-      shootLeft: this.mouseButtons.get(2) || false,  // Right mouse button
-      shootRight: this.mouseButtons.get(0) || false, // Left mouse button
-      dash: this.keys.get(this.keyBindings.dash) || this.keys.get('ShiftRight') || false,
-      useAbility: this.keys.get('KeyE') || false,
-      mouseX: this.mouseMovement.x,
-      mouseY: this.mouseMovement.y
+      // Physical key OR virtual joystick past the deadzone.
+      forward: this.keys.get(this.keyBindings.forward) || vm.y > dz || false,
+      backward: this.keys.get(this.keyBindings.backward) || vm.y < -dz || false,
+      left: this.keys.get(this.keyBindings.left) || vm.x < -dz || false,
+      right: this.keys.get(this.keyBindings.right) || vm.x > dz || false,
+      jump: this.keys.get(this.keyBindings.jump) || vb.get('jump') || false,
+      shootLeft: this.mouseButtons.get(2) || vb.get('shootLeft') || false,  // Right mouse button
+      shootRight: this.mouseButtons.get(0) || vb.get('shootRight') || false, // Left mouse button
+      dash: this.keys.get(this.keyBindings.dash) || this.keys.get('ShiftRight') || vb.get('dash') || false,
+      useAbility: this.keys.get('KeyE') || vb.get('useAbility') || false,
+      // Mouse look (under pointer lock) PLUS virtual look (touch drag, no lock needed).
+      mouseX: this.mouseMovement.x + this.virtualLook.x,
+      mouseY: this.mouseMovement.y + this.virtualLook.y
     }
   }
 
@@ -119,6 +137,34 @@ export class InputManager {
     // Reset the accumulator for next frame
     this.mouseAccumulator = { x: 0, y: 0 }
     this.mouseMovement = { x: 0, y: 0 }
+    // Virtual look is a per-frame delta — consume it too.
+    this.virtualLook = { x: 0, y: 0 }
+  }
+
+  // --- Virtual input API (driven by an on-screen touch overlay) ------------
+
+  /** Set the movement joystick vector. x = strafe (+right), y = +forward. Clamped to [-1, 1]. */
+  setVirtualMove(x: number, y: number) {
+    this.virtualMove.x = Math.max(-1, Math.min(1, x))
+    this.virtualMove.y = Math.max(-1, Math.min(1, y))
+  }
+
+  /** Add a look delta this frame (equivalent to mouse movementX/Y; no pointer lock required). */
+  addVirtualLook(dx: number, dy: number) {
+    this.virtualLook.x += dx
+    this.virtualLook.y += dy
+  }
+
+  /** Hold/release a virtual action button (fire, jump, dash, ability). */
+  setVirtualButton(name: VirtualButton, down: boolean) {
+    this.virtualButtons.set(name, down)
+  }
+
+  /** Release all virtual input (e.g. when the overlay unmounts or loses focus). */
+  clearVirtualInput() {
+    this.virtualMove = { x: 0, y: 0 }
+    this.virtualLook = { x: 0, y: 0 }
+    this.virtualButtons.clear()
   }
 
   cleanup() {
