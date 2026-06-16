@@ -46,7 +46,7 @@ export const QUESTS_PER_CHAIN = 3
 export const TOWN_DECAY_RADIUS = 60
 
 /** Half-extent of the square open world (matches StoryWorld ground / physics bounds). */
-export const WORLD_HALF_EXTENT = 400
+export const WORLD_HALF_EXTENT = 600
 
 // ============================================================================
 // Data model (see design doc §4)

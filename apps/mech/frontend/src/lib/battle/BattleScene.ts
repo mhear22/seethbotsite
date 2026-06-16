@@ -493,6 +493,11 @@ export class BattleScene {
     this.animate()
   }
 
+  /** The input manager, so a touch overlay can drive virtual movement/look/buttons. */
+  getInputManager(): InputManager {
+    return this.inputManager
+  }
+
   private animate = () => {
     // Don't queue further frames while the tab is hidden (visibilitychange will
     // resume). Guards against any stray rAF that fires during the hidden window.
@@ -567,6 +572,12 @@ export class BattleScene {
     }
 
     const input = this.inputManager.getInputState()
+
+    // Camera first: sets the mech's yaw from the mouse before movement, the mesh
+    // sync, and aim — so the body tracks the camera with no one-frame trail and
+    // movement/aim are camera-relative on the same frame.
+    this.camera.update(deltaTime, input.mouseX, input.mouseY)
+    this.inputManager.resetMouseMovement()
 
     // Update player mech
     const dashStarted = this.physicsSystem.updateDash(this.playerMech, input, deltaTime)
@@ -776,11 +787,7 @@ export class BattleScene {
       }
     }
 
-    // Update camera
-    this.camera.update(deltaTime, input.mouseX, input.mouseY)
-    this.inputManager.resetMouseMovement()
-
-    // Update targeting state
+    // Update targeting state (camera already updated at the top of the frame)
     this.targetingState = this.calculateTargeting()
   }
 

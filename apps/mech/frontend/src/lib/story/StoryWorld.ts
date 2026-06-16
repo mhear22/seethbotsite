@@ -7,6 +7,7 @@ import { InputManager } from '../battle/InputManager'
 import { ProjectileSystem } from '../battle/ProjectileSystem'
 import { ParticleSystem } from '../battle/ParticleSystem'
 import { Town } from './Town'
+import { Terrain } from './Terrain'
 import { StoryCombat } from './StoryCombat'
 import type { QuestDef } from './quests'
 import type { MechLoadout } from '../../composables/useMechBuilder'
@@ -77,6 +78,7 @@ export class StoryWorld {
   private projectileSystem: ProjectileSystem
   private particleSystem: ParticleSystem
   private combat: StoryCombat
+  private terrain!: Terrain
 
   /** Backing field for the player mech. Replaced in place by applyLoadout(). */
   private _playerMech: MechEntity
@@ -140,10 +142,17 @@ export class StoryWorld {
     // --- World content ---
     this.setupSky()
     this.setupLighting()
-    this.setupGround()
+    this.setupTerrain(config.towns)
     this.setupTowns(config.towns)
 
-    // Player mech into the scene.
+    // Mechs walk on the procedural terrain (towns sit on flattened pads).
+    this.physicsSystem.setGroundHeightProvider((x, z) => this.terrain.heightAt(x, z))
+
+    // Player mech into the scene, snapped onto the ground at its spawn.
+    this._playerMech.position.y = this.terrain.heightAt(
+      this._playerMech.position.x,
+      this._playerMech.position.z,
+    )
     this.scene.add(this.playerMech.mesh)
 
     // --- Events ---
@@ -180,6 +189,10 @@ export class StoryWorld {
       `,
     })
     this.scene.add(new THREE.Mesh(skyGeometry, skyMaterial))
+
+    // Distance haze: fades the far edges of the (large) map into the horizon
+    // colour so the world reads as open and continuous rather than a flat slab.
+    this.scene.fog = new THREE.Fog(0xc9dcef, WORLD_HALF_EXTENT * 0.75, WORLD_HALF_EXTENT * 1.95)
   }
 
   private setupLighting(): void {
@@ -192,33 +205,39 @@ export class StoryWorld {
     sun.shadow.camera.right = WORLD_HALF_EXTENT
     sun.shadow.camera.top = WORLD_HALF_EXTENT
     sun.shadow.camera.bottom = -WORLD_HALF_EXTENT
-    sun.shadow.camera.far = 600
-    sun.shadow.mapSize.width = 1024
-    sun.shadow.mapSize.height = 1024
+    sun.shadow.camera.far = 1200
+    sun.shadow.mapSize.width = 2048
+    sun.shadow.mapSize.height = 2048
     this.scene.add(sun)
 
     this.scene.add(new THREE.HemisphereLight(0xbfe3ff, 0x4a7a3a, 0.4))
   }
 
-  private setupGround(): void {
+  /**
+   * Procedurally-generated rolling terrain. Each town gets a flattened pad so
+   * its buildings, farms and combat encounters stay on level ground while the
+   * surrounding wilderness undulates. The heightfield is deterministic (seeded)
+   * so reloads reproduce the same hills, and it backs the physics ground-height
+   * queries so mechs walk on the surface.
+   */
+  private setupTerrain(townStates: TownState[]): void {
     const size = WORLD_HALF_EXTENT * 2
-    const groundGeo = new THREE.PlaneGeometry(size, size)
-    const groundMat = new THREE.MeshStandardMaterial({
-      color: 0x5a8a3c, // grassy green overworld
-      roughness: 0.95,
-      metalness: 0.0,
-    })
-    const ground = new THREE.Mesh(groundGeo, groundMat)
-    ground.rotation.x = -Math.PI / 2
-    ground.receiveShadow = true
-    this.scene.add(ground)
+    // Flatten generously around each town (the flat radius clears the town's 34u
+    // pad and the 30–45u combat-encounter spawn ring) plus a pad at the origin so
+    // the player always spawns on level plains. Pads sit at y = 0 so combat/spawn
+    // logic is unchanged.
+    const pads = townStates.map((t) => ({
+      x: t.position[0],
+      z: t.position[2],
+      flatRadius: 50,
+      blendRadius: 45,
+      elevation: 0,
+    }))
+    pads.push({ x: 0, z: 0, flatRadius: 32, blendRadius: 48, elevation: 0 })
 
-    // Subtle grid for spatial reference (no arena walls).
-    const grid = new THREE.GridHelper(size, 80, 0x3f6b2a, 0x4d7a35)
-    grid.position.y = 0.02
-    ;(grid.material as THREE.Material).transparent = true
-    ;(grid.material as THREE.Material).opacity = 0.25
-    this.scene.add(grid)
+    this.terrain = new Terrain({ size, segments: 300, seed: 1337, pads })
+    this.scene.add(this.terrain.mesh)
+    this.scene.add(this.terrain.waterMesh)
   }
 
   private setupTowns(townStates: TownState[]): void {
@@ -265,6 +284,12 @@ export class StoryWorld {
       return
     }
 
+    // Camera first: this sets the mech's yaw from the mouse BEFORE movement and
+    // the mesh sync below, so (a) movement is camera-relative on the same frame
+    // and (b) the rendered body tracks the camera with no one-frame trail.
+    this.camera.update(deltaTime, input.mouseX, input.mouseY)
+    this.inputManager.resetMouseMovement()
+
     // Player movement (dash / move / jump) — same systems as battle.
     const dashStarted = this.physicsSystem.updateDash(this.playerMech, input, deltaTime)
     if (dashStarted) {
@@ -277,10 +302,6 @@ export class StoryWorld {
     this.physicsSystem.updateJumpJets(this.playerMech, input, deltaTime)
     this.playerMech.update(deltaTime)
     this.playerMech.updatePower(deltaTime)
-
-    // Camera follows aim.
-    this.camera.update(deltaTime, input.mouseX, input.mouseY)
-    this.inputManager.resetMouseMovement()
 
     // --- Active encounter combat (firing, AI, projectiles, VFX) ---
     this.particleSystem.update(deltaTime)
@@ -381,6 +402,11 @@ export class StoryWorld {
     return this.towns.find((t) => t.id === id)
   }
 
+  /** The input manager, so a touch overlay can drive virtual movement/look/buttons. */
+  getInputManager(): InputManager {
+    return this.inputManager
+  }
+
   /** Pause/resume free-roam + decay + combat (used while a UI panel is open). */
   setPaused(paused: boolean): void {
     this.paused = paused
@@ -453,6 +479,8 @@ export class StoryWorld {
 
     for (const town of this.towns) town.dispose()
     this.towns = []
+
+    this.terrain.dispose()
 
     this._playerMech.cleanup()
 

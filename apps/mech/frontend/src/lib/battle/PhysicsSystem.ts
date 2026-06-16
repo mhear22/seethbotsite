@@ -3,14 +3,33 @@ import type { MechEntity } from './MechEntity'
 import type { InputState } from './InputManager'
 import { JUMP_VELOCITY_BASE, JUMP_VELOCITY_JETS } from './constants'
 
+/**
+ * How far above the ground the mech can be while still counting as "grounded"
+ * (and therefore stuck to the terrain surface). Keeps walking over rolling
+ * hills smooth; only larger drops (ledges, cliffs) trigger a real fall.
+ */
+const GROUND_STICK_DISTANCE = 1.5
+
 export class PhysicsSystem {
   public speedMultiplier = 1.0
   private arenaHalfW = 150
   private arenaHalfD = 150
 
+  /**
+   * Ground height at a world (x, z). Defaults to a flat floor at y = 0 (battle
+   * arenas); the story overworld supplies a terrain heightfield so mechs walk
+   * on the procedurally-generated hills.
+   */
+  private groundHeightAt: (x: number, z: number) => number = () => 0
+
   setArenaBounds(width: number, depth: number) {
     this.arenaHalfW = width / 2
     this.arenaHalfD = depth / 2
+  }
+
+  /** Supply a ground-height function (e.g. from procedural terrain). */
+  setGroundHeightProvider(fn: (x: number, z: number) => number) {
+    this.groundHeightAt = fn
   }
 
   updateMovement(mech: MechEntity, input: InputState, deltaTime: number): boolean {
@@ -180,9 +199,19 @@ export class PhysicsSystem {
       mech.isJumping = true
     }
 
-    // Apply gravity (increased for faster falling)
-    if (mech.position.y > 0 || mech.velocity.y > 0) {
-      mech.velocity.y -= 50 * deltaTime // Stronger gravity for faster falling
+    // Ground height beneath the mech (terrain in the overworld, else y = 0).
+    const groundY = this.groundHeightAt(mech.position.x, mech.position.z)
+    const aboveGround = mech.position.y - groundY
+
+    // "Airborne" means genuinely off the surface: mid-jump, still rising, or far
+    // enough above the ground to have walked off a ledge. Otherwise the mech is
+    // grounded and simply hugs the terrain — this keeps walking over rolling
+    // hills smooth instead of falling-and-snapping every frame on a downslope.
+    const airborne = mech.isJumping || mech.velocity.y > 0 || aboveGround > GROUND_STICK_DISTANCE
+
+    if (airborne) {
+      // Apply gravity (increased for faster falling)
+      mech.velocity.y -= 50 * deltaTime
       mech.position.y += mech.velocity.y * deltaTime
 
       // Consume jump fuel while airborne and ascending (jump jets only)
@@ -193,11 +222,16 @@ export class PhysicsSystem {
           mech.jumpFuel = 0
         }
       }
-    }
 
-    // Ground check
-    if (mech.position.y <= 0) {
-      mech.position.y = 0
+      // Land when we reach the surface.
+      if (mech.position.y <= groundY) {
+        mech.position.y = groundY
+        mech.velocity.y = 0
+        mech.isJumping = false
+      }
+    } else {
+      // Grounded: stick to the terrain surface (smoothly follows slopes up/down).
+      mech.position.y = groundY
       mech.velocity.y = 0
       mech.isJumping = false
     }
