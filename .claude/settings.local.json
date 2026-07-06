@@ -9,7 +9,10 @@
       "Bash(cd:*)",
       "Bash(npx:*)",
       "Bash(timeout:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(gh auth *)",
+      "Bash(echo \"---exit:$?\")",
+      "Bash(env)"
     ]
   },
   "model": "sonnet",
