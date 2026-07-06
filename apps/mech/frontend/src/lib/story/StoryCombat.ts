@@ -1,23 +1,63 @@
 import * as THREE from 'three'
 import { markRaw } from 'vue'
-import { MechEntity, type CombatStats } from '../battle/MechEntity'
-import { EnemyAI } from '../battle/EnemyAI'
+import { MechEntity } from '../battle/MechEntity'
+import { EnemyAI, type EnemyArchetype } from '../battle/EnemyAI'
 import { ProjectileSystem } from '../battle/ProjectileSystem'
 import { ParticleSystem } from '../battle/ParticleSystem'
-import { ARM_PARTS, CORE_PARTS, LEGS_PARTS, HEAD_PARTS, RACK_PARTS } from '../../shared/data/MechParts'
-import type { MechLoadout } from '../../composables/useMechBuilder'
+import {
+  archetypeStats,
+  archetypeLoadout,
+  weaponProjectileSpeed,
+  maxAliveForDifficulty,
+  compositionForDifficulty,
+  reinforcementComposition,
+} from '../battle/enemyGeneration'
 import type { AIDifficulty } from '../../composables/useGameSettings'
+import type { MechSlot } from '../../shared/types/MechTypes'
+import type { MechLoadout } from '../../composables/useMechBuilder'
 import type { QuestDef } from './quests'
 
 /**
- * Per-enemy bundle: the mech, its own AI brain, and its weapon cooldowns. Each
- * enemy in a wave gets an independent AI so they can flank/strafe separately.
+ * Per-enemy bundle: the mech, its own AI brain, its weapon cooldowns, and the
+ * archetype it was spawned as. Each enemy in a wave gets an independent AI so
+ * they can flank/strafe separately.
  */
 interface CombatEnemy {
   mech: MechEntity
   ai: EnemyAI
   lastShot: number
+  archetype: EnemyArchetype
+  /** Named-ace boss (drives the half-health reinforcement script). */
+  isBoss: boolean
+  /** Limb slots shot off this fight — the guaranteed-damaged salvage drops (§3.6). */
+  destroyedSlots: MechSlot[]
 }
+
+/** Payload the host consumes to award salvage for a killed enemy (§3.6/§3.7). */
+export interface EnemyKill {
+  /** The killed enemy's loadout — its parts are the salvage drop pool. */
+  loadout: MechLoadout
+  /** Limb slots destroyed during the fight (drop damaged, guaranteed). */
+  destroyedSlots: MechSlot[]
+  archetype: EnemyArchetype
+  isBoss: boolean
+}
+
+/** Story pacing: how much the quest difficulty tier scales archetype stats. */
+const TIER_SCALE: Record<AIDifficulty, number> = {
+  tutorial: 0.8,
+  easy: 0.9,
+  medium: 1.0,
+  hard: 1.15,
+  boss: 1.3,
+}
+
+/**
+ * Radius (world units) around the town centre inside which combat collateral
+ * (explosions, stray ordnance) registers. Mirrors useStoryMode's decay radius;
+ * kept local so this module stays free of the story-state composable.
+ */
+const COLLATERAL_RADIUS = 60
 
 /** Snapshot the host reads each frame to drive HUD / completion. */
 export interface CombatProgress {
@@ -31,57 +71,6 @@ export interface CombatProgress {
   collected: boolean
   /** True once the whole encounter is complete. */
   complete: boolean
-}
-
-/** Base difficulty stat archetypes (mirrors useMechBattle.generateEnemy). */
-const DIFFICULTY_STATS: Record<AIDifficulty, CombatStats> = {
-  tutorial: { maxHealth: 150, currentHealth: 150, armor: 10, speed: 60, firepower: 25, accuracy: 30, energy: 50 },
-  easy: { maxHealth: 200, currentHealth: 200, armor: 15, speed: 80, firepower: 30, accuracy: 40, energy: 60 },
-  medium: { maxHealth: 300, currentHealth: 300, armor: 25, speed: 70, firepower: 45, accuracy: 50, energy: 80 },
-  hard: { maxHealth: 400, currentHealth: 400, armor: 35, speed: 60, firepower: 60, accuracy: 60, energy: 100 },
-  boss: { maxHealth: 600, currentHealth: 600, armor: 45, speed: 70, firepower: 80, accuracy: 70, energy: 120 },
-}
-
-/** Loadout part indices per difficulty (mirrors useMechBattle.generateEnemy). */
-const DIFFICULTY_LOADOUT: Record<AIDifficulty, { arm: number; core: number; legs: number; head: number; rack: number }> = {
-  tutorial: { arm: 0, core: 0, legs: 0, head: 0, rack: 0 },
-  easy: { arm: 0, core: 2, legs: 0, head: 3, rack: 2 },
-  medium: { arm: 1, core: 0, legs: 1, head: 1, rack: 1 },
-  hard: { arm: 3, core: 1, legs: 3, head: 2, rack: 3 },
-  boss: { arm: 1, core: 1, legs: 1, head: 1, rack: 2 },
-}
-
-function enemyLoadout(difficulty: AIDifficulty): MechLoadout {
-  const idx = DIFFICULTY_LOADOUT[difficulty] ?? DIFFICULTY_LOADOUT.tutorial
-  return {
-    leftArm: ARM_PARTS[idx.arm] ?? ARM_PARTS[0],
-    rightArm: ARM_PARTS[idx.arm] ?? ARM_PARTS[0],
-    core: CORE_PARTS[idx.core] ?? CORE_PARTS[0],
-    legs: LEGS_PARTS[idx.legs] ?? LEGS_PARTS[0],
-    head: HEAD_PARTS[idx.head] ?? HEAD_PARTS[0],
-    rack: RACK_PARTS[idx.rack] ?? RACK_PARTS[0],
-  }
-}
-
-function scaledStats(difficulty: AIDifficulty, scale: number): CombatStats {
-  const base = DIFFICULTY_STATS[difficulty] ?? DIFFICULTY_STATS.tutorial
-  if (scale === 1) return { ...base }
-  return {
-    maxHealth: Math.round(base.maxHealth * scale),
-    currentHealth: Math.round(base.maxHealth * scale),
-    armor: Math.round(base.armor * scale),
-    speed: base.speed,
-    firepower: Math.round(base.firepower * scale),
-    accuracy: Math.min(95, Math.round(base.accuracy * scale)),
-    energy: Math.round(base.energy * scale),
-  }
-}
-
-/** Projectile speed for a weapon part (mirrors BattleScene.getWeaponProjectileSpeed). */
-function weaponProjectileSpeed(weaponType?: string, _partId?: string): number {
-  if (weaponType === 'energy') return 400
-  if (weaponType === 'missile') return 200 // matches arm-missile-pod's projectileSpeed
-  return 300
 }
 
 /**
@@ -115,9 +104,17 @@ export class StoryCombat {
   // Wave Defence pacing: spawn enemies in small batches as the player clears them.
   private waveSpawnQueue: number = 0 // enemies still to spawn for the current wave quest
   private waveDifficulty: AIDifficulty = 'easy'
+  private waveTierScale = 1
   private waveBatchTimer = 0
   private clearedCount = 0
   private totalCount = 0
+
+  // Boss (Sanction / named ace) state — drives the half-health reinforcement
+  // script (§3.6). `boss` is the ace unit; `bossReinforced` latches so the
+  // reinforcement pair spawns exactly once when it crosses 50% HP.
+  private boss: CombatEnemy | null = null
+  private bossReinforced = false
+  private bossScale = 1
 
   private elapsed = 0
 
@@ -132,6 +129,27 @@ export class StoryCombat {
   onPlayerDefeated?: () => void
   /** Camera shake hook (host wires CameraController.triggerShake). */
   onShake?: (amount: number) => void
+  /**
+   * Collateral hook (§3.5): fired when combat harms the town — explosions and
+   * stray ordnance detonating inside COLLATERAL_RADIUS of the town centre.
+   * `amount` is a normalized severity (≈1.0 for a full-size explosion at the
+   * town centre, tapering to 0 at the radius edge); `position` is the world
+   * impact point. Phase 2 only EMITS this; Phase 3 routes it into a gentle
+   * town-condition decrement. The host multiplies by its own coefficient.
+   */
+  onCollateral?: (amount: number, position: THREE.Vector3) => void
+  /**
+   * Comms-style HUD callout hook (§3.6): fired once when a named ace calls in
+   * its half-health reinforcement pair, so the host can surface a "hostile
+   * reinforcements inbound" banner. Phase 2 emits; the HUD lands in Phase 3.
+   */
+  onReinforcement?: (info: { bossName: string; count: number }) => void
+  /**
+   * Salvage hook (§3.6/§3.7): fired once per enemy killed, with its loadout and
+   * the limb slots destroyed during the fight. The host routes this into
+   * `useStoryMode.awardKillSalvage` (scrap + rolled part drops) and a HUD toast.
+   */
+  onEnemyKilled?: (kill: EnemyKill) => void
 
   constructor(scene: THREE.Scene, projectiles: ProjectileSystem, particles: ParticleSystem) {
     this.scene = scene
@@ -173,19 +191,26 @@ export class StoryCombat {
     this.clearedCount = 0
     this.objectFound = false
     this.objectCollected = false
+    this.boss = null
+    this.bossReinforced = false
 
     if (quest.type === 'hidden_object') {
       this.totalCount = 1
       this.spawnHiddenObject(quest)
     } else if (quest.type === 'boss_hunt') {
+      // Sanction: a named ace. The reinforcement pair (spawned at half HP) adds
+      // to totalCount when it arrives.
       this.totalCount = 1
-      this.spawnEnemy('boss', quest.bossScale ?? 1, 0)
+      this.bossScale = quest.bossScale ?? 1
+      this.boss = this.spawnArchetypeEnemy('ace', this.bossScale, 0, true)
     } else {
-      // wave_defence: queue N enemies, spawn the first batch.
+      // wave_defence: queue N enemies as a combined-arms composition, spawn the
+      // first batch.
       const n = quest.waveCount ?? 3
       this.totalCount = n
       this.waveSpawnQueue = n
       this.waveDifficulty = quest.difficulty ?? 'easy'
+      this.waveTierScale = TIER_SCALE[this.waveDifficulty] ?? 1
       this.spawnWaveBatch()
     }
     return true
@@ -203,6 +228,8 @@ export class StoryCombat {
     this.waveSpawnQueue = 0
     this.clearedCount = 0
     this.totalCount = 0
+    this.boss = null
+    this.bossReinforced = false
   }
 
   // --- Spawning ---
@@ -217,33 +244,70 @@ export class StoryCombat {
     )
   }
 
-  private spawnEnemy(difficulty: AIDifficulty, scale: number, index: number): void {
-    const stats = scaledStats(difficulty, scale)
-    const loadout = enemyLoadout(difficulty)
+  /** Short HUD label per archetype (falls back to a generic "Raider"). */
+  private static readonly ARCHETYPE_LABEL: Record<EnemyArchetype, string> = {
+    skirmisher: 'Skirmisher',
+    line: 'Trooper',
+    bulwark: 'Bulwark',
+    sniper: 'Lancer',
+    ace: 'Ace',
+  }
+
+  /**
+   * Spawn one archetype enemy from the unified enemyGeneration table and give it
+   * the matching AI brain (§3.6). Returns the CombatEnemy bundle so callers
+   * (boss spawn) can hold a reference. `scale` multiplies the archetype's base
+   * stats (boss scale / wave ramp).
+   */
+  private spawnArchetypeEnemy(
+    archetype: EnemyArchetype,
+    scale: number,
+    index: number,
+    isBoss = false,
+  ): CombatEnemy {
+    const stats = archetypeStats(archetype, scale)
+    const loadout = archetypeLoadout(archetype)
     const spawn = this.randomRingPoint(30, 45)
-    const isBoss = difficulty === 'boss'
-    const name = isBoss ? 'Town Bully' : `Raider ${index + 1}`
+    const label = StoryCombat.ARCHETYPE_LABEL[archetype] ?? 'Raider'
+    const name = isBoss ? 'Town Bully' : `${label} ${index + 1}`
     const mech = new MechEntity(`story-enemy-${this.elapsed}-${index}-${Math.random().toString(36).slice(2, 6)}`,
       name, loadout, stats, false, spawn)
     // Face the town centre.
     const toCenter = this.anchor.clone().sub(spawn)
     mech.rotation.y = Math.atan2(toCenter.x, toCenter.z)
 
-    const ai = new EnemyAI(difficulty)
+    // Behaviour brain: archetype profile drives kite/brawl/aim; the ace uses the
+    // boss difficulty as its base so it stays elite even before setArchetype.
+    const ai = new EnemyAI(isBoss ? 'boss' : 'medium')
+    ai.setArchetype(archetype)
     ai.setArenaBounds(this.arenaHalf, this.arenaHalf)
 
+    // Slot-destruction feedback + salvage tracking (§3.3/§3.6): record which limb
+    // was shot off (a guaranteed damaged drop when this enemy dies) and punch a
+    // burst + shake at the limb so delimbing reads distinctly from a plain hit.
+    const unit: CombatEnemy = { mech, ai, lastShot: 0, archetype, isBoss, destroyedSlots: [] }
+    mech.onSlotDestroyed = (m, slot) => {
+      unit.destroyedSlots.push(slot)
+      this.particles.spawnExplosion(m.getSlotPosition(slot), 1.2)
+      this.onShake?.(0.5)
+    }
+
     this.scene.add(mech.mesh)
-    this.enemies.push({ mech, ai, lastShot: 0 })
+    this.enemies.push(unit)
+    return unit
   }
 
   private spawnWaveBatch(): void {
-    // Keep at most ~2 enemies alive at once for readability; refill from queue.
-    const maxAlive = 2
+    // Combined-arms composition for this tier, cycled across the wave so the
+    // batch is mixed (skirmisher + bulwark + sniper …) rather than N clones.
+    const maxAlive = maxAliveForDifficulty(this.waveDifficulty)
+    const composition = compositionForDifficulty(this.waveDifficulty)
     while (this.enemies.length < maxAlive && this.waveSpawnQueue > 0) {
       const idx = this.totalCount - this.waveSpawnQueue
-      // Later enemies in the wave scale up slightly.
-      const scale = 1 + idx * 0.1
-      this.spawnEnemy(this.waveDifficulty, scale, idx)
+      const archetype = composition[idx % composition.length]
+      // Tier scale sets the wave's baseline toughness; later enemies ramp slightly.
+      const scale = this.waveTierScale * (1 + idx * 0.08)
+      this.spawnArchetypeEnemy(archetype, scale, idx)
       this.waveSpawnQueue--
     }
   }
@@ -414,11 +478,16 @@ export class StoryCombat {
       e.mech.updatePower(deltaTime)
       e.mech.update(deltaTime)
       if (shouldFire) {
-        const armPart = e.mech.loadout.rightArm ?? e.mech.loadout.leftArm
-        const projSpeed = weaponProjectileSpeed(armPart?.weaponType, armPart?.id)
-        const aimPoint = e.ai.computeAimPoint(e.mech, player, projSpeed)
-        const dir = aimPoint.sub(e.mech.getArmPosition('right')).normalize()
-        this.projectiles.fireWeapon(e.mech, dir, 'right', player)
+        // Fire from a live weapon arm (§3.3): a defanged right arm falls back to
+        // the left; both gone = the enemy can't shoot.
+        const fireArm = e.mech.liveWeaponArm()
+        if (fireArm) {
+          const armPart = e.mech.loadout[fireArm === 'left' ? 'leftArm' : 'rightArm']
+          const projSpeed = weaponProjectileSpeed(armPart?.weaponType)
+          const aimPoint = e.ai.computeAimPoint(e.mech, player, projSpeed)
+          const dir = aimPoint.sub(e.mech.getArmPosition(fireArm)).normalize()
+          this.projectiles.fireWeapon(e.mech, dir, fireArm, player)
+        }
       }
     }
 
@@ -431,6 +500,7 @@ export class StoryCombat {
         armorPierce: hit.projectile.armorPierce,
         burn: hit.projectile.appliesBurn,
         fromFront: hit.target.isHitFromFront(hit.projectile.velocity),
+        slot: hit.slot,
       })
       const impact = hit.target.position.clone()
       impact.y += 1.5
@@ -440,12 +510,15 @@ export class StoryCombat {
 
       if (hit.target === player) {
         this.onShake?.(0.4)
+        // Enemy ordnance detonating on the player inside town is minor collateral
+        // (§3.5 groundwork — a stray-fire proxy, small coefficient).
+        this.emitCollateral(hit.target.position, 0.2)
       } else {
         this.onShake?.(Math.min(0.4, 0.1 + hit.projectile.damage * 0.01))
       }
 
       if (defeated) {
-        this.particles.spawnExplosion(hit.target.position.clone(), 1.8)
+        this.spawnCollateralExplosion(hit.target.position.clone(), 1.8)
         this.onShake?.(1.0)
         hit.target.isDestroyed = true
         if (hit.target === player) {
@@ -461,11 +534,29 @@ export class StoryCombat {
     // in the removal loop below). Design §3.2 flamer identity.
     if (player.stats.currentHealth <= 0 && !player.isDestroyed) {
       player.isDestroyed = true
-      this.particles.spawnExplosion(player.position.clone(), 1.8)
+      this.spawnCollateralExplosion(player.position.clone(), 1.8)
       this.onShake?.(1.0)
       this.onPlayerDefeated?.()
       this.abort()
       return
+    }
+
+    // --- Named-ace half-health reinforcement script (§3.6) ---
+    // When the boss first drops to 50% HP, it calls in a scripted skirmisher
+    // pair and fires the comms callout hook. Fires exactly once.
+    const boss = this.boss
+    if (boss && !this.bossReinforced && !boss.mech.isDestroyed) {
+      const hp = boss.mech.stats.currentHealth / boss.mech.stats.maxHealth
+      if (hp <= 0.5) {
+        this.bossReinforced = true
+        const pair = reinforcementComposition()
+        // Reinforcements are lighter than the ace — half the boss scale, floored
+        // at 1 so they still bite.
+        const reScale = Math.max(1, this.bossScale * 0.5)
+        pair.forEach((arch, i) => this.spawnArchetypeEnemy(arch, reScale, this.totalCount + i))
+        this.totalCount += pair.length
+        this.onReinforcement?.({ bossName: boss.mech.name, count: pair.length })
+      }
     }
 
     // --- Remove dead enemies, refill wave, check completion ---
@@ -474,12 +565,21 @@ export class StoryCombat {
       // A burn-out (currentHealth <= 0 with no explosion yet) counts as a kill.
       if (!e.mech.isDestroyed && e.mech.stats.currentHealth <= 0) {
         e.mech.isDestroyed = true
-        this.particles.spawnExplosion(e.mech.position.clone(), 1.8)
+        this.spawnCollateralExplosion(e.mech.position.clone(), 1.8)
       }
       if (e.mech.isDestroyed) {
+        // Salvage (§3.6/§3.7): hand the host this enemy's loadout + the limbs it
+        // lost so it can award scrap and roll part drops. Read before cleanup().
+        this.onEnemyKilled?.({
+          loadout: e.mech.loadout,
+          destroyedSlots: e.destroyedSlots.slice(),
+          archetype: e.archetype,
+          isBoss: e.isBoss,
+        })
         this.scene.remove(e.mech.mesh)
         e.mech.cleanup()
         this.clearedCount++
+        if (this.boss === e) this.boss = null
       } else {
         stillAlive.push(e)
       }
@@ -489,7 +589,7 @@ export class StoryCombat {
     // Wave: refill from the queue if a slot opened.
     if (this.quest.type === 'wave_defence' && this.waveSpawnQueue > 0) {
       this.waveBatchTimer -= deltaTime
-      if (this.enemies.length < 2 && this.waveBatchTimer <= 0) {
+      if (this.enemies.length < maxAliveForDifficulty(this.waveDifficulty) && this.waveBatchTimer <= 0) {
         this.spawnWaveBatch()
         this.waveBatchTimer = 1.5
       }
@@ -508,6 +608,30 @@ export class StoryCombat {
   }
 
   // --- Helpers ---
+
+  /**
+   * Spawn an explosion AND register its collateral against the town (§3.5).
+   * Every death/AoE detonation goes through here so the collateral hook fires
+   * consistently from the same groundwork that already drove the VFX.
+   */
+  private spawnCollateralExplosion(position: THREE.Vector3, scale: number): void {
+    this.particles.spawnExplosion(position, scale)
+    this.emitCollateral(position, scale / 1.8) // normalize so a standard 1.8 blast ≈ 1.0
+  }
+
+  /**
+   * Emit a normalized collateral severity, tapered by distance from the town
+   * centre. No-op when there is no listener or the impact is outside the town.
+   */
+  private emitCollateral(position: THREE.Vector3, severity: number): void {
+    if (!this.onCollateral) return
+    const dx = position.x - this.anchor.x
+    const dz = position.z - this.anchor.z
+    const dist = Math.sqrt(dx * dx + dz * dz)
+    const proximity = 1 - dist / COLLATERAL_RADIUS
+    if (proximity <= 0) return
+    this.onCollateral(severity * proximity, position.clone())
+  }
 
   private nearestEnemyTo(player: MechEntity): CombatEnemy | null {
     let best: CombatEnemy | null = null

@@ -2,7 +2,7 @@ import { ref, computed } from 'vue'
 import * as THREE from 'three'
 import { MechEntity, type CombatStats } from '../lib/battle/MechEntity'
 import type { MechLoadout, MechStats } from './useMechBuilder'
-import { ARM_PARTS, CORE_PARTS, LEGS_PARTS, HEAD_PARTS, RACK_PARTS } from '../shared/data/MechParts'
+import { enemyStats, enemyLoadout, DIFFICULTY_NAMES } from '../lib/battle/enemyGeneration'
 
 export interface SpawnPosition {
   position: [number, number, number]
@@ -107,106 +107,14 @@ export function useMechBattle() {
     enemySpawn?: SpawnPosition,
     options?: { statScale?: number; nameSuffix?: string }
   ) {
-    // Enemy presets based on difficulty
-    const enemyConfigs = {
-      tutorial: {
-        name: 'Training Bot',
-        stats: {
-          maxHealth: 150,
-          currentHealth: 150,
-          armor: 10,
-          speed: 60,
-          firepower: 25,
-          accuracy: 30,
-          energy: 50
-        }
-      },
-      easy: {
-        name: 'Scout Mech',
-        stats: {
-          maxHealth: 200,
-          currentHealth: 200,
-          armor: 15,
-          speed: 80,
-          firepower: 30,
-          accuracy: 40,
-          energy: 60
-        }
-      },
-      medium: {
-        name: 'Assault Mech',
-        stats: {
-          maxHealth: 300,
-          currentHealth: 300,
-          armor: 25,
-          speed: 70,
-          firepower: 45,
-          accuracy: 50,
-          energy: 80
-        }
-      },
-      hard: {
-        name: 'Heavy Mech',
-        stats: {
-          maxHealth: 400,
-          currentHealth: 400,
-          armor: 35,
-          speed: 60,
-          firepower: 60,
-          accuracy: 60,
-          energy: 100
-        }
-      },
-      boss: {
-        name: 'TITAN-Class Destroyer',
-        stats: {
-          maxHealth: 600,
-          currentHealth: 600,
-          armor: 45,
-          speed: 70,
-          firepower: 80,
-          accuracy: 70,
-          energy: 120
-        }
-      }
-    }
-
-    const baseConfig = enemyConfigs[difficulty]
-
-    // Apply optional stat scaling (survival waves ramp the same archetype up).
+    // Stats + loadout come from the unified enemyGeneration table (single source
+    // of truth shared with StoryCombat). Survival waves pass statScale to ramp
+    // the same archetype up.
     const scale = options?.statScale ?? 1
-    const config = {
-      name: options?.nameSuffix ? `${baseConfig.name} ${options.nameSuffix}` : baseConfig.name,
-      stats: scale === 1 ? baseConfig.stats : {
-        maxHealth: Math.round(baseConfig.stats.maxHealth * scale),
-        currentHealth: Math.round(baseConfig.stats.maxHealth * scale),
-        armor: Math.round(baseConfig.stats.armor * scale),
-        speed: baseConfig.stats.speed, // keep mobility readable
-        firepower: Math.round(baseConfig.stats.firepower * scale),
-        accuracy: Math.min(95, Math.round(baseConfig.stats.accuracy * scale)),
-        energy: Math.round(baseConfig.stats.energy * scale)
-      }
-    }
-
-    // Select parts based on difficulty
-    const enemyLoadouts: Record<string, { arm: number; core: number; legs: number; head: number; rack: number }> = {
-      tutorial: { arm: 0, core: 0, legs: 0, head: 0, rack: 0 },       // autocannon, diesel, bipedal, standard optics, smoke
-      easy:    { arm: 0, core: 2, legs: 0, head: 3, rack: 2 },        // autocannon, gas turbine, bipedal, scout, jump jets
-      medium:  { arm: 1, core: 0, legs: 1, head: 1, rack: 1 },        // railgun, diesel, tracked, targeting array, ammo feed
-      hard:    { arm: 3, core: 1, legs: 3, head: 2, rack: 3 },        // missile pod, fusion, quad, reinforced, repair drone
-      boss:    { arm: 1, core: 1, legs: 1, head: 1, rack: 2 },        // railgun, fusion, tracked, targeting array, jump jets
-    }
-
-    const indices = enemyLoadouts[difficulty] ?? enemyLoadouts.tutorial
-
-    const enemyLoadout: MechLoadout = {
-      leftArm: ARM_PARTS[indices.arm] ?? ARM_PARTS[0],
-      rightArm: ARM_PARTS[indices.arm] ?? ARM_PARTS[0],
-      core: CORE_PARTS[indices.core] ?? CORE_PARTS[0],
-      legs: LEGS_PARTS[indices.legs] ?? LEGS_PARTS[0],
-      head: HEAD_PARTS[indices.head] ?? HEAD_PARTS[0],
-      rack: RACK_PARTS[indices.rack] ?? RACK_PARTS[0],
-    }
+    const stats = enemyStats(difficulty, scale)
+    const baseName = DIFFICULTY_NAMES[difficulty]
+    const name = options?.nameSuffix ? `${baseName} ${options.nameSuffix}` : baseName
+    const loadout = enemyLoadout(difficulty)
 
     const spawnPos = enemySpawn
       ? new THREE.Vector3(enemySpawn.position[0], enemySpawn.position[1], enemySpawn.position[2])
@@ -215,9 +123,9 @@ export function useMechBattle() {
 
     const enemy = new MechEntity(
       'enemy',
-      config.name,
-      enemyLoadout,
-      config.stats,
+      name,
+      loadout,
+      stats,
       false, // Not player
       spawnPos
     )

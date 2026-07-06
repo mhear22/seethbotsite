@@ -13,6 +13,13 @@ import {
   FOOTFALL,
 } from './constants'
 
+/**
+ * Legs-destroyed strand factor (design §3.3): a mech with blown legs crawls at
+ * 40% top speed with a matching acceleration cut, and can no longer dash or jump.
+ * Applied only when MechEntity.legsDestroyed is set by the hit-location system.
+ */
+const LEGS_DESTROYED_SPEED_MULT = 0.4
+
 export class PhysicsSystem {
   public speedMultiplier = 1.0
   private arenaHalfW: number = MOVEMENT.DEFAULT_ARENA_HALF
@@ -75,13 +82,17 @@ export class PhysicsSystem {
         boosting = false // out of power — no boost this frame
       }
     }
-    const targetSpeed = boosting ? baseSpeed * MOVEMENT.BOOST_MULTIPLIER : baseSpeed
+    const strandedSpeed = mech.legsDestroyed ? baseSpeed * LEGS_DESTROYED_SPEED_MULT : baseSpeed
+    const targetSpeed = boosting ? strandedSpeed * MOVEMENT.BOOST_MULTIPLIER : strandedSpeed
 
     // Momentum by weight class: heavier mechs spool up slower (lower accel) and
     // coast further (lower friction). Leg type layers a friction multiplier on
     // top (hover slides, tracked grips).
     const weightCurve = WEIGHT_MOVEMENT[mech.weightClass] ?? WEIGHT_MOVEMENT.medium
-    const accelRate = weightCurve.accel
+    // Legs-destroyed strand (design §3.3): cut top speed and acceleration so the
+    // mech becomes a slow, easy target once its legs are shot off.
+    const strandMult = mech.legsDestroyed ? LEGS_DESTROYED_SPEED_MULT : 1
+    const accelRate = weightCurve.accel * strandMult
     const frictionRate = weightCurve.friction * legMod.frictionMult
     const backwardSpeedPenalty = legMod.backwardPenalty
 
@@ -223,6 +234,9 @@ export class PhysicsSystem {
       return false
     }
 
+    // Legs-destroyed strand (design §3.3): no dash without legs.
+    if (mech.legsDestroyed) return false
+
     // Initiate dash — costs power (the dodge is the skill verb, and it spends
     // the combat economy so it can't be spammed while firing).
     const hasPower = !this.powerEconomyEnabled || mech.currentPower >= DASH.POWER_COST
@@ -265,6 +279,12 @@ export class PhysicsSystem {
 
     // Tracked legs can't jump
     if (legType === 'tracked') {
+      input = { ...input, jump: false }
+    }
+
+    // Legs-destroyed strand (design §3.3): no jump/jump-jets without legs. Still
+    // fall through so gravity/terrain-follow below keeps the mech on the ground.
+    if (mech.legsDestroyed) {
       input = { ...input, jump: false }
     }
 

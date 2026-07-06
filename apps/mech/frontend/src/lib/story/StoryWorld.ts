@@ -8,7 +8,7 @@ import { ProjectileSystem } from '../battle/ProjectileSystem'
 import { ParticleSystem } from '../battle/ParticleSystem'
 import { Town } from './Town'
 import { Terrain } from './Terrain'
-import { StoryCombat } from './StoryCombat'
+import { StoryCombat, type EnemyKill } from './StoryCombat'
 import type { QuestDef } from './quests'
 import type { MechLoadout } from '../../composables/useMechBuilder'
 import type { GraphicsSettings } from '../../composables/useGameSettings'
@@ -37,6 +37,16 @@ export interface StoryWorldConfig {
   onQuestComplete?: (quest: QuestDef) => void
   /** Fired when the player mech is destroyed during an encounter. */
   onPlayerDefeated?: () => void
+  /** Fired per enemy killed with its loadout + destroyed limbs (host awards salvage, §3.6). */
+  onEnemyKilled?: (kill: EnemyKill) => void
+  /** Fired when a named ace calls in its half-health reinforcement pair (§3.6 comms callout). */
+  onReinforcement?: (info: { bossName: string; count: number }) => void
+  /**
+   * Fired when combat harms the town (explosions / stray ordnance inside the
+   * town, §3.5). `amount` is a normalized severity, `position` the impact point.
+   * Phase 2 only surfaces this; Phase 3 routes it into a town-condition decrement.
+   */
+  onCollateral?: (amount: number, position: THREE.Vector3) => void
 }
 
 export interface StoryFrameInfo {
@@ -100,6 +110,9 @@ export class StoryWorld {
   private onFrame?: (info: StoryFrameInfo) => void
   private onQuestComplete?: (quest: QuestDef) => void
   private onPlayerDefeated?: () => void
+  private onEnemyKilled?: (kill: EnemyKill) => void
+  private onReinforcement?: (info: { bossName: string; count: number }) => void
+  private onCollateral?: (amount: number, position: THREE.Vector3) => void
 
   /** Animated sky shader material (drives drifting clouds); driven each frame. */
   private skyMaterial: THREE.ShaderMaterial | null = null
@@ -135,6 +148,9 @@ export class StoryWorld {
     this.onFrame = config.onFrame
     this.onQuestComplete = config.onQuestComplete
     this.onPlayerDefeated = config.onPlayerDefeated
+    this.onEnemyKilled = config.onEnemyKilled
+    this.onReinforcement = config.onReinforcement
+    this.onCollateral = config.onCollateral
 
     // --- Scene + renderer (mirrors BattleScene setup; honours graphics settings) ---
     const gfx = config.graphics
@@ -184,8 +200,8 @@ export class StoryWorld {
         this.playerMech.position.clone(), new THREE.Vector3(0, 1, 0), 'floor',
       )
     }
-    // Smoke rack ability deploys a cloud + arms the EnemyAI accuracy debuff.
-    this.playerMech.onSmokeDeploy = (pos) => this.particleSystem.spawnSmokeScreen(pos)
+    // Smoke rack ability + slot-destruction feedback on the player mech.
+    this.wirePlayerHooks(this.playerMech)
 
     this.combat = new StoryCombat(this.scene, this.projectileSystem, this.particleSystem)
     // Encounters are local to a town; bound the AI to a generous play radius.
@@ -193,6 +209,10 @@ export class StoryWorld {
     this.combat.onShake = (amount) => this.camera.triggerShake(amount)
     this.combat.onComplete = (quest) => this.onQuestComplete?.(quest)
     this.combat.onPlayerDefeated = () => this.onPlayerDefeated?.()
+    // Salvage + comms + collateral seams (§3.5/§3.6) — pass through to the host.
+    this.combat.onEnemyKilled = (kill) => this.onEnemyKilled?.(kill)
+    this.combat.onReinforcement = (info) => this.onReinforcement?.(info)
+    this.combat.onCollateral = (amount, pos) => this.onCollateral?.(amount, pos)
 
     // --- World content ---
     this.setupSky()
@@ -215,6 +235,19 @@ export class StoryWorld {
     window.addEventListener('resize', this.handleResizeBound)
     this.handleVisibilityBound = () => this.handleVisibilityChange()
     document.addEventListener('visibilitychange', this.handleVisibilityBound)
+  }
+
+  /**
+   * Wire the per-mech feedback callbacks the player entity needs: the smoke rack
+   * cloud and the slot-destruction burst (§3.3). Called at construction AND after
+   * applyLoadout rebuilds the mech, so a garage swap never drops these hooks.
+   */
+  private wirePlayerHooks(mech: MechEntity): void {
+    mech.onSmokeDeploy = (pos) => this.particleSystem.spawnSmokeScreen(pos)
+    mech.onSlotDestroyed = (m, slot) => {
+      this.particleSystem.spawnExplosion(m.getSlotPosition(slot), 1.2)
+      this.camera.triggerShake(0.5)
+    }
   }
 
   private setupSky(): void {
@@ -543,6 +576,7 @@ export class StoryWorld {
     rebuilt.rotation.y = yaw
     this._playerMech = rebuilt
     this.camera.target = rebuilt
+    this.wirePlayerHooks(rebuilt)
     this.scene.add(rebuilt.mesh)
   }
 

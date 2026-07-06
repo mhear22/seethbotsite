@@ -13,6 +13,7 @@ import {
   currentQuest as currentQuestDef,
   buildFinaleBoss,
   partPrice,
+  partPowerScore,
   slotsForPart,
   isWeaponArm,
   type QuestDef,
@@ -23,8 +24,32 @@ import {
 // Constants (v1 tuning — see docs/STORY_MODE_DESIGN.md §0)
 // ============================================================================
 
-/** localStorage key for the single active run (Q15). */
+/** localStorage key for the single active run (Q15). The key is the *slot*, not
+ *  the schema version — it stays stable across version bumps so `deserializeRun`
+ *  can read an older payload from the same slot and migrate it in place. */
 export const STORY_SAVE_KEY = 'mech-story-v1'
+
+/** Current save schema version. v1 -> v2 adds `run.inventory` (Phase 2 salvage). */
+export const SAVE_VERSION = 2 as const
+
+// ---- Salvage economy tuning (Phase 2 §3.7). Documented defaults where the
+// design left the numbers open. ----
+
+/** Scrap (salvage currency) granted per unit of a killed enemy's total part power. */
+export const SALVAGE_SCRAP_PER_POWER = 0.15
+/** Minimum scrap paid for any kill, so a stripped-down enemy still pays out. */
+export const SALVAGE_SCRAP_FLOOR = 20
+/** Chance an *intact* enemy slot drops its part (pristine) on kill. */
+export const SALVAGE_INTACT_DROP_CHANCE = 0.25
+/** Chance a slot the player *destroyed* drops its part (damaged) on kill.
+ *  1.0 = you shot the limb off, you always get the wreck to repair. */
+export const SALVAGE_DESTROYED_DROP_CHANCE = 1.0
+/** Repair fee for a damaged part, as a fraction of its shop price. */
+export const REPAIR_PRICE_FRACTION = 0.35
+/** Sell refund fraction of shop price for a pristine inventory part. */
+export const SELL_PRICE_FRACTION_PRISTINE = 0.4
+/** Sell refund fraction of shop price for a damaged inventory part. */
+export const SELL_PRICE_FRACTION_DAMAGED = 0.2
 
 /** Number of towns scattered across the open map (Q1). */
 export const TOWN_COUNT = 5
@@ -86,10 +111,31 @@ export interface RunStats {
   moneyEarned: number
 }
 
+/** Condition of an owned part instance. Damaged parts (salvaged off a limb the
+ *  player shot away) must be repaired before they can be installed. */
+export type InstanceCondition = 'pristine' | 'damaged'
+
+/**
+ * One owned part in the run inventory (Phase 2 §3.7). Parts are stored by catalog
+ * id (rehydrated via `findPartById`), not as full objects, so the save stays small
+ * and forward-compatible. `instanceId` is unique within a run so duplicates of the
+ * same part id — and their individual condition — are addressable.
+ */
+export interface InventoryItem {
+  /** Unique-within-run instance id (`inst-{n}`). */
+  instanceId: string
+  /** Catalog part id (see MechParts). */
+  partId: string
+  /** Damaged parts need a repair fee before they can be equipped. */
+  condition: InstanceCondition
+}
+
 export interface StoryRun {
-  /** Schema version for forward-compatible migrations. */
-  version: 1
+  /** Schema version for forward-compatible migrations (see deserializeRun). */
+  version: typeof SAVE_VERSION
   money: number
+  /** Owned-but-unequipped parts (bought or salvaged). Equipping pulls from here. */
+  inventory: InventoryItem[]
   /** The mech being built up this run (starts from the Starter, Q10). */
   loadout: MechLoadout
   towns: TownState[]
@@ -299,8 +345,9 @@ export function freshStats(): RunStats {
 
 export function createFreshRun(now: number = Date.now()): StoryRun {
   return {
-    version: 1,
+    version: SAVE_VERSION,
     money: 0,
+    inventory: [],
     loadout: buildStarterLoadout(),
     towns: createTowns(),
     phase: 'exploring',
@@ -386,6 +433,119 @@ export function verdictFlavor(verdict: Verdict): string {
 }
 
 // ============================================================================
+// Salvage economy & inventory (Phase 2 §3.7) — pure, testable
+// ============================================================================
+
+/** The six loadout slots, in a stable order for deterministic drop rolls. */
+export const SLOT_KEYS: ShopSlot[] = ['leftArm', 'rightArm', 'core', 'legs', 'head', 'rack']
+
+/**
+ * Next free inventory instance id. Ids are `inst-{n}` where n is one past the
+ * highest existing numeric suffix, so ids never collide with loaded ones and
+ * generation stays deterministic (important for tests + reloads).
+ */
+export function nextInstanceId(inventory: Array<{ instanceId: string }>): string {
+  let max = -1
+  for (const it of inventory) {
+    const m = /inst-(\d+)/.exec(it.instanceId)
+    if (m) max = Math.max(max, parseInt(m[1], 10))
+  }
+  return `inst-${max + 1}`
+}
+
+/** Repair fee to bring a damaged part back to working order (fraction of shop price). */
+export function repairPrice(part: MechPart): number {
+  return Math.max(20, Math.round((partPrice(part) * REPAIR_PRICE_FRACTION) / 10) * 10)
+}
+
+/** Scrap refunded for selling an owned part; damaged parts fetch less. */
+export function salvageSellPrice(part: MechPart, condition: InstanceCondition): number {
+  const frac = condition === 'damaged' ? SELL_PRICE_FRACTION_DAMAGED : SELL_PRICE_FRACTION_PRISTINE
+  return Math.max(10, Math.round((partPrice(part) * frac) / 10) * 10)
+}
+
+/** Result of a kill's salvage award: scrap gained + the parts that dropped. */
+export interface SalvageResult {
+  /** Scrap (salvage currency) granted for the kill. */
+  scrap: number
+  /** Parts that dropped into the run inventory (already appended to run.inventory). */
+  drops: InventoryItem[]
+}
+
+/**
+ * Award salvage for a killed enemy (design §3.7). Mutates `run`:
+ *  - grants scrap scaled by the KILLED enemy's total equipped part power
+ *    (min `SALVAGE_SCRAP_FLOOR`), tracked as gross earnings; and
+ *  - rolls the enemy's actual loadout parts as inventory drops: a slot the player
+ *    destroyed (`destroyedSlots`) drops its part in **damaged** condition at
+ *    `SALVAGE_DESTROYED_DROP_CHANCE` (default guaranteed — you shot it off, you
+ *    keep the wreck to repair); an intact slot has the lower
+ *    `SALVAGE_INTACT_DROP_CHANCE` to drop **pristine**.
+ *
+ * Pure w.r.t. randomness via the injectable `rng` (defaults to Math.random) so the
+ * whole thing is unit-testable without three.js. Returns the scrap + drops for the
+ * caller (StoryCombat kill hook / garage toast). Callers persist via `save()`.
+ */
+export function awardSalvage(
+  run: StoryRun,
+  killedLoadout: MechLoadout,
+  destroyedSlots: ShopSlot[] = [],
+  rng: () => number = Math.random,
+): SalvageResult {
+  // --- Scrap: scale by the enemy's total equipped part power. ---
+  let power = 0
+  for (const slot of SLOT_KEYS) {
+    const part = killedLoadout[slot]
+    if (part) power += partPowerScore(part)
+  }
+  const scrap = Math.max(SALVAGE_SCRAP_FLOOR, Math.round(power * SALVAGE_SCRAP_PER_POWER))
+
+  // --- Part drops: roll each equipped slot. ---
+  const drops: InventoryItem[] = []
+  // `working` seeds id generation off the current inventory + drops rolled so far
+  // so every dropped instance id is unique before we commit them to the run.
+  const working: InventoryItem[] = [...run.inventory]
+  for (const slot of SLOT_KEYS) {
+    const part = killedLoadout[slot]
+    if (!part) continue
+    const wasDestroyed = destroyedSlots.includes(slot)
+    const chance = wasDestroyed ? SALVAGE_DESTROYED_DROP_CHANCE : SALVAGE_INTACT_DROP_CHANCE
+    if (rng() >= chance) continue
+    const item: InventoryItem = {
+      instanceId: nextInstanceId(working),
+      partId: part.id,
+      condition: wasDestroyed ? 'damaged' : 'pristine',
+    }
+    working.push(item)
+    drops.push(item)
+  }
+
+  // --- Commit to the run. ---
+  run.money += scrap
+  run.stats.moneyEarned += scrap
+  for (const d of drops) run.inventory.push(d)
+
+  return { scrap, drops }
+}
+
+/** Drop unknown/malformed inventory entries and normalise condition + ids. */
+function sanitizeInventory(raw: unknown): InventoryItem[] {
+  if (!Array.isArray(raw)) return []
+  const out: InventoryItem[] = []
+  for (const entry of raw) {
+    if (!entry || typeof entry !== 'object') continue
+    const partId = (entry as { partId?: unknown }).partId
+    if (typeof partId !== 'string' || !findPartById(partId)) continue
+    const rawCond = (entry as { condition?: unknown }).condition
+    const condition: InstanceCondition = rawCond === 'damaged' ? 'damaged' : 'pristine'
+    const rawId = (entry as { instanceId?: unknown }).instanceId
+    const instanceId = typeof rawId === 'string' ? rawId : nextInstanceId(out)
+    out.push({ instanceId, partId, condition })
+  }
+  return out
+}
+
+// ============================================================================
 // Serialization (loadout parts are stored by id; rehydrated from MechParts)
 // ============================================================================
 
@@ -424,22 +584,49 @@ export function serializeRun(run: StoryRun): string {
   return JSON.stringify({ ...run, loadout: serializeLoadout(run.loadout) })
 }
 
+/**
+ * Migrate a v1 payload up to v2: gains an empty inventory; money carries over 1:1
+ * (scrap and money are the same currency in Phase 2). Pure — returns a new object.
+ */
+function migrateV1toV2(data: Record<string, unknown>): Record<string, unknown> {
+  return {
+    ...data,
+    version: 2,
+    inventory: Array.isArray(data.inventory) ? data.inventory : [],
+  }
+}
+
+/**
+ * Parse + migrate a saved run. Returns null on anything unusable — malformed JSON,
+ * a missing towns array, or an unknown/future schema version — so a bad slot fails
+ * cleanly (caller starts fresh) rather than crashing. Known older versions are run
+ * through the migration chain (v1 -> v2 -> …) before the run is rebuilt.
+ */
 export function deserializeRun(raw: string): StoryRun | null {
   try {
-    const data = JSON.parse(raw)
-    if (!data || data.version !== 1 || !Array.isArray(data.towns)) return null
+    const data = JSON.parse(raw) as Record<string, unknown> | null
+    if (!data || typeof data !== 'object' || !Array.isArray(data.towns)) return null
+
+    // --- Migration chain: step any known older schema up to SAVE_VERSION. ---
+    let migrated: Record<string, unknown>
+    if (data.version === 1) migrated = migrateV1toV2(data)
+    else if (data.version === SAVE_VERSION) migrated = data
+    else return null // unknown / future version -> clean rejection, never a crash
+
+    const stats = migrated.stats as Partial<RunStats> | undefined
     return {
-      version: 1,
-      money: typeof data.money === 'number' ? data.money : 0,
-      loadout: deserializeLoadout(data.loadout),
-      towns: data.towns as TownState[],
-      phase: (data.phase as StoryPhase) ?? 'exploring',
-      startedAt: data.startedAt ?? Date.now(),
-      realElapsedSec: data.realElapsedSec ?? 0,
+      version: SAVE_VERSION,
+      money: typeof migrated.money === 'number' ? migrated.money : 0,
+      inventory: sanitizeInventory(migrated.inventory),
+      loadout: deserializeLoadout(migrated.loadout as SerializedLoadout),
+      towns: migrated.towns as TownState[],
+      phase: (migrated.phase as StoryPhase) ?? 'exploring',
+      startedAt: (migrated.startedAt as number) ?? Date.now(),
+      realElapsedSec: (migrated.realElapsedSec as number) ?? 0,
       stats: {
-        questsCompleted: data.stats?.questsCompleted ?? 0,
-        bossesDefeated: data.stats?.bossesDefeated ?? 0,
-        moneyEarned: data.stats?.moneyEarned ?? 0,
+        questsCompleted: stats?.questsCompleted ?? 0,
+        bossesDefeated: stats?.bossesDefeated ?? 0,
+        moneyEarned: stats?.moneyEarned ?? 0,
       },
     }
   } catch {
@@ -708,9 +895,117 @@ export function useStoryMode() {
     return { ok: true }
   }
 
+  // --- Inventory & salvage (Phase 2 §3.7) ---
+
+  /**
+   * Award salvage for a killed enemy (scrap + rolled loadout drops). This is the
+   * StoryCombat kill-hook seam: the integrator calls this from the enemy-destroyed
+   * handler, passing the killed mech's `loadout` and the slots it destroyed
+   * (`onSlotDestroyed` accumulates these; core-death = the whole enemy dying, so
+   * the core slot is typically present). Persists and returns the scrap + drops
+   * for a garage/HUD toast.
+   */
+  function awardKillSalvage(
+    killedLoadout: MechLoadout,
+    destroyedSlots: ShopSlot[] = [],
+    rng: () => number = Math.random,
+  ): SalvageResult {
+    if (!run.value) return { scrap: 0, drops: [] }
+    const result = awardSalvage(run.value, killedLoadout, destroyedSlots, rng)
+    save()
+    return result
+  }
+
+  /**
+   * Buy a part into the inventory (does NOT equip). Spends scrap. Use
+   * `installFromInventory` to equip it. Returns the created instance on success.
+   */
+  function buyPart(part: MechPart): { ok: boolean; reason?: string; item?: InventoryItem } {
+    if (!run.value) return { ok: false, reason: 'No active run.' }
+    const price = partPrice(part)
+    if (run.value.money < price) return { ok: false, reason: `Not enough salvage (need ${price}).` }
+    const item: InventoryItem = {
+      instanceId: nextInstanceId(run.value.inventory),
+      partId: part.id,
+      condition: 'pristine',
+    }
+    run.value.inventory.push(item)
+    run.value.money -= price
+    save()
+    return { ok: true, item }
+  }
+
+  /**
+   * Install an owned (pristine) inventory instance into a slot. Validates slot
+   * fit + loadout legality (same rules as buyAndEquip). On success the instance is
+   * consumed and any displaced part is returned to the inventory (pristine), so a
+   * swap never destroys the part you took off. Damaged parts are refused until
+   * repaired. Caller applies the new loadout to the world (StoryWorld.applyLoadout).
+   */
+  function installFromInventory(instanceId: string, slot: ShopSlot): { ok: boolean; reason?: string } {
+    if (!run.value) return { ok: false, reason: 'No active run.' }
+    const idx = run.value.inventory.findIndex((i) => i.instanceId === instanceId)
+    if (idx < 0) return { ok: false, reason: 'That part is not in your inventory.' }
+    const item = run.value.inventory[idx]
+    if (item.condition === 'damaged') {
+      return { ok: false, reason: 'Part is damaged — repair it before installing.' }
+    }
+    const part = findPartById(item.partId)
+    if (!part) return { ok: false, reason: 'Unknown part.' }
+    if (!slotsForPart(part).includes(slot)) {
+      return { ok: false, reason: 'That part cannot go in that slot.' }
+    }
+    const candidate: MechLoadout = { ...run.value.loadout, [slot]: part as never }
+    const reason = loadoutInvalidReason(candidate)
+    if (reason) return { ok: false, reason }
+
+    const displaced = run.value.loadout[slot]
+    run.value.inventory.splice(idx, 1)
+    if (displaced) {
+      run.value.inventory.push({
+        instanceId: nextInstanceId(run.value.inventory),
+        partId: displaced.id,
+        condition: 'pristine',
+      })
+    }
+    run.value.loadout = candidate
+    save()
+    return { ok: true }
+  }
+
+  /** Repair a damaged inventory instance to pristine for scrap. */
+  function repairPart(instanceId: string): { ok: boolean; reason?: string; cost?: number } {
+    if (!run.value) return { ok: false, reason: 'No active run.' }
+    const item = run.value.inventory.find((i) => i.instanceId === instanceId)
+    if (!item) return { ok: false, reason: 'That part is not in your inventory.' }
+    if (item.condition !== 'damaged') return { ok: false, reason: 'That part is already in working order.' }
+    const part = findPartById(item.partId)
+    if (!part) return { ok: false, reason: 'Unknown part.' }
+    const cost = repairPrice(part)
+    if (run.value.money < cost) return { ok: false, reason: `Not enough salvage to repair (need ${cost}).` }
+    run.value.money -= cost
+    item.condition = 'pristine'
+    save()
+    return { ok: true, cost }
+  }
+
+  /** Sell an owned inventory instance for scrap (damaged parts fetch less). */
+  function sellPart(instanceId: string): { ok: boolean; reason?: string; refund?: number } {
+    if (!run.value) return { ok: false, reason: 'No active run.' }
+    const idx = run.value.inventory.findIndex((i) => i.instanceId === instanceId)
+    if (idx < 0) return { ok: false, reason: 'That part is not in your inventory.' }
+    const item = run.value.inventory[idx]
+    const part = findPartById(item.partId)
+    run.value.inventory.splice(idx, 1)
+    const refund = part ? salvageSellPrice(part, item.condition) : 0
+    addMoney(refund) // addMoney saves + tracks gross earnings
+    return { ok: true, refund }
+  }
+
   // --- Getters ---
 
   const money = computed(() => run.value?.money ?? 0)
+  const inventory = computed<InventoryItem[]>(() => run.value?.inventory ?? [])
   const towns = computed<TownState[]>(() => run.value?.towns ?? [])
   const phase = computed<StoryPhase>(() => run.value?.phase ?? 'exploring')
   const loadout = computed<MechLoadout | null>(() => run.value?.loadout ?? null)
@@ -736,6 +1031,7 @@ export function useStoryMode() {
     activeQuest,
     // getters
     money,
+    inventory,
     towns,
     phase,
     loadout,
@@ -774,5 +1070,11 @@ export function useStoryMode() {
     finishFinaleBoss,
     // garage / economy
     buyAndEquip,
+    // inventory / salvage
+    awardKillSalvage,
+    buyPart,
+    installFromInventory,
+    repairPart,
+    sellPart,
   }
 }

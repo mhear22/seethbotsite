@@ -7,8 +7,26 @@
         <button class="g-close" type="button" @click="$emit('close')">✕</button>
       </div>
 
+      <!-- Tab bar: Shop (buy & equip) vs Inventory (owned salvage) -->
+      <div class="g-tabs">
+        <button
+          class="g-tab"
+          :class="{ active: tab === 'shop' }"
+          type="button"
+          @click="tab = 'shop'"
+        >Shop</button>
+        <button
+          class="g-tab"
+          :class="{ active: tab === 'inventory' }"
+          type="button"
+          @click="tab = 'inventory'"
+        >Inventory <span v-if="inventory.length" class="g-tab-count">{{ inventory.length }}</span></button>
+      </div>
+
+      <!-- ================= SHOP TAB ================= -->
+      <template v-if="tab === 'shop'">
       <p class="g-sub">
-        Spend quest money to bolt on better parts. Builds must stay legal:
+        Spend salvage to bolt on better parts. Builds must stay legal:
         a core, legs, a head, at least one weapon, and no energy deficit.
       </p>
 
@@ -66,12 +84,76 @@
           </div>
         </div>
       </div>
+      </template>
+
+      <!-- ================= INVENTORY TAB ================= -->
+      <template v-else>
+        <p class="g-sub">
+          Parts you own but haven't installed — bought spares and battlefield salvage.
+          Damaged salvage must be repaired before it can be installed.
+        </p>
+
+        <p v-if="!inventoryRows.length" class="g-empty">
+          Your inventory is empty. Salvage drops from destroyed enemies land here,
+          and anything you unequip is stowed rather than scrapped.
+        </p>
+
+        <div v-else class="g-catalogue">
+          <div
+            v-for="row in inventoryRows"
+            :key="row.instanceId"
+            class="g-part"
+            :class="{ damaged: row.damaged, [row.part.rarity]: true }"
+          >
+            <div class="part-main">
+              <span class="part-name">{{ row.part.name }}</span>
+              <span class="part-rarity">{{ row.part.rarity }}</span>
+            </div>
+            <p class="part-desc">{{ row.part.description }}</p>
+            <div class="part-stats">
+              <span v-if="row.part.stats.firepower" class="stat fp">FP {{ row.part.stats.firepower }}</span>
+              <span v-if="row.part.stats.health" class="stat hp">HP {{ row.part.stats.health }}</span>
+              <span v-if="row.part.stats.armor" class="stat ar">AR {{ row.part.stats.armor }}</span>
+              <span v-if="row.part.stats.speed" class="stat sp">SP {{ row.part.stats.speed }}</span>
+              <span class="stat en" :class="{ neg: row.part.stats.energy < 0 }">EN {{ row.part.stats.energy }}</span>
+            </div>
+            <div v-if="row.damaged" class="inv-condition damaged">⚠ Damaged — repair to install</div>
+            <div class="part-foot inv-foot">
+              <!-- Damaged: only repair (for a fee) or sell as-is. -->
+              <template v-if="row.damaged">
+                <button
+                  class="buy-btn"
+                  type="button"
+                  :disabled="money < row.repairCost"
+                  @click="emitRepair(row.instanceId)"
+                >Repair 💰{{ row.repairCost }}</button>
+              </template>
+              <!-- Pristine: install into each valid slot. -->
+              <template v-else>
+                <button
+                  v-for="s in row.slots"
+                  :key="s.key"
+                  class="buy-btn"
+                  type="button"
+                  @click="emitInstall(row.instanceId, s.key)"
+                >Install {{ s.label }}</button>
+              </template>
+              <button
+                class="buy-btn sell-btn"
+                type="button"
+                @click="emitSell(row.instanceId)"
+              >Sell 💰{{ row.sellPrice }}</button>
+            </div>
+          </div>
+        </div>
+      </template>
 
       <p v-if="message" class="g-message" :class="{ error: messageError }">{{ message }}</p>
 
-      <p class="g-nav-hint">
+      <p v-if="tab === 'shop'" class="g-nav-hint">
         A/D or ←/→ switch slot · W/S or ↑/↓ pick part · Enter/E buy &amp; equip · Esc close
       </p>
+      <p v-else class="g-nav-hint">Click to install, repair, or sell · Esc close</p>
 
       <div class="g-actions">
         <button class="g-done" type="button" @click="$emit('close')">Done</button>
@@ -90,19 +172,76 @@ import {
   slotsForPart,
   type ShopSlot,
 } from '../../../lib/story/quests'
+import { findPartById } from '../../../shared/data/MechParts'
+import {
+  repairPrice,
+  salvageSellPrice,
+  type InventoryItem,
+} from '../../../composables/useStoryMode'
 
-const props = defineProps<{
-  money: number
-  loadout: MechLoadout
-  /** Last action result, surfaced as a banner. */
-  message?: string
-  messageError?: boolean
-}>()
+const props = withDefaults(
+  defineProps<{
+    money: number
+    loadout: MechLoadout
+    /** Owned-but-unequipped parts (bought spares + salvage). */
+    inventory?: InventoryItem[]
+    /** Last action result, surfaced as a banner. */
+    message?: string
+    messageError?: boolean
+  }>(),
+  { inventory: () => [] },
+)
 
 const emit = defineEmits<{
   (e: 'equip', payload: { part: MechPart; slot: ShopSlot }): void
+  (e: 'install', payload: { instanceId: string; slot: ShopSlot }): void
+  (e: 'repair', payload: { instanceId: string }): void
+  (e: 'sell', payload: { instanceId: string }): void
   (e: 'close'): void
 }>()
+
+/** Which tab is showing. */
+const tab = ref<'shop' | 'inventory'>('shop')
+
+/** Convenience alias for the (defaulted) inventory prop. */
+const inventory = computed<InventoryItem[]>(() => props.inventory ?? [])
+
+/** Short slot labels for install buttons (arms get L/R so both fit on a card). */
+const SLOT_SHORT: Record<ShopSlot, string> = {
+  leftArm: 'L',
+  rightArm: 'R',
+  core: 'Core',
+  legs: 'Legs',
+  head: 'Head',
+  rack: 'Rack',
+}
+
+/** Inventory rows resolved to parts + prices; unknown part ids are dropped. */
+const inventoryRows = computed(() =>
+  inventory.value.flatMap((item) => {
+    const part = findPartById(item.partId)
+    if (!part) return []
+    const damaged = item.condition === 'damaged'
+    return [{
+      instanceId: item.instanceId,
+      part,
+      damaged,
+      repairCost: repairPrice(part),
+      sellPrice: salvageSellPrice(part, item.condition),
+      slots: slotsForPart(part).map((key) => ({ key, label: SLOT_SHORT[key] })),
+    }]
+  }),
+)
+
+function emitInstall(instanceId: string, slot: ShopSlot): void {
+  emit('install', { instanceId, slot })
+}
+function emitRepair(instanceId: string): void {
+  emit('repair', { instanceId })
+}
+function emitSell(instanceId: string): void {
+  emit('sell', { instanceId })
+}
 
 const SLOTS: Array<{ key: ShopSlot; label: string }> = [
   { key: 'leftArm', label: 'Left Arm' },
@@ -158,6 +297,22 @@ function confirmSelected(): void {
 }
 
 function handleKey(e: KeyboardEvent) {
+  // Escape always closes, regardless of tab.
+  if (e.code === 'Escape') {
+    e.preventDefault()
+    e.stopPropagation()
+    emit('close')
+    return
+  }
+  // Tab toggles between Shop and Inventory.
+  if (e.code === 'Tab') {
+    e.preventDefault()
+    e.stopPropagation()
+    tab.value = tab.value === 'shop' ? 'inventory' : 'shop'
+    return
+  }
+  // The remaining keys drive the shop catalogue only.
+  if (tab.value !== 'shop') return
   const list = slotCatalogue.value
   switch (e.code) {
     case 'KeyW':
@@ -189,11 +344,6 @@ function handleKey(e: KeyboardEvent) {
       e.preventDefault()
       e.stopPropagation()
       confirmSelected()
-      break
-    case 'Escape':
-      e.preventDefault()
-      e.stopPropagation()
-      emit('close')
       break
   }
 }
@@ -455,5 +605,82 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey, true))
 
 .g-done:hover {
   box-shadow: 0 0 18px rgba(16, 185, 129, 0.4);
+}
+
+/* --- Tabs --- */
+.g-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.g-tab {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #cbd5e1;
+  font-weight: 700;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.g-tab.active {
+  border-color: rgba(99, 102, 241, 0.7);
+  background: rgba(99, 102, 241, 0.18);
+  color: #e0e7ff;
+}
+
+.g-tab-count {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(99, 102, 241, 0.4);
+  font-size: 0.7rem;
+}
+
+/* --- Inventory --- */
+.g-empty {
+  margin: 12px 0;
+  padding: 20px;
+  text-align: center;
+  font-size: 0.82rem;
+  color: #94a3b8;
+  line-height: 1.5;
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+}
+
+.g-part.damaged {
+  border-color: rgba(248, 113, 113, 0.5);
+  background: rgba(248, 113, 113, 0.08);
+}
+
+.inv-condition {
+  font-size: 0.7rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.inv-condition.damaged {
+  color: #fca5a5;
+}
+
+.inv-foot {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 6px;
+}
+
+.sell-btn {
+  background: rgba(255, 255, 255, 0.1);
+  color: #cbd5e1;
+  margin-left: auto;
+}
+
+.sell-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
 }
 </style>

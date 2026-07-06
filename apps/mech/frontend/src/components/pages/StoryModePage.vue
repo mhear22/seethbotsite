@@ -86,9 +86,13 @@
         v-if="showGarage && story.run.value"
         :money="money"
         :loadout="story.run.value.loadout"
+        :inventory="story.inventory.value"
         :message="garageMessage"
         :message-error="garageMessageError"
         @equip="onEquip"
+        @install="onInstall"
+        @repair="onRepair"
+        @sell="onSell"
         @close="closeGarage"
       />
 
@@ -113,6 +117,7 @@ import { useRouter, useRoute } from 'vue-router'
 import * as THREE from 'three'
 import { MechEntity } from '../../lib/battle/MechEntity'
 import { StoryWorld, type StoryFrameInfo } from '../../lib/story/StoryWorld'
+import type { EnemyKill } from '../../lib/story/StoryCombat'
 import { useStoryMode, computeCombatStats } from '../../composables/useStoryMode'
 import { useAudio } from '../../composables/useAudio'
 import { useGameSettings } from '../../composables/useGameSettings'
@@ -294,6 +299,9 @@ async function beginRoaming() {
     onFrame: handleFrame,
     onQuestComplete: handleQuestComplete,
     onPlayerDefeated: handlePlayerDefeated,
+    onEnemyKilled: handleEnemyKilled,
+    onReinforcement: handleReinforcement,
+    onCollateral: handleCollateral,
   })
   world.start()
   touchInput.value = world.getInputManager()
@@ -480,6 +488,37 @@ function handlePlayerDefeated() {
   showToast('Your mech was wrecked! Repaired at the nearest town — try again.', true)
 }
 
+/**
+ * Salvage (§3.6/§3.7): a killed enemy drops scrap + parts. `destroyedSlots` (the
+ * limbs you shot off) drop damaged & guaranteed; intact parts roll a chance to
+ * drop pristine. Surface the haul as a HUD toast.
+ */
+function handleEnemyKilled(kill: EnemyKill) {
+  const result = story.awardKillSalvage(kill.loadout, kill.destroyedSlots)
+  const drops = result.drops.length
+  const parts = drops === 1 ? 'part' : 'parts'
+  showToast(
+    drops > 0
+      ? `Salvage: +💰 ${result.scrap} and ${drops} ${parts} recovered.`
+      : `Salvage: +💰 ${result.scrap}.`,
+  )
+}
+
+/** Comms callout (§3.6): a named ace called in reinforcements at half health. */
+function handleReinforcement(info: { bossName: string; count: number }) {
+  audio.playError()
+  showToast(`${info.bossName}: hostile reinforcements inbound (${info.count})!`, true)
+}
+
+/**
+ * Collateral (§3.5): combat is harming the town. Phase 2 only surfaces the hook;
+ * the town-condition tax lands in Phase 3, so this is intentionally a no-op sink
+ * that keeps the emit path exercised for the Phase 3 wiring.
+ */
+function handleCollateral(_amount: number, _position: THREE.Vector3) {
+  // Phase 3: route into a gentle condition decrement mirroring tickTownDecay.
+}
+
 // --- Credits / run completion ---
 
 function openCredits() {
@@ -527,6 +566,40 @@ function onEquip(payload: { part: MechPart; slot: ShopSlot }) {
     garageMessageError.value = true
     garageMessage.value = result.reason ?? 'Could not equip that part.'
   }
+}
+
+/** Install a salvaged (pristine) inventory part; re-apply the loadout to the live mech. */
+function onInstall(payload: { instanceId: string; slot: ShopSlot }) {
+  const result = story.installFromInventory(payload.instanceId, payload.slot)
+  if (result.ok) {
+    garageMessageError.value = false
+    garageMessage.value = 'Part installed.'
+    if (world && story.run.value) {
+      const loadout = story.run.value.loadout
+      world.applyLoadout(loadout, computeCombatStats(loadout))
+    }
+  } else {
+    garageMessageError.value = true
+    garageMessage.value = result.reason ?? 'Could not install that part.'
+  }
+}
+
+/** Repair a damaged salvaged part back to pristine for scrap. */
+function onRepair(payload: { instanceId: string }) {
+  const result = story.repairPart(payload.instanceId)
+  garageMessageError.value = !result.ok
+  garageMessage.value = result.ok
+    ? `Repaired for 💰 ${result.cost}.`
+    : result.reason ?? 'Could not repair that part.'
+}
+
+/** Sell a salvaged part for scrap. */
+function onSell(payload: { instanceId: string }) {
+  const result = story.sellPart(payload.instanceId)
+  garageMessageError.value = !result.ok
+  garageMessage.value = result.ok
+    ? `Sold for 💰 ${result.refund}.`
+    : result.reason ?? 'Could not sell that part.'
 }
 
 function teardownWorld() {

@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import type { MechLoadout } from '../../composables/useMechBuilder'
-import type { DamageType } from '../../shared/types/MechTypes'
+import type { ArmPart, DamageType, MechSlot } from '../../shared/types/MechTypes'
 import { markRaw } from 'vue'
 import { getMechModelLoader, MODEL_ATTACH_POINTS } from './MechModelLoader'
 
@@ -28,11 +28,33 @@ const JUMP_JET_BOOST_DURATION = 1.2   // seconds of boosted jump PhysicsSystem m
 /** Ammo-feed rack ability: dt-driven fire-rate buff window (replaces setTimeout). */
 const AMMO_FEED_DURATION = 5.0
 
+// ---- Hit-location tuning (design §3.3). ----
+/** Per-slot HP = part.stats.health × this multiplier (design §3.3 table). */
+export const SLOT_HP_MULTIPLIER: Record<Exclude<MechSlot, 'core'>, number> = {
+  leftArm: 3,   // arm.stats.health ×3
+  rightArm: 3,
+  legs: 2,      // legs.stats.health ×2
+  head: 2,      // head.stats.health ×2
+}
+/**
+ * Fraction of a limb hit's post-mitigation damage that ALSO bleeds through to
+ * the core death pool, so aiming at a limb still progresses the kill (design
+ * §3.3: "core kills always progress"). A direct core / unresolved hit is 100%.
+ */
+export const SLOT_CORE_BLEED = 0.35
+/**
+ * Armour-piercing (railgun) multiplies damage dealt to the STRUCK SLOT pool —
+ * the aimed limb-stripping identity (design §3.3 railgun payoff). Core bleed is
+ * unaffected, so AP strips limbs fast without trivialising the core kill.
+ */
+export const SLOT_ARMOR_PIERCE_MULTIPLIER = 2.0
+
 /** Options carried from a projectile into takeDamage. */
 export interface DamageOptions {
-  armorPierce?: boolean          // halve target's flat armour (railgun)
+  armorPierce?: boolean          // halve target's flat armour (railgun) + amplify slot damage
   burn?: boolean                 // apply the flamer burn DoT
   fromFront?: boolean            // hit came from the mech's frontal arc (default true)
+  slot?: MechSlot                // resolved hit location (ProjectileSystem.checkCollisions); omit = core pool
 }
 
 export interface CombatStats {
@@ -97,6 +119,36 @@ export class MechEntity {
   /** Optional hook so the scene can spawn smoke particles when the smoke rack fires. */
   onSmokeDeploy?: (position: THREE.Vector3) => void
 
+  // ---- Hit locations & part destruction (design §3.3) ----
+  /**
+   * Remaining HP of each destructible limb overlay pool. Populated in the
+   * constructor from part stats × SLOT_HP_MULTIPLIER. A slot with no equipped
+   * part (or `core`) is absent here and is never independently destructible —
+   * damage to it flows straight to the core death pool (`stats.currentHealth`).
+   */
+  slotHP: Partial<Record<MechSlot, number>> = {}
+  /** Max HP per slot (for HUD bars / repair). Same keys as slotHP. */
+  slotMaxHP: Partial<Record<MechSlot, number>> = {}
+  /** Slots whose overlay pool has been destroyed (consequence already applied). */
+  destroyedSlots: Set<MechSlot> = new Set()
+
+  // Delimb consequence flags (read by ProjectileSystem / PhysicsSystem; see §3.3).
+  /** Left/right arm weapon dead — fireWeapon returns null for that arm. */
+  leftArmDestroyed: boolean = false
+  rightArmDestroyed: boolean = false
+  /** Legs gone — PhysicsSystem strands the mech (speed cut, no dash/jump). */
+  legsDestroyed: boolean = false
+  /** Head gone — no missile lock-on, targeting bonus lost, HUD nameplate drops. */
+  headDestroyed: boolean = false
+
+  /**
+   * Fired once when a limb slot is destroyed. Seam for scenes/salvage: spawn an
+   * explosion burst at getSlotPosition(slot), a brief hitstop, and (Phase 2
+   * salvage) drop that part as scrap. No-op default keeps headless/MP callers
+   * unaffected.
+   */
+  onSlotDestroyed?: (mech: MechEntity, slot: MechSlot) => void
+
   // Destruction animation - random velocities per mesh child
   private destroyVelocities: THREE.Vector3[] = []
   private destroyRotations: THREE.Vector3[] = []
@@ -140,6 +192,9 @@ export class MechEntity {
     this.position = spawnPosition.clone()
     this.rotation = new THREE.Euler(0, 0, 0)
     this.velocity = new THREE.Vector3(0, 0, 0)
+
+    // Derive per-slot overlay HP from the equipped parts (design §3.3).
+    this.initSlotHP()
 
     // Create immediate procedural mesh (fast, always available)
     this.mesh = markRaw(this.createMeshGroup())
@@ -208,6 +263,7 @@ export class MechEntity {
     const coreGeometry = new THREE.BoxGeometry(1.6, 1.6, 1.3)
     const coreMaterial = new THREE.MeshStandardMaterial({ color })
     const core = new THREE.Mesh(coreGeometry, coreMaterial)
+    core.name = 'core'
     core.position.copy(MODEL_ATTACH_POINTS.core)
     core.position.y += 0.8
     group.add(core)
@@ -218,6 +274,7 @@ export class MechEntity {
       color: this.isPlayer ? 0x60a5fa : 0xfca5a5
     })
     const head = new THREE.Mesh(headGeometry, headMaterial)
+    head.name = 'head'
     head.position.copy(MODEL_ATTACH_POINTS.head)
     group.add(head)
 
@@ -227,11 +284,13 @@ export class MechEntity {
       color: this.isPlayer ? 0x2563eb : 0xdc2626
     })
     const leftArm = new THREE.Mesh(armGeometry, armMaterial)
+    leftArm.name = 'leftArm'
     leftArm.position.copy(MODEL_ATTACH_POINTS.leftArm)
     group.add(leftArm)
 
     // Right arm
     const rightArm = new THREE.Mesh(armGeometry, armMaterial)
+    rightArm.name = 'rightArm'
     rightArm.position.copy(MODEL_ATTACH_POINTS.rightArm)
     group.add(rightArm)
 
@@ -241,6 +300,7 @@ export class MechEntity {
       color: this.isPlayer ? 0x1e40af : 0x991b1b
     })
     const legs = new THREE.Mesh(legsGeometry, legsMaterial)
+    legs.name = 'legs'
     legs.position.copy(MODEL_ATTACH_POINTS.legs)
     legs.position.y += 1.4
     group.add(legs)
@@ -478,6 +538,22 @@ export class MechEntity {
   }
 
   /** Returns the world-space position of the mech's arm weapon spawn, falling back to MODEL_ATTACH_POINTS. */
+  /**
+   * The arm this mech can still fire from (design §3.3 delimb fallback). Prefers
+   * the right arm (the AI's default gun arm) but falls back to a live left arm
+   * once the right is shot off, and returns null when both weapon arms are dead
+   * so callers stop trying to fire a defanged mech.
+   */
+  liveWeaponArm(): 'left' | 'right' | null {
+    // Only real weapons count — a support arm (shield-gen) is not a gun, so a mech
+    // whose gun arm is shot off must NOT fall back to firing its shield (that would
+    // re-raise the block and invert the §3.3 delimb "defang" consequence).
+    const isGun = (part: ArmPart | null): boolean => !!part && part.weaponType !== 'support'
+    if (isGun(this.loadout.rightArm) && !this.rightArmDestroyed) return 'right'
+    if (isGun(this.loadout.leftArm) && !this.leftArmDestroyed) return 'left'
+    return null
+  }
+
   getArmPosition(arm: 'left' | 'right'): THREE.Vector3 {
     const childName = arm === 'left' ? 'leftArm' : 'rightArm'
     const attachPoint = arm === 'left' ? MODEL_ATTACH_POINTS.leftArm : MODEL_ATTACH_POINTS.rightArm
@@ -512,14 +588,104 @@ export class MechEntity {
    *  3. Flat armour — capped at ARMOR_CAP (75%); halved by armour-piercing hits.
    *  4. Typed resistance — chassis parts resist/are weak to kinetic/energy;
    *     melee ignores this ("resisted only by range").
-   *  5. Flamer burn — starts/refreshes a dt-driven DoT (ticked in update()).
+   *  5. Hit location — a resolved limb slot (`opts.slot`) takes the damage into
+   *     its overlay pool (AP-amplified) and bleeds SLOT_CORE_BLEED into core;
+   *     an unresolved / core hit applies the full amount to core (design §3.3).
+   *  6. Flamer burn — starts/refreshes a dt-driven DoT (ticked in update()).
    *
    * `damageType`/`opts` are optional so legacy call sites (`takeDamage(dmg)`)
    * still compile; the integrator should pass the projectile's damageType and
-   * `{ armorPierce, burn }` from the hit to activate typed combat.
+   * `{ armorPierce, burn, slot }` from the hit to activate typed + located combat.
    */
+  /**
+   * Build the per-limb overlay HP pools from the equipped parts (design §3.3).
+   * A missing part yields no pool (that slot is never independently destructible;
+   * an armless mech already can't fire that arm). `core` has no overlay pool —
+   * it is the death pool tracked by stats.currentHealth.
+   */
+  private initSlotHP() {
+    const src: Record<Exclude<MechSlot, 'core'>, { stats: { health: number } } | null> = {
+      leftArm: this.loadout.leftArm,
+      rightArm: this.loadout.rightArm,
+      legs: this.loadout.legs,
+      head: this.loadout.head,
+    }
+    for (const slot of Object.keys(src) as Array<Exclude<MechSlot, 'core'>>) {
+      const part = src[slot]
+      if (!part) continue
+      const hp = Math.max(1, part.stats.health * SLOT_HP_MULTIPLIER[slot])
+      this.slotHP[slot] = hp
+      this.slotMaxHP[slot] = hp
+    }
+  }
+
+  /** World-space centre of a slot's mesh (for slot-destruction bursts). Falls back to attach points. */
+  getSlotPosition(slot: MechSlot): THREE.Vector3 {
+    if (slot === 'leftArm' || slot === 'rightArm') return this.getArmPosition(slot === 'leftArm' ? 'left' : 'right')
+    if (slot === 'core') return this.getCorePosition()
+    const child = this.findChildByName(this.mesh, slot)
+    if (child) {
+      const p = new THREE.Vector3()
+      child.getWorldPosition(p)
+      return p
+    }
+    const attach = slot === 'head' ? MODEL_ATTACH_POINTS.head : MODEL_ATTACH_POINTS.legs
+    return this.position.clone().setY(this.position.y + attach.y)
+  }
+
+  /**
+   * Apply post-mitigation damage to a limb overlay pool. When the pool empties
+   * the first time, mark the slot destroyed and run its delimb consequence
+   * (design §3.3). Returns true if this hit destroyed the slot.
+   */
+  private applySlotDamage(slot: Exclude<MechSlot, 'core'>, amount: number): boolean {
+    const hp = this.slotHP[slot]
+    if (hp === undefined || this.destroyedSlots.has(slot)) return false
+    const next = Math.max(0, hp - amount)
+    this.slotHP[slot] = next
+    if (next > 0) return false
+
+    // ---- Slot destroyed: apply the delimb consequence. ----
+    this.destroyedSlots.add(slot)
+    switch (slot) {
+      case 'leftArm':
+        this.leftArmDestroyed = true
+        this.blackenSlotMesh('leftArm')
+        break
+      case 'rightArm':
+        this.rightArmDestroyed = true
+        this.blackenSlotMesh('rightArm')
+        break
+      case 'legs':
+        this.legsDestroyed = true // PhysicsSystem reads this: strand + no dash/jump
+        this.blackenSlotMesh('legs')
+        break
+      case 'head':
+        this.headDestroyed = true // no lock-on / targeting bonus (see fireWeapon + getTargetingBonus)
+        this.blackenSlotMesh('head')
+        break
+    }
+    // Seam: scene spawns burst + hitstop, salvage drops the part.
+    this.onSlotDestroyed?.(this, slot)
+    return true
+  }
+
+  /** Darken a destroyed limb's mesh so it reads as knocked out (design §3.3 visual). */
+  private blackenSlotMesh(slot: MechSlot) {
+    const node = this.findChildByName(this.mesh, slot)
+    if (!node) return
+    node.traverse((child) => {
+      if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
+        child.material.color.multiplyScalar(0.2)
+        child.material.emissive?.setHex(0x000000)
+      }
+    })
+  }
+
   takeDamage(damage: number, damageType: DamageType = 'kinetic', opts?: DamageOptions): boolean {
     // 1. Dash i-frames: fully invulnerable mid-dash (the skill dodge, §3.1).
+    //    Gates slot damage too — the dodge negates the whole hit before it can
+    //    resolve to a limb (design §3.3 keeps the Phase 1 i-frames working).
     if (this.isInvulnerable) return false
 
     let incoming = damage
@@ -545,9 +711,23 @@ export class MechEntity {
     }
 
     actualDamage = Math.max(0, actualDamage)
-    this.stats.currentHealth -= actualDamage
 
-    // 5. Flamer burn: start/refresh the DoT.
+    // 5. Hit location (design §3.3). A limb hit chips that slot's overlay pool
+    //    (amplified by armour-piercing, the railgun limb-stripping payoff) and
+    //    bleeds a fraction into the core death pool so kills still progress. A
+    //    core hit, or a hit with no resolved slot (legacy / MP callers), applies
+    //    the full amount to the core pool exactly as before hit locations.
+    const slot = opts?.slot
+    const limbPool = slot && slot !== 'core' ? this.slotHP[slot] : undefined
+    if (slot && slot !== 'core' && limbPool !== undefined && !this.destroyedSlots.has(slot)) {
+      const slotDamage = actualDamage * (opts?.armorPierce ? SLOT_ARMOR_PIERCE_MULTIPLIER : 1)
+      this.applySlotDamage(slot as Exclude<MechSlot, 'core'>, slotDamage)
+      this.stats.currentHealth -= actualDamage * SLOT_CORE_BLEED
+    } else {
+      this.stats.currentHealth -= actualDamage
+    }
+
+    // 6. Flamer burn: start/refresh the DoT.
     if (opts?.burn) {
       this.burnTimer = BURN_DURATION
       this.burnDps = BURN_DPS
@@ -666,6 +846,9 @@ export class MechEntity {
 
   // Targeting system
   getTargetingBonus(targetDistance: number, isMoving: boolean): number {
+    // A blown-off head loses fire control entirely: no targeting bonus, which
+    // also widens weapon spread at the ProjectileSystem seam (design §3.3).
+    if (this.headDestroyed) return 0
     const head = this.loadout.head
     if (!head) return 0
 

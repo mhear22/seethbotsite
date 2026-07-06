@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import type { MechEntity } from './MechEntity'
-import type { DamageType, WeaponType } from '../../shared/types/MechTypes'
+import type { DamageType, WeaponType, MechSlot } from '../../shared/types/MechTypes'
 import { markRaw } from 'vue'
 
 export interface Projectile {
@@ -105,6 +105,12 @@ export class ProjectileSystem {
     // Get correct weapon
     const armPart = arm === 'left' ? mech.loadout.leftArm : mech.loadout.rightArm
     if (!armPart) return null
+
+    // Delimb consequence (design §3.3): a destroyed arm's weapon is dead. The gun
+    // stops firing entirely — this is the "defang the gun arm to halve DPS" payoff.
+    if ((arm === 'left' && mech.leftArmDestroyed) || (arm === 'right' && mech.rightArmDestroyed)) {
+      return null
+    }
 
     const weaponType = armPart.weaponType || 'ballistic'
 
@@ -250,7 +256,11 @@ export class ProjectileSystem {
         pooledGeometry: true,
         pooledMaterial: true,
         smokeTimer: 0,
-        ...(projType === 'missile' && target ? {
+        // Delimb consequence (design §3.3): a destroyed head loses lock-on, so
+        // this mech's missiles can no longer acquire — they fly straight (dumb-
+        // fire) instead of homing. Enemy AI aim vs the player is unaffected;
+        // only the firing mech loses its own lock.
+        ...(projType === 'missile' && target && !mech.headDestroyed ? {
           targetId: target.id,
           homingDelay: MISSILE_HOMING_DELAY // fly straight briefly, then home
         } : {})
@@ -494,8 +504,8 @@ export class ProjectileSystem {
     return this.projectiles
   }
 
-  checkCollisions(mechs: MechEntity[]): Array<{projectile: Projectile, target: MechEntity}> {
-    const hits: Array<{projectile: Projectile, target: MechEntity}> = []
+  checkCollisions(mechs: MechEntity[]): Array<{projectile: Projectile, target: MechEntity, slot: MechSlot}> {
+    const hits: Array<{projectile: Projectile, target: MechEntity, slot: MechSlot}> = []
 
     for (const proj of this.projectiles) {
       for (const mech of mechs) {
@@ -524,12 +534,41 @@ export class ProjectileSystem {
         const hitRadiusY = 2.5    // Half-height (total height ~5 units)
 
         if (horizontalDist < hitRadiusXZ && Math.abs(dy) < hitRadiusY) {
-          hits.push({ projectile: proj, target: mech })
+          hits.push({ projectile: proj, target: mech, slot: this.resolveHitSlot(proj, mech) })
         }
       }
     }
 
     return hits
+  }
+
+  /**
+   * Resolve which sub-hitbox a hit landed on (design §3.3). The cylinder above is
+   * a single volume; here we bin the impact into a slot using simple attach-point-
+   * anchored bands — approximate by design ("head top, arms sides, legs bottom
+   * third, core center default"). The band is chosen by local height, and within
+   * the arm band a lateral offset (in the mech's own right-vector) picks the
+   * left/right arm; a small central offset falls through to the core.
+   *
+   * Local Y runs 0 (feet) → ~5 (head) since collision spans mech.position.y ..
+   * +5 (attach points: legs 0, core ~2.8+0.8, arms ~3.8, head ~4.8).
+   */
+  private resolveHitSlot(proj: Projectile, mech: MechEntity): MechSlot {
+    const localY = proj.position.y - mech.position.y
+
+    // Head: the top band.
+    if (localY >= 4.2) return 'head'
+    // Legs: the bottom third of the ~5u frame.
+    if (localY < 1.8) return 'legs'
+
+    // Torso band: split arms (flanks) from core (centre) by lateral offset along
+    // the mech's own right vector (attach points put arms at |x| ≈ 1.3).
+    const toHit = proj.position.clone().sub(mech.position)
+    const lateral = toHit.dot(mech.getRightDirection())
+    const ARM_LATERAL_THRESHOLD = 0.7
+    if (lateral <= -ARM_LATERAL_THRESHOLD) return 'leftArm'  // left arm attaches at -x
+    if (lateral >= ARM_LATERAL_THRESHOLD) return 'rightArm'  // right arm attaches at +x
+    return 'core' // centre mass — the default death-pool hit
   }
 
   /**

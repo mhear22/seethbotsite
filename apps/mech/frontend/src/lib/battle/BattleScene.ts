@@ -6,6 +6,7 @@ import { PhysicsSystem } from './PhysicsSystem'
 import { InputManager, type InputState } from './InputManager'
 import { ParticleSystem } from './ParticleSystem'
 import { EnemyAI } from './EnemyAI'
+import { weaponProjectileSpeed } from './enemyGeneration'
 import { MapRenderer } from './MapRenderer'
 import { applyWindowShaders, updateWindowShaders } from './WindowShader'
 import { createDamageShaderPass, decayDamageIntensity } from './DamageShader'
@@ -56,6 +57,21 @@ export interface Building {
   depth: number
 }
 
+/**
+ * Per-enemy bundle for the single-player arena: the mech, its own AI brain, and
+ * its weapon cooldown. The arena was hardwired 1v1 (a scalar `enemyMech`); this
+ * array generalizes it to player-vs-squad (each enemy targets the one player —
+ * exactly the shape EnemyAI.update already supports). `enemyMech` is retained as
+ * the "focus" enemy (nearest living, or the last one during the death anim) for
+ * targeting, radar, and MultiplayerBattleScene, which overrides update() and
+ * drives its single opponent through the `enemyMech` field directly.
+ */
+interface SceneEnemy {
+  mech: MechEntity
+  ai: EnemyAI
+  lastShot: number
+}
+
 export interface TargetingState {
   isTargeted: boolean
   screenX: number      // pixels from left edge
@@ -76,7 +92,10 @@ export class BattleScene {
   protected audio: ReturnType<typeof useAudio>
 
   playerMech: MechEntity
+  /** Focus enemy (nearest living / last-killed). See SceneEnemy doc. */
   enemyMech: MechEntity
+  /** Single-player squad. Empty during MP (which uses enemyMech directly). */
+  protected enemies: SceneEnemy[] = []
   private buildings: Building[] = []
   protected mapRenderer: MapRenderer | null = null
   protected mapDef: MapDefinition | null = null
@@ -183,6 +202,10 @@ export class BattleScene {
     }
     this.camera = new CameraController(this.playerMech)
     this.enemyAI = new EnemyAI(config.aiDifficulty ?? 'medium')
+    // Seed the squad with the initial enemy (1v1 by default; the arena can grow
+    // it via addEnemy). MultiplayerBattleScene ignores this array — it overrides
+    // update() and drives its opponent through the enemyMech field.
+    this.enemies = [{ mech: this.enemyMech, ai: this.enemyAI, lastShot: 0 }]
     this.audio = useAudio()
 
     // Footfall / landing weight (design §3.1): PhysicsSystem detects strides and
@@ -478,7 +501,58 @@ export class BattleScene {
 
   private addMechsToScene() {
     this.scene.add(this.playerMech.mesh)
-    this.scene.add(this.enemyMech.mesh)
+    this.wireSlotFeedback(this.playerMech)
+    // Add every enemy in the squad. For MP / classic 1v1 this is just the one
+    // opponent; the focus enemyMech is always among them at construction.
+    for (const e of this.enemies) {
+      this.scene.add(e.mech.mesh)
+      this.wireSlotFeedback(e.mech)
+    }
+  }
+
+  /**
+   * Slot-destruction feedback (design §3.3): when a limb is shot off, punch a
+   * small explosion at the limb, shake the camera, and add a beat of hitstop so
+   * delimbing reads as a distinct impact from a plain hit. Harmless for MP —
+   * server-authoritative damage never passes a slot, so this never fires there.
+   */
+  protected wireSlotFeedback(mech: MechEntity): void {
+    mech.onSlotDestroyed = (m, slot) => {
+      this.particleSystem.spawnExplosion(m.getSlotPosition(slot), 1.2)
+      this.camera.triggerShake(0.5)
+      this.hitstopTimer = Math.max(this.hitstopTimer, 0.08)
+    }
+  }
+
+  /**
+   * Nearest living squad enemy to the player — the "focus" used for targeting,
+   * player auto-aim/homing, and radar. Null only when the squad is wiped.
+   */
+  protected nearestEnemy(): SceneEnemy | null {
+    let best: SceneEnemy | null = null
+    let bestSq = Infinity
+    for (const e of this.enemies) {
+      if (e.mech.isDestroyed) continue
+      const d = e.mech.position.distanceToSquared(this.playerMech.position)
+      if (d < bestSq) {
+        bestSq = d
+        best = e
+      }
+    }
+    return best
+  }
+
+  /**
+   * Add another enemy to the single-player squad mid-scene (combined-arms /
+   * wave reinforcement seam). Each gets its own AI brain so it flanks
+   * independently. No-op shape for MP (which never calls this).
+   */
+  addEnemy(mech: MechEntity, difficulty?: AIDifficulty): void {
+    const ai = new EnemyAI(difficulty ?? 'medium')
+    if (this.mapDef) ai.setArenaBounds(this.mapDef.arena.width / 2, this.mapDef.arena.depth / 2)
+    this.enemies.push({ mech, ai, lastShot: 0 })
+    this.scene.add(mech.mesh)
+    this.wireSlotFeedback(mech)
   }
 
   private handleResize() {
@@ -630,6 +704,11 @@ export class BattleScene {
     }
     this.rackAbilityHeld = input.useRackAbility
 
+    // Focus the nearest living squad enemy. enemyMech tracks it so the shared
+    // targeting / radar / aim code (and MultiplayerBattleScene) is unchanged.
+    const focus = this.nearestEnemy()
+    if (focus) this.enemyMech = focus.mech
+
     // Dual weapon firing with separate cooldowns
     // When locked, compute per-arm aim from each arm's spawn position to target center
     const targetPoint = this.targetingState.isTargeted
@@ -700,42 +779,45 @@ export class BattleScene {
     const incomingThreats = this.projectileSystem.getProjectiles()
       .filter((p) => p.ownerId === this.playerMech.id)
       .map((p) => ({ position: p.position, velocity: p.velocity }))
-    this.enemyAI.feedThreats(incomingThreats)
 
-    // Update enemy AI (new dedicated class)
-    const shouldEnemyFire = this.enemyAI.update(
-      this.enemyMech,
-      this.playerMech,
-      deltaTime
-    )
+    // Update each squad enemy with its own AI brain (player-vs-squad: every
+    // enemy targets the single player mech).
+    for (const e of this.enemies) {
+      if (e.mech.isDestroyed) continue
+      e.ai.feedThreats(incomingThreats)
+      const shouldEnemyFire = e.ai.update(e.mech, this.playerMech, deltaTime)
+      e.mech.updatePower(deltaTime)
 
-    // Update enemy power regeneration
-    this.enemyMech.updatePower(deltaTime)
+      if (shouldEnemyFire) {
+        // Fire from a live weapon arm (design §3.3): defanging the enemy's right
+        // gun arm makes it fall back to the left; both gone = it can't fire.
+        const fireArm = e.mech.liveWeaponArm()
+        if (fireArm) {
+          // Aim at a leading intercept point with an aim-error cone scaled by the
+          // difficulty's aimSkill, so the accuracy stat actually affects aim.
+          const armPart = e.mech.loadout[fireArm === 'left' ? 'leftArm' : 'rightArm']
+          const projSpeed = weaponProjectileSpeed(armPart?.weaponType)
+          const aimPoint = e.ai.computeAimPoint(e.mech, this.playerMech, projSpeed)
+          const enemyAimDirection = aimPoint
+            .sub(e.mech.getArmPosition(fireArm))
+            .normalize()
+          this.projectileSystem.fireWeapon(e.mech, enemyAimDirection, fireArm, this.playerMech)
+        }
+      }
 
-    if (shouldEnemyFire) {
-      // Aim at a leading intercept point with an aim-error cone scaled by the
-      // difficulty's aimSkill, so the accuracy stat actually affects aim.
-      const armPart = this.enemyMech.loadout.rightArm ?? this.enemyMech.loadout.leftArm
-      const projSpeed = this.getWeaponProjectileSpeed(armPart?.weaponType, armPart?.id)
-      const aimPoint = this.enemyAI.computeAimPoint(this.enemyMech, this.playerMech, projSpeed)
-      const enemyAimDirection = aimPoint
-        .sub(this.enemyMech.getArmPosition('right'))
-        .normalize()
-      // Enemy fires from right arm by default
-      this.projectileSystem.fireWeapon(this.enemyMech, enemyAimDirection, 'right', this.playerMech)
+      this.checkMechBuildingCollisions(e.mech)
+      e.mech.update(deltaTime)
     }
 
-    this.checkMechBuildingCollisions(this.enemyMech)
-    this.enemyMech.update(deltaTime)
-
-    // Update projectiles
-    this.projectileSystem.update(deltaTime, [this.playerMech, this.enemyMech])
+    // Update projectiles + resolve collisions against the player and all enemies.
+    const allMechs = [this.playerMech, ...this.enemies.map((e) => e.mech)]
+    this.projectileSystem.update(deltaTime, allMechs)
 
     // Check projectile-building collisions
     this.checkProjectileBuildingCollisions()
 
     // Check projectile collisions
-    const hits = this.projectileSystem.checkCollisions([this.playerMech, this.enemyMech])
+    const hits = this.projectileSystem.checkCollisions(allMechs)
 
     for (const hit of hits) {
       const damage = hit.projectile.damage
@@ -743,8 +825,11 @@ export class BattleScene {
         armorPierce: hit.projectile.armorPierce,
         burn: hit.projectile.appliesBurn,
         fromFront: hit.target.isHitFromFront(hit.projectile.velocity),
+        slot: hit.slot,
       })
-      const isPlayerShot = hit.target === this.enemyMech
+      // Player landed the hit iff its projectile is the player's (robust for
+      // squads — the target may be any enemy, not just the focus).
+      const isPlayerShot = hit.projectile.ownerId === this.playerMech.id && hit.target !== this.playerMech
       // Heuristic crit: high-damage hits (melee / heavy weapons) read as crits.
       const crit = damage >= 15
 
@@ -797,7 +882,9 @@ export class BattleScene {
 
       this.projectileSystem.removeProjectile(hit.projectile)
 
-      // Check for battle end — start destruction animation instead of immediate stop
+      // Mark the kill + play the impact explosion. Enemy kills are reconciled
+      // after the loop (win only when the whole squad is cleared) so a squad
+      // fight never ends on the first kill; a player death ends immediately.
       if (defeated) {
         // Bigger explosion for kills (per VFX agent guidance: scale 1.5-2).
         this.particleSystem.spawnExplosion(hit.target.position.clone(), 1.8)
@@ -807,27 +894,68 @@ export class BattleScene {
           this.hitstopTimer = 0.12
         }
         hit.target.isDestroyed = true
-        this.battleEnding = true
-        this.battleEndTimer = 2.0
-        this.battleEndResult = hit.target === this.playerMech ? 'defeat' : 'victory'
+        if (hit.target === this.playerMech) {
+          this.battleEnding = true
+          this.battleEndTimer = 2.0
+          this.battleEndResult = 'defeat'
+        }
       }
     }
 
     // Burn DoT (flamer) chips currentHealth in MechEntity.update() outside the
-    // projectile-hit path; register a burn-only death here so a mech that burns
-    // out doesn't linger until the next hit lands (design §3.2 flamer identity).
+    // projectile-hit path; register burn-only enemy deaths here (design §3.2
+    // flamer identity) so a mech that burns out doesn't linger.
     if (!this.battleEnding) {
-      for (const m of [this.enemyMech, this.playerMech]) {
-        if (!m.isDestroyed && m.stats.currentHealth <= 0) {
-          this.particleSystem.spawnExplosion(m.position.clone(), 1.8)
+      for (const e of this.enemies) {
+        if (!e.mech.isDestroyed && e.mech.stats.currentHealth <= 0) {
+          e.mech.isDestroyed = true
+          this.particleSystem.spawnExplosion(e.mech.position.clone(), 1.8)
           this.camera.triggerShake(1.0)
-          m.isDestroyed = true
-          this.battleEnding = true
-          this.battleEndTimer = 2.0
-          this.battleEndResult = m === this.playerMech ? 'defeat' : 'victory'
-          break
         }
       }
+    }
+
+    // Reconcile enemy deaths → win condition. The squad is cleared = victory.
+    if (!this.battleEnding) {
+      const dead = this.enemies.filter((e) => e.mech.isDestroyed)
+      if (dead.length > 0) {
+        const live = this.enemies.filter((e) => !e.mech.isDestroyed)
+        if (live.length === 0) {
+          // Final kill — victory. Keep the last-killed mech + its mesh in the
+          // scene so the destruction animation can play on it; dispose the rest.
+          const last = dead[dead.length - 1].mech
+          for (const e of dead) {
+            if (e.mech !== last) {
+              this.scene.remove(e.mech.mesh)
+              e.mech.cleanup()
+            }
+          }
+          this.enemyMech = last
+          this.enemies = []
+          this.battleEnding = true
+          this.battleEndTimer = 2.0
+          this.battleEndResult = 'victory'
+        } else {
+          // Squad fight continues — dispose the dead and keep going.
+          for (const e of dead) {
+            this.scene.remove(e.mech.mesh)
+            e.mech.cleanup()
+          }
+          this.enemies = live
+          const f = this.nearestEnemy()
+          if (f) this.enemyMech = f.mech
+        }
+      }
+    }
+
+    // Player burn-out death.
+    if (!this.battleEnding && !this.playerMech.isDestroyed && this.playerMech.stats.currentHealth <= 0) {
+      this.particleSystem.spawnExplosion(this.playerMech.position.clone(), 1.8)
+      this.camera.triggerShake(1.0)
+      this.playerMech.isDestroyed = true
+      this.battleEnding = true
+      this.battleEndTimer = 2.0
+      this.battleEndResult = 'defeat'
     }
 
     // Update targeting state (camera already updated at the top of the frame)
@@ -859,13 +987,25 @@ export class BattleScene {
    * survival only; multiplayer never calls this.
    */
   respawnEnemy(newEnemy: MechEntity, difficulty?: AIDifficulty): void {
-    // Remove + dispose the previous enemy's mesh.
-    this.scene.remove(this.enemyMech.mesh)
-    this.enemyMech.cleanup()
+    // Dispose the previous squad (any live stragglers) and the focus mesh — after
+    // a victory the enemies array is empty but the last-killed focus mesh is kept
+    // in the scene for the destruction animation, so clean that up too. Dedupe so
+    // a mech that is both the focus and in the array isn't disposed twice.
+    const disposed = new Set<MechEntity>()
+    const dispose = (m: MechEntity) => {
+      if (disposed.has(m)) return
+      disposed.add(m)
+      this.scene.remove(m.mesh)
+      m.cleanup()
+    }
+    dispose(this.enemyMech)
+    for (const e of this.enemies) dispose(e.mech)
 
-    // Adopt the new enemy and add it to the scene.
+    // Adopt the new enemy as a fresh 1-enemy squad and add it to the scene.
     this.enemyMech = newEnemy
+    this.enemies = [{ mech: newEnemy, ai: this.enemyAI, lastShot: 0 }]
     this.scene.add(this.enemyMech.mesh)
+    this.wireSlotFeedback(newEnemy)
 
     // Re-arm the AI for the new wave.
     if (difficulty) this.enemyAI.setDifficulty(difficulty)
@@ -911,17 +1051,6 @@ export class BattleScene {
     this.audio.playWeaponFire(fxType)
   }
 
-  /**
-   * Projectile speed for a weapon part, mirroring ProjectileSystem's per-type
-   * speeds. Used by the AI to lead its shots. Missiles are ballistic parts whose
-   * id contains 'missile'.
-   */
-  private getWeaponProjectileSpeed(weaponType?: string, _partId?: string): number {
-    if (weaponType === 'energy') return 400
-    if (weaponType === 'missile') return 200 // matches arm-missile-pod's projectileSpeed
-    return 300 // ballistic / melee / support fallback
-  }
-
   triggerDamageEffect(intensity: number = 1.0) {
     this.damageIntensity = Math.min(1.0, this.damageIntensity + intensity)
     if (this.damagePass) {
@@ -937,7 +1066,14 @@ export class BattleScene {
     this.projectileSystem.cleanup()
     this.particleSystem.cleanup()
     this.playerMech.cleanup()
-    this.enemyMech.cleanup()
+    // Dispose the focus enemy + any live squad members, deduped (the focus is
+    // usually also in the array; MP's single opponent is both).
+    const disposed = new Set<MechEntity>()
+    for (const m of [this.enemyMech, ...this.enemies.map((e) => e.mech)]) {
+      if (disposed.has(m)) continue
+      disposed.add(m)
+      m.cleanup()
+    }
 
     // Cleanup scene
     this.scene.traverse((object) => {

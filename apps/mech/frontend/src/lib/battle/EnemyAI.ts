@@ -3,6 +3,9 @@ import type { MechEntity } from './MechEntity'
 import { JUMP_VELOCITY_BASE, JUMP_VELOCITY_JETS } from './constants'
 import type { AIDifficulty } from '../../composables/useGameSettings'
 
+/** Top-speed multiplier for a stranded (legs-destroyed) mech (mirrors PhysicsSystem). */
+const LEGS_DESTROYED_SPEED_MULT = 0.4
+
 type AIState = 'flank' | 'retreat' | 'aggressive' | 'chase'
 
 /**
@@ -383,6 +386,14 @@ export class EnemyAI {
       this.state = 'flank'
     }
 
+    // Delimb consequence (design §3.3): a stranded mech (legs shot off) can't
+    // kite — it can barely move. Drop the retreat intent so it holds ground and
+    // keeps firing instead of vainly trying to back off; the speed cap below is
+    // slashed to match, and the evasive jump is disabled further down.
+    if (enemy.legsDestroyed && this.state === 'retreat') {
+      this.state = 'flank'
+    }
+
     // Strafe direction — flip every 2–4 seconds (faster for aggressive profiles)
     this.strafeDirTimer -= deltaTime
     if (this.strafeDirTimer <= 0) {
@@ -403,7 +414,10 @@ export class EnemyAI {
     // single accel so their behaviour tuning stays independent and stable).
     const speedStat = Math.max(10, enemy.stats.speed) / 100
     const weightFactor = enemy.weightPenalty
-    const maxSpeed = 8 * speedStat * weightFactor
+    // Strand a delimbed mech: legs gone ⇒ 40% top speed (mirrors PhysicsSystem's
+    // LEGS_DESTROYED_SPEED_MULT for the player, design §3.3).
+    const strandMult = enemy.legsDestroyed ? LEGS_DESTROYED_SPEED_MULT : 1
+    const maxSpeed = 8 * speedStat * weightFactor * strandMult
     const accel = 60 * weightFactor // units/s²
 
     const strafeVec = new THREE.Vector3(-dirToPlayer.z, 0, dirToPlayer.x)
@@ -493,7 +507,7 @@ export class EnemyAI {
     // Jump when the player is close and aiming at us, when retreating, or to
     // leap over an imminent incoming shot (scaled by evadeFrequency).
     this.jumpCooldown -= deltaTime
-    if (this.jumpCooldown <= 0 && !enemy.isJumping) {
+    if (this.jumpCooldown <= 0 && !enemy.isJumping && !enemy.legsDestroyed) {
       // Estimate if player is aimed toward us
       const playerLookDir = new THREE.Vector3(
         Math.sin(player.rotation.y),

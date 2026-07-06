@@ -48,6 +48,20 @@ export type DamageType = 'kinetic' | 'energy' | 'melee'
  */
 export type DamageResistances = Partial<Record<DamageType, number>>
 
+// ============================================================================
+// Hit locations (design §3.3)
+// ============================================================================
+
+/**
+ * The five destructible mech locations. Each maps 1:1 to a loadout slot and to
+ * a sub-hitbox resolved in ProjectileSystem.checkCollisions. Limbs (leftArm /
+ * rightArm / legs / head) carry an overlay HP pool derived from their part
+ * stats; destroying one applies a delimb consequence (see MechEntity). `core`
+ * is the death pool — a core hit / an unresolved hit damages `stats.currentHealth`
+ * directly, exactly as before hit locations existed.
+ */
+export type MechSlot = 'leftArm' | 'rightArm' | 'legs' | 'head' | 'core'
+
 // Base part interface
 export interface MechPart {
   id: string
