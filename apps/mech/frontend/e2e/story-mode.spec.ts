@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { watchConsole, waitForCanvasRender, canvasRenderInfo } from './helpers'
+import { watchConsole, waitForCanvasRender, canvasScreenshotBytes, NON_BLANK_PNG_BYTES } from './helpers'
 
 /**
  * Smoke playtest for Story Mode (single-player, client-only).
@@ -44,12 +44,12 @@ test('story mode starts a run and renders the 3D world', async ({ page }, testIn
     `story canvas missing or unsized: ${JSON.stringify(info)}`,
   ).toBeTruthy()
 
-  // The core render assertion: canvas is not a single flat color.
+  // The core render assertion: the canvas presented a non-blank frame (composited
+  // screenshot fallback covers WebGL-without-preserveDrawingBuffer readback).
   expect(
-    info.distinctColors,
-    `story canvas appears blank/uniform (distinctColors=${info.distinctColors}). ` +
-      `This indicates headless WebGL did not render. Full info: ${JSON.stringify(info)}`,
-  ).toBeGreaterThanOrEqual(3)
+    info.nonBlank,
+    `story canvas appears blank/uniform: ${JSON.stringify(info)}`,
+  ).toBeTruthy()
 
   // Focus the canvas/world and drive forward movement (W) for ~1s.
   await canvas.click({ position: { x: 640, y: 360 } }).catch(() => {})
@@ -59,15 +59,15 @@ test('story mode starts a run and renders the 3D world', async ({ page }, testIn
 
   // Let a few more frames render after movement.
   await page.waitForTimeout(600)
-  const after = await canvasRenderInfo(page, 'canvas.story-canvas')
+  const afterBytes = await canvasScreenshotBytes(page, 'canvas.story-canvas')
 
   await page.screenshot({ path: 'e2e/screenshots/story-after.png' })
   await page.screenshot({ path: testInfo.outputPath('story-after.png') })
 
   expect(
-    after.distinctColors,
-    `story canvas blank after movement: ${JSON.stringify(after)}`,
-  ).toBeGreaterThanOrEqual(3)
+    afterBytes,
+    `story canvas blank after movement: composited PNG ${afterBytes} bytes`,
+  ).toBeGreaterThanOrEqual(NON_BLANK_PNG_BYTES)
 
   expect(watcher.crashes, `page crashes/exceptions:\n${watcher.crashes.join('\n')}`).toEqual([])
   expect(watcher.errors, `severe console errors during play:\n${watcher.errors.join('\n')}`).toEqual([])
@@ -148,9 +148,11 @@ test('story mode: dismount hub restores, walks, and remounts the Frame (§4)', a
   await page.keyboard.up('KeyS')
   await page.waitForTimeout(400)
 
-  // 6. Remount the parked Frame (F) -> back in the cockpit; the hint flips back.
+  // 6. Remount the parked Frame (F) -> back in the cockpit; the hint flips from the
+  //    pedestrian verbs back to the in-Frame verbs (P4 copy: "Shift dash …" is
+  //    mech-only, so its presence proves the mount() swap took effect).
   await page.keyboard.press('KeyF')
-  await expect(hint).toContainText('E dismount', { timeout: 15_000 })
+  await expect(hint).toContainText('Shift dash', { timeout: 15_000 })
 
   await page.screenshot({ path: 'e2e/screenshots/story-remount.png' })
   await page.screenshot({ path: testInfo.outputPath('story-remount.png') })

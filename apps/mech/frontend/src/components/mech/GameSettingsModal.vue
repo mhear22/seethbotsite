@@ -182,6 +182,18 @@
           </div>
         </div>
 
+        <!-- Reduced Motion (§5 accessibility): suppresses camera shake / FOV kicks
+             / footfall dips. Defaults from the OS prefers-reduced-motion setting. -->
+        <div class="setting-group">
+          <label class="setting-label">Accessibility</label>
+          <div class="checkbox-group">
+            <label class="checkbox-label">
+              <input type="checkbox" v-model="settings.graphics.reducedMotion" />
+              <span>Reduced Motion (calm camera — no shake, kick, or dip)</span>
+            </label>
+          </div>
+        </div>
+
         <!-- Shadow Quality -->
         <div class="setting-group">
           <label class="setting-label">Shadow Quality</label>

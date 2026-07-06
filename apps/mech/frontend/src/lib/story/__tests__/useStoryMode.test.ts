@@ -207,6 +207,39 @@ describe('composable: quests + garage', () => {
     expect(story.activeQuest.value).toBeNull()
   })
 
+  it('finishActiveQuest honours a degraded reward override (§5 escort attrition)', () => {
+    const story = useStoryMode()
+    story.newRun()
+    const town = story.towns.value[0]
+    const quest = story.getCurrentQuest(town.id)!
+    story.startQuest(quest)
+
+    const moneyBefore = story.money.value
+    // A partial escort pays a fraction of the base reward; the chain still advances.
+    const degraded = Math.round(quest.reward * 0.5)
+    story.finishActiveQuest(quest, degraded)
+
+    expect(story.money.value).toBe(moneyBefore + degraded)
+    expect(story.getTown(town.id)!.questIndex).toBe(1) // still advanced
+    expect(story.activeQuest.value).toBeNull()
+  })
+
+  it('an ace_hunt kill counts toward the boss tally like a Sanction (§5.4)', () => {
+    const story = useStoryMode()
+    story.newRun()
+    // A later town (Kiln, index 2) authors an ace_hunt in its boss slot.
+    const town = story.towns.value[2]
+    const before = story.stats.value.bossesDefeated
+    let sawAce = false
+    for (let q = 0; q < QUESTS_PER_CHAIN; q++) {
+      const quest = story.getCurrentQuest(town.id)!
+      if (quest.type === 'ace_hunt') sawAce = true
+      story.finishActiveQuest(quest)
+    }
+    expect(sawAce).toBe(true) // guards the fixture: Kiln really does field an ace
+    expect(story.stats.value.bossesDefeated).toBe(before + 1)
+  })
+
   it('a full chain makes the town happy and unlocks the finale at 3 towns', () => {
     const story = useStoryMode()
     story.newRun()

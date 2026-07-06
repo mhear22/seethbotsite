@@ -5,6 +5,13 @@
         <div class="credits-eyebrow">Directorate Tribunal · Talus Reach</div>
         <h1 class="credits-title">{{ title }}</h1>
 
+        <!-- Run-condition badges: the tribunal records that you ran Ironman, and
+             which New Game+ cycle this was. -->
+        <div v-if="ironman || ngPlusLevel > 0" class="credits-badges">
+          <span v-if="ironman" class="cbadge ironman">IRONMAN CONDITION</span>
+          <span v-if="ngPlusLevel > 0" class="cbadge ngplus">NEW GAME+ · CYCLE {{ ngPlusLevel }}</span>
+        </div>
+
         <!-- Overall verdict / tribunal finding -->
         <section class="verdict-block" :class="verdictClass">
           <div class="verdict-label">Tribunal Finding</div>
@@ -65,7 +72,16 @@
 
         <div class="credits-footer">
           <p>{{ footerNote }}</p>
-          <button class="finish-btn" @click="$emit('finish')">{{ finishLabel }}</button>
+          <div class="credits-actions">
+            <button class="finish-btn ngplus" @click="$emit('new-game-plus')">
+              Redeploy · New Game+ (Cycle {{ nextCycle }})
+            </button>
+            <button class="finish-btn ghost" @click="$emit('finish')">{{ finishLabel }}</button>
+          </div>
+          <p class="ngplus-note">
+            New Game+ carries your Frame, salvage, inventory and both reputations into a fresh Reach.
+            The towns reset, the acts start over, and the Combine fields tougher machines.
+          </p>
         </div>
       </div>
     </div>
@@ -106,6 +122,12 @@ const props = withDefaults(
     flags?: TribunalFlag[]
     finishLabel?: string
     footerNote?: string
+    /** Whether this run was played under the Ironman condition (§5) — surfaced as
+     *  a tribunal badge so the record notes it. */
+    ironman?: boolean
+    /** New Game+ cycle this run belongs to (0 = first world). Drives the NG+ badge
+     *  and the "next cycle" number on the Redeploy prompt. */
+    ngPlusLevel?: number
   }>(),
   {
     title: 'Tribunal Record',
@@ -113,10 +135,15 @@ const props = withDefaults(
     flags: () => [],
     finishLabel: 'Close the file',
     footerNote: 'Filed by the Directorate. Contested by no one still alive to contest it.',
+    ironman: false,
+    ngPlusLevel: 0,
   },
 )
 
-defineEmits<{ (e: 'finish'): void }>()
+defineEmits<{ (e: 'finish'): void; (e: 'new-game-plus'): void }>()
+
+/** The cycle a New Game+ would start (current + 1). */
+const nextCycle = computed(() => (props.ngPlusLevel ?? 0) + 1)
 
 // Prefer CONTENT-supplied finding prose; fall back to the built-in flavor.
 const finding = computed(() => props.findingText ?? verdictFlavor(props.verdict))
@@ -406,4 +433,49 @@ h2 {
 }
 
 .finish-btn:hover { box-shadow: 0 0 24px rgba(245, 158, 11, 0.5); }
+
+/* Run-condition badges under the title */
+.credits-badges {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: -16px;
+}
+.cbadge {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  padding: 4px 12px;
+  border-radius: 999px;
+}
+.cbadge.ironman {
+  color: #fecaca;
+  background: rgba(220, 38, 38, 0.22);
+  border: 1px solid rgba(248, 113, 113, 0.5);
+}
+.cbadge.ngplus {
+  color: #bfdbfe;
+  background: rgba(37, 99, 235, 0.22);
+  border: 1px solid rgba(96, 165, 250, 0.5);
+}
+
+/* Footer actions (New Game+ / close) */
+.credits-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 14px;
+}
+.finish-btn.ghost {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+.finish-btn.ghost:hover { box-shadow: 0 0 18px rgba(255, 255, 255, 0.18); }
+.ngplus-note {
+  color: #6b7280;
+  font-size: 0.78rem;
+  max-width: 460px;
+  line-height: 1.5;
+}
 </style>

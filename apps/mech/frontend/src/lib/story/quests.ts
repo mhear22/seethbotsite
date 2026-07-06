@@ -31,7 +31,48 @@ import {
 // Quest model
 // ============================================================================
 
-export type QuestType = 'wave_defence' | 'hidden_object' | 'boss_hunt'
+/**
+ * Quest kinds. The three ORIGINAL archetypes (wave_defence / hidden_object /
+ * boss_hunt — re-skinned Hold / Recovery / Sanction) drive the deterministic
+ * chain machinery and the authored five-town arcs. Phase 5 (§5) adds four
+ * VARIETY types on the multi-enemy core; each substitutes into a later town's
+ * chain within the SAME family (see `questFamily`), so the arc's wave/recovery/
+ * boss "shape" is preserved while the moment-to-moment objective varies.
+ */
+export type QuestType =
+  | 'wave_defence'
+  | 'hidden_object'
+  | 'boss_hunt'
+  // Phase 5 variety (§5):
+  | 'escort_convoy' // wave-family: protect slow crawlers to a map-edge waypoint
+  | 'hold_the_line' // wave-family: defend a barricade prop through timed waves
+  | 'extraction' // wave-family: reach a beacon, hold a shrinking perimeter T sec
+  | 'ace_hunt' // boss-family: kill a marked roaming ace (+ bodyguard pair)
+
+/**
+ * The chain FAMILY a quest type belongs to. Chain placement is deterministic by
+ * family, not by exact type: the three base types define the family per slot
+ * (`questTypeFor`), and any Phase-5 variety that substitutes into that slot must
+ * share the family so the town's authored three-beat arc keeps its wave /
+ * recovery / boss shape (§5 "variety without breaking determinism").
+ */
+export type QuestFamily = 'wave' | 'recovery' | 'boss'
+
+/** The family a quest type belongs to (§5 determinism guard). */
+export function questFamily(type: QuestType): QuestFamily {
+  switch (type) {
+    case 'wave_defence':
+    case 'escort_convoy':
+    case 'hold_the_line':
+    case 'extraction':
+      return 'wave'
+    case 'hidden_object':
+      return 'recovery'
+    case 'boss_hunt':
+    case 'ace_hunt':
+      return 'boss'
+  }
+}
 
 export interface QuestDef {
   /** Stable id `town-{i}-quest-{q}` (matches TownState.questChain entries). */
@@ -82,6 +123,29 @@ export interface QuestDef {
    * authored Talus Reach recoveries (black box, pit survivor, missing kid, lost
    * pilgrim, buried cache) are all in-town, on-foot by design (§2.6). */
   onFoot?: boolean
+
+  // --- Phase 5 variety params (§5) — only the relevant type populates each ---
+  /** escort_convoy: number of slow convoy crawlers to shepherd (2-3). */
+  escortCount?: number
+  /** escort_convoy: distance (world units) from the town gate to the map-edge
+   *  waypoint the convoy must reach. */
+  waypointDistance?: number
+  /** escort_convoy: total Combine interceptors that harass across the run. */
+  interceptorCount?: number
+  /** hold_the_line: number of timed assault waves to survive. */
+  holdWaves?: number
+  /** hold_the_line: breather seconds between cleared waves. */
+  breatherSeconds?: number
+  /** hold_the_line: barricade prop hit points (fail if it is destroyed). */
+  barricadeHp?: number
+  /** extraction: seconds to hold the shrinking perimeter once the beacon is reached. */
+  holdSeconds?: number
+  /** extraction: distance (world units) out to the downed-pilot beacon. */
+  beaconDistance?: number
+  /** extraction: starting perimeter ring radius (shrinks to a floor over holdSeconds). */
+  perimeterRadius?: number
+  /** ace_hunt: number of bodyguard mechs escorting the ace (design: a pair). */
+  bodyguardCount?: number
 }
 
 /**
@@ -90,6 +154,30 @@ export interface QuestDef {
  * pilot reaches it on foot — decay-free by §4.2. StoryCombat rings the object in
  * [inner, searchRadius]; keeping this < the decay radius keeps it in-town. */
 export const ON_FOOT_SEARCH_RADIUS = 28
+
+// ── Phase 5 variety tuning (§5) — baseline mechanical params per new type ────
+// buildQuest reads these and ramps a few by chain depth (`slot`). They are the
+// single knob surface for balancing the variety missions; StoryCombat consumes
+// the resolved QuestDef fields and never hardcodes these numbers.
+
+/** escort_convoy: crawlers in the convoy (design: 2-3 slow haulers). */
+export const ESCORT_CRAWLER_COUNT = 3
+/** escort_convoy: gate → map-edge waypoint distance the convoy must cross. */
+export const ESCORT_WAYPOINT_DISTANCE = 220
+/** hold_the_line: timed assault waves to survive. */
+export const HOLD_WAVES = 3
+/** hold_the_line: breather seconds between cleared waves. */
+export const HOLD_BREATHER_SECONDS = 6
+/** hold_the_line: barricade prop HP at slot 0 (ramps with depth). */
+export const HOLD_BARRICADE_HP = 900
+/** extraction: seconds to hold the shrinking perimeter once the beacon is reached. */
+export const EXTRACTION_HOLD_SECONDS = 45
+/** extraction: field distance out to the downed-pilot beacon. */
+export const EXTRACTION_BEACON_DISTANCE = 160
+/** extraction: starting perimeter radius (StoryCombat shrinks it to a floor). */
+export const EXTRACTION_PERIMETER_RADIUS = 34
+/** ace_hunt: bodyguard mechs escorting the roaming ace (design: a pair). */
+export const ACE_HUNT_BODYGUARDS = 2
 
 // ============================================================================
 // Chain generation (deterministic per town)
@@ -102,23 +190,34 @@ export const ON_FOOT_SEARCH_RADIUS = 28
  *  this order produces for every slot — pinned by a determinism test. */
 const QUEST_TYPE_ORDER: QuestType[] = ['wave_defence', 'hidden_object', 'boss_hunt']
 
-/** The type this deterministic machinery assigns to a (townIndex, slot). Exposed
- *  so the content-vs-machinery determinism test can assert the authored
- *  CAMPAIGN_QUESTS entries never drift from it. */
+/**
+ * The FAMILY-defining type this deterministic machinery assigns to a
+ * (townIndex, slot). The authored CAMPAIGN_QUESTS entry for that slot may carry
+ * a Phase-5 VARIETY type, but its `questFamily` must equal this type's family —
+ * so the town's three-beat wave/recovery/boss arc is preserved even when the
+ * exact objective varies. A determinism test pins `questFamily(content.type) ===
+ * questFamily(questTypeFor(t, s))` for every shipping slot.
+ */
 export function questTypeFor(townIndex: number, slot: number): QuestType {
   return QUEST_TYPE_ORDER[(slot + townIndex) % QUEST_TYPE_ORDER.length]
 }
 
 /**
- * Reward for a quest scales with chain depth (later quests pay more) and type
- * (boss hunts pay best, hidden objects least). Tuned so a full town chain funds
- * a couple of mid-tier part upgrades.
+ * Reward for a quest scales with chain depth (later quests pay more) and type.
+ * Ordering within a family holds (a Sanction/ace hunt pays best, a Recovery
+ * least); the Phase-5 variety types pay a small premium over their plain-family
+ * base for their extra objective complexity. Tuned so a full town chain funds a
+ * couple of mid-tier part upgrades.
  */
 export function questReward(type: QuestType, index: number): number {
   const base: Record<QuestType, number> = {
     hidden_object: 120,
     wave_defence: 200,
+    escort_convoy: 240,
+    hold_the_line: 240,
+    extraction: 260,
     boss_hunt: 320,
+    ace_hunt: 360,
   }
   // +60% by the last quest in a chain.
   const depthMult = 1 + index * 0.3
@@ -149,12 +248,21 @@ function fallbackContent(type: QuestType): QuestContent {
   }
 }
 
-/** Build a single quest def for a town slot. Pure + deterministic. */
+/**
+ * Build a single quest def for a town slot. Pure + deterministic.
+ *
+ * The RESOLVED type comes from the authored content (`content.type`), which is
+ * the source of truth for what the mission actually is — early towns author the
+ * plain three types, later towns author Phase-5 variety within the same family
+ * (§5). `questTypeFor` still supplies the family (and the fallback type when a
+ * slot is unauthored, e.g. a hypothetical sixth town). Mechanical params are
+ * layered on per resolved type from the tuning constants above.
+ */
 export function buildQuest(townId: string, townIndex: number, slot: number): QuestDef {
-  const type = questTypeFor(townIndex, slot)
   const id = `${townId}-quest-${slot}`
+  const content = questContent(townIndex, slot) ?? fallbackContent(questTypeFor(townIndex, slot))
+  const type = content.type
   const reward = questReward(type, slot)
-  const content = questContent(townIndex, slot) ?? fallbackContent(type)
   const giver = townIdentity(townIndex)?.warden.name ?? 'The warden'
 
   const common = {
@@ -173,29 +281,67 @@ export function buildQuest(townId: string, townIndex: number, slot: number): Que
     reward,
   }
 
-  if (type === 'wave_defence') {
-    return {
-      ...common,
-      waveCount: 2 + slot, // 2, 3, 4 enemies across the chain
-      difficulty: difficultyForIndex(slot),
-    }
-  }
+  switch (type) {
+    case 'wave_defence':
+      return {
+        ...common,
+        waveCount: 2 + slot, // 2, 3, 4 enemies across the chain
+        difficulty: difficultyForIndex(slot),
+      }
 
-  if (type === 'boss_hunt') {
-    return {
-      ...common,
-      difficulty: 'boss',
-      bossScale: 1 + slot * 0.25, // tougher boss deeper in the chain
-      bossName: content.target ?? `${content.title} target`,
-    }
-  }
+    case 'boss_hunt':
+      return {
+        ...common,
+        difficulty: 'boss',
+        bossScale: 1 + slot * 0.25, // tougher boss deeper in the chain
+        bossName: content.target ?? `${content.title} target`,
+      }
 
-  // hidden_object (Recovery) — on-foot, in-town, decay-free (§4.2).
-  return {
-    ...common,
-    objectName: content.objectName ?? 'the recovery target',
-    searchRadius: ON_FOOT_SEARCH_RADIUS,
-    onFoot: true,
+    // ── Phase 5 variety (§5) ────────────────────────────────────────────
+    case 'escort_convoy':
+      return {
+        ...common,
+        escortCount: ESCORT_CRAWLER_COUNT,
+        waypointDistance: ESCORT_WAYPOINT_DISTANCE,
+        interceptorCount: 4 + slot * 2, // more harassers deeper in the chain
+        difficulty: difficultyForIndex(slot),
+      }
+
+    case 'hold_the_line':
+      return {
+        ...common,
+        holdWaves: HOLD_WAVES,
+        breatherSeconds: HOLD_BREATHER_SECONDS,
+        barricadeHp: Math.round(HOLD_BARRICADE_HP * (1 + slot * 0.15)),
+        difficulty: difficultyForIndex(slot),
+      }
+
+    case 'extraction':
+      return {
+        ...common,
+        holdSeconds: EXTRACTION_HOLD_SECONDS,
+        beaconDistance: EXTRACTION_BEACON_DISTANCE,
+        perimeterRadius: EXTRACTION_PERIMETER_RADIUS,
+        difficulty: difficultyForIndex(slot),
+      }
+
+    case 'ace_hunt':
+      return {
+        ...common,
+        difficulty: 'boss',
+        bossScale: 1 + slot * 0.25,
+        bossName: content.target ?? `${content.title} target`,
+        bodyguardCount: ACE_HUNT_BODYGUARDS,
+      }
+
+    // hidden_object (Recovery) — on-foot, in-town, decay-free (§4.2).
+    case 'hidden_object':
+      return {
+        ...common,
+        objectName: content.objectName ?? 'the recovery target',
+        searchRadius: ON_FOOT_SEARCH_RADIUS,
+        onFoot: true,
+      }
   }
 }
 
@@ -338,16 +484,25 @@ export function isFinaleBoss(quest: QuestDef): boolean {
   return quest.id.endsWith('-finale')
 }
 
-/** Short human label for a quest type, re-skinned to the fiction (§2.6). */
+/** Short human label for a quest type, re-skinned to the fiction (§2.6 / §5). */
 export function questTypeLabel(type: QuestType): string {
   switch (type) {
     case 'wave_defence': return 'Hold'
     case 'hidden_object': return 'Recovery'
     case 'boss_hunt': return 'Sanction'
+    case 'escort_convoy': return 'Escort'
+    case 'hold_the_line': return 'Defend'
+    case 'extraction': return 'Extraction'
+    case 'ace_hunt': return 'Ace Hunt'
   }
 }
 
-/** One-line objective text for the active-quest HUD. */
+/**
+ * One-line objective text for the active-quest HUD. `progress` is the type's
+ * primary counter: enemies cleared (waves), search state (recovery), crawlers
+ * still rolling (escort), waves survived (defend), seconds left / phase
+ * (extraction), or unused (hunts).
+ */
 export function questObjective(quest: QuestDef, progress: number): string {
   switch (quest.type) {
     case 'wave_defence':
@@ -356,6 +511,14 @@ export function questObjective(quest: QuestDef, progress: number): string {
       return `Sanction the target`
     case 'hidden_object':
       return progress > 0 ? `Recover ${quest.objectName}` : `Locate ${quest.objectName}`
+    case 'escort_convoy':
+      return `Get the convoy to the waypoint (${progress}/${quest.escortCount ?? 0} rolling)`
+    case 'hold_the_line':
+      return `Hold the barricade (wave ${progress}/${quest.holdWaves ?? 0})`
+    case 'extraction':
+      return progress > 0 ? `Hold the perimeter (${progress}s)` : `Reach the downed pilot's beacon`
+    case 'ace_hunt':
+      return `Hunt down ${quest.bossName ?? 'the ace'}`
   }
 }
 

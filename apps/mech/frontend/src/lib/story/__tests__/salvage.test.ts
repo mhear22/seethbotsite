@@ -154,6 +154,39 @@ describe('awardSalvage (pure)', () => {
     const allIds = run.inventory.map((i) => i.instanceId)
     expect(new Set(allIds).size).toBe(allIds.length)
   })
+
+  // --- ace_hunt guaranteed pristine drop (§5.4) ---
+  it('guaranteePristine forces one pristine drop even when every chance roll fails', () => {
+    const loadout = killedLoadout()
+    // rng 0.99 fails BOTH the intact (0.25) and destroyed (0.85) rolls: with no
+    // guarantee this kill would drop nothing. The ace guarantee must still yield one.
+    const result = awardSalvage(run, loadout, ['leftArm'], rngConst(0.99), { guaranteePristine: true })
+    expect(result.drops).toHaveLength(1)
+    expect(result.drops[0].condition).toBe('pristine')
+    // It is one of the ace's equipped parts, committed to the run inventory.
+    const equippedIds = SLOT_KEYS.map((s) => loadout[s]?.id).filter(Boolean)
+    expect(equippedIds).toContain(result.drops[0].partId)
+    expect(run.inventory).toContainEqual(result.drops[0])
+  })
+
+  it('guaranteePristine does not add a second drop when a pristine already rolled', () => {
+    const loadout = killedLoadout()
+    // rng 0 passes every intact roll -> all equipped slots already drop pristine.
+    const result = awardSalvage(run, loadout, [], rngConst(0), { guaranteePristine: true })
+    expect(result.drops).toHaveLength(equippedSlotCount(loadout))
+    expect(result.drops.every((d) => d.condition === 'pristine')).toBe(true)
+  })
+
+  it('guaranteePristine prefers an intact slot over a destroyed one', () => {
+    const loadout = killedLoadout()
+    // Every EQUIPPED slot destroyed except the core. rng 0.99 fails all rolls, so
+    // the only pristine drop is the forced one — and it must be the intact core.
+    const destroyed = SLOT_KEYS.filter((s) => s !== 'core' && loadout[s])
+    const result = awardSalvage(run, loadout, destroyed, rngConst(0.99), { guaranteePristine: true })
+    const pristine = result.drops.filter((d) => d.condition === 'pristine')
+    expect(pristine).toHaveLength(1)
+    expect(pristine[0].partId).toBe(loadout.core!.id)
+  })
 })
 
 // ===========================================================================

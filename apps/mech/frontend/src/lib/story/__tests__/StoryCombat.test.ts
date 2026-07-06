@@ -239,6 +239,161 @@ describe('onCollateral emission (§3.5 groundwork)', () => {
   })
 })
 
+// ---------------------------------------------------------------------------
+// Phase 5 mission variety (§5) — the four new types on the multi-enemy core.
+describe('escort_convoy (§5.1)', () => {
+  it('spawns crawlers, marches them to the waypoint, and completes with full reward when none are lost', () => {
+    const { combat, player, enemies } = makeRig()
+    let completed: QuestDef | null = null
+    let outcome: any = null
+    combat.onComplete = (q, o) => { completed = q; outcome = o }
+
+    // Short waypoint, no harassers -> a clean delivery.
+    combat.start(
+      quest({ type: 'escort_convoy', escortCount: 2, waypointDistance: 20, interceptorCount: 0, difficulty: 'easy' }),
+      new THREE.Vector3(0, 0, 0),
+    )
+    expect((combat as any).crawlers).toHaveLength(2)
+    expect(enemies()).toHaveLength(0) // no interceptors queued
+
+    // March the convoy: several steps at the slow crawler speed until arrival.
+    for (let i = 0; i < 30 && combat.active; i++) combat.update(0.5, player, NO_FIRE, i)
+
+    expect(completed).not.toBeNull()
+    expect(outcome.rewardMultiplier).toBeCloseTo(1, 5)
+    expect(outcome.crawlersSaved).toBe(2)
+    expect(combat.active).toBe(false)
+  })
+
+  it('fails (not player death) when the whole convoy is wiped out', () => {
+    const { combat, player } = makeRig()
+    let failed: { quest: QuestDef; reason: string } | null = null
+    combat.onQuestFailed = (q, reason) => { failed = { quest: q, reason } }
+    combat.onComplete = () => { throw new Error('should not complete') }
+
+    combat.start(
+      quest({ type: 'escort_convoy', escortCount: 2, waypointDistance: 400, interceptorCount: 0, difficulty: 'easy' }),
+      new THREE.Vector3(0, 0, 0),
+    )
+    // Kill every crawler outright, then tick: the convoy-lost fail fires.
+    ;(combat as any).crawlers.forEach((c: any) => { c.alive = false })
+    combat.update(0.1, player, NO_FIRE, 1)
+
+    expect(failed).not.toBeNull()
+    expect(failed!.reason).toBe('convoy-lost')
+    expect(combat.active).toBe(false)
+  })
+})
+
+describe('hold_the_line (§5.2)', () => {
+  it('deploys a barricade, runs N waves with a breather, and completes after the last wave', () => {
+    const { combat, player, enemies } = makeRig()
+    let completed: QuestDef | null = null
+    combat.onComplete = (q) => { completed = q }
+
+    combat.start(
+      quest({ type: 'hold_the_line', holdWaves: 2, breatherSeconds: 0, barricadeHp: 100000, difficulty: 'easy' }),
+      new THREE.Vector3(0, 0, 0),
+    )
+    expect((combat as any).barricade).not.toBeNull()
+    expect((combat as any).holdWaveIndex).toBe(1) // first wave on field
+    expect(enemies().length).toBeGreaterThan(0)
+
+    // Clear wave 1 (park enemies far from the barricade so it takes no attrition).
+    enemies().forEach((e: any) => { e.mech.position.set(500, 0, 500); e.mech.stats.currentHealth = 0 })
+    combat.update(0.1, player, NO_FIRE, 1)
+    expect(combat.active).toBe(true)
+    expect((combat as any).holdWaveIndex).toBe(2) // second wave spawned after breather
+
+    // Clear wave 2 -> completion.
+    enemies().forEach((e: any) => { e.mech.position.set(500, 0, 500); e.mech.stats.currentHealth = 0 })
+    combat.update(0.1, player, NO_FIRE, 2)
+    expect(completed).not.toBeNull()
+    expect(combat.active).toBe(false)
+  })
+
+  it('fails when the barricade is destroyed', () => {
+    const { combat, player, enemies } = makeRig()
+    let failed: { reason: string } | null = null
+    combat.onQuestFailed = (_q, reason) => { failed = { reason } }
+
+    combat.start(
+      quest({ type: 'hold_the_line', holdWaves: 3, breatherSeconds: 5, barricadeHp: 1, difficulty: 'easy' }),
+      new THREE.Vector3(0, 0, 0),
+    )
+    // Drive an enemy onto the barricade so it takes attrition, and tick.
+    enemies()[0].mech.position.set(0, 0, 0)
+    combat.update(0.5, player, NO_FIRE, 1)
+
+    expect(failed).not.toBeNull()
+    expect(failed!.reason).toBe('barricade-destroyed')
+    expect(combat.active).toBe(false)
+  })
+})
+
+describe('extraction (§5.3)', () => {
+  it('flips reach -> hold when the player reaches the beacon, then completes after the timer', () => {
+    const { combat, player } = makeRig()
+    let completed: QuestDef | null = null
+    combat.onComplete = (q) => { completed = q }
+
+    combat.start(
+      quest({ type: 'extraction', beaconDistance: 30, perimeterRadius: 20, holdSeconds: 2, difficulty: 'easy' }),
+      new THREE.Vector3(0, 0, 0),
+    )
+    const beaconPos = (combat as any).beacon.position.clone() as THREE.Vector3
+    expect((combat as any).extractionPhase).toBe('reach')
+
+    // Away from the beacon: stays in reach.
+    player.position.set(beaconPos.x + 300, 0, beaconPos.z + 300)
+    combat.update(0.1, player, NO_FIRE, 1)
+    expect((combat as any).extractionPhase).toBe('reach')
+    expect(combat.getProgress().extractionPhase).toBe('reach')
+
+    // Stand on the beacon: flips to hold and starts the countdown.
+    player.position.copy(beaconPos)
+    combat.update(0.1, player, NO_FIRE, 1.1)
+    expect((combat as any).extractionPhase).toBe('hold')
+    expect(combat.getProgress().secondsLeft).toBeGreaterThan(0)
+
+    // Ride out the hold timer -> completion.
+    combat.update(2.5, player, NO_FIRE, 4)
+    expect(completed).not.toBeNull()
+    expect(combat.active).toBe(false)
+  })
+})
+
+describe('ace_hunt (§5.4)', () => {
+  it('spawns an ace + bodyguard pair, and killing the ace completes regardless of the guards, dropping a pristine part', () => {
+    const { combat, player, enemies } = makeRig()
+    let completed: QuestDef | null = null
+    const kills: EnemyKill[] = []
+    combat.onComplete = (q) => { completed = q }
+    combat.onEnemyKilled = (k) => kills.push(k)
+
+    combat.start(
+      quest({ type: 'ace_hunt', bossScale: 2, bodyguardCount: 2, difficulty: 'boss', bossName: 'Captain Roone' }),
+      new THREE.Vector3(0, 0, 0),
+    )
+    expect(enemies()).toHaveLength(3) // ace + 2 bodyguards
+    const ace = (combat as any).boss.mech as MechEntity
+    expect(ace.name).toBe('Captain Roone')
+
+    // Suppress the half-HP reinforcement so the completion-regardless-of-guards
+    // assertion is unambiguous, then drop the ace with both guards at full HP.
+    ;(combat as any).bossReinforced = true
+    ace.stats.currentHealth = 0
+    combat.update(0.05, player, NO_FIRE, 1)
+
+    expect(completed).not.toBeNull()
+    // The ace kill carries the guaranteed pristine drop flag (§5.4).
+    const aceKill = kills.find((k) => k.isBoss)
+    expect(aceKill).toBeTruthy()
+    expect(aceKill!.pristineDrop).toBe(true)
+    expect(combat.active).toBe(false)
+  })
+})
+
 // On-foot Recovery (design §2.6/§4): a hidden_object encounter is driven from the
 // dismounted PILOT's position via updateSearchAt (no MechEntity, no combat loop).
 // This is the Phase-4 seam StoryWorld.updateOnFoot uses while dismounted.

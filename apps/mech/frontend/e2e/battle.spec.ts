@@ -64,9 +64,9 @@ test('single-player battle vs AI renders and shows HUD', async ({ page }, testIn
   await page.screenshot({ path: testInfo.outputPath('battle-hud.png') })
 
   expect(
-    info.distinctColors,
-    `battle canvas appears blank/uniform (distinctColors=${info.distinctColors}): ${JSON.stringify(info)}`,
-  ).toBeGreaterThanOrEqual(3)
+    info.nonBlank,
+    `battle canvas appears blank/uniform: ${JSON.stringify(info)}`,
+  ).toBeTruthy()
 
   expect(watcher.crashes, `page crashes/exceptions:\n${watcher.crashes.join('\n')}`).toEqual([])
   expect(watcher.errors, `severe console errors during battle:\n${watcher.errors.join('\n')}`).toEqual([])

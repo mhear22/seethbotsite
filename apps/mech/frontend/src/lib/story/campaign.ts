@@ -135,9 +135,14 @@ export function townIdentity(index: number): TownIdentity | undefined {
 // ============================================================================
 
 /**
- * Authored strings + rep deltas for one quest slot. `type` MUST match the type
- * `quests.buildQuest` computes for that (townIndex, slot) — a determinism test
- * pins this so content can never silently drift from the machinery.
+ * Authored strings + rep deltas for one quest slot. `type` is the RESOLVED
+ * mission type (the source of truth buildQuest reads). It may be one of the
+ * three base types OR a Phase-5 variety type (§5) — but its `questFamily` MUST
+ * match the family `quests.questTypeFor` computes for that (townIndex, slot), so
+ * the town's authored three-beat wave/recovery/boss arc is preserved. A
+ * determinism test pins this so content can never silently drift from the
+ * machinery. Early towns (0-1) author the plain three types; later towns author
+ * variety within-family.
  *
  * Rep axis (§3.7): Command-sanctioned Holds/Sanctions raise Command; on-foot
  * Recoveries and town-loved fights raise Town and can annoy Command. A Sanction
@@ -256,26 +261,26 @@ export const CAMPAIGN_QUESTS: readonly (readonly QuestContent[])[] = [
   // ---- town-2 The Kiln (refinery) — slots: boss, wave, hidden ----
   [
     {
-      type: 'boss_hunt',
+      type: 'ace_hunt',
       title: 'House Rules',
       target: 'Captain Roone',
-      hook: "There's a warband boss squatting my north kiln. I want him gone.",
+      hook: "A warband ace prowls my north ore-fields with two guns riding escort. Run him down.",
       briefing:
-        "Voss points you at a rival captain who's set up in the cold north kiln — calls him a raider threat. He's really a competitor cutting into Voss's trade, and Voss knows you know. But the captain does run a heavy, and he will burn the Kiln to keep it. So burn him first.",
+        "Voss points you at Captain Roone — a rival ace circling the cold north kilns, calls him a raider threat. He's really a competitor cutting into Voss's trade, and Voss knows you know. Roone rides with a bodyguard pair and won't hold still; chase him down and put him in the ground. Drop the escort or don't — it's Roone that matters.",
       completion:
-        'The rival captain goes into his own furnace. Voss counts the north kiln back into his ledger before the ash settles. "Pleasure doing business," he says. It wasn\'t Command\'s war you fought today.',
+        'Roone goes into his own furnace and his escort scatters into the ash. Voss counts the north kilns back into his ledger before the slag cools. "Pleasure doing business," he says. It wasn\'t Command\'s war you fought today.',
       sanctioned: false,
       commandRep: -2,
       townRep: 8,
     },
     {
-      type: 'wave_defence',
-      title: 'Feed the Fire',
-      hook: 'Combine raid on the smelter. If the pour stops, the Kiln dies.',
+      type: 'escort_convoy',
+      title: 'Metal Run',
+      hook: 'A refined-metal convoy has to reach the Directorate depot. The Combine wants it dead on the road.',
       briefing:
-        "The Combine wants The Kiln's output for its own guns and sent a raiding column to take it. Hold the smelter floor — if the furnace goes cold it takes a week to relight, and the Kiln doesn't have a week.",
+        "The Kiln's smelted its quota and the ore-haulers have to crawl to the Directorate depot at the Reach's edge — Voss gets paid, Command gets its metal. The Combine knows the schedule and will throw interceptors at the crawlers the whole way. They're slow and unarmed; you're their only escort. Get them through. Every hauler that burns is metal that never arrives.",
       completion:
-        'The raid breaks against the furnace wall and the pour never stops. Voss will sell three versions of this story by morning — one to the Directorate, one to the Combine, one to himself. The furnace roars on.',
+        'The surviving haulers grind into the depot and Voss counts his payout twice. He will sell three versions of the road to three buyers by morning — but the metal moved, and that is the only version that pays. The furnace roars on.',
       sanctioned: true,
       commandRep: 8,
       townRep: 6,
@@ -297,16 +302,16 @@ export const CAMPAIGN_QUESTS: readonly (readonly QuestContent[])[] = [
   // ---- town-3 Longwater (farm) — slots: wave, hidden, boss ----
   [
     {
-      type: 'wave_defence',
+      type: 'hold_the_line',
       title: 'The Flood Wall',
-      hook: 'Raiders come for the water. Providence sent us a Frame. Hold the dome.',
+      hook: 'Raiders come for the water in waves. Providence sent us a Frame. Hold the wall — do not let it fall.',
       briefing:
-        "Longwater's domes hold the only clean water for a hundred kilometres, and a raider band means to siphon it dry. Hold the flood wall. Mother Enye will call it a miracle either way — make it the kind where the water stays.",
+        "Longwater's domes hold the only clean water for a hundred kilometres, and a raider band means to breach the flood wall and siphon it dry. They'll come in waves, throwing themselves at the barricade the faithful threw up across the dome mouth. Stand on that wall. If the barricade goes down, the domes go with it — and there is no second wall behind it.",
       completion:
-        'The raiders retreat with empty tanks. Mother Enye declares you an instrument of providence and marks the wall with salt and oil. You are, at least, an instrument. The domes stay green.',
+        'The last wave breaks on the barricade and pulls back into the salt. The wall holds, cracked but standing. Mother Enye declares you an instrument of providence and marks the stone with salt and oil. You are, at least, an instrument. The domes stay green.',
       sanctioned: true,
-      commandRep: 8,
-      townRep: 6,
+      commandRep: 6,
+      townRep: 8,
     },
     {
       type: 'hidden_object',
@@ -322,14 +327,14 @@ export const CAMPAIGN_QUESTS: readonly (readonly QuestContent[])[] = [
       objectName: 'the lost pilgrim',
     },
     {
-      type: 'boss_hunt',
+      type: 'ace_hunt',
       title: 'Apostate',
       target: 'Mercenary Sear',
-      hook: 'A heretic would sell our water to the Combine. Break the machine that guards him.',
+      hook: 'A heretic would sell our water to the Combine. The ace who guards him never stops moving. Hunt it down.',
       briefing:
-        "A Longwater farmer struck a deal to pipe water to the Combine and hired a Frame to guard the valves. Mother Enye names him apostate; Command, pleased to deny the Combine water, co-signs the sanction. The farmer's guard-Frame is the target — the farmer himself will run once it's slag.",
+        "A Longwater farmer struck a deal to pipe water to the Combine and hired an ace — Sear — to guard the valves. Mother Enye names the mercenary apostate; Command, pleased to deny the Combine water, co-signs the sanction. Sear kites the valve-fields with a pair of hired guns; run the ace down and the farmer runs the moment it's slag.",
       completion:
-        "The guard-Frame dies at the valves and the apostate flees into the flats. Enye consecrates the ground where it fell; half of Longwater cheers and half won't meet your eye. The water stays Directorate. For now.",
+        "Sear falls at the valves and the hired guns melt into the flats behind their dead ace. The apostate farmer runs with them. Enye consecrates the ground where the mercenary died; half of Longwater cheers and half won't meet your eye. The water stays Directorate. For now.",
       sanctioned: true,
       commandRep: 12,
       townRep: 4,
@@ -351,28 +356,28 @@ export const CAMPAIGN_QUESTS: readonly (readonly QuestContent[])[] = [
       objectName: 'the buried munitions manifest',
     },
     {
-      type: 'boss_hunt',
+      type: 'ace_hunt',
       title: 'Last Train',
       target: 'Junction-Ace Vell',
-      hook: 'A Combine ace sits in my junction tower. Clear it and the line runs again.',
+      hook: 'A Combine ace works the rail-yards with two escorts. Kill Vell and the line runs again.',
       briefing:
-        "A Combine ace has claimed the junction tower and with it the only signal that lets a train through Halberd. Command wants the line reopened for resupply; Sett wants it reopened to live. Same target either way — a Frame in the tower. Take it down.",
+        "Junction-Ace Vell patrols the dead rail-yards, and while that ace flies, no train moves through Halberd — the signal stays red on its authority alone. Command wants the line reopened for resupply; Sett wants it reopened to live. Vell rides with a bodyguard pair through the sidings. Hunt the ace down; the escort is incidental, the ace is the lock.",
       completion:
-        'The tower burns and the signals go green. A supply train grinds through Halberd Station for the first time in a year, and Sett runs alongside it laughing like a child. Cull just watches the tail lights, believing.',
+        "Vell goes down in the sidings and the escort breaks off the moment the ace does. The signals cycle green on their own. A supply train grinds through Halberd Station for the first time in a year, and Sett runs alongside it laughing like a child. Cull just watches the tail lights, believing.",
       sanctioned: true,
       commandRep: 12,
       townRep: 6,
     },
     {
-      type: 'wave_defence',
-      title: 'Hold the Platform',
-      hook: "They want the junction back. They can't have it. Hold the platform.",
+      type: 'extraction',
+      title: 'Down the Line',
+      hook: "A Directorate flyer went down out on the dead line. Reach the beacon, hold it, bring the pilot home.",
       briefing:
-        'The Combine wants its junction tower back and sent a column to retake it before the line beds in. Hold the platform. If they take the signal again, Halberd goes dark for good and no one will bother relighting it.',
+        "A Directorate recon flyer took fire and crashed kilometres down the dead rail line — the crash beacon is still pinging out in the open flats. Command wants the pilot recovered before the Combine gets there, and they are already converging. Push out to the beacon, then hold the ground around it until the dustoff bird can drop in. They will press you from every side while you wait — stay standing on that beacon.",
       completion:
-        'The column breaks on the platform edge and pulls back down the dead line. Cull, who had stopped speaking in futures, says quietly: "Maybe the line lives." From Cull, that is a resurrection.',
+        "The dustoff lifts the flyer out under your guns and banks away down the dead line. Command logs a clean recovery; Sett logs one more reason the station still matters. Cull, who had stopped speaking in futures, watches the bird go and says quietly: \"Maybe the line lives.\" From Cull, that is a resurrection.",
       sanctioned: true,
-      commandRep: 8,
+      commandRep: 10,
       townRep: 6,
     },
   ],

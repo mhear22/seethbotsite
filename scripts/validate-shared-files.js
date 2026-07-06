@@ -9,48 +9,77 @@ const crypto = require('crypto');
  * This script compares duplicate files and throws an error if they differ.
  *
  * Run this as part of the build process to catch out-of-sync files early.
+ *
+ * There are THREE copies of the shared network/map contract in this repo:
+ *   1. backend/src/shared             — server-authoritative source of truth
+ *   2. frontend/shared                — the (main-site) root frontend copy
+ *   3. apps/mech/frontend/src/shared  — the LIVE mech SPA copy (deployed to /mech/)
+ * Every pair below carries an optional `appsMech` path so the live SPA copy is
+ * validated against the backend contract too. Previously only backend↔root-frontend
+ * was guarded, so the deployed SPA could silently drift from the server protocol
+ * (see docs/MECH_ARCHITECTURE_MAP.md §5).
+ *
+ * INTENTIONAL, DOCUMENTED EXCEPTION — maps/endOfUniverse.ts:
+ *   Both frontend copies add client-only cosmetic material fields
+ *   (`emissive` / `emissiveIntensity`) that the backend copy omits, because the
+ *   server simulation never renders and ignores them. This is additive-only,
+ *   client-side visual divergence, identical between the two frontends. It is
+ *   deliberately NOT validated for byte-equality here — forcing the backend to
+ *   carry unused render fields would be churn with no protocol benefit. If the
+ *   *structure* of endOfUniverse (geometry/collision) ever needs to match the
+ *   server, promote it to SHARED_FILE_PAIRS and reconcile the non-cosmetic fields.
  */
 
-// Configuration: Define the pairs of files that should be kept in sync
+// Configuration: Define the pairs of files that should be kept in sync.
+// `appsMech` (optional) is the live mech SPA copy, validated against `backend`.
 const SHARED_FILE_PAIRS = [
   // Types
   {
     backend: 'backend/src/shared/types/MapDefinition.ts',
     frontend: 'frontend/shared/types/MapDefinition.ts',
+    appsMech: 'apps/mech/frontend/src/shared/types/MapDefinition.ts',
   },
   {
     backend: 'backend/src/shared/types/NetworkMessages.ts',
     frontend: 'frontend/shared/types/NetworkMessages.ts',
+    appsMech: 'apps/mech/frontend/src/shared/types/NetworkMessages.ts',
   },
   // Constants
   {
     backend: 'backend/src/shared/constants/GameConstants.ts',
     frontend: 'frontend/shared/constants/GameConstants.ts',
+    appsMech: 'apps/mech/frontend/src/shared/constants/GameConstants.ts',
   },
   // Maps
   {
     backend: 'backend/src/shared/maps/defaultArena.ts',
     frontend: 'frontend/shared/maps/defaultArena.ts',
+    appsMech: 'apps/mech/frontend/src/shared/maps/defaultArena.ts',
   },
   {
     backend: 'backend/src/shared/maps/ruinedHighway.ts',
     frontend: 'frontend/shared/maps/ruinedHighway.ts',
+    appsMech: 'apps/mech/frontend/src/shared/maps/ruinedHighway.ts',
   },
   {
     backend: 'backend/src/shared/maps/reactorCore.ts',
     frontend: 'frontend/shared/maps/reactorCore.ts',
+    appsMech: 'apps/mech/frontend/src/shared/maps/reactorCore.ts',
   },
   {
     backend: 'backend/src/shared/maps/megaFactory.ts',
     frontend: 'frontend/shared/maps/megaFactory.ts',
+    appsMech: 'apps/mech/frontend/src/shared/maps/megaFactory.ts',
   },
   {
     backend: 'backend/src/shared/maps/spaceColony.ts',
     frontend: 'frontend/shared/maps/spaceColony.ts',
+    appsMech: 'apps/mech/frontend/src/shared/maps/spaceColony.ts',
   },
   {
     backend: 'backend/src/shared/maps/index.ts',
     frontend: 'frontend/shared/maps/index.ts',
+    appsMech: 'apps/mech/frontend/src/shared/maps/index.ts',
   },
 ];
 
@@ -103,61 +132,73 @@ function main() {
   let errorCount = 0;
   let missingCount = 0;
 
-  for (const pair of SHARED_FILE_PAIRS) {
-    const backendPath = path.resolve(rootDir, pair.backend);
-    const frontendPath = path.resolve(rootDir, pair.frontend);
+  // Compare one copy against the backend reference. Returns 'synced' | 'error' | 'missing'.
+  function compareCopy(label, backendRel, backendHash, backendPath, copyRel) {
+    const copyPath = path.resolve(rootDir, copyRel);
+    const copyHash = getFileHash(copyPath);
 
-    const backendHash = getFileHash(backendPath);
-    const frontendHash = getFileHash(frontendPath);
-
-    if (backendHash === null && frontendHash === null) {
-      console.log(`${colors.yellow}⚠ NEITHER EXISTS${colors.reset}`);
-      console.log(`  Backend:  ${pair.backend}`);
-      console.log(`  Frontend: ${pair.frontend}`);
+    if (copyHash === null) {
+      console.log(`${colors.yellow}⚠ ${label.toUpperCase()} MISSING${colors.reset}`);
+      console.log(`  Backend exists: ${backendRel}`);
+      console.log(`  ${copyRel}`);
       console.log('');
-      missingCount++;
-      continue;
+      return 'missing';
     }
 
+    if (backendHash === copyHash) {
+      console.log(`${colors.green}✓ IN SYNC${colors.reset} (backend ↔ ${label}) ${copyRel}`);
+      return 'synced';
+    }
+
+    const backendTime = getFileModTime(backendPath);
+    const copyTime = getFileModTime(copyPath);
+    console.log(`${colors.red}✗ OUT OF SYNC${colors.reset} (backend ↔ ${label})`);
+    console.log(`  File: ${path.basename(backendRel)}`);
+    console.log(`  ${colors.blue}Backend${colors.reset} (${formatTime(backendTime)}): ${backendRel}`);
+    console.log(`  ${colors.blue}${label}${colors.reset} (${formatTime(copyTime)}): ${copyRel}`);
+    if (backendTime > copyTime) {
+      console.log(`  ${colors.yellow}→ Backend is newer. Run: cp ${backendRel} ${copyRel}${colors.reset}`);
+    } else {
+      console.log(`  ${colors.yellow}→ ${label} is newer. Run: cp ${copyRel} ${backendRel}${colors.reset}`);
+    }
+    console.log('');
+    return 'error';
+  }
+
+  for (const pair of SHARED_FILE_PAIRS) {
+    const backendPath = path.resolve(rootDir, pair.backend);
+    const backendHash = getFileHash(backendPath);
+
+    // The backend copy is the source of truth; if it is missing we cannot compare.
     if (backendHash === null) {
       console.log(`${colors.yellow}⚠ BACKEND MISSING${colors.reset}`);
       console.log(`  ${pair.backend}`);
-      console.log(`  Frontend exists: ${pair.frontend}`);
       console.log('');
-      missingCount++;
-      continue;
-    }
-
-    if (frontendHash === null) {
-      console.log(`${colors.yellow}⚠ FRONTEND MISSING${colors.reset}`);
-      console.log(`  Backend exists: ${pair.backend}`);
-      console.log(`  ${pair.frontend}`);
-      console.log('');
-      missingCount++;
-      continue;
-    }
-
-    if (backendHash === frontendHash) {
-      console.log(`${colors.green}✓ IN SYNC${colors.reset} ${pair.backend}`);
-      syncedCount++;
-    } else {
-      const backendTime = getFileModTime(backendPath);
-      const frontendTime = getFileModTime(frontendPath);
-
-      console.log(`${colors.red}✗ OUT OF SYNC${colors.reset}`);
-      console.log(`  File: ${path.basename(pair.backend)}`);
-      console.log(`  ${colors.blue}Backend${colors.reset}  (${formatTime(backendTime)}): ${pair.backend}`);
-      console.log(`  ${colors.blue}Frontend${colors.reset} (${formatTime(frontendTime)}): ${pair.frontend}`);
-
-      if (backendTime > frontendTime) {
-        console.log(`  ${colors.yellow}→ Backend is newer. Run: cp ${pair.backend} ${pair.frontend}${colors.reset}`);
-      } else {
-        console.log(`  ${colors.yellow}→ Frontend is newer. Run: cp ${pair.frontend} ${pair.backend}${colors.reset}`);
-      }
-      console.log('');
-
+      // A missing source-of-truth means the pair cannot be validated at all —
+      // that is a sync failure, not a green pass.
       hasErrors = true;
-      errorCount++;
+      missingCount++;
+      continue;
+    }
+
+    // Build the list of copies to validate against the backend reference.
+    const copies = [{ label: 'frontend', rel: pair.frontend }];
+    if (pair.appsMech) {
+      copies.push({ label: 'apps/mech', rel: pair.appsMech });
+    }
+
+    for (const copy of copies) {
+      const result = compareCopy(copy.label, pair.backend, backendHash, backendPath, copy.rel);
+      if (result === 'synced') syncedCount++;
+      else if (result === 'missing') {
+        // A protocol copy that is absent has drifted from the backend contract as
+        // surely as one that differs — fail the gate so the sync guard is real.
+        hasErrors = true;
+        missingCount++;
+      } else {
+        hasErrors = true;
+        errorCount++;
+      }
     }
   }
 

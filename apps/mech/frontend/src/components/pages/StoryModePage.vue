@@ -19,6 +19,15 @@
           <button class="settings-btn" @click="startNewRun">New Run</button>
           <button class="back-btn" @click="returnToBattle">Back</button>
         </div>
+
+        <!-- Ironman opt-in (§5). Applies to the NEW run only; a tooltip documents
+             exactly what it changes so the choice is honest. -->
+        <label class="ironman-toggle" title="Ironman: if your Frame goes down you lose 50% of your salvage — double the normal 25% — and the loss is locked in the instant you fall (it auto-saves, so there is no reloading to undo it). You still respawn; it is not a hard game-over. The tribunal records that you ran Ironman.">
+          <input type="checkbox" v-model="ironmanOptIn" />
+          <span class="ironman-label">Ironman</span>
+          <span class="ironman-desc">Death costs double salvage and can't be reloaded away. Recorded at the tribunal.</span>
+        </label>
+
         <p v-if="hasSave" class="save-hint">A saved run was found (single slot). “New Run” overwrites it.</p>
       </div>
     </div>
@@ -58,10 +67,11 @@
         @remount="doRemount"
       />
 
-      <!-- Active-quest objective tracker -->
-      <div v-if="activeQuestObjective" class="story-objective">
+      <!-- Active-quest objective tracker (§5 variety: convoy / barricade / timer). -->
+      <div v-if="activeQuestObjective" class="story-objective" :class="{ urgent: activeQuestUrgent }">
         <span class="obj-type">{{ activeQuestTypeLabel }}</span>
         <span class="obj-text">{{ activeQuestObjective }}</span>
+        <span v-if="activeQuestDetail" class="obj-detail">{{ activeQuestDetail }}</span>
       </div>
 
       <!-- Dismount prompt (in the Frame, inside a town, out of combat, §4.1). -->
@@ -85,15 +95,15 @@
           WASD walk · Mouse look · E interact · F mount up
         </template>
         <template v-else>
-          WASD move · Mouse look · Shift dash · Space jump · LMB/RMB fire · E dismount
+          WASD move · Mouse look · Shift dash (i-frame dodge) · Space jump · LMB/RMB fire · E boost · Q rack ability
         </template>
       </div>
 
-      <button type="button" class="story-exit" @click="returnToBattle">Exit to Menu</button>
+      <button type="button" class="story-exit" @click="openPause">☰ Menu</button>
 
       <!-- On-screen controls (touch devices only; self-gates). Hidden while a panel is open. -->
       <TouchControls
-        v-if="!showDialog && !showGarage && !showCredits && !showBoard && !storyTree"
+        v-if="!showDialog && !showGarage && !showCredits && !showBoard && !storyTree && !isPauseOpen"
         :input="touchInput"
         context="story"
       />
@@ -157,6 +167,29 @@
         @close="closeGarage"
       />
 
+      <!-- Pause menu (§5): resume / settings / save-exit / abandon (with confirm). -->
+      <div v-if="isPauseOpen" class="story-pause-backdrop" @click.self="resumeFromPause">
+        <div class="story-pause-panel" role="dialog" aria-modal="true" aria-label="Paused">
+          <h2 class="pause-title">Paused</h2>
+          <div class="pause-actions">
+            <button class="pause-btn primary" @click="resumeFromPause">Resume</button>
+            <button class="pause-btn" @click="isSettingsOpen = true">Settings</button>
+            <button class="pause-btn" @click="exitToMenu">Save &amp; exit to menu</button>
+            <template v-if="!confirmAbandon">
+              <button class="pause-btn danger" @click="confirmAbandon = true">Abandon run</button>
+            </template>
+            <div v-else class="pause-confirm">
+              <p>Abandon this run? Your progress and save are erased — this can't be undone.</p>
+              <div class="pause-confirm-row">
+                <button class="pause-btn danger" @click="abandonRun">Yes, abandon</button>
+                <button class="pause-btn" @click="confirmAbandon = false">Keep playing</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <GameSettingsModal :is-open="isSettingsOpen" @close="isSettingsOpen = false" />
+
       <!-- Credits / damage report (run complete) -->
       <StoryCredits
         v-if="showCredits"
@@ -169,7 +202,10 @@
         :title="creditTitle"
         :finding-text="creditFinding"
         :flags="creditFlags"
+        :ironman="story.ironman.value"
+        :ng-plus-level="story.ngPlusLevel.value"
         @finish="finishRun"
+        @new-game-plus="startNewGamePlus"
       />
     </template>
   </div>
@@ -181,7 +217,7 @@ import { useRouter, useRoute } from 'vue-router'
 import * as THREE from 'three'
 import { MechEntity } from '../../lib/battle/MechEntity'
 import { StoryWorld, type StoryFrameInfo, type OnFootFrameInfo } from '../../lib/story/StoryWorld'
-import type { EnemyKill } from '../../lib/story/StoryCombat'
+import type { EnemyKill, CombatOutcome } from '../../lib/story/StoryCombat'
 import {
   useStoryMode,
   computeCombatStats,
@@ -244,6 +280,7 @@ import CommsToast from '../mech/story/CommsToast.vue'
 import DialogueView from '../mech/story/DialogueView.vue'
 import type { CommsBeat } from '../mech/story/commsTypes'
 import TouchControls from '../mech/TouchControls.vue'
+import GameSettingsModal from '../mech/GameSettingsModal.vue'
 import type { InputManager } from '../../lib/battle/InputManager'
 
 const router = useRouter()
@@ -255,6 +292,12 @@ const gameSettings = useGameSettings()
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 const roaming = ref(false)
 const hasSave = ref(false)
+// Intro-screen Ironman opt-in (§5). Applies to the next New Run only.
+const ironmanOptIn = ref(false)
+// Roaming pause menu (§5 polish): resume / settings / abandon-run (with confirm).
+const isPauseOpen = ref(false)
+const isSettingsOpen = ref(false)
+const confirmAbandon = ref(false)
 
 // Live HUD state fed by the world's per-frame callback.
 const nearestTownName = ref<string | null>(null)
@@ -268,6 +311,12 @@ const questGiverTownId = ref<string | null>(null)
 const encounterActive = ref(false)
 const activeQuestObjective = ref('')
 const activeQuestTypeLabel = ref('')
+// §5 variety HUD: a live secondary readout beside the objective line — convoy
+// delivered/attrition, barricade integrity, or extraction phase cue.
+const activeQuestDetail = ref('')
+// True while the encounter is urgent (extraction hold / low barricade) so the
+// objective chip can pulse. Kept simple + reactive off the frame info.
+const activeQuestUrgent = ref(false)
 
 // --- Phase 4: on-foot / dismount state (fed by handleFrame) ---
 const pilotMode = ref<'mech' | 'onFoot'>('mech')
@@ -351,7 +400,8 @@ const anyModalOpen = computed(
     showGarage.value ||
     showCredits.value ||
     showBoard.value ||
-    storyTree.value !== null,
+    storyTree.value !== null ||
+    isPauseOpen.value,
 )
 
 /**
@@ -531,9 +581,13 @@ onUnmounted(() => {
 function handleKey(e: KeyboardEvent) {
   if (!roaming.value) return
   if (e.code === 'Escape') {
+    // Escape closes the topmost hub panel; with nothing else open it toggles the
+    // pause menu (never a soft-lock — pause is always dismissable to Resume).
     if (showBoard.value) closeBoard()
     else if (showGarage.value) closeGarage()
     else if (showDialog.value) closeDialog()
+    else if (isPauseOpen.value) resumeFromPause()
+    else if (!anyModalOpen.value) openPause()
     return
   }
   if (anyModalOpen.value) return
@@ -558,7 +612,7 @@ function showToast(message: string, bad = false) {
 }
 
 function startNewRun() {
-  story.newRun()
+  story.newRun({ ironman: ironmanOptIn.value })
   beginRoaming()
 }
 
@@ -587,20 +641,37 @@ async function beginRoaming() {
     new THREE.Vector3(0, 0, 0),
   )
 
-  world = new StoryWorld({
-    canvas,
-    playerMech,
-    towns: story.run.value.towns,
-    graphics: gameSettings.settings.value.graphics,
-    onFrame: handleFrame,
-    onQuestComplete: handleQuestComplete,
-    onPlayerDefeated: handlePlayerDefeated,
-    onEnemyKilled: handleEnemyKilled,
-    onReinforcement: handleReinforcement,
-    onCollateral: handleCollateral,
-    onModeChange: handleModeChange,
-  })
-  world.start()
+  // WebGL init can throw (unsupported/blacklisted GPU, or contexts exhausted).
+  // Because roaming is already true the intro screen is gone, so on failure we
+  // reset back to it and surface an error rather than stranding the player on a
+  // black canvas with only HUD overlays.
+  try {
+    world = new StoryWorld({
+      canvas,
+      playerMech,
+      towns: story.run.value.towns,
+      graphics: gameSettings.settings.value.graphics,
+      ngPlusLevel: story.ngPlusLevel.value,
+      onFrame: handleFrame,
+      onQuestComplete: handleQuestComplete,
+      onQuestFailed: handleQuestFailed,
+      onPlayerDefeated: handlePlayerDefeated,
+      onEnemyKilled: handleEnemyKilled,
+      onReinforcement: handleReinforcement,
+      onCollateral: handleCollateral,
+      onModeChange: handleModeChange,
+    })
+    world.start()
+  } catch (err) {
+    console.error('[StoryMode] Failed to initialise the 3D world:', err)
+    if (world) {
+      world.cleanup()
+      world = null
+    }
+    roaming.value = false
+    showToast('Could not start the 3D world — your browser may not support WebGL.', true)
+    return
+  }
   touchInput.value = world.getInputManager()
 
   // Resume a run saved mid-dismount (§4 persistence): park the Frame where it was
@@ -868,17 +939,60 @@ function handleFrame(info: StoryFrameInfo) {
   // Total real elapsed.
   story.tickElapsed(info.deltaTime)
 
-  // Active-quest objective tracker (from the live encounter progress).
+  // Active-quest objective tracker (from the live encounter progress). Each type
+  // feeds questObjective its own primary counter, and the §5 variety types add a
+  // live secondary readout (convoy attrition / barricade integrity / extraction).
   if (info.encounter && story.activeQuest.value) {
     const q = story.activeQuest.value
+    const enc = info.encounter
     activeQuestTypeLabel.value = questTypeLabel(q.type)
-    const progress = q.type === 'hidden_object'
-      ? (info.encounter.found ? 1 : 0)
-      : info.encounter.cleared
+    let progress: number
+    let detail = ''
+    let urgent = false
+    switch (q.type) {
+      case 'hidden_object':
+        progress = enc.found ? 1 : 0
+        break
+      case 'escort_convoy': {
+        progress = enc.crawlersAlive ?? 0
+        const arrived = enc.crawlersArrived ?? 0
+        const total = enc.crawlersTotal ?? 0
+        const lost = Math.max(0, total - (enc.crawlersAlive ?? 0) - arrived)
+        detail = `${arrived}/${total} delivered${lost > 0 ? ` · ${lost} lost` : ''}`
+        break
+      }
+      case 'hold_the_line': {
+        progress = enc.waveIndex ?? 0
+        const pct = Math.round((enc.barricadeFraction ?? 1) * 100)
+        detail = `Barricade ${pct}%`
+        urgent = pct <= 30
+        break
+      }
+      case 'extraction':
+        if (enc.extractionPhase === 'hold') {
+          progress = Math.ceil(enc.secondsLeft ?? 0)
+          detail = 'Perimeter under fire — hold'
+          urgent = true
+        } else {
+          progress = 0
+          detail = 'Fight to the beacon'
+        }
+        break
+      case 'ace_hunt':
+        progress = 0
+        detail = 'Ace marked'
+        break
+      default:
+        progress = enc.cleared
+    }
     activeQuestObjective.value = questObjective(q, progress)
+    activeQuestDetail.value = detail
+    activeQuestUrgent.value = urgent
   } else {
     activeQuestObjective.value = ''
     activeQuestTypeLabel.value = ''
+    activeQuestDetail.value = ''
+    activeQuestUrgent.value = false
   }
 
   // Decay the town the player is inside (real-time, proximity-gated), then push
@@ -1100,7 +1214,7 @@ function onWardenChoice(choice: DialogueChoice): void {
 
 // --- Quest completion / defeat ---
 
-function handleQuestComplete(quest: QuestDef) {
+function handleQuestComplete(quest: QuestDef, outcome?: CombatOutcome) {
   // Finale boss kills clear the town outright (separate path from chain quests).
   if (isFinaleBoss(quest)) {
     const town = story.finishFinaleBoss(quest)
@@ -1117,11 +1231,24 @@ function handleQuestComplete(quest: QuestDef) {
     return
   }
 
-  const town = story.finishActiveQuest(quest)
+  // §5: a partial success (escort that lost crawlers) pays a degraded reward via
+  // the outcome multiplier. Default 1 = full payout for a clean run / other types.
+  const multiplier = outcome?.rewardMultiplier ?? 1
+  const paidReward = Math.max(0, Math.round(quest.reward * multiplier))
+  const town = story.finishActiveQuest(quest, paidReward)
   audio.playSuccess()
   // Two-axis reputation from the authored quest content (§3.7).
   story.adjustReputation({ commandRep: quest.commandRep, townRep: quest.townRep })
-  showToast(`Contract filled: ${quest.title}. +◈${quest.reward} salvage`)
+  // Surface an escort's attrition tally when it degraded the reward.
+  if (outcome && outcome.crawlersLost !== undefined && outcome.crawlersLost > 0) {
+    showToast(
+      `Convoy delivered — ${outcome.crawlersSaved ?? 0} of ${
+        (outcome.crawlersSaved ?? 0) + outcome.crawlersLost
+      } through. +◈${paidReward} salvage (${outcome.crawlersLost} lost).`,
+    )
+  } else {
+    showToast(`Contract filled: ${quest.title}. +◈${paidReward} salvage`)
+  }
   // The authored completion beat, delivered by the warden over comms.
   if (quest.completion) {
     pushComms({
@@ -1141,6 +1268,36 @@ function handleQuestComplete(quest: QuestDef) {
   }
   // Act-transition + Kestrel-sighting comms, keyed off the new milestone state.
   scheduleActComms(quest)
+}
+
+/**
+ * §5 objective FAILURE (not a player death): the escort lost every crawler, or the
+ * barricade fell. No reward, no chain advance, no rep change — we simply clear the
+ * active-quest marker so the quest returns to the town's board/warden to re-attempt.
+ * The encounter itself is already torn down inside StoryCombat.fail(); this is a
+ * strict no-soft-lock exit (the player is back in the Frame, free to redeploy).
+ */
+function handleQuestFailed(quest: QuestDef, reason: string) {
+  story.clearActiveQuest()
+  pendingFinaleTownId = null
+  audio.playError()
+  const line = reason === 'convoy-lost'
+    ? 'Convoy\'s gone — every hauler down. Nothing left to escort. Pull back and try again.'
+    : reason === 'barricade-destroyed'
+      ? 'The line broke — barricade\'s scrap. Fall back, rearm, and we hold it again.'
+      : 'Objective lost. Regroup and redeploy.'
+  pushComms({
+    id: `failed-${quest.id}-${Date.now()}`,
+    callsign: (quest.giver || 'WARDEN').toUpperCase().slice(0, 18),
+    line,
+    variant: 'reinforcement',
+  })
+  const what = reason === 'convoy-lost'
+    ? 'Convoy lost'
+    : reason === 'barricade-destroyed'
+      ? 'The line broke'
+      : 'Mission failed'
+  showToast(`${what}: ${quest.title}. No pay — the contract stays open. Try again.`, true)
 }
 
 /**
@@ -1191,14 +1348,22 @@ function handlePlayerDefeated(destroyedSlots: MechSlot[]) {
  * Surface the haul as a HUD toast.
  */
 function handleEnemyKilled(kill: EnemyKill) {
-  const result = story.awardKillSalvage(kill.loadout, kill.destroyedSlots)
+  // ace_hunt (§5.4): the marked ace guarantees one pristine equipped-part drop.
+  const result = story.awardKillSalvage(kill.loadout, kill.destroyedSlots, Math.random, {
+    guaranteePristine: kill.pristineDrop === true,
+  })
   const drops = result.drops.length
   const parts = drops === 1 ? 'part' : 'parts'
-  showToast(
-    drops > 0
-      ? `Salvage: +◈${result.scrap} and ${drops} ${parts} stripped.`
-      : `Salvage: +◈${result.scrap}.`,
-  )
+  if (kill.pristineDrop) {
+    // Emphasise the ace's guaranteed pristine reward.
+    showToast(`Ace down. Salvage: +◈${result.scrap} and a pristine part recovered.`)
+  } else {
+    showToast(
+      drops > 0
+        ? `Salvage: +◈${result.scrap} and ${drops} ${parts} stripped.`
+        : `Salvage: +◈${result.scrap}.`,
+    )
+  }
 }
 
 /** Comms callout (§3.6): a named ace called in reinforcements at half health. */
@@ -1255,6 +1420,18 @@ function finishRun() {
   story.clearSavedRun()
   teardownWorld()
   router.push({ name: 'mech-home' })
+}
+
+/**
+ * New Game+ (§5): carry the finished run's loadout / inventory / salvage / rep /
+ * Ironman condition into a fresh cycle (towns + acts reset, +1 enemy tier), then
+ * drop straight back into the world. Called from the tribunal's NG+ prompt.
+ */
+function startNewGamePlus() {
+  story.startNewGamePlus() // reads the finished run, then overwrites it with the cycle
+  showCredits.value = false
+  teardownWorld()
+  beginRoaming() // resets finaleAnnounced for the fresh 'exploring' cycle
 }
 
 // --- Garage ---
@@ -1338,6 +1515,41 @@ function teardownWorld() {
 
 function returnToBattle() {
   teardownWorld()
+  router.push({ name: 'mech-home' })
+}
+
+// --- Pause menu (§5 polish) ---
+
+/** Open the pause overlay and freeze the world. */
+function openPause() {
+  isPauseOpen.value = true
+  isSettingsOpen.value = false
+  confirmAbandon.value = false
+  world?.setPaused(true)
+}
+
+/** Close the pause overlay; resume the world only if nothing else holds it paused. */
+function resumeFromPause() {
+  isPauseOpen.value = false
+  isSettingsOpen.value = false
+  confirmAbandon.value = false
+  if (!anyModalOpen.value) world?.setPaused(false)
+}
+
+/** Save the run and exit to the main menu (progress kept — resumable via Continue). */
+function exitToMenu() {
+  isPauseOpen.value = false
+  returnToBattle() // teardownWorld() persists the run before leaving
+}
+
+/** Abandon the run: erase the save and return to the menu (confirmed in the UI).
+ *  Tear down first (that persists the run), THEN wipe the slot, so the world's
+ *  final save can't resurrect the run we're abandoning. */
+function abandonRun() {
+  isPauseOpen.value = false
+  confirmAbandon.value = false
+  teardownWorld()
+  story.clearSavedRun()
   router.push({ name: 'mech-home' })
 }
 </script>
@@ -1431,6 +1643,112 @@ function returnToBattle() {
   font-size: 0.9rem;
   margin-top: 20px;
 }
+
+/* Ironman opt-in (intro screen) */
+.ironman-toggle {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: 480px;
+  margin: 22px auto 0;
+  padding: 12px 16px;
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  border-radius: 10px;
+  background: rgba(220, 38, 38, 0.08);
+  cursor: pointer;
+  text-align: left;
+}
+.ironman-toggle input {
+  width: 18px;
+  height: 18px;
+  accent-color: #ef4444;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+.ironman-label {
+  color: #fecaca;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+.ironman-desc {
+  color: #9ca3af;
+  font-size: 0.82rem;
+  flex: 1 1 240px;
+}
+
+/* Pause menu (roaming) */
+.story-pause-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 2500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(6, 10, 20, 0.72);
+  backdrop-filter: blur(2px);
+}
+.story-pause-panel {
+  width: min(360px, 90vw);
+  padding: 28px 24px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: linear-gradient(180deg, rgba(30, 41, 66, 0.98), rgba(16, 24, 43, 0.98));
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+}
+.pause-title {
+  margin: 0 0 20px;
+  text-align: center;
+  color: #e8eefc;
+  font-size: 1.5rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.pause-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.pause-btn {
+  padding: 12px 18px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  color: #e8eefc;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.pause-btn:hover { background: rgba(255, 255, 255, 0.14); }
+.pause-btn.primary {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  border-color: transparent;
+  color: #fff;
+}
+.pause-btn.danger {
+  border-color: rgba(248, 113, 113, 0.5);
+  color: #fca5a5;
+}
+.pause-btn.danger:hover { background: rgba(220, 38, 38, 0.22); }
+.pause-confirm {
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: rgba(220, 38, 38, 0.1);
+  border: 1px solid rgba(248, 113, 113, 0.4);
+}
+.pause-confirm p {
+  margin: 0 0 12px;
+  color: #fecaca;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+.pause-confirm-row {
+  display: flex;
+  gap: 10px;
+}
+.pause-confirm-row .pause-btn { flex: 1; }
 
 .button-group {
   display: flex;
@@ -1579,6 +1897,31 @@ function returnToBattle() {
   font-size: 0.92rem;
   font-weight: 700;
   text-align: right;
+}
+
+/* §5 variety secondary readout (convoy attrition / barricade % / extraction cue). */
+.obj-detail {
+  font-size: 0.74rem;
+  font-weight: 600;
+  text-align: right;
+  color: #cbd5e1;
+  letter-spacing: 0.02em;
+}
+
+/* Urgent encounter (extraction hold / barricade critical): warm border + pulse. */
+.story-objective.urgent {
+  border-color: rgba(248, 113, 113, 0.85);
+  animation: obj-pulse 1.1s ease-in-out infinite;
+}
+.story-objective.urgent .obj-detail {
+  color: #fca5a5;
+}
+@keyframes obj-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(248, 113, 113, 0.0); }
+  50% { box-shadow: 0 0 14px 2px rgba(248, 113, 113, 0.45); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .story-objective.urgent { animation: none; }
 }
 
 /* Quest-giver interact prompt (center-bottom, above controls hint) */

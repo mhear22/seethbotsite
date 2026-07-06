@@ -5,22 +5,21 @@ import { watchConsole } from './helpers'
  * Smoke playtest: the app boots at '/', renders the initial menu/UI, and does
  * not throw real console errors or crash.
  *
- * The root route redirects to the Mech Builder. We assert the builder UI is
- * present (the "Battle" launch control) rather than depending on WebGL here, so
- * this test passes even if headless GL is unavailable.
+ * The root route lands on the GRINDER home menu (HomePage.vue) — not the builder.
+ * We assert the two primary menu entries are visible (real, sized, on-screen
+ * elements) rather than the `#app` container, which is a zero-height wrapper for
+ * full-viewport positioned content and so reads as "hidden" to Playwright.
  */
 test('app loads without severe errors', async ({ page }, testInfo) => {
   const watcher = watchConsole(page)
 
   await page.goto('/', { waitUntil: 'domcontentloaded' })
 
-  // Vue app root mounts.
-  const appRoot = page.locator('#app')
-  await expect(appRoot).toBeVisible({ timeout: 30_000 })
+  // The home menu's two primary entries route into the campaign and the arena.
+  const campaignEntry = page.getByRole('button', { name: /campaign/i }).first()
+  await expect(campaignEntry).toBeVisible({ timeout: 30_000 })
 
-  // The builder (default landing) shows a Battle launch button. Be lenient on
-  // the exact label, matching the "Battle" text used in the builder header/footer.
-  const battleControl = page.getByRole('button', { name: /battle/i }).first()
+  const battleControl = page.getByRole('button', { name: /build\s*&?\s*battle/i }).first()
   await expect(battleControl).toBeVisible({ timeout: 30_000 })
 
   // Give the app a moment to settle so late errors are captured.

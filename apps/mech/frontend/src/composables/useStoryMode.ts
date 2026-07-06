@@ -135,6 +135,15 @@ export const COLLATERAL_SEVERITY_PER_ENEMY_KILL = 0
 
 /** Fraction of carried salvage lost when the player's Frame is downed. */
 export const DEATH_SALVAGE_LOSS_FRACTION = 0.25
+/**
+ * Ironman death penalty (design §5 optional flag). On an Ironman run the salvage
+ * loss on a downing is DOUBLED (50% vs the normal 25%). Everything else about a
+ * downing is identical — Ironman is not a hard game-over, it just makes the one
+ * consequence that can be reload-dodged (salvage) bite twice as hard, and (via
+ * playerDefeated persisting immediately) locks the loss in the instant you go
+ * down. See the intro-screen Ironman tooltip for the exact player-facing contract.
+ */
+export const DEATH_SALVAGE_LOSS_FRACTION_IRONMAN = 0.5
 /** Condition the defended town loses when you go down (enemies overrun it). */
 export const DEATH_TOWN_CONDITION_HIT = 8
 /** Per-town standing lost when you fail its defence by being downed. */
@@ -268,6 +277,17 @@ export interface StoryRun {
   onFootTownId?: TownId | null
   /** World-space position the Frame is parked/monumented at while on foot. */
   mechPark?: [number, number, number] | null
+
+  // --- Meta flags (design §5, Phase 5). Additive optional fields — a save
+  //     written before Phase 5 simply lacks them and defaults to a normal,
+  //     first-cycle run. No save-version bump is needed. ---
+  /** Ironman run: doubled death salvage loss, no reload-forgiveness (the tribunal
+   *  records the condition). Absent/undefined ⇒ a normal (forgiving-stakes) run. */
+  ironman?: boolean
+  /** New Game+ cycle count: 0 (or absent) is the first world; each NG+ carry-over
+   *  increments it. Enemy generation adds +1 difficulty tier per level (integrator
+   *  seam — read by the enemy generator; see the Phase 5 report). */
+  ngPlusLevel?: number
 }
 
 // ============================================================================
@@ -468,7 +488,14 @@ export function freshStats(): RunStats {
   return { questsCompleted: 0, bossesDefeated: 0, moneyEarned: 0 }
 }
 
-export function createFreshRun(now: number = Date.now()): StoryRun {
+/** Options for a fresh run (design §5). `ironman` opts into doubled death stakes;
+ *  `ngPlusLevel` seeds a New Game+ cycle (see createNewGamePlusRun). */
+export interface NewRunOptions {
+  ironman?: boolean
+  ngPlusLevel?: number
+}
+
+export function createFreshRun(now: number = Date.now(), opts: NewRunOptions = {}): StoryRun {
   return {
     version: SAVE_VERSION,
     salvage: 0,
@@ -486,7 +513,34 @@ export function createFreshRun(now: number = Date.now()): StoryRun {
     pilotMode: 'mech',
     onFootTownId: null,
     mechPark: null,
+    ironman: opts.ironman === true,
+    ngPlusLevel: Math.max(0, Math.floor(opts.ngPlusLevel ?? 0)),
   }
+}
+
+/**
+ * Build the next New Game+ cycle from a finished run (design §5). A fresh world —
+ * towns, acts, phase, story flags, quest chains and elapsed time all RESET — that
+ * CARRIES the persistent spoils across: the built loadout, the salvage inventory,
+ * the salvage balance, both reputation axes, and the Ironman condition. The enemy
+ * generator reads the incremented `ngPlusLevel` for its +1 difficulty tier
+ * (integrator seam). Pure: does not touch storage or the live run ref.
+ */
+export function createNewGamePlusRun(prev: StoryRun, now: number = Date.now()): StoryRun {
+  const fresh = createFreshRun(now, {
+    ironman: prev.ironman === true,
+    ngPlusLevel: (prev.ngPlusLevel ?? 0) + 1,
+  })
+  // Carry the spoils. Loadout parts + inventory are cloned by id via the existing
+  // serialize round-trip semantics; here a shallow copy is enough since parts are
+  // shared immutable catalog objects and inventory items are plain data.
+  fresh.loadout = { ...prev.loadout }
+  fresh.inventory = prev.inventory.map((it) => ({ ...it }))
+  fresh.salvage = Math.max(0, prev.salvage)
+  fresh.stats = { ...freshStats(), moneyEarned: prev.stats.moneyEarned }
+  fresh.commandRep = clampRep(prev.commandRep)
+  fresh.townRep = clampRep(prev.townRep)
+  return fresh
 }
 
 // ============================================================================
@@ -507,6 +561,32 @@ export function deriveChapter(
 ): Chapter {
   if (phase === 'finale' || phase === 'ended') return 'act3'
   return questsCompleted === 0 ? 'act1' : 'act2'
+}
+
+/**
+ * Human-readable act/phase label for the home-menu Continue card (design §5).
+ * Mirrors the phase→act mapping the in-world HUD uses so the menu never disagrees
+ * with the game about which act you are in.
+ */
+export function actLabelFor(phase: StoryPhase, chapter: Chapter): string {
+  if (phase === 'ended') return 'Tribunal'
+  if (phase === 'finale') return 'Act III · The Order'
+  return chapter === 'act1' ? 'Act I · Deployment' : 'Act II · The Grind'
+}
+
+/** Read-only summary of a saved run for the home-menu Continue card (design §5). */
+export interface SavedRunSummary {
+  phase: StoryPhase
+  chapter: Chapter
+  /** e.g. "Act II · The Grind" / "Tribunal". */
+  actLabel: string
+  /** Towns made happy (held) so far. */
+  townsHeld: number
+  /** Total towns in the run (so the card can read "2/5 held"). */
+  townCount: number
+  salvage: number
+  ironman: boolean
+  ngPlusLevel: number
 }
 
 /** True if a narrative flag has been raised on the run. */
@@ -657,8 +737,11 @@ export function handlePlayerDefeated(
   townId?: TownId,
   destroyedSlots: ShopSlot[] = [],
 ): DefeatResult {
-  // --- 25% salvage loss. ---
-  const salvageLost = Math.floor(run.salvage * DEATH_SALVAGE_LOSS_FRACTION)
+  // --- Salvage loss: 25% normally, doubled to 50% on an Ironman run (§5). ---
+  const lossFraction = run.ironman
+    ? DEATH_SALVAGE_LOSS_FRACTION_IRONMAN
+    : DEATH_SALVAGE_LOSS_FRACTION
+  const salvageLost = Math.floor(run.salvage * lossFraction)
   run.salvage = Math.max(0, run.salvage - salvageLost)
 
   // --- Town takes the hit you failed to prevent. ---
@@ -836,6 +919,7 @@ export function awardSalvage(
   killedLoadout: MechLoadout,
   destroyedSlots: ShopSlot[] = [],
   rng: () => number = Math.random,
+  opts: { guaranteePristine?: boolean } = {},
 ): SalvageResult {
   // --- Scrap: scale by the enemy's total equipped part power. ---
   let power = 0
@@ -863,6 +947,39 @@ export function awardSalvage(
     }
     working.push(item)
     drops.push(item)
+  }
+
+  // --- Guaranteed pristine drop (ace_hunt §5.4). ---
+  // A marked ace always yields one PRISTINE equipped part regardless of the rolls
+  // above. If the chance rolls already produced a pristine drop, that satisfies it;
+  // otherwise force the ace's best intact part (or, if every slot was shot off, its
+  // best part) as a pristine reward.
+  if (opts.guaranteePristine && !drops.some((d) => d.condition === 'pristine')) {
+    let bestSlot: ShopSlot | null = null
+    let bestIntactSlot: ShopSlot | null = null
+    let bestScore = -1
+    let bestIntactScore = -1
+    for (const slot of SLOT_KEYS) {
+      const part = killedLoadout[slot]
+      if (!part) continue
+      const score = partPowerScore(part)
+      if (score > bestScore) { bestScore = score; bestSlot = slot }
+      if (!destroyedSlots.includes(slot) && score > bestIntactScore) {
+        bestIntactScore = score
+        bestIntactSlot = slot
+      }
+    }
+    const target = bestIntactSlot ?? bestSlot
+    const targetPart = target ? killedLoadout[target] : null
+    if (targetPart) {
+      const item: InventoryItem = {
+        instanceId: nextInstanceId(working),
+        partId: targetPart.id,
+        condition: 'pristine',
+      }
+      working.push(item)
+      drops.push(item)
+    }
   }
 
   // --- Commit to the run. ---
@@ -1013,6 +1130,13 @@ export function deserializeRun(raw: string): StoryRun | null {
       pilotMode: migrated.pilotMode === 'onFoot' ? 'onFoot' : 'mech',
       onFootTownId: typeof migrated.onFootTownId === 'string' ? migrated.onFootTownId : null,
       mechPark: sanitizeVec3(migrated.mechPark),
+      // Meta flags (§5). Additive on v3 — a pre-Phase-5 save lacks them and
+      // resumes as a normal, first-cycle run.
+      ironman: migrated.ironman === true,
+      ngPlusLevel:
+        typeof migrated.ngPlusLevel === 'number' && Number.isFinite(migrated.ngPlusLevel)
+          ? Math.max(0, Math.floor(migrated.ngPlusLevel))
+          : 0,
     }
   } catch {
     return null
@@ -1080,6 +1204,33 @@ export function useStoryMode() {
     }
   }
 
+  /**
+   * A read-only glance at the saved run for the home-menu Continue card (design §5
+   * / Phase 5 HomePage retone) — WITHOUT loading it as the active run. Returns null
+   * if there is no readable save. Cheap and side-effect-free (parses the slot,
+   * discards the run).
+   */
+  function peekSavedRun(): SavedRunSummary | null {
+    try {
+      const raw = localStorage.getItem(STORY_SAVE_KEY)
+      if (!raw) return null
+      const parsed = deserializeRun(raw)
+      if (!parsed) return null
+      return {
+        phase: parsed.phase,
+        chapter: parsed.chapter,
+        actLabel: actLabelFor(parsed.phase, parsed.chapter),
+        townsHeld: happyTownCount(parsed.towns),
+        townCount: parsed.towns.length,
+        salvage: parsed.salvage,
+        ironman: parsed.ironman === true,
+        ngPlusLevel: parsed.ngPlusLevel ?? 0,
+      }
+    } catch {
+      return null
+    }
+  }
+
   function clearSavedRun(): void {
     try {
       localStorage.removeItem(STORY_SAVE_KEY)
@@ -1088,9 +1239,23 @@ export function useStoryMode() {
     }
   }
 
-  /** Start a brand-new run (overwrites the single save slot). */
-  function newRun(): StoryRun {
-    run.value = createFreshRun()
+  /** Start a brand-new run (overwrites the single save slot). `opts.ironman` opts
+   *  into the doubled-death-stakes Ironman condition (design §5). */
+  function newRun(opts: NewRunOptions = {}): StoryRun {
+    run.value = createFreshRun(Date.now(), opts)
+    save()
+    return run.value
+  }
+
+  /**
+   * Begin a New Game+ cycle from the just-finished run (design §5): a fresh world
+   * that carries the loadout, inventory, salvage, both rep axes and the Ironman
+   * condition, with `ngPlusLevel` incremented for the enemy generator's +1 tier.
+   * Overwrites the single save slot. No-op-safe: with no active run it starts a
+   * plain fresh run instead. Call this from the tribunal's "New Game+" prompt.
+   */
+  function startNewGamePlus(): StoryRun {
+    run.value = run.value ? createNewGamePlusRun(run.value) : createFreshRun()
     save()
     return run.value
   }
@@ -1259,13 +1424,18 @@ export function useStoryMode() {
    * the town's chain (via completeQuest), and clears the active marker. Returns
    * the town it belonged to (or undefined).
    */
-  function finishActiveQuest(quest: QuestDef): TownState | undefined {
+  function finishActiveQuest(quest: QuestDef, reward: number = quest.reward): TownState | undefined {
     const town = getTown(quest.townId)
     if (!town) return undefined
     // Only advance if this quest is still the town's current one (guards double-fire).
     if (town.questIndex === quest.index) {
-      if (quest.type === 'boss_hunt' && run.value) run.value.stats.bossesDefeated += 1
-      completeQuest(quest.townId, quest.reward) // pays + standing + saves
+      // Named-ace hunts (§5.4) are boss-caliber kills — counted alongside boss_hunt
+      // so the tribunal tally + Kestrel sightings reflect them.
+      if ((quest.type === 'boss_hunt' || quest.type === 'ace_hunt') && run.value) {
+        run.value.stats.bossesDefeated += 1
+      }
+      // `reward` may be a degraded payout (§5 escort attrition — rewardMultiplier<1).
+      completeQuest(quest.townId, Math.max(0, Math.round(reward))) // pays + standing + saves
     }
     activeQuest.value = null
     return town
@@ -1365,9 +1535,10 @@ export function useStoryMode() {
     killedLoadout: MechLoadout,
     destroyedSlots: ShopSlot[] = [],
     rng: () => number = Math.random,
+    opts: { guaranteePristine?: boolean } = {},
   ): SalvageResult {
     if (!run.value) return { scrap: 0, drops: [] }
-    const result = awardSalvage(run.value, killedLoadout, destroyedSlots, rng)
+    const result = awardSalvage(run.value, killedLoadout, destroyedSlots, rng, opts)
     save()
     return result
   }
@@ -1569,6 +1740,10 @@ export function useStoryMode() {
   const onFootTownId = computed<TownId | null>(() => run.value?.onFootTownId ?? null)
   /** World-space Frame park position while on foot, or null. */
   const mechPark = computed<[number, number, number] | null>(() => run.value?.mechPark ?? null)
+  /** Whether the active run is an Ironman run (doubled death stakes, §5). */
+  const ironman = computed(() => run.value?.ironman === true)
+  /** New Game+ cycle count for the active run (0 = first world, §5). */
+  const ngPlusLevel = computed(() => run.value?.ngPlusLevel ?? 0)
   /** Number of towns the player made happy (helped) this run. */
   const townsHelped = computed(() => happyCount.value)
   /** Per-town damage reports for the credits screen. */
@@ -1605,6 +1780,9 @@ export function useStoryMode() {
     isOnFoot,
     onFootTownId,
     mechPark,
+    // meta flags (Phase 5)
+    ironman,
+    ngPlusLevel,
     townsHelped,
     damageReports,
     avgDestruction,
@@ -1614,6 +1792,8 @@ export function useStoryMode() {
     load,
     loadOrNew,
     newRun,
+    startNewGamePlus,
+    peekSavedRun,
     hasSavedRun,
     clearSavedRun,
     // mutations

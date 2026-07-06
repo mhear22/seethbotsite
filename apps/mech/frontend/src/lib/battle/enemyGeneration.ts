@@ -200,3 +200,68 @@ export function compositionForDifficulty(difficulty: AIDifficulty): EnemyArchety
 export function reinforcementComposition(): EnemyArchetype[] {
   return ['skirmisher', 'skirmisher']
 }
+
+// ── Phase 5 mission-variety compositions (§5) ─────────────────────────────
+// New composition entries feeding the four Phase-5 mission types in
+// StoryCombat. Behaviour still comes from EnemyAI.ARCHETYPE_PROFILES; these only
+// decide the BODY MIX each new objective fields, cycled across the spawn count.
+
+/**
+ * escort_convoy interceptors (§5.1). Combine harassers sent to pick off slow
+ * haulers: fast skirmishers lead (they reach the convoy first), with a line
+ * grunt to apply steadier pressure at higher tiers. Kept light — the fight is
+ * about protecting the crawlers, not a grinding brawl.
+ */
+export function convoyInterceptorComposition(difficulty: AIDifficulty): EnemyArchetype[] {
+  switch (difficulty) {
+    case 'tutorial':
+    case 'easy': return ['skirmisher', 'skirmisher']
+    case 'medium': return ['skirmisher', 'skirmisher', 'line']
+    case 'hard': return ['skirmisher', 'line', 'skirmisher']
+    case 'boss': return ['skirmisher', 'sniper', 'skirmisher']
+    default: return ['skirmisher', 'skirmisher']
+  }
+}
+
+/**
+ * hold_the_line assault waves (§5.2). A frontal push against a fixed barricade:
+ * a bulwark anchors the line and lighter units flank, so the player must protect
+ * the structure while managing a wall. Leads with the bulwark at higher tiers so
+ * the wave reads as a shove, not a swarm.
+ */
+export function holdLineComposition(difficulty: AIDifficulty): EnemyArchetype[] {
+  switch (difficulty) {
+    case 'tutorial':
+    case 'easy': return ['line', 'line']
+    case 'medium': return ['line', 'skirmisher', 'line']
+    case 'hard': return ['bulwark', 'line', 'skirmisher']
+    case 'boss': return ['bulwark', 'sniper', 'line', 'skirmisher']
+    default: return ['line', 'skirmisher']
+  }
+}
+
+/**
+ * extraction perimeter-press waves (§5.3). Units that punish a stationary
+ * defender holding a shrinking ring: snipers to tax standing still and
+ * skirmishers to collapse the perimeter. The player cannot simply turtle.
+ */
+export function extractionPressComposition(difficulty: AIDifficulty): EnemyArchetype[] {
+  switch (difficulty) {
+    case 'tutorial':
+    case 'easy': return ['skirmisher', 'line']
+    case 'medium': return ['skirmisher', 'sniper', 'line']
+    case 'hard': return ['skirmisher', 'sniper', 'skirmisher', 'line']
+    case 'boss': return ['sniper', 'skirmisher', 'bulwark', 'skirmisher']
+    default: return ['skirmisher', 'line']
+  }
+}
+
+/**
+ * ace_hunt bodyguard pair (§5.4). The named ace roams with a two-mech escort: a
+ * line trooper for staying power and a skirmisher to peel off and flank while the
+ * player tries to focus the ace. Killing the ace ends the hunt regardless of
+ * whether these are down (StoryCombat gates completion on the ace).
+ */
+export function aceBodyguardComposition(): EnemyArchetype[] {
+  return ['line', 'skirmisher']
+}

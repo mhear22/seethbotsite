@@ -138,25 +138,87 @@ export async function canvasRenderInfo(
 }
 
 /**
- * Waits until a canvas matching `selector` exists, is sized, and is rendering
- * more than a single flat color (i.e. three.js has drawn a frame). Returns the
- * final render info. Throws via the caller's assertion if it never renders.
+ * Byte floor below which a canvas element screenshot is treated as effectively
+ * blank. three.js creates its WebGLRenderer WITHOUT `preserveDrawingBuffer`, so
+ * the in-browser `drawImage(webglCanvas)` readback above reads a *cleared* buffer
+ * post-composite and reports a single flat colour even when the frame renders
+ * perfectly (verified against the saved screenshots). Playwright's compositor
+ * screenshot, by contrast, captures the real presented pixels regardless of
+ * `preserveDrawingBuffer`, so we use its PNG size as the reliable non-blank
+ * signal: a uniform 1280×720 PNG compresses to ~1–3 KB, while any real 3D frame
+ * (sky gradient + geometry + HUD) is tens to hundreds of KB. 6 KB is a safe,
+ * WebGL-variance-tolerant floor — no pixel asserts.
+ */
+export const NON_BLANK_PNG_BYTES = 6_000
+
+export interface CanvasRenderResult {
+  found: boolean
+  width: number
+  height: number
+  /** In-browser readback distinct-colour count (0/1 for WebGL without preserve). */
+  distinctColors: number
+  /** Size of the composited canvas-element PNG captured by Playwright. */
+  screenshotBytes: number
+  /** True when EITHER signal shows the canvas rendered a non-uniform frame. */
+  nonBlank: boolean
+}
+
+/**
+ * Screenshots just the canvas element via Playwright's compositor and returns the
+ * PNG byte size. Reliable for WebGL (unlike in-browser readback). Returns 0 if the
+ * element can't be captured (missing/detached/zero-size).
+ */
+export async function canvasScreenshotBytes(page: Page, selector: string): Promise<number> {
+  try {
+    const buf = await page.locator(selector).first().screenshot({ timeout: 10_000 })
+    return buf.length
+  } catch {
+    return 0
+  }
+}
+
+/**
+ * Waits until a canvas matching `selector` exists, is sized, and has rendered a
+ * non-blank frame. Uses the fast in-browser readback first; if that reports
+ * uniform (the expected WebGL case here), falls back to the compositor-screenshot
+ * byte floor. Returns the final result; callers assert on `nonBlank`.
  */
 export async function waitForCanvasRender(
   page: Page,
   selector: string,
   opts: { timeout?: number; minDistinctColors?: number } = {},
-): Promise<{ found: boolean; width: number; height: number; uniform: boolean; distinctColors: number }> {
+): Promise<CanvasRenderResult> {
   const timeout = opts.timeout ?? 30_000
   const minDistinct = opts.minDistinctColors ?? 2
   const deadline = Date.now() + timeout
-  let last = { found: false, width: 0, height: 0, uniform: true, distinctColors: 0 }
+  let last: CanvasRenderResult = {
+    found: false,
+    width: 0,
+    height: 0,
+    distinctColors: 0,
+    screenshotBytes: 0,
+    nonBlank: false,
+  }
 
   while (Date.now() < deadline) {
-    last = await canvasRenderInfo(page, selector)
-    if (last.found && last.width > 0 && last.distinctColors >= minDistinct) {
-      return last
+    const info = await canvasRenderInfo(page, selector)
+    let screenshotBytes = 0
+    let nonBlank = info.found && info.width > 0 && info.distinctColors >= minDistinct
+    if (info.found && info.width > 0 && !nonBlank) {
+      // In-browser readback is uniform (WebGL without preserveDrawingBuffer).
+      // Confirm against the reliable compositor screenshot.
+      screenshotBytes = await canvasScreenshotBytes(page, selector)
+      nonBlank = screenshotBytes >= NON_BLANK_PNG_BYTES
     }
+    last = {
+      found: info.found,
+      width: info.width,
+      height: info.height,
+      distinctColors: info.distinctColors,
+      screenshotBytes,
+      nonBlank,
+    }
+    if (nonBlank) return last
     await page.waitForTimeout(500)
   }
   return last

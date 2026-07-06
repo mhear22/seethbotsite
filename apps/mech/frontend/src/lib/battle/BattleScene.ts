@@ -19,7 +19,7 @@ import { markRaw } from 'vue'
 import { useAudio } from '../../composables/useAudio'
 import { getMapById } from '@shared/maps'
 import type { MapDefinition } from '@shared/types/MapDefinition'
-import type { GraphicsSettings, AIDifficulty } from '../../composables/useGameSettings'
+import { motionScale, type GraphicsSettings, type AIDifficulty } from '../../composables/useGameSettings'
 
 export interface BattleSceneConfig {
   canvas: HTMLCanvasElement
@@ -201,6 +201,8 @@ export class BattleScene {
       this.particleSystem.spawnImpactSparks(p, new THREE.Vector3(0, 1, 0), 'floor')
     }
     this.camera = new CameraController(this.playerMech)
+    // Reduced-motion (§5): suppress camera shake/kick/dip when opted in.
+    this.camera.motionScale = motionScale({ reducedMotion: config.graphics?.reducedMotion ?? false })
     this.enemyAI = new EnemyAI(config.aiDifficulty ?? 'medium')
     // Seed the squad with the initial enemy (1v1 by default; the arena can grow
     // it via addEnemy). MultiplayerBattleScene ignores this array — it overrides
@@ -1087,6 +1089,9 @@ export class BattleScene {
 
     this.composer?.dispose()
     this.renderer.dispose()
+    // Release the WebGL context, not just its buffers: browsers cap live contexts
+    // (~8-16), so re-entering Battle would orphan and eventually exhaust them.
+    this.renderer.forceContextLoss()
   }
 
   getBattleTime(): number {

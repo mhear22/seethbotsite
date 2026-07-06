@@ -15,22 +15,31 @@
         <span class="logo-line">THE MECH</span>
         <span class="logo-line accent">APP</span>
       </div>
-      <p class="home-tagline">A walking disaster with a heart of gold.</p>
+      <p class="home-tagline">
+        Sixty tons of Directorate Frame in a colony belt the war forgot.
+        The only thing that can save these towns — and the reason they need saving.
+      </p>
 
       <nav class="home-menu" aria-label="Main menu">
-        <button v-if="hasSave" class="menu-entry continue" @click="continueStory">
-          <span class="entry-title">▶ CONTINUE</span>
-          <span class="entry-sub">Pick up your story run</span>
+        <button v-if="savedSummary" class="menu-entry continue" @click="continueStory">
+          <span class="entry-title">
+            ▶ CONTINUE
+            <span v-if="savedSummary.ironman" class="badge ironman" title="Ironman run">IRONMAN</span>
+            <span v-if="savedSummary.ngPlusLevel > 0" class="badge ngplus" title="New Game+ cycle">NG+{{ savedSummary.ngPlusLevel }}</span>
+          </span>
+          <span class="entry-sub">
+            {{ savedSummary.actLabel }} · {{ savedSummary.townsHeld }}/{{ savedSummary.townCount }} held · ◈ {{ savedSummary.salvage }}
+          </span>
         </button>
 
         <button class="menu-entry" @click="goStory">
-          <span class="entry-title">🏘 STORY MODE</span>
-          <span class="entry-sub">Roam, help (or wreck) the towns</span>
+          <span class="entry-title">◈ THE REACH — CAMPAIGN</span>
+          <span class="entry-sub">Hold the line. Count the cost.</span>
         </button>
 
         <button class="menu-entry" @click="goBuildBattle">
           <span class="entry-title">⚔ BUILD &amp; BATTLE</span>
-          <span class="entry-sub">Forge a mech, then fight</span>
+          <span class="entry-sub">Forge a Frame, then take it to the arena</span>
         </button>
 
         <button class="menu-entry subtle" @click="isSettingsOpen = true">
@@ -38,7 +47,7 @@
         </button>
       </nav>
 
-      <p class="home-footer">v1 · all data saved locally</p>
+      <p class="home-footer">Talus Reach deployment · all data saved locally</p>
     </div>
   </div>
 </template>
@@ -53,8 +62,10 @@ import { useStoryMode, buildStarterLoadout } from '../../composables/useStoryMod
 const router = useRouter()
 const story = useStoryMode()
 
-// Whether a saved story run exists — drives the optional "Continue" entry.
-const hasSave = ref(story.hasSavedRun())
+// A read-only glance at the saved story run — drives the optional "Continue"
+// entry and its run summary (act, towns held, salvage, Ironman/NG+ badges).
+// Null when there is no readable save.
+const savedSummary = ref(story.peekSavedRun())
 const isSettingsOpen = ref(false)
 // A throwaway starter loadout purely for the decorative background preview.
 const idleLoadout = buildStarterLoadout()
@@ -195,6 +206,29 @@ function goBuildBattle() {
 .menu-entry .entry-sub {
   font-size: 0.85rem;
   color: #9fb0d2;
+}
+
+/* Run-state badges on the Continue entry (Ironman / New Game+). */
+.badge {
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1.5;
+}
+.badge.ironman {
+  color: #fecaca;
+  background: rgba(220, 38, 38, 0.28);
+  border: 1px solid rgba(248, 113, 113, 0.5);
+}
+.badge.ngplus {
+  color: #bfdbfe;
+  background: rgba(37, 99, 235, 0.28);
+  border: 1px solid rgba(96, 165, 250, 0.5);
 }
 .menu-entry.continue {
   border-color: rgba(255, 213, 79, 0.6);

@@ -34,6 +34,14 @@ export class CameraController {
   public sensitivityMultiplier = 1.0
   public invertMouseX = false
   public invertMouseY = false
+  /**
+   * Reduced-motion multiplier (design §5 accessibility). 1 = full camera juice;
+   * 0 = suppress shake / FOV kicks / dips entirely. Set from
+   * `motionScale(graphics.reducedMotion)` by the scene that owns this rig
+   * (StoryWorld / BattleScene). Multiplied into every punch primitive below so
+   * footfalls, landings, hit-shake and dash kicks all honour the setting.
+   */
+  public motionScale = 1.0
 
   // Mouse velocity smoothing - converts discrete integer input into smooth rotation
   private mouseVelocity = { x: 0, y: 0 }
@@ -306,19 +314,28 @@ export class CameraController {
 
   triggerShake(intensity: number) {
     // Profile shake scale heavily damps on-foot shake — a person has no weight.
-    this.shakeIntensity = Math.max(this.shakeIntensity, intensity * this.profile.shakeScale)
+    // motionScale (reduced-motion) can zero it out entirely.
+    this.shakeIntensity = Math.max(
+      this.shakeIntensity,
+      intensity * this.profile.shakeScale * this.motionScale,
+    )
   }
 
   /** Punch the FOV outward (dash juice); eased back to base in update(). */
   triggerFovKick(amount: number) {
     // Additive so kicks accumulate a little, clamped so it never over-widens.
-    this.fovOffset = Math.max(-15, Math.min(25, this.fovOffset + amount))
+    // Reduced-motion suppresses the kick (motionScale = 0).
+    this.fovOffset = Math.max(-15, Math.min(25, this.fovOffset + amount * this.motionScale))
   }
 
   /** Punch the camera downward (footfall / landing weight); eased back in update(). */
   triggerDip(amount: number) {
-    // Damped by the active profile so on-foot footfalls barely register.
-    this.dipOffset = Math.min(2.0, this.dipOffset + amount * this.profile.shakeScale)
+    // Damped by the active profile so on-foot footfalls barely register; and by
+    // motionScale so reduced-motion holds the camera steady.
+    this.dipOffset = Math.min(
+      2.0,
+      this.dipOffset + amount * this.profile.shakeScale * this.motionScale,
+    )
   }
 
   /**

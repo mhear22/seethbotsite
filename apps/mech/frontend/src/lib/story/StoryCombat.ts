@@ -11,6 +11,10 @@ import {
   maxAliveForDifficulty,
   compositionForDifficulty,
   reinforcementComposition,
+  convoyInterceptorComposition,
+  holdLineComposition,
+  extractionPressComposition,
+  aceBodyguardComposition,
 } from '../battle/enemyGeneration'
 import type { AIDifficulty } from '../../composables/useGameSettings'
 import type { MechSlot } from '../../shared/types/MechTypes'
@@ -45,6 +49,27 @@ export interface EnemyKill {
   destroyedSlots: MechSlot[]
   archetype: EnemyArchetype
   isBoss: boolean
+  /**
+   * ace_hunt (§5.4): the marked ace drops a GUARANTEED pristine part from its
+   * loadout. When set, the host's awardKillSalvage must roll one equipped part as
+   * a pristine (undamaged) drop rather than the normal chance-based roll.
+   */
+  pristineDrop?: boolean
+}
+
+/**
+ * Outcome payload handed to onComplete alongside the quest (§5). Backward
+ * compatible — existing single-arg wiring ignores it. `rewardMultiplier` lets a
+ * partial success (an escort that lost crawlers) pay less than a clean run; the
+ * host multiplies the quest's base reward by it.
+ */
+export interface CombatOutcome {
+  /** Multiplier the host applies to quest.reward (1 = full; <1 = degraded). */
+  rewardMultiplier: number
+  /** escort_convoy: crawlers that reached the waypoint. */
+  crawlersSaved?: number
+  /** escort_convoy: crawlers lost en route. */
+  crawlersLost?: number
 }
 
 /** Story pacing: how much the quest difficulty tier scales archetype stats. */
@@ -54,6 +79,17 @@ const TIER_SCALE: Record<AIDifficulty, number> = {
   medium: 1.0,
   hard: 1.15,
   boss: 1.3,
+}
+
+/**
+ * New Game+ enemy toughness multiplier (§5). Each completed cycle fields machines
+ * ~one difficulty tier tougher — 0.15 mirrors the largest step in TIER_SCALE
+ * (hard→boss). Multiplies the per-encounter scale for EVERY spawned enemy (waves,
+ * boss, guards, reinforcements) so the whole cycle ramps, not just one fight.
+ * Cycle 0 returns 1 (no change), keeping first-run balance identical.
+ */
+export function ngPlusEnemyScale(level: number): number {
+  return 1 + 0.15 * Math.max(0, Math.floor(level))
 }
 
 /**
@@ -75,6 +111,53 @@ export interface CombatProgress {
   collected: boolean
   /** True once the whole encounter is complete. */
   complete: boolean
+  // --- Phase 5 variety readouts (§5) — populated only for the relevant type ---
+  /** escort_convoy: crawlers still rolling. */
+  crawlersAlive?: number
+  /** escort_convoy: crawlers that reached the waypoint. */
+  crawlersArrived?: number
+  /** escort_convoy / any convoy: total crawlers dispatched. */
+  crawlersTotal?: number
+  /** hold_the_line: current wave (1-based) and total; barricade HP fraction 0..1. */
+  waveIndex?: number
+  waveTotal?: number
+  barricadeFraction?: number
+  /** extraction: current phase and seconds left in the hold; perimeter fraction 0..1. */
+  extractionPhase?: 'reach' | 'hold'
+  secondsLeft?: number
+  perimeterFraction?: number
+}
+
+// ── Phase 5 mission-variety tuning (§5) — local to the encounter driver ──────
+/** escort_convoy: crawler ground speed (u/s). Deliberately slow — the escort is
+ *  paced by the convoy, not the player. */
+const CONVOY_SPEED = 9
+/** escort_convoy: distance to the waypoint at which a crawler counts as arrived. */
+const CONVOY_ARRIVE_RADIUS = 12
+/** escort_convoy: an interceptor within this range of a crawler chips its HP. */
+const CONVOY_HARASS_RADIUS = 42
+/** escort_convoy: crawler HP loss per second per harassing interceptor. */
+const CONVOY_HARASS_DPS = 16
+/** escort_convoy: crawler hit points. No weapons, no armour — just endurance. */
+const CRAWLER_HP = 260
+/** escort_convoy: obstacle-avoidance radius (crawlers steer around mechs + siblings). */
+const CONVOY_AVOID_RADIUS = 11
+/** hold_the_line: an enemy within this range of the barricade damages it. */
+const BARRICADE_THREAT_RADIUS = 30
+/** hold_the_line: barricade HP loss per second per enemy in range. */
+const BARRICADE_DPS = 20
+/** extraction: player proximity to the beacon that flips reach -> hold. */
+const EXTRACTION_REACH_RADIUS = 14
+/** extraction: the perimeter ring never shrinks below this radius. */
+const EXTRACTION_PERIMETER_FLOOR = 10
+
+/** One convoy hauler (escort_convoy). Boxy, unarmed, HP only (§5.1). */
+interface Crawler {
+  mesh: THREE.Group
+  hp: number
+  maxHp: number
+  alive: boolean
+  arrived: boolean
 }
 
 /**
@@ -109,9 +192,21 @@ export class StoryCombat {
   private waveSpawnQueue: number = 0 // enemies still to spawn for the current wave quest
   private waveDifficulty: AIDifficulty = 'easy'
   private waveTierScale = 1
+  /** New Game+ toughness multiplier (§5); 1 on the first cycle. Set once per
+   *  session by the host via setNgPlusLevel and folded into every enemy spawn. */
+  private ngPlusScale = 1
   private waveBatchTimer = 0
   private clearedCount = 0
   private totalCount = 0
+  /** Monotonic count of enemies spawned this encounter — drives the toughness
+   *  ramp + name index without depending on the (per-type) totalCount meaning. */
+  private waveSpawnedTotal = 0
+  /** Archetype pool the current encounter's waves cycle through (per-type, §5).
+   *  Empty = fall back to compositionForDifficulty (plain wave_defence). */
+  private waveComposition: EnemyArchetype[] = []
+  /** Centre spawned enemies ring around (town gate by default; the beacon for
+   *  extraction, the convoy for escort) so field encounters spawn in the field. */
+  private spawnCenter = new THREE.Vector3()
 
   // Boss (Sanction / named ace) state — drives the half-health reinforcement
   // script (§3.6). `boss` is the ace unit; `bossReinforced` latches so the
@@ -120,6 +215,34 @@ export class StoryCombat {
   private bossReinforced = false
   private bossScale = 1
 
+  // --- Phase 5 variety state (§5) ---
+  // Shared prop bookkeeping for disposal (crawlers/barricade/beacon/perimeter).
+  private propGeoms: THREE.BufferGeometry[] = []
+  private propMats: THREE.Material[] = []
+
+  // escort_convoy
+  private crawlers: Crawler[] = []
+  private convoyWaypoint = new THREE.Vector3()
+  private crawlersArrived = 0
+  private crawlersLost = 0
+
+  // hold_the_line
+  private barricade: THREE.Mesh | null = null
+  private barricadeHp = 0
+  private barricadeMaxHp = 0
+  private holdWaveIndex = 0 // waves fully spawned so far
+  private holdWaveTotal = 0
+  private holdBreather = 0 // seconds left before the next wave
+  private holdWaveOnField = false // a wave currently has enemies to clear
+
+  // extraction
+  private beacon: THREE.Group | null = null
+  private perimeterRing: THREE.Mesh | null = null
+  private extractionPhase: 'reach' | 'hold' = 'reach'
+  private extractionSeconds = 0
+  private extractionHoldTotal = 0
+  private extractionPerimeterR = 0
+
   private elapsed = 0
 
   // Player firing cooldowns (the world drives player firing through us so the
@@ -127,8 +250,21 @@ export class StoryCombat {
   private lastLeftShot = 0
   private lastRightShot = 0
 
-  /** Fired when the encounter is fully complete (all enemies dead / object got). */
-  onComplete?: (quest: QuestDef) => void
+  /**
+   * Fired when the encounter is fully complete (all enemies dead / object got /
+   * convoy delivered / perimeter held / ace down). The optional `outcome` carries
+   * a reward multiplier and per-type detail (§5); existing single-arg wiring
+   * simply ignores it and pays the full reward.
+   */
+  onComplete?: (quest: QuestDef, outcome?: CombatOutcome) => void
+  /**
+   * Fired when a variety objective FAILS without the player being destroyed (§5):
+   * escort_convoy loses every crawler, or hold_the_line's barricade is destroyed.
+   * The host treats it as a failed mission (no reward, no chain advance) and ends
+   * the encounter. `reason` is a short machine tag for the HUD banner. Player
+   * DEATH still routes through onPlayerDefeated (the death-stakes path), not here.
+   */
+  onQuestFailed?: (quest: QuestDef, reason: string) => void
   /**
    * Fired when the player mech is destroyed during an encounter. Carries the
    * limb slots the player lost in the fight (from MechEntity.destroyedSlots, core
@@ -171,6 +307,11 @@ export class StoryCombat {
     this.arenaHalf = half
   }
 
+  /** §5 New Game+: field tougher machines each cycle. Applied to every spawn. */
+  setNgPlusLevel(level: number): void {
+    this.ngPlusScale = ngPlusEnemyScale(level)
+  }
+
   get active(): boolean {
     return this.quest !== null
   }
@@ -180,12 +321,39 @@ export class StoryCombat {
   }
 
   getProgress(): CombatProgress {
-    return {
+    const base: CombatProgress = {
       cleared: this.clearedCount,
       total: this.totalCount,
       found: this.objectFound,
       collected: this.objectCollected,
       complete: false,
+    }
+    switch (this.quest?.type) {
+      case 'escort_convoy':
+        return {
+          ...base,
+          crawlersAlive: this.crawlers.filter((c) => c.alive && !c.arrived).length,
+          crawlersArrived: this.crawlersArrived,
+          crawlersTotal: this.crawlers.length,
+        }
+      case 'hold_the_line':
+        return {
+          ...base,
+          waveIndex: this.holdWaveIndex,
+          waveTotal: this.holdWaveTotal,
+          barricadeFraction: this.barricadeMaxHp > 0 ? Math.max(0, this.barricadeHp / this.barricadeMaxHp) : 0,
+        }
+      case 'extraction':
+        return {
+          ...base,
+          extractionPhase: this.extractionPhase,
+          secondsLeft: this.extractionPhase === 'hold' ? Math.ceil(this.extractionSeconds) : 0,
+          perimeterFraction: this.extractionHoldTotal > 0
+            ? Math.max(0, this.extractionSeconds / this.extractionHoldTotal)
+            : 0,
+        }
+      default:
+        return base
     }
   }
 
@@ -197,49 +365,110 @@ export class StoryCombat {
     if (this.quest) return false
     this.quest = quest
     this.anchor.copy(townCenter)
+    this.spawnCenter.copy(townCenter)
     this.elapsed = 0
     this.clearedCount = 0
     this.objectFound = false
     this.objectCollected = false
     this.boss = null
     this.bossReinforced = false
+    this.waveComposition = []
+    this.waveSpawnQueue = 0
+    this.waveSpawnedTotal = 0
+    this.waveBatchTimer = 0
+    // Reset variety state.
+    this.crawlers = []
+    this.crawlersArrived = 0
+    this.crawlersLost = 0
+    this.barricade = null
+    this.barricadeHp = 0
+    this.barricadeMaxHp = 0
+    this.holdWaveIndex = 0
+    this.holdWaveTotal = 0
+    this.holdBreather = 0
+    this.holdWaveOnField = false
+    this.beacon = null
+    this.perimeterRing = null
+    this.extractionPhase = 'reach'
 
-    if (quest.type === 'hidden_object') {
-      this.totalCount = 1
-      this.spawnHiddenObject(quest)
-    } else if (quest.type === 'boss_hunt') {
-      // Sanction: a named ace. The reinforcement pair (spawned at half HP) adds
-      // to totalCount when it arrives.
-      this.totalCount = 1
-      this.bossScale = quest.bossScale ?? 1
-      this.boss = this.spawnArchetypeEnemy('ace', this.bossScale, 0, true, quest.bossName)
-    } else {
-      // wave_defence: queue N enemies as a combined-arms composition, spawn the
-      // first batch.
-      const n = quest.waveCount ?? 3
-      this.totalCount = n
-      this.waveSpawnQueue = n
-      this.waveDifficulty = quest.difficulty ?? 'easy'
-      this.waveTierScale = TIER_SCALE[this.waveDifficulty] ?? 1
-      this.spawnWaveBatch()
+    switch (quest.type) {
+      case 'hidden_object':
+        this.totalCount = 1
+        this.spawnHiddenObject(quest)
+        break
+
+      case 'boss_hunt':
+        // Sanction: a named ace. The reinforcement pair (spawned at half HP) adds
+        // to totalCount when it arrives.
+        this.totalCount = 1
+        this.bossScale = quest.bossScale ?? 1
+        this.boss = this.spawnArchetypeEnemy('ace', this.bossScale, 0, true, quest.bossName)
+        break
+
+      case 'ace_hunt':
+        this.startAceHunt(quest)
+        break
+
+      case 'escort_convoy':
+        this.startEscort(quest)
+        break
+
+      case 'hold_the_line':
+        this.startHold(quest)
+        break
+
+      case 'extraction':
+        this.startExtraction(quest)
+        break
+
+      case 'wave_defence':
+      default: {
+        // wave_defence: queue N enemies as a combined-arms composition, spawn the
+        // first batch.
+        const n = quest.waveCount ?? 3
+        this.totalCount = n
+        this.waveSpawnQueue = n
+        this.waveDifficulty = quest.difficulty ?? 'easy'
+        this.waveTierScale = TIER_SCALE[this.waveDifficulty] ?? 1
+        this.spawnWaveBatch()
+        break
+      }
     }
     return true
   }
 
-  /** Abandon the current encounter, removing all spawned content from the scene. */
-  abort(): void {
+  /**
+   * Remove + dispose everything this encounter put in the scene: live enemy
+   * mechs, the hidden object, and the variety props (crawlers/barricade/beacon/
+   * ring). Does NOT award salvage — used both when an encounter is abandoned and
+   * when it COMPLETES with survivors still on the field (an ace hunt ends the
+   * moment the ace dies; a delivered convoy despawns its escorts). Idempotent.
+   */
+  private clearSpawned(): void {
     for (const e of this.enemies) {
       this.scene.remove(e.mech.mesh)
       e.mech.cleanup()
     }
     this.enemies = []
     this.disposeHiddenObject()
+    this.disposeProps()
+  }
+
+  /** Abandon the current encounter, removing all spawned content from the scene. */
+  abort(): void {
+    this.clearSpawned()
     this.quest = null
     this.waveSpawnQueue = 0
     this.clearedCount = 0
     this.totalCount = 0
     this.boss = null
     this.bossReinforced = false
+    this.waveComposition = []
+    this.crawlers = []
+    this.barricade = null
+    this.beacon = null
+    this.perimeterRing = null
+    this.holdWaveOnField = false
   }
 
   // --- Spawning ---
@@ -248,10 +477,22 @@ export class StoryCombat {
     const a = Math.random() * Math.PI * 2
     const r = minR + Math.random() * (maxR - minR)
     return new THREE.Vector3(
-      this.anchor.x + Math.cos(a) * r,
+      this.spawnCenter.x + Math.cos(a) * r,
       0,
-      this.anchor.z + Math.sin(a) * r,
+      this.spawnCenter.z + Math.sin(a) * r,
     )
+  }
+
+  /**
+   * Unit direction from the world origin outward through the town anchor — the
+   * bearing convoy waypoints and extraction beacons point along, so field
+   * objectives head AWAY from the map centre toward an edge. Deterministic; falls
+   * back to +x when the anchor sits on the origin.
+   */
+  private outwardDirection(): THREE.Vector3 {
+    const d = new THREE.Vector3(this.anchor.x, 0, this.anchor.z)
+    if (d.lengthSq() < 1) return new THREE.Vector3(1, 0, 0)
+    return d.normalize()
   }
 
   /** Short HUD label per archetype (falls back to a generic "Raider"). */
@@ -276,7 +517,7 @@ export class StoryCombat {
     isBoss = false,
     bossName?: string,
   ): CombatEnemy {
-    const stats = archetypeStats(archetype, scale)
+    const stats = archetypeStats(archetype, scale * this.ngPlusScale)
     const loadout = archetypeLoadout(archetype)
     const spawn = this.randomRingPoint(30, 45)
     const label = StoryCombat.ARCHETYPE_LABEL[archetype] ?? 'Raider'
@@ -311,17 +552,23 @@ export class StoryCombat {
   }
 
   private spawnWaveBatch(): void {
-    // Combined-arms composition for this tier, cycled across the wave so the
-    // batch is mixed (skirmisher + bulwark + sniper …) rather than N clones.
+    // Combined-arms composition for this encounter, cycled across the wave so the
+    // batch is mixed (skirmisher + bulwark + sniper …) rather than N clones. The
+    // per-type pool (waveComposition) wins when set; otherwise the plain
+    // wave_defence composition for the tier.
     const maxAlive = maxAliveForDifficulty(this.waveDifficulty)
-    const composition = compositionForDifficulty(this.waveDifficulty)
+    const composition = this.waveComposition.length
+      ? this.waveComposition
+      : compositionForDifficulty(this.waveDifficulty)
     while (this.enemies.length < maxAlive && this.waveSpawnQueue > 0) {
-      const idx = this.totalCount - this.waveSpawnQueue
+      const idx = this.waveSpawnedTotal
       const archetype = composition[idx % composition.length]
-      // Tier scale sets the wave's baseline toughness; later enemies ramp slightly.
-      const scale = this.waveTierScale * (1 + idx * 0.08)
+      // Tier scale sets the wave's baseline toughness; later enemies ramp slightly
+      // (capped so a long continuous press does not runaway-scale).
+      const scale = this.waveTierScale * (1 + Math.min(0.4, idx * 0.08))
       this.spawnArchetypeEnemy(archetype, scale, idx)
       this.waveSpawnQueue--
+      this.waveSpawnedTotal++
     }
   }
 
@@ -603,11 +850,13 @@ export class StoryCombat {
       if (e.mech.isDestroyed) {
         // Salvage (§3.6/§3.7): hand the host this enemy's loadout + the limbs it
         // lost so it can award scrap and roll part drops. Read before cleanup().
+        // ace_hunt (§5.4): the marked ace drops a GUARANTEED pristine part.
         this.onEnemyKilled?.({
           loadout: e.mech.loadout,
           destroyedSlots: e.destroyedSlots.slice(),
           archetype: e.archetype,
           isBoss: e.isBoss,
+          pristineDrop: e.isBoss && this.quest?.type === 'ace_hunt',
         })
         this.scene.remove(e.mech.mesh)
         e.mech.cleanup()
@@ -619,25 +868,471 @@ export class StoryCombat {
     }
     this.enemies = stillAlive
 
-    // Wave: refill from the queue if a slot opened.
-    if (this.quest.type === 'wave_defence' && this.waveSpawnQueue > 0) {
-      this.waveBatchTimer -= deltaTime
-      if (this.enemies.length < maxAliveForDifficulty(this.waveDifficulty) && this.waveBatchTimer <= 0) {
-        this.spawnWaveBatch()
-        this.waveBatchTimer = 1.5
-      }
-    }
+    // Per-type objective bookkeeping: wave refill, variety props, completion/fail.
+    this.updateObjective(deltaTime, player)
+  }
 
-    // Complete when nothing left to fight or spawn.
-    if (this.enemies.length === 0 && this.waveSpawnQueue === 0) {
-      this.finish()
+  /**
+   * Advance the active quest's objective after enemy removal each frame: refill
+   * waves, tick the variety props (convoy / barricade / beacon+perimeter), and
+   * apply the type's completion or fail condition. Player DEATH is handled inline
+   * in updateCombat (the death-stakes path); this method never handles death.
+   */
+  private updateObjective(deltaTime: number, player: MechEntity): void {
+    switch (this.quest?.type) {
+      case 'escort_convoy':
+        this.updateEscort(deltaTime, player)
+        return
+      case 'hold_the_line':
+        this.updateHold(deltaTime)
+        return
+      case 'extraction':
+        this.updateExtraction(deltaTime, player)
+        return
+      case 'ace_hunt':
+        // Killing the ace ends the hunt regardless of the bodyguards (§5.4).
+        if (this.boss === null) this.finish()
+        return
+      case 'wave_defence':
+        // Refill the wave from the queue if a slot opened.
+        if (this.waveSpawnQueue > 0) {
+          this.waveBatchTimer -= deltaTime
+          if (this.enemies.length < maxAliveForDifficulty(this.waveDifficulty) && this.waveBatchTimer <= 0) {
+            this.spawnWaveBatch()
+            this.waveBatchTimer = 1.5
+          }
+        }
+        if (this.enemies.length === 0 && this.waveSpawnQueue === 0) this.finish()
+        return
+      case 'boss_hunt':
+      default:
+        // Boss + any reinforcements cleared.
+        if (this.enemies.length === 0 && this.waveSpawnQueue === 0) this.finish()
+        return
     }
   }
 
-  private finish(): void {
+  private finish(outcome?: CombatOutcome): void {
     const quest = this.quest
+    // Despawn anything still on the field (ace-hunt bodyguards, a delivered
+    // convoy's interceptors + crawlers, the extraction beacon/ring, the hold
+    // barricade). Salvage was already awarded per-kill in the removal loop; this
+    // is pure scene cleanup so a completion never leaks meshes/geometry.
+    this.clearSpawned()
+    this.crawlers = []
+    this.barricade = null
+    this.beacon = null
+    this.perimeterRing = null
+    this.boss = null
+    this.holdWaveOnField = false
     this.quest = null
-    if (quest) this.onComplete?.(quest)
+    if (quest) this.onComplete?.(quest, outcome)
+  }
+
+  /** Fail a variety objective (convoy wiped / barricade destroyed). Ends the
+   *  encounter and notifies the host — distinct from player death (§5). */
+  private fail(reason: string): void {
+    const quest = this.quest
+    this.abort()
+    if (quest) this.onQuestFailed?.(quest, reason)
+  }
+
+  // ==========================================================================
+  // Phase 5 mission variety (§5)
+  // ==========================================================================
+
+  /** Clamp an XZ point just inside the arena bounds (waypoints / beacons). */
+  private clampToArena(v: THREE.Vector3): void {
+    const h = this.arenaHalf * 0.95
+    v.x = Math.max(-h, Math.min(h, v.x))
+    v.z = Math.max(-h, Math.min(h, v.z))
+  }
+
+  /** Count live enemies within `r` of a point (barricade attrition). */
+  private countEnemiesNear(pos: THREE.Vector3, r: number): number {
+    const r2 = r * r
+    let n = 0
+    for (const e of this.enemies) {
+      if (!e.mech.isDestroyed && e.mech.position.distanceToSquared(pos) <= r2) n++
+    }
+    return n
+  }
+
+  // ── ace_hunt (§5.4) ────────────────────────────────────────────────────
+  /**
+   * A marked named ace roaming a field zone with a bodyguard pair. The ace is a
+   * `boss` unit, so it inherits the P1 ace archetype and the P2 half-health
+   * reinforcement script (the shared `this.boss` machinery). Killing the ace
+   * completes the hunt regardless of the bodyguards (updateObjective), and the
+   * ace's kill carries a guaranteed pristine drop (the kill loop).
+   */
+  private startAceHunt(quest: QuestDef): void {
+    this.bossScale = quest.bossScale ?? 1
+    this.boss = this.spawnArchetypeEnemy('ace', this.bossScale, 0, true, quest.bossName)
+    const guards = aceBodyguardComposition().slice(0, quest.bodyguardCount ?? 2)
+    const guardScale = Math.max(1, this.bossScale * 0.6)
+    guards.forEach((arch, i) => this.spawnArchetypeEnemy(arch, guardScale, i + 1))
+    this.totalCount = 1 + guards.length
+  }
+
+  // ── escort_convoy (§5.1) ─────────────────────────────────────────────────
+  /**
+   * Shepherd 2-3 slow, unarmed crawlers from the town gate to a map-edge
+   * waypoint while Combine interceptors harass. Crawlers path with simple
+   * steering + obstacle-radius avoidance (§5); interceptors spawn in a refilling
+   * harass queue and target the player (the standard AI). Reward degrades per
+   * crawler lost; the run fails only if the whole convoy is wiped out.
+   */
+  private startEscort(quest: QuestDef): void {
+    const count = quest.escortCount ?? 3
+    const dir = this.outwardDirection()
+    const dist = quest.waypointDistance ?? 220
+    this.convoyWaypoint.copy(this.anchor).addScaledVector(dir, dist)
+    this.clampToArena(this.convoyWaypoint)
+
+    // Crawlers line up at the gate (just behind the anchor), spread laterally.
+    const perp = new THREE.Vector3(-dir.z, 0, dir.x)
+    const gate = this.anchor.clone().addScaledVector(dir, -6)
+    for (let i = 0; i < count; i++) {
+      const pos = gate.clone().addScaledVector(perp, (i - (count - 1) / 2) * 6)
+      this.spawnCrawler(pos, dir)
+    }
+    this.totalCount = count
+
+    this.waveDifficulty = quest.difficulty ?? 'easy'
+    this.waveTierScale = TIER_SCALE[this.waveDifficulty] ?? 1
+    this.waveComposition = convoyInterceptorComposition(this.waveDifficulty)
+    this.waveSpawnQueue = quest.interceptorCount ?? 4
+    this.spawnCenter.copy(gate)
+    this.spawnWaveBatch()
+  }
+
+  private spawnCrawler(pos: THREE.Vector3, facing: THREE.Vector3): void {
+    const mesh = this.buildCrawler()
+    mesh.position.copy(pos)
+    mesh.position.y = 0
+    mesh.rotation.y = Math.atan2(facing.x, facing.z)
+    this.scene.add(mesh)
+    this.crawlers.push({ mesh, hp: CRAWLER_HP, maxHp: CRAWLER_HP, alive: true, arrived: false })
+  }
+
+  /** A procedural boxy hauler (§5.1) — body + cab, no weapons. */
+  private buildCrawler(): THREE.Group {
+    const group = markRaw(new THREE.Group())
+    const bodyGeo = new THREE.BoxGeometry(6, 3, 3.6)
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x6b7280, roughness: 0.85, metalness: 0.25 })
+    const body = new THREE.Mesh(bodyGeo, bodyMat)
+    body.position.y = 2
+    body.castShadow = true
+    group.add(body)
+    const cabGeo = new THREE.BoxGeometry(2.2, 2.2, 3.2)
+    const cabMat = new THREE.MeshStandardMaterial({ color: 0x9aa3af, roughness: 0.7, metalness: 0.2 })
+    const cab = new THREE.Mesh(cabGeo, cabMat)
+    cab.position.set(3.4, 1.6, 0)
+    group.add(cab)
+    this.propGeoms.push(bodyGeo, cabGeo)
+    this.propMats.push(bodyMat, cabMat)
+    return group
+  }
+
+  /** Centroid of the still-rolling crawlers (spawn interceptors near the convoy). */
+  private convoyCentroid(): THREE.Vector3 {
+    const live = this.crawlers.filter((c) => c.alive && !c.arrived)
+    if (live.length === 0) return this.anchor.clone()
+    const c = new THREE.Vector3()
+    for (const cr of live) c.add(cr.mesh.position)
+    return c.multiplyScalar(1 / live.length)
+  }
+
+  private updateEscort(deltaTime: number, _player: MechEntity): void {
+    // Refill the interceptor harass up to the cap, near the moving convoy.
+    if (this.waveSpawnQueue > 0) {
+      this.waveBatchTimer -= deltaTime
+      if (this.enemies.length < maxAliveForDifficulty(this.waveDifficulty) && this.waveBatchTimer <= 0) {
+        this.spawnCenter.copy(this.convoyCentroid())
+        this.spawnWaveBatch()
+        this.waveBatchTimer = 3
+      }
+    }
+
+    const live = this.enemies.filter((e) => !e.mech.isDestroyed)
+    for (const c of this.crawlers) {
+      if (!c.alive || c.arrived) continue
+
+      // Attrition: each interceptor inside harass range chips the crawler.
+      const harassers = live.reduce(
+        (n, e) =>
+          e.mech.position.distanceToSquared(c.mesh.position) <= CONVOY_HARASS_RADIUS * CONVOY_HARASS_RADIUS
+            ? n + 1
+            : n,
+        0,
+      )
+      if (harassers > 0) {
+        c.hp -= CONVOY_HARASS_DPS * harassers * deltaTime
+        if (c.hp <= 0) {
+          c.alive = false
+          this.crawlersLost++
+          this.spawnDeathExplosion(c.mesh.position.clone(), 2.0)
+          this.onShake?.(0.8)
+          if (c.mesh.parent) this.scene.remove(c.mesh)
+          continue
+        }
+      }
+
+      // Steering toward the waypoint with obstacle-radius avoidance.
+      const toWp = this.convoyWaypoint.clone().sub(c.mesh.position)
+      toWp.y = 0
+      const dist = toWp.length()
+      if (dist <= CONVOY_ARRIVE_RADIUS) {
+        c.arrived = true
+        this.crawlersArrived++
+        continue
+      }
+      const steer = toWp.normalize()
+      const avoid = new THREE.Vector3()
+      for (const o of this.crawlers) {
+        if (o === c || !o.alive || o.arrived) continue
+        this.accumulateAvoid(avoid, c.mesh.position, o.mesh.position)
+      }
+      for (const e of live) this.accumulateAvoid(avoid, c.mesh.position, e.mech.position)
+      steer.add(avoid)
+      if (steer.lengthSq() > 1e-6) steer.normalize()
+      c.mesh.position.addScaledVector(steer, CONVOY_SPEED * deltaTime)
+      c.mesh.position.y = 0
+      c.mesh.rotation.y = Math.atan2(steer.x, steer.z)
+    }
+
+    // Fail only if the whole convoy is gone; otherwise complete once every
+    // surviving crawler has reached the waypoint (degraded reward per loss).
+    if (!this.crawlers.some((c) => c.alive)) {
+      this.fail('convoy-lost')
+      return
+    }
+    if (this.crawlers.every((c) => !c.alive || c.arrived)) {
+      const saved = this.crawlers.filter((c) => c.arrived).length
+      const total = this.crawlers.length
+      this.finish({
+        rewardMultiplier: total > 0 ? saved / total : 0,
+        crawlersSaved: saved,
+        crawlersLost: this.crawlersLost,
+      })
+    }
+  }
+
+  /** Accumulate a separation push away from an obstacle within CONVOY_AVOID_RADIUS. */
+  private accumulateAvoid(out: THREE.Vector3, self: THREE.Vector3, other: THREE.Vector3): void {
+    const dx = self.x - other.x
+    const dz = self.z - other.z
+    const d2 = dx * dx + dz * dz
+    if (d2 < CONVOY_AVOID_RADIUS * CONVOY_AVOID_RADIUS && d2 > 1e-4) {
+      const d = Math.sqrt(d2)
+      const w = (CONVOY_AVOID_RADIUS - d) / CONVOY_AVOID_RADIUS
+      out.x += (dx / d) * w
+      out.z += (dz / d) * w
+    }
+  }
+
+  // ── hold_the_line (§5.2) ─────────────────────────────────────────────────
+  /**
+   * Defend the town-gate anchor through N timed waves, with a breather beat
+   * between them, behind a deployable barricade prop. Reuses the wave machinery
+   * (one batch per wave). The run fails if the barricade is destroyed; it
+   * completes once the final wave is cleared.
+   */
+  private startHold(quest: QuestDef): void {
+    this.waveDifficulty = quest.difficulty ?? 'easy'
+    this.waveTierScale = TIER_SCALE[this.waveDifficulty] ?? 1
+    this.waveComposition = holdLineComposition(this.waveDifficulty)
+    this.holdWaveTotal = quest.holdWaves ?? 3
+    this.holdWaveIndex = 0
+    this.holdBreather = 0
+    this.holdWaveOnField = false
+    this.totalCount = this.holdWaveTotal
+    this.barricadeMaxHp = quest.barricadeHp ?? 900
+    this.barricadeHp = this.barricadeMaxHp
+    this.buildBarricade()
+    this.spawnCenter.copy(this.anchor)
+    this.spawnHoldWave()
+  }
+
+  /** Spawn one hold wave (a batch of up to maxAlive) at the gate. */
+  private spawnHoldWave(): void {
+    this.waveSpawnQueue = maxAliveForDifficulty(this.waveDifficulty)
+    this.spawnCenter.copy(this.anchor)
+    this.spawnWaveBatch()
+    this.holdWaveIndex++
+    this.holdWaveOnField = true
+  }
+
+  /** A deployable barricade prop at the town gate (the point to defend). */
+  private buildBarricade(): void {
+    const geo = new THREE.BoxGeometry(16, 5, 2.2)
+    const mat = new THREE.MeshStandardMaterial({ color: 0x8a5a2b, roughness: 0.9, metalness: 0.1 })
+    const wall = markRaw(new THREE.Mesh(geo, mat))
+    wall.position.copy(this.anchor)
+    wall.position.y = 2.5
+    wall.castShadow = true
+    this.propGeoms.push(geo)
+    this.propMats.push(mat)
+    this.scene.add(wall)
+    this.barricade = wall
+  }
+
+  private updateBarricadeVisual(): void {
+    if (!this.barricade) return
+    const frac = this.barricadeMaxHp > 0 ? Math.max(0, this.barricadeHp / this.barricadeMaxHp) : 0
+    const m = this.barricade.material as THREE.MeshStandardMaterial
+    m.emissive.setRGB(0.6 * (1 - frac), 0.05 * (1 - frac), 0)
+    m.emissiveIntensity = 0.6 * (1 - frac)
+  }
+
+  private updateHold(deltaTime: number): void {
+    // Barricade attrition: any enemy pressing the gate chips it.
+    if (this.barricade) {
+      const near = this.countEnemiesNear(this.barricade.position, BARRICADE_THREAT_RADIUS)
+      if (near > 0) {
+        this.barricadeHp -= BARRICADE_DPS * near * deltaTime
+        this.updateBarricadeVisual()
+        if (this.barricadeHp <= 0) {
+          this.spawnDeathExplosion(this.barricade.position.clone(), 2.6)
+          this.onShake?.(1.0)
+          this.fail('barricade-destroyed')
+          return
+        }
+      }
+    }
+
+    // Wave scheduling: current wave cleared -> breather -> next wave (or finish).
+    if (this.holdWaveOnField && this.enemies.length === 0 && this.waveSpawnQueue === 0) {
+      this.holdWaveOnField = false
+      if (this.holdWaveIndex >= this.holdWaveTotal) {
+        this.finish()
+        return
+      }
+      this.holdBreather = this.quest?.breatherSeconds ?? 6
+    }
+    if (!this.holdWaveOnField && this.holdWaveIndex < this.holdWaveTotal) {
+      this.holdBreather -= deltaTime
+      if (this.holdBreather <= 0) this.spawnHoldWave()
+    }
+  }
+
+  // ── extraction (§5.3) ────────────────────────────────────────────────────
+  /**
+   * Push out to a downed-pilot beacon at field distance, then hold a SHRINKING
+   * perimeter for T seconds while waves press. Two phases: `reach` (get to the
+   * beacon) then `hold` (survive the timer). Completion is surviving the hold —
+   * no return trip (§5). Player death routes through the death-stakes path.
+   */
+  private startExtraction(quest: QuestDef): void {
+    const dir = this.outwardDirection()
+    const beaconPos = this.anchor.clone().addScaledVector(dir, quest.beaconDistance ?? 160)
+    this.clampToArena(beaconPos)
+    this.extractionPerimeterR = quest.perimeterRadius ?? 34
+    this.extractionHoldTotal = quest.holdSeconds ?? 45
+    this.extractionSeconds = this.extractionHoldTotal
+    this.extractionPhase = 'reach'
+    this.buildBeaconAndPerimeter(beaconPos)
+    this.totalCount = 1
+
+    this.waveDifficulty = quest.difficulty ?? 'easy'
+    this.waveTierScale = TIER_SCALE[this.waveDifficulty] ?? 1
+    this.waveComposition = extractionPressComposition(this.waveDifficulty)
+    // A light initial press so the approach is contested.
+    this.waveSpawnQueue = maxAliveForDifficulty(this.waveDifficulty)
+    this.spawnCenter.copy(beaconPos)
+    this.spawnWaveBatch()
+  }
+
+  /** The beacon pillar + the perimeter ring the player must hold (§5.3). */
+  private buildBeaconAndPerimeter(pos: THREE.Vector3): void {
+    const group = markRaw(new THREE.Group())
+    group.position.copy(pos)
+    const pillarGeo = new THREE.CylinderGeometry(0.6, 0.95, 4.5, 10)
+    const pillarMat = new THREE.MeshStandardMaterial({
+      color: 0x22d3ee,
+      emissive: 0x0891b2,
+      emissiveIntensity: 0.9,
+      roughness: 0.4,
+      metalness: 0.4,
+    })
+    const pillar = new THREE.Mesh(pillarGeo, pillarMat)
+    pillar.position.y = 2.25
+    pillar.castShadow = true
+    group.add(pillar)
+    this.propGeoms.push(pillarGeo)
+    this.propMats.push(pillarMat)
+    this.scene.add(group)
+    this.beacon = group
+
+    const ringGeo = new THREE.RingGeometry(this.extractionPerimeterR - 0.8, this.extractionPerimeterR, 56)
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: 0x22d3ee,
+      transparent: true,
+      opacity: 0.35,
+      side: THREE.DoubleSide,
+    })
+    const ring = markRaw(new THREE.Mesh(ringGeo, ringMat))
+    ring.rotation.x = -Math.PI / 2
+    ring.position.copy(pos)
+    ring.position.y = 0.12
+    this.propGeoms.push(ringGeo)
+    this.propMats.push(ringMat)
+    this.scene.add(ring)
+    this.perimeterRing = ring
+  }
+
+  /** Scale the perimeter ring to the current (shrinking) radius. */
+  private updatePerimeterVisual(r: number): void {
+    if (!this.perimeterRing) return
+    const s = this.extractionPerimeterR > 0 ? r / this.extractionPerimeterR : 1
+    this.perimeterRing.scale.set(s, s, 1)
+  }
+
+  /** Keep enemies topped to the cap around a centre while a hold is contested. */
+  private topUpPress(deltaTime: number, center: THREE.Vector3): void {
+    const cap = maxAliveForDifficulty(this.waveDifficulty)
+    this.waveBatchTimer -= deltaTime
+    if (this.enemies.length < cap && this.waveBatchTimer <= 0) {
+      this.waveSpawnQueue = cap - this.enemies.length
+      this.spawnCenter.copy(center)
+      this.spawnWaveBatch()
+      this.waveBatchTimer = 2.5
+    }
+  }
+
+  private updateExtraction(deltaTime: number, player: MechEntity): void {
+    if (!this.beacon) return
+    const beaconPos = this.beacon.position
+    this.beacon.rotation.y += deltaTime * 1.4 // pulse/spin so it reads as a beacon
+    this.topUpPress(deltaTime, beaconPos)
+
+    if (this.extractionPhase === 'reach') {
+      const dx = player.position.x - beaconPos.x
+      const dz = player.position.z - beaconPos.z
+      if (dx * dx + dz * dz <= EXTRACTION_REACH_RADIUS * EXTRACTION_REACH_RADIUS) {
+        this.extractionPhase = 'hold'
+      }
+      return
+    }
+
+    // Hold phase: count down and shrink the perimeter to its floor.
+    this.extractionSeconds -= deltaTime
+    const frac = Math.max(0, this.extractionSeconds / this.extractionHoldTotal)
+    this.updatePerimeterVisual(EXTRACTION_PERIMETER_FLOOR + (this.extractionPerimeterR - EXTRACTION_PERIMETER_FLOOR) * frac)
+    if (this.extractionSeconds <= 0) this.finish()
+  }
+
+  /** Remove + dispose all variety props (crawlers / barricade / beacon / ring). */
+  private disposeProps(): void {
+    for (const c of this.crawlers) if (c.mesh.parent) this.scene.remove(c.mesh)
+    if (this.barricade?.parent) this.scene.remove(this.barricade)
+    if (this.beacon?.parent) this.scene.remove(this.beacon)
+    if (this.perimeterRing?.parent) this.scene.remove(this.perimeterRing)
+    for (const g of this.propGeoms) g.dispose()
+    for (const m of this.propMats) m.dispose()
+    this.propGeoms = []
+    this.propMats = []
   }
 
   // --- Helpers ---

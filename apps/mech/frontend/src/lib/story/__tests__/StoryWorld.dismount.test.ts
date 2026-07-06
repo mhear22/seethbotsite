@@ -40,6 +40,7 @@ vi.mock('three', async (importOriginal) => {
     setClearColor() {}
     render() {}
     dispose() {}
+    forceContextLoss() {}
   }
   return { ...actual, WebGLRenderer: HeadlessRenderer }
 })

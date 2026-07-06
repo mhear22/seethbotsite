@@ -8,14 +8,14 @@ import { ProjectileSystem } from '../battle/ProjectileSystem'
 import { ParticleSystem } from '../battle/ParticleSystem'
 import { Town, type AnchorKind, type NPCRole } from './Town'
 import { Terrain } from './Terrain'
-import { StoryCombat, type EnemyKill } from './StoryCombat'
+import { StoryCombat, type EnemyKill, type CombatOutcome } from './StoryCombat'
 import { OnFootEntity } from './OnFootEntity'
 import { OnFootPhysics } from './OnFootPhysics'
 import type { InputState } from '../battle/InputManager'
 import type { QuestDef } from './quests'
 import type { MechLoadout } from '../../composables/useMechBuilder'
 import type { MechSlot } from '../../shared/types/MechTypes'
-import type { GraphicsSettings } from '../../composables/useGameSettings'
+import { motionScale, type GraphicsSettings } from '../../composables/useGameSettings'
 import type { TownState, PilotMode } from '../../composables/useStoryMode'
 import { TOWN_DECAY_RADIUS, WORLD_HALF_EXTENT } from '../../composables/useStoryMode'
 import { terrainHeight, type TerrainParams } from './TerrainNoise'
@@ -67,13 +67,21 @@ export interface StoryWorldConfig {
   towns: TownState[]
   /** Graphics quality (shadow/AA/render-scale); honours the user's settings. */
   graphics?: GraphicsSettings
+  /** New Game+ cycle (§5). >0 fields tougher enemies for the whole session. */
+  ngPlusLevel?: number
   /**
    * Called once per frame with the player's current world position, the nearest
    * town, its centre distance, and the dt — so the host can drive decay/HUD.
    */
   onFrame?: (info: StoryFrameInfo) => void
-  /** Fired when an active combat/object encounter completes (host pays + advances). */
-  onQuestComplete?: (quest: QuestDef) => void
+  /** Fired when an active combat/object encounter completes (host pays + advances).
+   *  The optional §5 outcome carries a `rewardMultiplier` (degraded escort payouts)
+   *  and per-type detail the host can fold into its reward/toast. */
+  onQuestComplete?: (quest: QuestDef, outcome?: CombatOutcome) => void
+  /** Fired when a §5 objective encounter FAILS without a player death (all crawlers
+   *  lost, barricade destroyed). The host pays nothing and leaves the quest available
+   *  to re-attempt — never a soft-lock. Death still routes through onPlayerDefeated. */
+  onQuestFailed?: (quest: QuestDef, reason: string) => void
   /** Fired when the player mech is destroyed during an encounter, with the limb
    *  slots lost (core excluded) for the §3.7 death-stakes repair debt. */
   onPlayerDefeated?: (destroyedSlots: MechSlot[]) => void
@@ -115,13 +123,27 @@ export interface StoryFrameInfo {
   questGiverTownId: string | null
   /** Whether a combat/object encounter is currently running. */
   encounterActive: boolean
-  /** Live progress of the active encounter (cleared/total, found/collected). */
+  /** Live progress of the active encounter (cleared/total, found/collected), plus
+   *  the §5 variety readouts (convoy / hold-waves / extraction) when relevant. */
   encounter: {
     questId: string
     cleared: number
     total: number
     found: boolean
     collected: boolean
+    // --- Phase 5 variety HUD readouts (populated only for the relevant type) ---
+    /** escort_convoy: crawlers still rolling / that reached the waypoint / dispatched. */
+    crawlersAlive?: number
+    crawlersArrived?: number
+    crawlersTotal?: number
+    /** hold_the_line: current wave (1-based), total waves, barricade HP fraction 0..1. */
+    waveIndex?: number
+    waveTotal?: number
+    barricadeFraction?: number
+    /** extraction: current phase, seconds left in the hold, perimeter ring fraction 0..1. */
+    extractionPhase?: 'reach' | 'hold'
+    secondsLeft?: number
+    perimeterFraction?: number
   } | null
 }
 
@@ -161,7 +183,8 @@ export class StoryWorld {
   private towns: Town[] = []
 
   private onFrame?: (info: StoryFrameInfo) => void
-  private onQuestComplete?: (quest: QuestDef) => void
+  private onQuestComplete?: (quest: QuestDef, outcome?: CombatOutcome) => void
+  private onQuestFailed?: (quest: QuestDef, reason: string) => void
   private onPlayerDefeated?: (destroyedSlots: MechSlot[]) => void
   private onEnemyKilled?: (kill: EnemyKill) => void
   private onReinforcement?: (info: { bossName: string; count: number }) => void
@@ -217,11 +240,18 @@ export class StoryWorld {
 
   private handleResizeBound: () => void
   private handleVisibilityBound: () => void
+  private handleContextLostBound: (e: Event) => void
+  private handleContextRestoredBound: () => void
+  /** True while the WebGL context is lost (e.g. OS reclaimed it under memory
+   *  pressure on mobile). The render loop pauses instead of hammering a dead
+   *  context with GL errors; it resumes on `webglcontextrestored`. */
+  private contextLost = false
 
   constructor(config: StoryWorldConfig) {
     this._playerMech = config.playerMech
     this.onFrame = config.onFrame
     this.onQuestComplete = config.onQuestComplete
+    this.onQuestFailed = config.onQuestFailed
     this.onPlayerDefeated = config.onPlayerDefeated
     this.onEnemyKilled = config.onEnemyKilled
     this.onReinforcement = config.onReinforcement
@@ -259,6 +289,8 @@ export class StoryWorld {
     // playable square spans the whole ground plane.
     this.physicsSystem.setArenaBounds(WORLD_HALF_EXTENT * 2, WORLD_HALF_EXTENT * 2)
     this.camera = new CameraController(this.playerMech)
+    // Reduced-motion (§5): zero out camera shake/kick/dip when the player opted in.
+    this.camera.motionScale = motionScale({ reducedMotion: gfx?.reducedMotion ?? false })
 
     // --- Combat systems (single-player only; mirrors BattleScene) ---
     this.projectileSystem = new ProjectileSystem(this.scene)
@@ -282,8 +314,11 @@ export class StoryWorld {
     this.combat = new StoryCombat(this.scene, this.projectileSystem, this.particleSystem)
     // Encounters are local to a town; bound the AI to a generous play radius.
     this.combat.setArenaBounds(WORLD_HALF_EXTENT)
+    // New Game+ (§5): every enemy this session spawns one tier tougher per cycle.
+    if (config.ngPlusLevel) this.combat.setNgPlusLevel(config.ngPlusLevel)
     this.combat.onShake = (amount) => this.camera.triggerShake(amount)
-    this.combat.onComplete = (quest) => this.onQuestComplete?.(quest)
+    this.combat.onComplete = (quest, outcome) => this.onQuestComplete?.(quest, outcome)
+    this.combat.onQuestFailed = (quest, reason) => this.onQuestFailed?.(quest, reason)
     this.combat.onPlayerDefeated = (slots) => this.onPlayerDefeated?.(slots)
     // Salvage + comms + collateral seams (§3.5/§3.6) — pass through to the host.
     this.combat.onEnemyKilled = (kill) => this.onEnemyKilled?.(kill)
@@ -311,6 +346,13 @@ export class StoryWorld {
     window.addEventListener('resize', this.handleResizeBound)
     this.handleVisibilityBound = () => this.handleVisibilityChange()
     document.addEventListener('visibilitychange', this.handleVisibilityBound)
+    // WebGL context loss/restore (§ production): mobile browsers reclaim the GL
+    // context under memory pressure or when backgrounded. preventDefault() opts
+    // into automatic restoration; we pause the loop while lost and resume after.
+    this.handleContextLostBound = (e: Event) => this.handleContextLost(e)
+    this.handleContextRestoredBound = () => this.handleContextRestored()
+    this.canvas.addEventListener('webglcontextlost', this.handleContextLostBound, false)
+    this.canvas.addEventListener('webglcontextrestored', this.handleContextRestoredBound, false)
   }
 
   /**
@@ -420,7 +462,7 @@ export class StoryWorld {
   }
 
   private animate = (): void => {
-    if (document.hidden) {
+    if (document.hidden || this.contextLost) {
       this.animationId = null
       return
     }
@@ -540,6 +582,16 @@ export class StoryWorld {
         total: prog.total,
         found: prog.found,
         collected: prog.collected,
+        // §5 variety readouts — forwarded verbatim (undefined for non-variety types).
+        crawlersAlive: prog.crawlersAlive,
+        crawlersArrived: prog.crawlersArrived,
+        crawlersTotal: prog.crawlersTotal,
+        waveIndex: prog.waveIndex,
+        waveTotal: prog.waveTotal,
+        barricadeFraction: prog.barricadeFraction,
+        extractionPhase: prog.extractionPhase,
+        secondsLeft: prog.secondsLeft,
+        perimeterFraction: prog.perimeterFraction,
       } : null,
     })
   }
@@ -647,7 +699,31 @@ export class StoryWorld {
   private handleVisibilityChange(): void {
     if (document.hidden) {
       this.stop()
-    } else if (this.animationId === null) {
+    } else if (this.animationId === null && !this.contextLost) {
+      this.lastTime = performance.now()
+      this.animate()
+    }
+  }
+
+  /**
+   * WebGL context lost (mobile OS reclaim, GPU reset, or contexts exhausted).
+   * preventDefault() tells the browser we intend to restore, then we pause the
+   * render loop so we stop calling renderer.render() on a dead context.
+   */
+  private handleContextLost(e: Event): void {
+    e.preventDefault()
+    this.contextLost = true
+    this.stop()
+  }
+
+  /**
+   * Context restored: THREE.WebGLRenderer re-initialises its GL state and lazily
+   * re-uploads geometries/textures on the next render, so resuming the loop
+   * rebuilds the frame. Skip if the tab is hidden — visibilitychange resumes it.
+   */
+  private handleContextRestored(): void {
+    this.contextLost = false
+    if (!document.hidden && this.animationId === null) {
       this.lastTime = performance.now()
       this.animate()
     }
@@ -955,6 +1031,8 @@ export class StoryWorld {
     this.stop()
     window.removeEventListener('resize', this.handleResizeBound)
     document.removeEventListener('visibilitychange', this.handleVisibilityBound)
+    this.canvas.removeEventListener('webglcontextlost', this.handleContextLostBound, false)
+    this.canvas.removeEventListener('webglcontextrestored', this.handleContextRestoredBound, false)
     this.inputManager.cleanup()
 
     this.combat.cleanup()
@@ -986,5 +1064,9 @@ export class StoryWorld {
     })
 
     this.renderer.dispose()
+    // dispose() frees GPU buffers but leaves the WebGL context live; browsers cap
+    // live contexts (~8-16), so re-entering Story Mode would orphan and exhaust
+    // them. forceContextLoss() releases the context on teardown (documented fix).
+    this.renderer.forceContextLoss()
   }
 }
