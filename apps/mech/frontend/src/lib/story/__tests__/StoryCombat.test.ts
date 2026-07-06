@@ -238,3 +238,40 @@ describe('onCollateral emission (§3.5 groundwork)', () => {
     for (const a of amounts) expect(a).toBeLessThanOrEqual(0.035 + 1e-6)
   })
 })
+
+// On-foot Recovery (design §2.6/§4): a hidden_object encounter is driven from the
+// dismounted PILOT's position via updateSearchAt (no MechEntity, no combat loop).
+// This is the Phase-4 seam StoryWorld.updateOnFoot uses while dismounted.
+describe('on-foot Recovery search (updateSearchAt)', () => {
+  it('reveals and collects the hidden object from a walked position, then completes', () => {
+    const { combat } = makeRig()
+    let completed: QuestDef | null = null
+    combat.onComplete = (q) => { completed = q }
+
+    combat.start(quest({ type: 'hidden_object', searchRadius: 28 }), new THREE.Vector3(0, 0, 0))
+    expect(combat.active).toBe(true)
+    expect(combat.getProgress().collected).toBe(false)
+
+    const objPos = (combat as any).hiddenObject.position.clone() as THREE.Vector3
+
+    // Standing far away: not found.
+    combat.updateSearchAt(new THREE.Vector3(objPos.x + 500, 0, objPos.z + 500), 0.1)
+    expect(combat.getProgress().found).toBe(false)
+
+    // Walk onto it: reveal + pick up in the same step -> encounter finishes.
+    combat.updateSearchAt(objPos, 0.1)
+    expect(combat.getProgress().found).toBe(true)
+    expect(completed).not.toBeNull()
+    expect(combat.active).toBe(false)
+  })
+
+  it('is a no-op for a combat (non-hidden_object) encounter', () => {
+    const { combat } = makeRig()
+    combat.start(quest({ type: 'wave_defence', waveCount: 1, difficulty: 'easy' }), new THREE.Vector3(0, 0, 0))
+    const before = combat.getProgress().cleared
+    // Driving a search on a Hold does nothing (no on-foot combat, §6).
+    combat.updateSearchAt(new THREE.Vector3(0, 0, 0), 0.1)
+    expect(combat.getProgress().cleared).toBe(before)
+    expect(combat.active).toBe(true)
+  })
+})

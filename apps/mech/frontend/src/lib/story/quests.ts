@@ -72,7 +72,24 @@ export interface QuestDef {
   objectName?: string
   /** Hidden Object: search radius (world units) the object hides within. */
   searchRadius?: number
+  /**
+   * Recovery (hidden_object) only: whether the search is walked ON FOOT inside the
+   * town, vs driven as a mech-scale field encounter (§4, Phase 4). On-foot
+   * recoveries hide their target within town bounds (searchRadius fits inside
+   * TOWN_DECAY_RADIUS) and are DECAY-FREE by the keystone rule (§4.2) — the town
+   * does not decay while the pilot is out of the cockpit. A field-wreck recovery
+   * outside town stays mech-scale (`onFoot: false`, larger radius). The five
+   * authored Talus Reach recoveries (black box, pit survivor, missing kid, lost
+   * pilgrim, buried cache) are all in-town, on-foot by design (§2.6). */
+  onFoot?: boolean
 }
+
+/**
+ * On-foot Recovery search radius (world units). Sized to sit INSIDE town bounds
+ * (TOWN_DECAY_RADIUS = 60) so the target hides within the walkable town and the
+ * pilot reaches it on foot — decay-free by §4.2. StoryCombat rings the object in
+ * [inner, searchRadius]; keeping this < the decay radius keeps it in-town. */
+export const ON_FOOT_SEARCH_RADIUS = 28
 
 // ============================================================================
 // Chain generation (deterministic per town)
@@ -173,12 +190,25 @@ export function buildQuest(townId: string, townIndex: number, slot: number): Que
     }
   }
 
-  // hidden_object (Recovery)
+  // hidden_object (Recovery) — on-foot, in-town, decay-free (§4.2).
   return {
     ...common,
     objectName: content.objectName ?? 'the recovery target',
-    searchRadius: 28,
+    searchRadius: ON_FOOT_SEARCH_RADIUS,
+    onFoot: true,
   }
+}
+
+/**
+ * Whether a quest is an on-foot Recovery: a hidden_object accepted (from a warden,
+ * the mission board, or in the street) that is walked on foot inside town bounds,
+ * decay-free by the keystone rule (§4.2). Combat/field recoveries (`onFoot: false`)
+ * stay mech-scale. The integrator reads this to route acceptance: an on-foot
+ * Recovery dismounts (or stays dismounted) and marks its search area as a walkable
+ * objective; everything else mounts up and drives out.
+ */
+export function isOnFootRecovery(quest: QuestDef): boolean {
+  return quest.type === 'hidden_object' && quest.onFoot === true
 }
 
 /** Full 3-quest chain for a town (index order matches TownState.questChain). */
@@ -193,6 +223,65 @@ export function buildQuestChain(townId: string, townIndex: number): QuestDef[] {
 export function currentQuest(townId: string, townIndex: number, questIndex: number): QuestDef | null {
   if (questIndex >= QUESTS_PER_CHAIN) return null
   return buildQuest(townId, townIndex, questIndex)
+}
+
+// ============================================================================
+// Mission board (Phase 4 §4.5) — the warden-office board, data-driven
+// ============================================================================
+
+/** Where a quest sits relative to the town's chain progress. */
+export type MissionStatus = 'completed' | 'available' | 'locked'
+
+/**
+ * One row on the warden-office mission board. Pure/derived from the deterministic
+ * chain + the town's `questIndex`, so MissionBoard.vue is fully data-driven (like
+ * the P3 components). The board lists the WHOLE chain: cleared beats read as done,
+ * the current beat is acceptable (routes the SAME accept flow as warden dialogue),
+ * and later beats are shown locked so the arc reads as a three-beat story.
+ */
+export interface MissionBoardEntry {
+  quest: QuestDef
+  status: MissionStatus
+  /** Re-skinned type label (Hold / Recovery / Sanction). */
+  typeLabel: string
+  /** One-line briefing for the board row (the warden's terse hook). */
+  oneLine: string
+  /** Reputation-axis tags for the row (§3.7): who this beat serves. */
+  rep: { command: number; town: number; sanctioned: boolean }
+  /** True for on-foot in-town Recovery (§4): the board can flag it "on foot". */
+  onFoot: boolean
+}
+
+/**
+ * Build the full mission board for a town given how far through its chain it is.
+ * `questIndex` is the town's progress (0..QUESTS_PER_CHAIN). Rows before it are
+ * completed, the row at it is available, rows after it are locked. Deterministic
+ * and pure — MissionBoard.vue renders the returned rows and emits `accept` with
+ * the `available` row's quest, which the host routes exactly like the dialogue
+ * `acceptQuest` action.
+ */
+export function buildMissionBoard(
+  townId: string,
+  townIndex: number,
+  questIndex: number,
+): MissionBoardEntry[] {
+  return buildQuestChain(townId, townIndex).map((quest) => {
+    const status: MissionStatus =
+      quest.index < questIndex ? 'completed' : quest.index === questIndex ? 'available' : 'locked'
+    return {
+      quest,
+      status,
+      typeLabel: questTypeLabel(quest.type),
+      oneLine: quest.flavor,
+      rep: { command: quest.commandRep, town: quest.townRep, sanctioned: quest.sanctioned },
+      onFoot: isOnFootRecovery(quest),
+    }
+  })
+}
+
+/** Whether the town has an acceptable mission on its board (chain not finished). */
+export function boardHasOpenMission(questIndex: number): boolean {
+  return questIndex < QUESTS_PER_CHAIN
 }
 
 // ============================================================================

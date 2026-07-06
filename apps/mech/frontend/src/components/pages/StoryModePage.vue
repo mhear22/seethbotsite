@@ -33,9 +33,9 @@
         <div class="hud-phase">{{ phaseLabel }} · {{ happyCount }}/3 held</div>
       </div>
 
-      <!-- Town HUD: name, color-coded condition bar, both reputation axes, cues -->
+      <!-- In-mech Town HUD: name, condition bar, both reputation axes, cues. -->
       <TownHud
-        v-if="nearestTownName"
+        v-if="nearestTownName && pilotMode === 'mech'"
         :name="nearestTownName"
         :condition="nearestTownCondition"
         :standing="nearestTownStanding"
@@ -45,15 +45,34 @@
         :collateral-tick="collateralTick"
       />
 
+      <!-- On-foot hub HUD (§4): human-scale, DECAY HELD chip, anchor/remount E/F.
+           Buttons mirror the keybinds so touch players get the same affordances. -->
+      <TownHubHud
+        v-if="pilotMode === 'onFoot'"
+        :town-name="onFootTownName"
+        :anchor="onFootPrompt"
+        :can-remount="canRemount"
+        remount-label="Mount up"
+        :decay-held="true"
+        @interact="interactOnFoot"
+        @remount="doRemount"
+      />
+
       <!-- Active-quest objective tracker -->
       <div v-if="activeQuestObjective" class="story-objective">
         <span class="obj-type">{{ activeQuestTypeLabel }}</span>
         <span class="obj-text">{{ activeQuestObjective }}</span>
       </div>
 
-      <!-- Quest-giver interaction prompt -->
-      <div v-if="canTalkToQuestGiver" class="story-interact">
-        <span class="key">E</span> Talk to {{ questGiverTownName }}’s quest giver
+      <!-- Dismount prompt (in the Frame, inside a town, out of combat, §4.1). -->
+      <div v-if="dismountReady" class="story-interact">
+        <span class="key">E</span> Power down &amp; dismount
+      </div>
+
+      <!-- Urgent-remount banner: hostiles found the pilot on foot (§4.3). -->
+      <div v-if="remountSecondsLeft !== null" class="story-remount-warning">
+        Hostiles inbound — get back in the Frame.
+        <span class="rw-count">Auto-mount in {{ Math.ceil(remountSecondsLeft) }}s</span>
       </div>
 
       <!-- Toast for quest results / equip results -->
@@ -62,14 +81,19 @@
       </transition>
 
       <div class="story-controls-hint">
-        WASD move · Mouse look · Shift dash · Space jump · LMB/RMB fire · E interact
+        <template v-if="pilotMode === 'onFoot'">
+          WASD walk · Mouse look · E interact · F mount up
+        </template>
+        <template v-else>
+          WASD move · Mouse look · Shift dash · Space jump · LMB/RMB fire · E dismount
+        </template>
       </div>
 
       <button type="button" class="story-exit" @click="returnToBattle">Exit to Menu</button>
 
       <!-- On-screen controls (touch devices only; self-gates). Hidden while a panel is open. -->
       <TouchControls
-        v-if="!showDialog && !showGarage && !showCredits && !storyTree"
+        v-if="!showDialog && !showGarage && !showCredits && !showBoard && !storyTree"
         :input="touchInput"
         context="story"
       />
@@ -85,7 +109,17 @@
         @choice-selected="onWardenChoice"
         @accept="onAcceptQuest"
         @open-garage="openGarageFromDialog"
+        @open-board="openBoardFromDialog"
         @close="closeDialog"
+      />
+
+      <!-- Warden-office mission board (on foot, §4.4): the whole-chain view. -->
+      <MissionBoard
+        v-if="showBoard && boardTownState"
+        :town-name="boardTownState.name"
+        :entries="boardEntries"
+        @accept="onAcceptQuest"
+        @close="closeBoard"
       />
 
       <!-- Story dialogue: Vaun's Act III order + the Kestrel confrontation -->
@@ -93,6 +127,7 @@
         <div class="story-dialogue-panel">
           <DialogueView
             :tree="storyTree"
+            :start-id="storyTreeStartId"
             :is-choice-available="dialogueChoiceAvailable"
             :skippable="true"
             @choice-selected="onStoryChoice"
@@ -145,7 +180,7 @@ import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import * as THREE from 'three'
 import { MechEntity } from '../../lib/battle/MechEntity'
-import { StoryWorld, type StoryFrameInfo } from '../../lib/story/StoryWorld'
+import { StoryWorld, type StoryFrameInfo, type OnFootFrameInfo } from '../../lib/story/StoryWorld'
 import type { EnemyKill } from '../../lib/story/StoryCombat'
 import {
   useStoryMode,
@@ -168,8 +203,11 @@ import {
   questTypeLabel,
   questObjective,
   isFinaleBoss,
+  isOnFootRecovery,
+  buildMissionBoard,
   type QuestDef,
   type ShopSlot,
+  type MissionBoardEntry,
 } from '../../lib/story/quests'
 import {
   VAUN_COMMS,
@@ -183,6 +221,12 @@ import {
   wardenTreeForTown,
   vaunSanctionTree,
   kestrelConfrontationTree,
+  ANCHOR_DIALOGUE,
+  dialogueForAnchor,
+  rookerKestrelToast,
+  commonsEntryFor,
+  ALL_DIALOGUE_TREES,
+  type AnchorKind,
 } from '../../lib/story/dialogueTrees'
 import {
   isChoiceAvailable as isDialogueChoiceAvailable,
@@ -191,6 +235,8 @@ import {
 } from '../../lib/story/dialogue'
 import type { MechPart, MechSlot } from '../../shared/types/MechTypes'
 import TownHud from '../mech/story/TownHud.vue'
+import TownHubHud, { type HubAnchorPrompt } from '../mech/story/TownHubHud.vue'
+import MissionBoard from '../mech/story/MissionBoard.vue'
 import QuestDialog from '../mech/story/QuestDialog.vue'
 import Garage from '../mech/story/Garage.vue'
 import StoryCredits from '../mech/story/StoryCredits.vue'
@@ -223,6 +269,18 @@ const encounterActive = ref(false)
 const activeQuestObjective = ref('')
 const activeQuestTypeLabel = ref('')
 
+// --- Phase 4: on-foot / dismount state (fed by handleFrame) ---
+const pilotMode = ref<'mech' | 'onFoot'>('mech')
+const canDismount = ref(false)
+const onFootInfo = ref<OnFootFrameInfo | null>(null)
+// The town id the active body is inside the decay radius of (mech or pilot).
+const currentInsideTownId = ref<string | null>(null)
+// True on foot when close enough to the parked Frame to climb back in (F prompt).
+const canRemount = ref(false)
+// Warden-office mission board (on foot).
+const showBoard = ref(false)
+const boardTownId = ref<string | null>(null)
+
 // Modals.
 const showDialog = ref(false)
 const dialogTownId = ref<string | null>(null)
@@ -238,7 +296,10 @@ const showCredits = ref(false)
 const commsToastRef = ref<InstanceType<typeof CommsToast> | null>(null)
 // A blocking Vaun/Kestrel dialogue tree (distinct from the warden QuestDialog).
 const storyTree = ref<DialogueTree | null>(null)
-const storyTreeKind = ref<'sanction' | 'kestrel' | null>(null)
+const storyTreeKind = ref<'sanction' | 'kestrel' | 'comms' | 'commons' | 'garage' | null>(null)
+// Optional start node for the story tree (commons opens on its condition-reactive
+// hardship line in a gutted town, §4.5).
+const storyTreeStartId = ref<string | undefined>(undefined)
 // Monotonic collateral-tax cue for the TownHud pulse + a severity accumulator so
 // the HUD flashes on meaningful chunks, not every frame.
 const collateralTick = ref(0)
@@ -283,27 +344,58 @@ const phaseLabel = computed(() => {
   }
 })
 
-// True only when a quest-giver is in range AND no encounter/modal is blocking.
-// During the finale, un-helped target towns are held by a boss (you fight, not
-// talk), so their quest-giver is unavailable.
-const canTalkToQuestGiver = computed(
+/** Any blocking hub/story panel is open (suppresses roam-key interactions). */
+const anyModalOpen = computed(
   () =>
-    questGiverTownId.value !== null &&
-    !encounterActive.value &&
-    !showDialog.value &&
-    !showGarage.value &&
-    !showCredits.value &&
-    storyTree.value === null &&
-    !isFinaleTargetTown(questGiverTownId.value),
+    showDialog.value ||
+    showGarage.value ||
+    showCredits.value ||
+    showBoard.value ||
+    storyTree.value !== null,
+)
+
+/**
+ * The dismount prompt is live only in the Frame, inside a town, out of combat
+ * (world.canDismount), with no panel open — and never in a finale target town,
+ * where an ace is waiting and the answer is to fight, not step out (§4.3/§6).
+ */
+const dismountReady = computed(
+  () =>
+    pilotMode.value === 'mech' &&
+    canDismount.value &&
+    !anyModalOpen.value &&
+    !isFinaleTargetTown(currentInsideTownId.value),
+)
+
+/**
+ * The on-foot E-prompt (§4.5): the anchor/NPC the pilot is standing next to,
+ * mapped to ANCHOR_DIALOGUE's verb + label. Prefers a named NPC's own name when
+ * one is in reach at the same anchor ("talk to Rooker" over "enter the garage").
+ */
+const onFootPrompt = computed<HubAnchorPrompt | null>(() => {
+  const of = onFootInfo.value
+  if (!of) return null
+  const kind: AnchorKind | null = of.nearestAnchor?.kind ?? of.nearestNPC?.anchor ?? null
+  if (!kind) return null
+  const spec = ANCHOR_DIALOGUE[kind]
+  const npc = of.nearestNPC && of.nearestNPC.anchor === kind ? of.nearestNPC : null
+  return { kind, verb: npc ? 'talk to' : spec.verb, label: npc ? npc.name : spec.label }
+})
+
+/** Seconds until forced remount when hostiles appeared on foot (else null). */
+const remountSecondsLeft = computed(() =>
+  onFootInfo.value?.remountSecondsLeft ?? null,
 )
 
 function isFinaleTargetTown(townId: string | null): boolean {
   if (!townId || story.phase.value !== 'finale') return false
   return story.remainingFinaleTargets.value.some((t) => t.id === townId)
 }
-const questGiverTownName = computed(
-  () => (questGiverTownId.value ? story.getTown(questGiverTownId.value)?.name ?? '' : ''),
-)
+/** The settlement name shown on the on-foot hub HUD (the dismount town). */
+const onFootTownName = computed(() => {
+  const id = onFootInfo.value?.townId
+  return (id ? story.getTown(id)?.name : null) ?? nearestTownName.value ?? ''
+})
 
 const dialogTown = computed(() =>
   dialogTownId.value ? story.getTown(dialogTownId.value) : undefined,
@@ -429,17 +521,31 @@ onUnmounted(() => {
   teardownWorld()
 })
 
-/** E opens the quest-giver dialogue; Escape closes whatever panel is open. */
+/**
+ * Roam keys (§4.3/§4.5). Escape closes whatever hub panel is open (never a soft-
+ * lock — every on-foot panel is dismissable). E is context-sensitive: in the Frame
+ * inside a town it drops you out (dismount); on foot it interacts with the anchor
+ * in reach. F remounts the parked Frame. The story/warden panels own their own
+ * keys (DialogueView/QuestDialog listen in capture phase), so E/F no-op there.
+ */
 function handleKey(e: KeyboardEvent) {
   if (!roaming.value) return
   if (e.code === 'Escape') {
-    if (showGarage.value) closeGarage()
+    if (showBoard.value) closeBoard()
+    else if (showGarage.value) closeGarage()
     else if (showDialog.value) closeDialog()
     return
   }
-  if (e.code === 'KeyE' && canTalkToQuestGiver.value && questGiverTownId.value) {
-    openDialog(questGiverTownId.value)
+  if (anyModalOpen.value) return
+
+  if (pilotMode.value === 'onFoot') {
+    if (e.code === 'KeyE') interactOnFoot()
+    else if (e.code === 'KeyF' && canRemount.value) doRemount()
+    return
   }
+
+  // In the Frame: E drops you out of the cockpit when a dismount is allowed.
+  if (e.code === 'KeyE' && dismountReady.value) doDismount()
 }
 
 function showToast(message: string, bad = false) {
@@ -492,27 +598,207 @@ async function beginRoaming() {
     onEnemyKilled: handleEnemyKilled,
     onReinforcement: handleReinforcement,
     onCollateral: handleCollateral,
+    onModeChange: handleModeChange,
   })
   world.start()
   touchInput.value = world.getInputManager()
+
+  // Resume a run saved mid-dismount (§4 persistence): park the Frame where it was
+  // and re-enter the on-foot body without the drop transition or decay resuming.
+  // We only commit to on-foot if we can BOTH place the parked Frame (mechPark) and
+  // resolve its town (onFootTownId → a live town, restoreOnFoot returns true). If
+  // either is missing/stale (corrupt/migrated save), restoring would leave no
+  // reachable remount AND silently pin the §4.2 decay/collateral pause ON for the
+  // whole run — so we fall back to the mech and RECONCILE the persisted flag, since
+  // the composable's run.pilotMode drives that pause (useStoryMode tickTownDecay /
+  // applyTownCollateral early-return while 'onFoot').
+  if (story.isOnFoot.value) {
+    const townId = story.onFootTownId.value
+    const park = story.mechPark.value
+    let restored = false
+    if (townId && park) {
+      world.setPlayerPosition(park[0], park[2])
+      restored = world.restoreOnFoot(townId)
+    }
+    if (restored) {
+      pilotMode.value = 'onFoot'
+    } else {
+      pilotMode.value = 'mech'
+      story.setPilotMode('mech')
+    }
+  }
 
   // Act I arrival hail (once per run). A continued mid-campaign run won't re-hear
   // it (the flag persists); a fresh deployment gets Vaun's opener.
   fireOnce('beat:arrival', () => vaunComms('arrival'))
 }
 
-// --- Story dialogue (Vaun / Kestrel) — a blocking DialogueView modal ---
+// --- On-foot / dismount (design §4) ---
 
-/** Open a blocking story tree (pauses the world). */
-function openStoryTree(tree: DialogueTree, kind: 'sanction' | 'kestrel'): void {
-  storyTree.value = tree
-  storyTreeKind.value = kind
+/**
+ * The world flipped the player's body (dismount / mount / restore). Persist the
+ * mode + park spot through the composable — that single source of truth drives
+ * the §4.2 decay pause and the save/load round-trip.
+ */
+function handleModeChange(
+  mode: 'mech' | 'onFoot',
+  ctx: { townId: string | null; mechPark: [number, number, number] | null },
+) {
+  pilotMode.value = mode
+  story.setPilotMode(mode, { townId: ctx.townId, mechPark: ctx.mechPark })
+}
+
+/** Drop out of the cockpit (§4.1). The world plays the god→person fall + dust. */
+function doDismount() {
+  if (!world) return
+  if (world.dismount()) {
+    audio.playThruster() // hydraulics hiss / reactor whine-down (§4.1)
+    showToast('You climb down. The ground goes quiet. Decay held while you walk.')
+  }
+}
+
+/** Climb back into the parked Frame (§4.1). */
+function doRemount() {
+  if (!world) return
+  // Any open hub panel is closed first so the world unpauses cleanly on mount.
+  if (showBoard.value) closeBoard()
+  if (world.mount()) {
+    audio.playLevelUp()
+  }
+}
+
+/**
+ * Interact with the anchor/NPC in reach on foot (§4.5). Routes per ANCHOR_DIALOGUE:
+ * gate → remount; garage → Garage.vue (+ Rooker's mirror line); warden → the
+ * warden dialogue/board; comms → Vaun's per-act tree; commons → the ambient tree
+ * (opening on its hardship line in a gutted town).
+ */
+function interactOnFoot() {
+  const of = onFootInfo.value
+  const prompt = onFootPrompt.value
+  if (!of || !prompt) return
+  const townId = of.townId
+  const kind = prompt.kind
+
+  switch (kind) {
+    case 'gate':
+      doRemount()
+      return
+    case 'garage':
+      openRookerGarage(townId)
+      return
+    case 'warden':
+      openDialog(townId)
+      return
+    case 'comms':
+    case 'commons': {
+      const id = dialogueForAnchor(kind, { townId, chapter: story.chapter.value })
+      if (!id) return
+      // The withdrawal ORDER (vaun:sanction) carries a locked-in decision (its
+      // choices move rep + set obeyed/refused). It is delivered once, by the
+      // finale flow; if the player already answered it, the comms post must NOT
+      // re-open it (that would let the choice re-apply its rep deltas). §2.5.
+      if (
+        id === 'vaun:sanction' &&
+        (story.hasStoryFlag('obeyed-withdrawal') || story.hasStoryFlag('refused-order'))
+      ) {
+        showToast('Comms: no new orders from Command. The channel is quiet.')
+        return
+      }
+      const tree = ALL_DIALOGUE_TREES[id]
+      if (!tree) return
+      const treeKind = id === 'vaun:sanction' ? 'sanction' : kind
+      const startId =
+        kind === 'commons' ? commonsEntryFor(story.getTown(townId)?.condition ?? 100) : undefined
+      openStoryTree(tree, treeKind, startId)
+      return
+    }
+  }
+}
+
+/**
+ * Meet Rooker at the garage on foot (§4.5). First surfaces the §4.2 mirror-reveal:
+ * once the player has NOTICED Kestrel keeps her towns clean but Rooker hasn't named
+ * the trick, this visit is where he says it out loud (proactive comms toast),
+ * latching `rooker-named-trick` so it fires exactly once. Then opens Rooker's
+ * dialogue (the dormant `rooker:garage` tree, §4.5) — a choice there hands off to
+ * the Garage panel via the `openGarage` action (onStoryChoice).
+ */
+function openRookerGarage(townId: string) {
+  garageTownId.value = townId
+  const line = rookerKestrelToast(story.storyFlags.value)
+  if (line) {
+    story.raiseFlag('rooker-named-trick')
+    pushComms({ id: 'rooker-kestrel-reveal', callsign: 'ROOKER', line, variant: 'comms' })
+  }
+  const tree = ALL_DIALOGUE_TREES['rooker:garage']
+  if (tree) openStoryTree(tree, 'garage')
+  else openGaragePanel(townId)
+}
+
+/** Open the actual Garage.vue shop panel (world stays paused). */
+function openGaragePanel(townId: string) {
+  garageTownId.value = townId
+  garageMessage.value = ''
+  showGarage.value = true
   world?.setPaused(true)
 }
+
+/** Open the warden-office mission board on foot (§4.4). */
+function openBoard(townId: string) {
+  boardTownId.value = townId
+  showDialog.value = false
+  dialogTownId.value = null
+  showBoard.value = true
+  world?.setPaused(true)
+}
+
+/** QuestDialog "Board" button → open the board for the town being talked to. */
+function openBoardFromDialog() {
+  if (dialogTownId.value) openBoard(dialogTownId.value)
+}
+
+function closeBoard() {
+  showBoard.value = false
+  boardTownId.value = null
+  if (!showGarage.value && !showDialog.value) world?.setPaused(false)
+}
+
+/** The town whose mission board is open (on foot). */
+const boardTownState = computed(() =>
+  boardTownId.value ? story.getTown(boardTownId.value) : undefined,
+)
+/** The whole-chain board rows for {@link MissionBoard} (data-driven, §4.5). */
+const boardEntries = computed<MissionBoardEntry[]>(() => {
+  const t = boardTownState.value
+  if (!t) return []
+  return buildMissionBoard(t.id, townIndexFromId(t.id), t.questIndex)
+})
+
+// --- Story dialogue (Vaun / Kestrel) — a blocking DialogueView modal ---
+
+/** Open a blocking story tree (pauses the world), optionally at a start node. */
+function openStoryTree(
+  tree: DialogueTree,
+  kind: 'sanction' | 'kestrel' | 'comms' | 'commons' | 'garage',
+  startId?: string,
+): void {
+  storyTree.value = tree
+  storyTreeKind.value = kind
+  storyTreeStartId.value = startId
+  world?.setPaused(true)
+}
+
+// Set when a Rooker-dialogue choice chose to open the garage, so the dialogue's
+// terminal 'end' hands off to the Garage panel (staying paused) instead of
+// unpausing the world.
+let pendingGarageHandoff = false
 
 /** Apply a story-dialogue choice's effects (flags/rep) through the composable. */
 function onStoryChoice(choice: DialogueChoice): void {
   story.chooseDialogue(choice)
+  // Rooker's "open her up" choice (§4.5) hands off from dialogue to the shop.
+  if (choice.effects?.action === 'openGarage') pendingGarageHandoff = true
 }
 
 /** Resolve a story tree: unpause, then branch on which tree it was. */
@@ -520,6 +806,15 @@ function onStoryDialogueEnd(): void {
   const kind = storyTreeKind.value
   storyTree.value = null
   storyTreeKind.value = null
+  storyTreeStartId.value = undefined
+
+  // Rooker → garage handoff: keep the world paused and open the shop panel.
+  if (pendingGarageHandoff) {
+    pendingGarageHandoff = false
+    openGaragePanel(garageTownId.value ?? currentInsideTownId.value ?? '')
+    return
+  }
+
   world?.setPaused(false)
 
   if (kind === 'kestrel' && pendingKestrelBoss) {
@@ -545,6 +840,30 @@ function handleFrame(info: StoryFrameInfo) {
   insideTown.value = info.insideTownId !== null
   questGiverTownId.value = info.questGiverTownId
   encounterActive.value = info.encounterActive
+
+  // --- Phase 4 body-mode state (drives the HUD swap + prompts) ---
+  pilotMode.value = info.mode
+  canDismount.value = info.canDismount
+  onFootInfo.value = info.onFoot
+  currentInsideTownId.value = info.insideTownId
+  // Remount affordance (F): close enough to the parked Frame monument to climb in,
+  // or standing at the gate. World-space distance to the mech park spot.
+  if (info.mode === 'onFoot') {
+    const park = world?.getMechParkPosition() ?? null
+    const atGate = info.onFoot?.nearestAnchor?.kind === 'gate'
+    const nearPark =
+      park !== null &&
+      Math.hypot(info.playerPosition.x - park.x, info.playerPosition.z - park.z) <= 8
+    canRemount.value = atGate || nearPark
+    // Hostiles-on-foot interlock (§4.3): if the pilot is caught dismounted inside a
+    // finale target town (an ace holds it), start the forced-remount countdown —
+    // the answer to danger on foot is to get back in the Frame, never to fight (§6).
+    if (story.phase.value === 'finale' && isFinaleTargetTown(info.onFoot?.townId ?? null)) {
+      world?.signalHostileWhileOnFoot()
+    }
+  } else {
+    canRemount.value = false
+  }
 
   // Total real elapsed.
   story.tickElapsed(info.deltaTime)
@@ -630,7 +949,10 @@ function handleFinale(info: StoryFrameInfo) {
   }
 
   // Walk into an un-helped, uncleared town -> the ace who took it is waiting.
+  // Never auto-start the fight while on foot: the hostiles-on-foot interlock
+  // (handleFrame) force-remounts first, and the boss starts once back in the Frame.
   if (
+    info.mode === 'mech' &&
     info.insideTownId &&
     !info.encounterActive &&
     !story.activeQuest.value &&
@@ -708,27 +1030,59 @@ function openDialog(townId: string) {
 function closeDialog() {
   showDialog.value = false
   dialogTownId.value = null
-  // Only resume if the garage isn't also open.
-  if (!showGarage.value) world?.setPaused(false)
+  // Only resume if no other panel is still holding the world paused.
+  if (!showGarage.value && !showBoard.value && storyTree.value === null) world?.setPaused(false)
 }
 
+/**
+ * Accept a mission from the warden dialogue or the mission board (§4.5/§2.6).
+ * Two routings, keyed off {@link isOnFootRecovery}:
+ *   - On-foot Recovery (hidden_object, in-town): stays dismounted. It is a decay-
+ *     free walking search (§4.2) — the world runs the hidden-object reveal against
+ *     the pilot's position (StoryWorld.updateOnFoot). No combat-ready gate applies.
+ *   - Everything else (Hold / Sanction): a Frame job. If accepted on foot, remount
+ *     first (the combat interlock — no fighting out of the cockpit, §6), then start
+ *     the encounter. Gated on a combat-ready loadout (death-stakes repair debt).
+ */
 function onAcceptQuest(quest: QuestDef) {
   if (!world) return
+
+  // Close whichever acceptance surface is open (warden dialogue or the board).
+  showDialog.value = false
+  dialogTownId.value = null
+  showBoard.value = false
+  boardTownId.value = null
+
+  if (isOnFootRecovery(quest)) {
+    story.startQuest(quest)
+    const started = world.startQuest(quest, quest.townId)
+    world.setPaused(false)
+    if (started) {
+      showToast(`Recovery accepted: ${quest.title}. Search the ground on foot — no rush, no harm.`)
+    } else {
+      story.clearActiveQuest()
+      showToast('Could not start the search right now.', true)
+    }
+    return
+  }
+
   // Death-stakes gate (§3.7): don't let a downed pilot redeploy on a Frame the
   // last fight stripped invalid (legs/head/weapon arms shot off into repair debt).
-  // They must repair + refit at Rooker's first. Keep the dialogue open so the
-  // garage is one choice away.
+  // They must repair + refit at Rooker's first.
   if (story.run.value && !isLoadoutValid(story.run.value.loadout)) {
+    world.setPaused(false)
     showToast(
       "Frame's not combat-ready — repair and refit at Rooker's before you redeploy.",
       true,
     )
     return
   }
+
+  // A combat mission is a Frame job: if accepted on foot, climb back in first.
+  if (world.isOnFoot()) world.mount()
+
   story.startQuest(quest)
   const started = world.startQuest(quest, quest.townId)
-  showDialog.value = false
-  dialogTownId.value = null
   world.setPaused(false)
   if (started) {
     showToast(`Order accepted: ${quest.title}. Make it quick and clean.`)
@@ -918,7 +1272,7 @@ function openGarageFromDialog() {
 function closeGarage() {
   showGarage.value = false
   garageMessage.value = ''
-  if (!showDialog.value) world?.setPaused(false)
+  if (!showDialog.value && !showBoard.value && storyTree.value === null) world?.setPaused(false)
 }
 
 function onEquip(payload: { part: MechPart; slot: ShopSlot }) {
@@ -1245,6 +1599,40 @@ function returnToBattle() {
   font-weight: 600;
   font-size: 0.95rem;
   backdrop-filter: blur(8px);
+}
+
+/* Urgent-remount banner (hostiles found the pilot on foot) */
+.story-remount-warning {
+  position: fixed;
+  top: 108px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2400;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 10px 22px;
+  border-radius: 12px;
+  background: rgba(127, 29, 29, 0.9);
+  border: 1px solid rgba(248, 113, 113, 0.7);
+  color: #fee2e2;
+  font-weight: 800;
+  font-size: 0.95rem;
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  animation: rw-pulse 1s ease-in-out infinite;
+}
+
+.story-remount-warning .rw-count {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #fca5a5;
+}
+
+@keyframes rw-pulse {
+  0%, 100% { box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); }
+  50% { box-shadow: 0 0 22px rgba(248, 113, 113, 0.6); }
 }
 
 .story-interact .key {

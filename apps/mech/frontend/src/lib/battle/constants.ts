@@ -162,6 +162,56 @@ export const FOOTFALL = {
 } as const
 
 // ---------------------------------------------------------------------------
+// ON-FOOT — the dismount (design §4.1/§4.3). The pilot is a fragile human, not
+// a machine: no weight, no dash i-frames, no jump-jets, no power economy. Speed
+// collapses from the mech's tens-of-u/s to a walk, acceleration is near-instant
+// (a person just moves), and the only "juice" is a tiny footstep event fed to
+// the camera at a fraction of the mech's intensity. All values live here so the
+// integrator can retune the god→person contrast in one place.
+//
+// NOTE (design reconciliation): design §4.1/§4.3 name a ~4u/s walk; this cluster
+// ships the slightly brisker 6u/s walk / 10u/s sprint from the Phase-4 task brief
+// so the hub is not tedious to cross. Both read as an enormous collapse from the
+// Frame's speed; retune WALK_SPEED to 4 here if the emotional beat needs it.
+// ---------------------------------------------------------------------------
+export const ON_FOOT = {
+  /** Pilot total height in world units. The ~5-6u Frame towers over this. */
+  HEIGHT: 1.8,
+  /** Capsule radius used for collider blocking against town pedestrian colliders. */
+  RADIUS: 0.45,
+
+  /** Base walk speed (units/s). */
+  WALK_SPEED: 6,
+  /** Sprint speed (units/s) while the dash key is held — no i-frames, just a jog. */
+  SPRINT_SPEED: 10,
+  /** Near-instant acceleration (units/s²) — a human has no momentum to spool up. */
+  ACCEL: 60,
+  /** Ground friction (per-second exponential decay) when input releases. Stops fast. */
+  FRICTION: 14,
+
+  /** Gravity (units/s²) — gentler than the mech; only matters walking off a ledge. */
+  GRAVITY: 30,
+  /** Max upward ground step the pilot snaps over without falling/climbing logic. */
+  STEP_UP_TOLERANCE: 0.6,
+
+  // Footstep cadence + juice (mirrors the FOOTFALL shape at a fraction of scale).
+  /** Below this horizontal speed the pilot is standing (no steps). */
+  MIN_STEP_SPEED: 0.4,
+  /** Stride length: step interval = STRIDE / speed, clamped. */
+  STRIDE_LENGTH: 1.6,
+  MIN_STEP_INTERVAL: 0.28,
+  MAX_STEP_INTERVAL: 0.55,
+  /** Footstep intensity fed to the camera — tiny vs the mech's 0.05–0.28. */
+  STEP_INTENSITY: 0.02,
+
+  // Idle / walk body bob (OnFootEntity.update animates the mesh with these).
+  BOB_WALK_FREQUENCY: 9,     // rad/s at full walk
+  BOB_WALK_AMPLITUDE: 0.06,  // vertical bob (units) at full walk
+  BOB_IDLE_FREQUENCY: 2.2,   // slow breathing sway when standing
+  BOB_IDLE_AMPLITUDE: 0.02,
+} as const
+
+// ---------------------------------------------------------------------------
 // CAMERA — over-the-shoulder rig, shake, dip, FOV juice, speed lag.
 // ---------------------------------------------------------------------------
 export const CAMERA = {
@@ -210,4 +260,68 @@ export const CAMERA = {
   POSITION_LAG_BASE: 40,
   /** How much the lag rate is reduced at SPEED_FOV_REF_SPEED (0..1). */
   POSITION_LAG_SPEED_FALLOFF: 0.5,
+} as const
+
+// ---------------------------------------------------------------------------
+// CAMERA PROFILES — the god↔person contrast (design §3.1/§4.1). The rig geometry
+// that differs between piloting the Frame and walking as the human is bundled
+// into a profile the CameraController swaps with setProfile()/the dismount
+// transition. The 'mech' profile is exactly today's behaviour (sourced from the
+// CAMERA group above), so switching to it is a no-op for existing scenes.
+// ---------------------------------------------------------------------------
+export interface CameraProfileParams {
+  /** Orbit distance clamp + resting distance. */
+  minDistance: number
+  maxDistance: number
+  defaultDistance: number
+  /** Over-the-shoulder offset applied after the orbit calc. */
+  shoulderRight: number
+  shoulderUp: number
+  /** Anchor lift above the target's position (rig pivot height). */
+  anchorUp: number
+  /** Resting field of view. On foot this widens for the small-and-exposed read. */
+  baseFov: number
+  /** Multiplier on ALL shake/dip intensity — heavily damped on foot (no weight). */
+  shakeScale: number
+}
+
+export const CAMERA_PROFILES: Record<'mech' | 'onFoot', CameraProfileParams> = {
+  // The Frame: high, heavy, far shoulder — identical to the standalone CAMERA group.
+  mech: {
+    minDistance: CAMERA.MIN_DISTANCE,
+    maxDistance: CAMERA.MAX_DISTANCE,
+    defaultDistance: CAMERA.DEFAULT_DISTANCE,
+    shoulderRight: CAMERA.SHOULDER_RIGHT,
+    shoulderUp: CAMERA.SHOULDER_UP,
+    anchorUp: CAMERA.ANCHOR_UP,
+    baseFov: CAMERA.BASE_FOV,
+    shakeScale: 1.0,
+  },
+  // The human: close, low (~1.7u eye height = anchorUp + shoulderUp), wide, calm.
+  onFoot: {
+    minDistance: 1.5,
+    maxDistance: 4.5,
+    defaultDistance: 2.8,
+    shoulderRight: 0.7,
+    shoulderUp: 0.3,
+    anchorUp: 1.4,
+    baseFov: 82,
+    shakeScale: 0.25,
+  },
+}
+
+export type CameraProfileName = keyof typeof CAMERA_PROFILES
+
+// ---------------------------------------------------------------------------
+// DISMOUNT TRANSITION — the ~0.8s fall from cockpit height to human eye height
+// (design §4.1: "the camera falls … with a landing settle"). The reverse (climb)
+// reuses the same machinery with the profiles swapped.
+// ---------------------------------------------------------------------------
+export const CAMERA_TRANSITION = {
+  /** Duration of the drop/climb, seconds. */
+  DROP_DURATION: 0.8,
+  /** Downward dip punched in when the drop lands (the "settle" thud). */
+  SETTLE_DIP: 0.35,
+  /** Brief inward FOV pinch on the landing settle (negative = narrow). */
+  SETTLE_FOV: -3,
 } as const

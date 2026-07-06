@@ -1,26 +1,39 @@
 import * as THREE from 'three'
-import type { MechEntity } from './MechEntity'
 import { markRaw } from 'vue'
-import { CAMERA } from './constants'
+import {
+  CAMERA,
+  CAMERA_PROFILES,
+  CAMERA_TRANSITION,
+  type CameraProfileName,
+  type CameraProfileParams,
+} from './constants'
+import type { PilotableEntity } from './PilotableEntity'
+
+/** A profile passed to setProfile / playDismountTransition, by name or by params. */
+type ProfileArg = CameraProfileName | CameraProfileParams
 
 export class CameraController {
   camera: THREE.PerspectiveCamera
-  target: MechEntity
+  /** Anything pilotable — the Frame (MechEntity) or the pilot on foot (OnFootEntity). */
+  target: PilotableEntity
   mouseRotation: { x: number; y: number } = { x: 0, y: 0 }
 
-  // Camera settings (centralized in constants.ts CAMERA group).
-  private readonly MIN_DISTANCE = CAMERA.MIN_DISTANCE
-  private readonly MAX_DISTANCE = CAMERA.MAX_DISTANCE
+  /**
+   * Active rig geometry (distances, shoulder/anchor offsets, base FOV, shake
+   * scale). Swapped by setProfile() and interpolated by the dismount transition
+   * so the same controller serves the towering-Frame view and the low, close,
+   * calm on-foot view (design §3.1/§4.1). Defaults to the 'mech' profile, which
+   * reproduces the pre-Phase-4 CAMERA constants exactly.
+   */
+  private profile: CameraProfileParams = { ...CAMERA_PROFILES.mech }
+
+  // Pitch clamp is shared across profiles (looking straight up/down is always bad).
   private readonly MIN_PITCH = CAMERA.MIN_PITCH
   private readonly MAX_PITCH = CAMERA.MAX_PITCH
-  private currentDistance: number = CAMERA.DEFAULT_DISTANCE
+  private currentDistance: number = CAMERA_PROFILES.mech.defaultDistance
   public sensitivityMultiplier = 1.0
   public invertMouseX = false
   public invertMouseY = false
-
-  // Over-the-shoulder offset (applied after orbit calculation)
-  private readonly SHOULDER_RIGHT = CAMERA.SHOULDER_RIGHT
-  private readonly SHOULDER_UP = CAMERA.SHOULDER_UP
 
   // Mouse velocity smoothing - converts discrete integer input into smooth rotation
   private mouseVelocity = { x: 0, y: 0 }
@@ -32,7 +45,6 @@ export class CameraController {
 
   // FOV offset (dash kick +, landing settle −), eased back toward 0 each frame,
   // plus a live speed-based widening layered on top.
-  private readonly BASE_FOV = CAMERA.BASE_FOV
   private fovOffset = 0
   private readonly FOV_RETURN = CAMERA.FOV_RETURN
 
@@ -42,17 +54,121 @@ export class CameraController {
   // Smoothed camera position for subtle speed-based positional lag.
   private smoothedPosition: THREE.Vector3 | null = null
 
-  constructor(target: MechEntity) {
+  /**
+   * Active dismount/remount transition (design §4.1). While set, update() eases
+   * the rig geometry from `from` → `to` over `duration`, punches a landing
+   * settle, and calls `done` when complete. null = no transition.
+   */
+  private transition:
+    | { from: CameraProfileParams; to: CameraProfileParams; elapsed: number; duration: number; done?: () => void }
+    | null = null
+
+  constructor(target: PilotableEntity, profile: ProfileArg = 'mech') {
     this.target = target
+    this.profile = { ...this.resolveProfile(profile) }
+    this.currentDistance = this.profile.defaultDistance
+    // Aspect from the window when present; 1 in headless/test contexts.
+    const aspect = typeof window !== 'undefined' && window.innerHeight
+      ? window.innerWidth / window.innerHeight
+      : 1
     this.camera = markRaw(new THREE.PerspectiveCamera(
-      this.BASE_FOV, // FOV
-      window.innerWidth / window.innerHeight,
+      this.profile.baseFov, // FOV
+      aspect,
       0.1, // Near
       1000 // Far
     ))
   }
 
+  /** Resolve a profile name or explicit params to a params object. */
+  private resolveProfile(p: ProfileArg): CameraProfileParams {
+    return typeof p === 'string' ? CAMERA_PROFILES[p] : p
+  }
+
+  /**
+   * Instantly adopt a rig profile (no transition). Repoints the resting distance
+   * and clamps the current orbit distance into the new profile's range.
+   */
+  setProfile(profile: ProfileArg): void {
+    this.transition = null
+    this.profile = { ...this.resolveProfile(profile) }
+    this.currentDistance = Math.max(
+      this.profile.minDistance,
+      Math.min(this.profile.maxDistance, this.profile.defaultDistance),
+    )
+  }
+
+  /**
+   * Repoint the rig at a new pilotable body (mount/dismount pointer swap). Snaps
+   * the smoothed position so the view does not lerp across the world from the old
+   * body — the drop transition (if any) owns the felt motion.
+   */
+  setTarget(target: PilotableEntity): void {
+    this.target = target
+    this.smoothedPosition = null
+  }
+
+  /**
+   * Play the ~0.8s camera fall from the cockpit view to the human eye view
+   * (design §4.1). Eases the rig geometry from `from` → `to`, and on landing
+   * punches a downward settle + brief FOV pinch. The remount is the same call
+   * with the profiles swapped (from onFoot → mech = the climb back up).
+   */
+  playDismountTransition(from: ProfileArg, to: ProfileArg, done?: () => void): void {
+    const f = { ...this.resolveProfile(from) }
+    const t = { ...this.resolveProfile(to) }
+    this.profile = { ...f }
+    this.currentDistance = f.defaultDistance
+    this.transition = { from: f, to: t, elapsed: 0, duration: CAMERA_TRANSITION.DROP_DURATION, done }
+  }
+
+  /** True while a dismount/remount drop is animating. */
+  get isTransitioning(): boolean {
+    return this.transition !== null
+  }
+
+  /**
+   * Advance an active dismount/remount transition: ease the rig geometry and
+   * resting distance from `from` → `to`, then on completion snap to `to`, punch
+   * the landing settle (dip + inward FOV pinch), and fire the done callback.
+   */
+  private advanceTransition(deltaTime: number) {
+    const tr = this.transition
+    if (!tr) return
+    tr.elapsed += deltaTime
+    const raw = Math.min(1, tr.elapsed / tr.duration)
+    // easeOutCubic — fast fall that settles gently, matching "falls … and settles".
+    const e = 1 - Math.pow(1 - raw, 3)
+    this.profile = CameraController.lerpProfile(tr.from, tr.to, e)
+    this.currentDistance = tr.from.defaultDistance + (tr.to.defaultDistance - tr.from.defaultDistance) * e
+    if (raw >= 1) {
+      this.profile = { ...tr.to }
+      this.currentDistance = tr.to.defaultDistance
+      // Landing settle: a downward thud + a brief inward FOV pinch.
+      this.triggerDip(CAMERA_TRANSITION.SETTLE_DIP)
+      this.triggerFovKick(CAMERA_TRANSITION.SETTLE_FOV)
+      const done = tr.done
+      this.transition = null
+      done?.()
+    }
+  }
+
+  /** Linear blend of two rig profiles (used mid-transition). */
+  private static lerpProfile(a: CameraProfileParams, b: CameraProfileParams, t: number): CameraProfileParams {
+    const l = (x: number, y: number) => x + (y - x) * t
+    return {
+      minDistance: l(a.minDistance, b.minDistance),
+      maxDistance: l(a.maxDistance, b.maxDistance),
+      defaultDistance: l(a.defaultDistance, b.defaultDistance),
+      shoulderRight: l(a.shoulderRight, b.shoulderRight),
+      shoulderUp: l(a.shoulderUp, b.shoulderUp),
+      anchorUp: l(a.anchorUp, b.anchorUp),
+      baseFov: l(a.baseFov, b.baseFov),
+      shakeScale: l(a.shakeScale, b.shakeScale),
+    }
+  }
+
   update(deltaTime: number, mouseX: number, mouseY: number) {
+    this.advanceTransition(deltaTime)
     const baseSensitivity = 0.0003
     const sensitivity = baseSensitivity * this.sensitivityMultiplier
 
@@ -98,15 +214,15 @@ export class CameraController {
     // Camera right direction (must match THREE.js Euler Y rotation convention)
     const rightDir = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw))
 
-    // Anchor point: mech center, slightly elevated
+    // Anchor point: target center, elevated by the active profile.
     const anchor = this.target.position.clone()
-    anchor.y += CAMERA.ANCHOR_UP
+    anchor.y += this.profile.anchorUp
 
     // Position camera behind the aim direction + shoulder offset
     const desiredPosition = anchor.clone()
       .sub(aimDir.clone().multiplyScalar(distance))
-      .add(rightDir.clone().multiplyScalar(this.SHOULDER_RIGHT))
-    desiredPosition.y += this.SHOULDER_UP
+      .add(rightDir.clone().multiplyScalar(this.profile.shoulderRight))
+    desiredPosition.y += this.profile.shoulderUp
 
     // Subtle speed-based positional lag: the camera eases toward the desired
     // spot, and the lag rate drops a little at speed so the rig trails the mech
@@ -143,7 +259,7 @@ export class CameraController {
     this.fovOffset *= Math.max(0, 1 - this.FOV_RETURN * deltaTime)
     if (Math.abs(this.fovOffset) < 0.01) this.fovOffset = 0
     const speedFov = CAMERA.SPEED_FOV_MAX * Math.min(1, speed / CAMERA.SPEED_FOV_REF_SPEED)
-    const desiredFov = this.BASE_FOV + this.fovOffset + speedFov
+    const desiredFov = this.profile.baseFov + this.fovOffset + speedFov
     if (Math.abs(this.camera.fov - desiredFov) > 0.01) {
       this.camera.fov = desiredFov
       this.camera.updateProjectionMatrix()
@@ -173,12 +289,12 @@ export class CameraController {
     const rightDir = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw))
 
     const anchor = this.target.position.clone()
-    anchor.y += CAMERA.ANCHOR_UP
+    anchor.y += this.profile.anchorUp
 
     const desiredPosition = anchor.clone()
       .sub(aimDir.clone().multiplyScalar(distance))
-      .add(rightDir.clone().multiplyScalar(this.SHOULDER_RIGHT))
-    desiredPosition.y += this.SHOULDER_UP
+      .add(rightDir.clone().multiplyScalar(this.profile.shoulderRight))
+    desiredPosition.y += this.profile.shoulderUp
     desiredPosition.y -= this.dipOffset
 
     if (this.smoothedPosition) {
@@ -189,7 +305,8 @@ export class CameraController {
   }
 
   triggerShake(intensity: number) {
-    this.shakeIntensity = Math.max(this.shakeIntensity, intensity)
+    // Profile shake scale heavily damps on-foot shake — a person has no weight.
+    this.shakeIntensity = Math.max(this.shakeIntensity, intensity * this.profile.shakeScale)
   }
 
   /** Punch the FOV outward (dash juice); eased back to base in update(). */
@@ -200,7 +317,8 @@ export class CameraController {
 
   /** Punch the camera downward (footfall / landing weight); eased back in update(). */
   triggerDip(amount: number) {
-    this.dipOffset = Math.min(2.0, this.dipOffset + amount)
+    // Damped by the active profile so on-foot footfalls barely register.
+    this.dipOffset = Math.min(2.0, this.dipOffset + amount * this.profile.shakeScale)
   }
 
   /**
@@ -230,10 +348,10 @@ export class CameraController {
   }
 
   zoomIn(amount: number) {
-    this.currentDistance = Math.max(this.MIN_DISTANCE, this.currentDistance - amount)
+    this.currentDistance = Math.max(this.profile.minDistance, this.currentDistance - amount)
   }
 
   zoomOut(amount: number) {
-    this.currentDistance = Math.min(this.MAX_DISTANCE, this.currentDistance + amount)
+    this.currentDistance = Math.min(this.profile.maxDistance, this.currentDistance + amount)
   }
 }

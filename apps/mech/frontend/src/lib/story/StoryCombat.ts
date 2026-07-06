@@ -395,18 +395,30 @@ export class StoryCombat {
     this.elapsed += deltaTime
 
     if (this.quest.type === 'hidden_object') {
-      this.updateHiddenObject(player)
+      this.updateHiddenObject(player.position)
       return
     }
 
     this.updateCombat(deltaTime, player, fire, battleTime)
   }
 
-  private updateHiddenObject(player: MechEntity): void {
+  /**
+   * Advance an on-foot Recovery search (design §4/§2.6). The dismounted pilot has
+   * no combat loop, so StoryWorld drives the hidden-object proximity/reveal/collect
+   * directly from the pilot's world position while on foot — decay-free (§4.2). A
+   * no-op for any non-hidden-object encounter (there is no on-foot combat, §6).
+   */
+  updateSearchAt(pos: THREE.Vector3, deltaTime: number): void {
+    if (this.quest?.type !== 'hidden_object') return
+    this.elapsed += deltaTime
+    this.updateHiddenObject(pos)
+  }
+
+  private updateHiddenObject(pos: THREE.Vector3): void {
     if (!this.hiddenObject || this.objectCollected) return
     const obj = this.hiddenObject
-    const dx = player.position.x - obj.position.x
-    const dz = player.position.z - obj.position.z
+    const dx = pos.x - obj.position.x
+    const dz = pos.z - obj.position.z
     const distSq = dx * dx + dz * dz
 
     // Reveal within 18 units; sparkle/grow when found.

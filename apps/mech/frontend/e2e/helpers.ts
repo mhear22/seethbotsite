@@ -21,7 +21,12 @@ const BENIGN_ERROR_PATTERNS: RegExp[] = [
   // Network calls to the (absent) game backend — Story Mode is client-only but
   // some shared modules may probe /api or /ws; those are not playtest failures.
   /Failed to load resource.*\/(api|ws)\b/i,
+  /\/(api|ws)\b/i,
   /net::ERR_CONNECTION_REFUSED/i,
+  // Intentional once-per-session GLB availability probe: no .glb models ship by
+  // default (MechModelLoader.probeModels), so the HEAD request 404s BY DESIGN and
+  // the loader falls back to procedural meshes. Not a playtest failure.
+  /\.glb(\?|$)/i,
   /the server responded with a status of 50\d/i,
   /WebSocket connection to .* failed/i,
   // Vue Router hydration/no-match warnings are warnings, not errors, but guard anyway.
@@ -46,7 +51,11 @@ export function watchConsole(page: Page): ConsoleWatcher {
   page.on('console', (msg: ConsoleMessage) => {
     if (msg.type() !== 'error') return
     const text = msg.text()
-    if (isBenign(text)) return
+    // Resource-load failures (404s, refused connections) carry a GENERIC text
+    // ("Failed to load resource: ...") and put the offending URL in location().
+    // Classify against text AND url so the url-scoped benign patterns can match.
+    const url = msg.location()?.url ?? ''
+    if (isBenign(text) || (url && isBenign(url))) return
     watcher.errors.push(text)
   })
 

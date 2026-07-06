@@ -23,6 +23,8 @@
  */
 
 import type { DialogueTree } from './dialogue'
+import type { Chapter } from '../../composables/useStoryMode'
+import { ROOKER_KESTREL_LINE } from './campaign'
 
 // Flags the trees set (documented so SYSTEMS/finale/tribunal can read them):
 export const STORY_FLAGS = {
@@ -565,6 +567,211 @@ export const rookerTree: DialogueTree = {
 }
 
 // ============================================================================
+// Commons NPC ambient trees (§4.4 / §4.5) — the townsfolk on foot
+// ============================================================================
+
+/**
+ * Below this condition a settlement reads as gutted, and the commons NPCs speak
+ * their hardship variant instead of their ambient line (§4.5). SYSTEMS knows the
+ * live condition; the UI passes `commonsEntryFor(condition)` as DialogueView's
+ * `startId` so the reactive line opens the conversation. The hardship node is ALSO
+ * reachable from the normal greet by a "how are things?" choice, so it is never an
+ * orphan (the integrity walker requires every node reachable from `entry`).
+ */
+export const COMMONS_RUINED_THRESHOLD = 40
+
+/**
+ * The node a commons conversation should OPEN on for a given town condition. On a
+ * gutted town (< threshold) it opens on the NPC's `hard` line; otherwise on the
+ * tree's normal entry. Wire-ready: `<DialogueView :start-id="commonsEntryFor(cond)">`.
+ * `hard` is a stable node id present in every commons tree.
+ */
+export function commonsEntryFor(condition: number): string {
+  return condition < COMMONS_RUINED_THRESHOLD ? 'hard' : 'greet'
+}
+
+const commonsWardensRestTree: DialogueTree = {
+  entry: 'greet',
+  nodes: {
+    greet: {
+      id: 'greet',
+      speaker: 'Pvt. Neve',
+      text: "You're the pilot. Sarge said don't gawp, but — that Frame's the biggest thing I've ever stood next to, and it's on our side. It is on our side. Right?",
+      choices: [
+        { text: "It's on your side, private.", next: 'neve' },
+        { text: 'Who keeps the barracks?', next: 'odalys' },
+        { text: 'Stay sharp.', effects: { action: 'end' } },
+      ],
+    },
+    neve: {
+      id: 'neve',
+      speaker: 'Pvt. Neve',
+      text: "Good. 'Cause when you walk it through the square, everyone goes quiet. Even the dogs. I tell myself that's respect, and not the other thing.",
+      choices: [
+        { text: "It's respect.", effects: { action: 'end' } },
+        { text: 'Keep your head down.', effects: { action: 'end' } },
+      ],
+    },
+    odalys: {
+      id: 'odalys',
+      speaker: 'Odalys',
+      text: 'Two hundred names on my wire and I know every one. Keep that machine off the barracks roof and I keep them fed. The deal nobody bothered to write down.',
+      choices: [
+        { text: "How's the wire holding?", next: 'hard' },
+        { text: 'Deal.', effects: { action: 'end' } },
+      ],
+    },
+    hard: {
+      id: 'hard',
+      speaker: 'Odalys',
+      text: "Half my wire's gone quiet this month. Some ran. Some didn't get the chance to. Every time the Frame fights close, I lose another name off the list. I'm not blaming you, pilot. I'm just counting.",
+      choices: [
+        { text: "I'll keep it clear of the barracks.", effects: { action: 'end' } },
+        { text: "I'm sorry.", effects: { action: 'end' } },
+      ],
+    },
+  },
+}
+
+const commonsSumpTree: DialogueTree = {
+  entry: 'greet',
+  nodes: {
+    greet: {
+      id: 'greet',
+      speaker: 'Ludo',
+      text: "You're taller than the last pilot. Pit got him — not the machine, the pit. Everything here gets et by the pit eventually. Want the fast way to the drifts? I know all of 'em.",
+      choices: [
+        { text: "You shouldn't be down the drifts, kid.", next: 'chide' },
+        { text: 'Rough town to be small in.', next: 'hard' },
+        { text: 'Not now, Ludo.', effects: { action: 'end' } },
+      ],
+    },
+    chide: {
+      id: 'chide',
+      speaker: 'Ludo',
+      text: "Somebody's gotta run the messages, and I'm small and I'm fast. Korr says I'm worth three grown diggers 'cause I fit where they don't. I'll take that.",
+      choices: [{ text: 'Stay out of the deep ones.', effects: { action: 'end' } }],
+    },
+    hard: {
+      id: 'hard',
+      speaker: 'Ludo',
+      text: "It's a pit that eats people, mister. Was that before you came, it's that now. Only difference is now the ground shakes when your machine walks, and I gotta guess if it's you or a cave-in. Kinda wish it'd just be the one thing.",
+      choices: [
+        { text: "I'll walk it lighter.", effects: { action: 'end' } },
+        { text: 'Stay safe down there.', effects: { action: 'end' } },
+      ],
+    },
+  },
+}
+
+const commonsKilnTree: DialogueTree = {
+  entry: 'greet',
+  nodes: {
+    greet: {
+      id: 'greet',
+      speaker: 'Marn',
+      text: "Voss says be polite. So. Hello. Don't touch the pour, don't stand the machine near the ledgers. That's the whole tour.",
+      choices: [
+        { text: 'You always this warm, Marn?', next: 'talk' },
+        { text: "How's the Kiln, really?", next: 'hard' },
+        { text: 'Understood.', effects: { action: 'end' } },
+      ],
+    },
+    talk: {
+      id: 'talk',
+      speaker: 'Marn',
+      text: "I talk when it's worth the breath. Job was clean, furnace still burns, Voss still pays. Nothing worth the breath. That's a compliment, pilot.",
+      choices: [{ text: "I'll take it.", effects: { action: 'end' } }],
+    },
+    hard: {
+      id: 'hard',
+      speaker: 'Marn',
+      text: "Furnace is limping. Every wall the machine cracks, Voss docks from wages — and guess who tells a man his pay went to fix your footprints. Me. So. Fewer walls.",
+      choices: [
+        { text: 'Fewer walls. Noted.', effects: { action: 'end' } },
+        { text: 'Not my intent.', effects: { action: 'end' } },
+      ],
+    },
+  },
+}
+
+const commonsLongwaterTree: DialogueTree = {
+  entry: 'greet',
+  nodes: {
+    greet: {
+      id: 'greet',
+      speaker: 'Tobias',
+      text: "Mother says you're providence. I keep the pumps running, so I'll say you're a pilot with good aim and hope that's enough. Don't tell her I put it that way.",
+      choices: [
+        { text: "You don't buy the scripture?", next: 'doubt' },
+        { text: 'How are the domes holding?', next: 'hard' },
+        { text: "Your secret's safe.", effects: { action: 'end' } },
+      ],
+    },
+    doubt: {
+      id: 'doubt',
+      speaker: 'Tobias',
+      text: "I buy the water. Water's real. The rest I run on faith and spare parts, same as the pumps. Keep the raiders off and I'll keep believing in valves. Fair trade.",
+      choices: [{ text: 'Fair trade.', effects: { action: 'end' } }],
+    },
+    hard: {
+      id: 'hard',
+      speaker: 'Tobias',
+      text: "Two domes cracked, green's browning at the edges. Mother calls it a test. I call it pressure loss I can't patch fast enough. Every time the ground shakes I hold my breath and watch the glass. Hold yours too, next time you fight near us.",
+      choices: [
+        { text: "I'll fight clear of the domes.", effects: { action: 'end' } },
+        { text: 'Understood.', effects: { action: 'end' } },
+      ],
+    },
+  },
+}
+
+const commonsHalberdTree: DialogueTree = {
+  entry: 'greet',
+  nodes: {
+    greet: {
+      id: 'greet',
+      speaker: 'Sett',
+      text: "Don't listen to my father — he'll tell you Halberd's dead. It's not dead, it's stubborn. Same as me. Get that line running and I'll prove it to both of you.",
+      choices: [
+        { text: 'Why stay, if it\'s this hard?', next: 'stay' },
+        { text: 'How bad is it, honestly?', next: 'hard' },
+        { text: 'Keep the lights on.', effects: { action: 'end' } },
+      ],
+    },
+    stay: {
+      id: 'stay',
+      speaker: 'Sett',
+      text: "Because somebody has to be here when the trains come back. And they are coming back. You don't leave a station dark just because the timetable's late. That's not stubbornness. That's a schedule.",
+      choices: [{ text: "Then I'll get you a train.", effects: { action: 'end' } }],
+    },
+    hard: {
+      id: 'hard',
+      speaker: 'Sett',
+      text: "Honestly? One generator, and it coughs every time your Frame throws its weight around near the tower. If it dies, the lights die, and Dad's finally right about us. Don't make my father right, pilot. That's all I ask.",
+      choices: [
+        { text: "I won't. The lights stay on.", effects: { action: 'end' } },
+        { text: 'Understood.', effects: { action: 'end' } },
+      ],
+    },
+  },
+}
+
+/** All five commons ambient trees, keyed by town id (parallels WARDEN_TREES). */
+export const COMMONS_TREES: Record<string, DialogueTree> = {
+  'town-0': commonsWardensRestTree,
+  'town-1': commonsSumpTree,
+  'town-2': commonsKilnTree,
+  'town-3': commonsLongwaterTree,
+  'town-4': commonsHalberdTree,
+}
+
+/** The commons ambient tree for a given town id (null if none). */
+export function commonsTreeForTown(townId: string): DialogueTree | null {
+  return COMMONS_TREES[townId] ?? null
+}
+
+// ============================================================================
 // Registry — every authored tree, for the integrator to mount
 // ============================================================================
 
@@ -584,9 +791,108 @@ export const ALL_DIALOGUE_TREES: Record<string, DialogueTree> = {
   'vaun:sanction': vaunSanctionTree,
   'kestrel:confrontation': kestrelConfrontationTree,
   'rooker:garage': rookerTree,
+  'commons:town-0': commonsWardensRestTree,
+  'commons:town-1': commonsSumpTree,
+  'commons:town-2': commonsKilnTree,
+  'commons:town-3': commonsLongwaterTree,
+  'commons:town-4': commonsHalberdTree,
 }
 
 /** The warden tree for a given town id (null if none). */
 export function wardenTreeForTown(townId: string): DialogueTree | null {
   return WARDEN_TREES[townId] ?? null
+}
+
+// ============================================================================
+// Anchor metadata (§4.4 / §4.5) — pedestrian-scale building anchors -> dialogue
+// ============================================================================
+
+/**
+ * The interactable building anchors on a town's main street (§4.4). Each is an
+ * E-prompt the pilot walks up to on foot. `gate` is the parked Frame / mount
+ * point — it opens NO dialogue (its interaction is remount, handled by the host).
+ */
+export type AnchorKind = 'gate' | 'garage' | 'comms' | 'warden' | 'commons'
+
+/** Static, wire-ready metadata for one anchor kind (labels + how its tree resolves). */
+export interface AnchorSpec {
+  /** E-prompt verb the HUD shows ("talk to", "enter", "read"). */
+  verb: string
+  /** Short anchor label for the prompt ("Rooker's garage", "the comms post"). */
+  label: string
+  /**
+   * Fixed tree id, or null when the tree depends on run context (per-town warden /
+   * commons, per-act comms) and must be resolved via `dialogueForAnchor`, or when
+   * the anchor opens no dialogue at all (the gate). `perContext` disambiguates.
+   */
+  tree: string | null
+  /** True when the tree id is resolved per town/act by `dialogueForAnchor`. */
+  perContext: boolean
+  /** True when the anchor opens the Garage UI rather than a plain dialogue tree. */
+  opensGarage?: boolean
+}
+
+/**
+ * ANCHOR_DIALOGUE — the anchor -> dialogue mapping the integrator wires into the
+ * on-foot hub (§4.5). Static labels/verbs live here; the actual tree id for the
+ * context-dependent anchors comes from `dialogueForAnchor(anchor, ctx)`:
+ *   - gate    -> no dialogue (remount point)
+ *   - garage  -> `rooker:garage` (opens the Garage UI; surfaces the §4.2 mirror
+ *                line when `saw-kestrel-clean` is set — see rookerKestrelToast)
+ *   - comms   -> Vaun by act: arrival (I) / escalation (II) / sanction (III)
+ *   - warden  -> the town's warden tree (`warden:town-N`) — quest acceptance
+ *   - commons -> the town's ambient NPC tree (`commons:town-N`)
+ */
+export const ANCHOR_DIALOGUE: Record<AnchorKind, AnchorSpec> = {
+  gate: { verb: 'mount', label: 'your Frame', tree: null, perContext: false },
+  garage: { verb: 'enter', label: "Rooker's garage", tree: 'rooker:garage', perContext: false, opensGarage: true },
+  comms: { verb: 'open', label: 'the comms post', tree: null, perContext: true },
+  warden: { verb: 'talk to', label: "the warden's office", tree: null, perContext: true },
+  commons: { verb: 'talk to', label: 'the commons', tree: null, perContext: true },
+}
+
+/** Run context needed to resolve a per-context anchor's tree id. */
+export interface AnchorContext {
+  /** The town the anchor belongs to (for warden / commons). */
+  townId: string
+  /** Narrative act (for the comms post's Vaun tree). */
+  chapter: Chapter
+}
+
+/** Vaun's comms tree for the current act (§2.5): arrival / escalation / sanction. */
+function vaunTreeIdForChapter(chapter: Chapter): string {
+  switch (chapter) {
+    case 'act1': return 'vaun:arrival'
+    case 'act2': return 'vaun:escalation'
+    case 'act3': return 'vaun:sanction'
+  }
+}
+
+/**
+ * Resolve the dialogue tree id an anchor opens for the given run context. Returns
+ * null for the gate (no dialogue). The returned id is always a key of
+ * ALL_DIALOGUE_TREES (guarded by tests), so the UI can mount it directly.
+ */
+export function dialogueForAnchor(anchor: AnchorKind, ctx: AnchorContext): string | null {
+  switch (anchor) {
+    case 'gate': return null
+    case 'garage': return 'rooker:garage'
+    case 'comms': return vaunTreeIdForChapter(ctx.chapter)
+    case 'warden': return `warden:${ctx.townId}`
+    case 'commons': return `commons:${ctx.townId}`
+  }
+}
+
+/**
+ * The §4.2 mirror-reveal surfacing at the garage. When the pilot has NOTICED
+ * Kestrel's clean towns (`saw-kestrel-clean`) but Rooker has not yet named the
+ * trick (`rooker-named-trick`), a garage visit is the moment Rooker says it out
+ * loud. Returns ROOKER_KESTREL_LINE for the host to surface as a proactive comms
+ * toast on entry (the interactive branch also lives in `rooker:garage`). Returns
+ * null once the trick is named or before the player has noticed. Pure over flags.
+ */
+export function rookerKestrelToast(flags: readonly string[]): string | null {
+  const noticed = flags.includes(STORY_FLAGS.SAW_KESTREL_CLEAN)
+  const named = flags.includes(STORY_FLAGS.ROOKER_NAMED_TRICK)
+  return noticed && !named ? ROOKER_KESTREL_LINE : null
 }

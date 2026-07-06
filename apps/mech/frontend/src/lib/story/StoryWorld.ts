@@ -6,20 +6,58 @@ import { PhysicsSystem } from '../battle/PhysicsSystem'
 import { InputManager } from '../battle/InputManager'
 import { ProjectileSystem } from '../battle/ProjectileSystem'
 import { ParticleSystem } from '../battle/ParticleSystem'
-import { Town } from './Town'
+import { Town, type AnchorKind, type NPCRole } from './Town'
 import { Terrain } from './Terrain'
 import { StoryCombat, type EnemyKill } from './StoryCombat'
+import { OnFootEntity } from './OnFootEntity'
+import { OnFootPhysics } from './OnFootPhysics'
+import type { InputState } from '../battle/InputManager'
 import type { QuestDef } from './quests'
 import type { MechLoadout } from '../../composables/useMechBuilder'
 import type { MechSlot } from '../../shared/types/MechTypes'
 import type { GraphicsSettings } from '../../composables/useGameSettings'
-import type { TownState } from '../../composables/useStoryMode'
+import type { TownState, PilotMode } from '../../composables/useStoryMode'
 import { TOWN_DECAY_RADIUS, WORLD_HALF_EXTENT } from '../../composables/useStoryMode'
 import { terrainHeight, type TerrainParams } from './TerrainNoise'
 import { createOverworldSkyMaterial, updateOverworldSky, SUN_DIRECTION } from './OverworldSky'
 
 /** XZ distance within which the E-key opens a town's quest-giver dialogue. */
 export const QUEST_GIVER_RADIUS = 14
+
+// --- On-foot pedestrian constants (design §4.3/§4.4) ---
+/** Pedestrian "town bounds": beyond this the pilot is nudged to head back. */
+export const ON_FOOT_TOWN_RADIUS = 45
+/** Hard leash — the pilot is clamped inside 1.5× the town radius (§4.3). */
+export const ON_FOOT_HARD_LIMIT = ON_FOOT_TOWN_RADIUS * 1.5
+/** XZ radius for the on-foot "talk to {NPC}" E-prompt. */
+export const NPC_INTERACT_RADIUS = 4.5
+/** XZ radius for the on-foot "enter {anchor}" E-prompt (garage/comms/warden). */
+export const ANCHOR_INTERACT_RADIUS = 6
+/**
+ * How far in front of the parked Frame the pilot spawns on dismount (§4.1). Far
+ * enough to clear the Frame's leg/torso geometry and frame the towering machine
+ * behind the pilot, but well inside the 8u remount radius.
+ */
+export const DISMOUNT_SPAWN_OFFSET = 4.5
+/**
+ * Generous grace after hostiles appear while on foot before the pilot is force-
+ * remounted (design §4.3 combat interlock: the answer is remount, not fight).
+ */
+export const ON_FOOT_HOSTILE_GRACE_SEC = 12
+
+/** On-foot slice of the per-frame info (null while in the mech). */
+export interface OnFootFrameInfo {
+  /** Town the pilot is dismounted inside. */
+  townId: string
+  /** Nearest interactable NPC within {@link NPC_INTERACT_RADIUS}, or null. */
+  nearestNPC: { id: string; name: string; role: NPCRole; anchor: AnchorKind; distance: number } | null
+  /** Nearest anchor within {@link ANCHOR_INTERACT_RADIUS}, or null. */
+  nearestAnchor: { kind: AnchorKind; label: string; distance: number } | null
+  /** True once the pilot walks past the town bounds (show a "head back" nudge). */
+  outOfBounds: boolean
+  /** Seconds until forced remount when hostiles appeared on foot, else null. */
+  remountSecondsLeft: number | null
+}
 
 export interface StoryWorldConfig {
   canvas: HTMLCanvasElement
@@ -49,9 +87,22 @@ export interface StoryWorldConfig {
    * Phase 2 only surfaces this; Phase 3 routes it into a town-condition decrement.
    */
   onCollateral?: (amount: number, position: THREE.Vector3) => void
+  /**
+   * Fired whenever the body mode flips (dismount/mount/restore). The host routes
+   * this into `useStoryMode.setPilotMode(mode, { townId, mechPark })` so the decay
+   * pause (§4.2) and the save/load round-trip share one source of truth.
+   */
+  onModeChange?: (mode: PilotMode, ctx: { townId: string | null; mechPark: [number, number, number] | null }) => void
 }
 
 export interface StoryFrameInfo {
+  /** Which body the player currently inhabits (design §4). */
+  mode: PilotMode
+  /** On-foot details (nearest NPC/anchor, bounds, remount timer), null in mech. */
+  onFoot: OnFootFrameInfo | null
+  /** True when a dismount is currently allowed (in mech, inside a town, no combat,
+   *  seam wired) — the host shows the "Dismount" prompt off this. */
+  canDismount: boolean
   deltaTime: number
   playerPosition: THREE.Vector3
   nearestTownId: string | null
@@ -142,6 +193,28 @@ export class StoryWorld {
   /** Suspends decay/free-roam input while a dialogue/garage UI is open. */
   private paused: boolean = false
 
+  // --- On-foot / dismount state (design §4) ---
+  private onModeChange?: (mode: PilotMode, ctx: { townId: string | null; mechPark: [number, number, number] | null }) => void
+  /** Current body mode; the Frame is always kept in the scene (monument). */
+  private _mode: PilotMode = 'mech'
+  /** The dismounted pilot body (ENTITY cluster) while on foot, else null. */
+  private _onFootEntity: OnFootEntity | null = null
+  /** OnFootPhysics controller (constructed lazily, reused across dismounts). */
+  private _onFootPhysics: OnFootPhysics | null = null
+  /** Town the pilot dismounted inside (bounds + NPC/anchor queries key off it). */
+  private _dismountTown: Town | null = null
+  /** Where the Frame is parked while on foot (monument), world-space. */
+  private _mechPark: THREE.Vector3 | null = null
+  /** Nearest town + inside-id snapshot, refreshed each frame (dismount gating). */
+  private _nearestTown: Town | null = null
+  private _insideTownId: string | null = null
+  /**
+   * Seconds left before a forced remount after on-foot hostiles, or null. Counted
+   * down in updateOnFoot (which is skipped while paused), NOT against `elapsed` —
+   * so opening a hub panel during the grace window doesn't silently burn it (§4.3).
+   */
+  private _remountSecondsLeft: number | null = null
+
   private handleResizeBound: () => void
   private handleVisibilityBound: () => void
 
@@ -153,6 +226,7 @@ export class StoryWorld {
     this.onEnemyKilled = config.onEnemyKilled
     this.onReinforcement = config.onReinforcement
     this.onCollateral = config.onCollateral
+    this.onModeChange = config.onModeChange
 
     // --- Scene + renderer (mirrors BattleScene setup; honours graphics settings) ---
     const gfx = config.graphics
@@ -380,35 +454,43 @@ export class StoryWorld {
     this.camera.update(deltaTime, input.mouseX, input.mouseY)
     this.inputManager.resetMouseMovement()
 
-    // Player movement (dash / move / jump) — same systems as battle.
-    const dashStarted = this.physicsSystem.updateDash(this.playerMech, input, deltaTime)
-    if (dashStarted) {
-      this.camera.triggerShake(0.25)
-      this.camera.triggerFovKick(10)
-    }
-    if (!this.playerMech.isDashing) {
-      this.physicsSystem.updateMovement(this.playerMech, input, deltaTime)
-    }
-    this.physicsSystem.updateJumpJets(this.playerMech, input, deltaTime)
-    this.playerMech.update(deltaTime)
-    this.playerMech.updatePower(deltaTime)
+    if (this._mode === 'onFoot') {
+      // On foot (design §4): no dash/jump/rack/weapons — just a slow walk resolved
+      // against the town's colliders. The Frame stays parked as a monument.
+      this.updateOnFoot(input, deltaTime)
+    } else {
+      // Player movement (dash / move / jump) — same systems as battle.
+      const dashStarted = this.physicsSystem.updateDash(this.playerMech, input, deltaTime)
+      if (dashStarted) {
+        this.camera.triggerShake(0.25)
+        this.camera.triggerFovKick(10)
+      }
+      if (!this.playerMech.isDashing) {
+        this.physicsSystem.updateMovement(this.playerMech, input, deltaTime)
+      }
+      this.physicsSystem.updateJumpJets(this.playerMech, input, deltaTime)
+      this.playerMech.update(deltaTime)
+      this.playerMech.updatePower(deltaTime)
 
-    // Rack ability (smoke / shield / jump-jets / repair) — mirrors BattleScene so
-    // the finished rack abilities (design §3.4) are reachable in story combat too.
-    // Bound to Q and edge-triggered so holding boost (E) never auto-dumps it.
-    this.playerMech.rackAbilityCooldown = Math.max(0, this.playerMech.rackAbilityCooldown - deltaTime)
-    if (input.useRackAbility && !this.rackAbilityHeld) {
-      this.playerMech.useRackAbility()
+      // Rack ability (smoke / shield / jump-jets / repair) — mirrors BattleScene so
+      // the finished rack abilities (design §3.4) are reachable in story combat too.
+      // Bound to Q and edge-triggered so holding boost (E) never auto-dumps it.
+      this.playerMech.rackAbilityCooldown = Math.max(0, this.playerMech.rackAbilityCooldown - deltaTime)
+      if (input.useRackAbility && !this.rackAbilityHeld) {
+        this.playerMech.useRackAbility()
+      }
+      this.rackAbilityHeld = input.useRackAbility
     }
-    this.rackAbilityHeld = input.useRackAbility
 
-    // Re-anchor the camera to the mech's new position this frame so the view
-    // tracks the mech as it moves (movement above shifts playerMech.position).
+    // Re-anchor the camera to the active entity's new position this frame so the
+    // view tracks it as it moves (movement above shifts the entity position).
     this.camera.reanchor()
 
     // --- Active encounter combat (firing, AI, projectiles, VFX) ---
+    // Never runs on foot: the interlock blocks dismount during combat, and any
+    // hostiles that appear on foot force a remount rather than an on-foot fight.
     this.particleSystem.update(deltaTime)
-    if (this.combat.active) {
+    if (this._mode === 'mech' && this.combat.active) {
       this.combat.update(
         deltaTime,
         this.playerMech,
@@ -417,12 +499,14 @@ export class StoryWorld {
       )
     }
 
-    // Towns: animate markers + find the nearest one to the player.
+    // Towns: animate markers + find the nearest one to the ACTIVE body (mech or
+    // pilot), so all proximity readouts follow whoever the camera is on.
+    const activePos = this.activePosition()
     let nearest: Town | null = null
     let nearestDistSq = Infinity
     for (const town of this.towns) {
       town.update(this.elapsed)
-      const dSq = town.distanceSqTo(this.playerMech.position)
+      const dSq = town.distanceSqTo(activePos)
       if (dSq < nearestDistSq) {
         nearestDistSq = dSq
         nearest = town
@@ -431,13 +515,19 @@ export class StoryWorld {
 
     const insideRadius = nearest !== null && nearestDistSq <= TOWN_DECAY_RADIUS * TOWN_DECAY_RADIUS
     const questGiverInRange = nearest !== null && nearestDistSq <= QUEST_GIVER_RADIUS * QUEST_GIVER_RADIUS
+    // Snapshot for dismount gating (dismount() reads these on the host's keypress).
+    this._nearestTown = nearest
+    this._insideTownId = insideRadius ? nearest!.id : null
 
     const prog = this.combat.active ? this.combat.getProgress() : null
     const activeQuest = this.combat.activeQuest
 
     this.onFrame?.({
       deltaTime,
-      playerPosition: this.playerMech.position,
+      mode: this._mode,
+      onFoot: this._mode === 'onFoot' ? this.buildOnFootInfo(activePos) : null,
+      canDismount: this.canDismount(),
+      playerPosition: activePos,
       nearestTownId: nearest?.id ?? null,
       nearestTownName: nearest?.name ?? null,
       nearestTownDistance: nearest ? Math.sqrt(nearestDistSq) : Infinity,
@@ -452,6 +542,84 @@ export class StoryWorld {
         collected: prog.collected,
       } : null,
     })
+  }
+
+  /** World-space position of the body the camera is currently on. */
+  private activePosition(): THREE.Vector3 {
+    return this._mode === 'onFoot' && this._onFootEntity
+      ? this._onFootEntity.position
+      : this._playerMech.position
+  }
+
+  /**
+   * Advance the dismounted pilot for one frame (design §4.3). Delegates the walk +
+   * collider resolution to the injected OnFootController, then enforces the town
+   * leash: past the town radius the pilot is nudged (frame-info flag), and at the
+   * hard limit (1.5× radius) they are clamped back so they can never wander the
+   * open wilderness on foot. A forced-remount deadline (on-foot hostiles) is also
+   * ticked here and auto-mounts on expiry — the answer to danger on foot is to get
+   * back in the machine, never to fight (design §6: no on-foot combat).
+   */
+  private updateOnFoot(input: InputState, deltaTime: number): void {
+    const entity = this._onFootEntity
+    const physics = this._onFootPhysics
+    const town = this._dismountTown
+    if (!entity || !physics || !town) return
+
+    // OnFootPhysics reads the town colliders + terrain (set on dismount) and the
+    // body's yaw (the camera wrote entity.rotation.y this frame), so movement is
+    // camera-relative just like the mech. No dash/jump/rack/weapons on foot.
+    physics.updateMovement(entity, input, deltaTime)
+    entity.update(deltaTime)
+
+    // On-foot Recovery (§2.6): a dismounted search has no combat loop, so drive
+    // the hidden-object reveal/collect directly from the pilot's position. Combat
+    // encounters never run on foot (the interlock forces a remount instead).
+    if (this.combat.active && this.combat.activeQuest?.type === 'hidden_object') {
+      this.combat.updateSearchAt(entity.position, deltaTime)
+    }
+
+    // Town leash (design §4.3): clamp inside the hard limit around the town centre.
+    const dx = entity.position.x - town.position.x
+    const dz = entity.position.z - town.position.z
+    const dist = Math.sqrt(dx * dx + dz * dz)
+    if (dist > ON_FOOT_HARD_LIMIT && dist > 0) {
+      const s = ON_FOOT_HARD_LIMIT / dist
+      entity.position.x = town.position.x + dx * s
+      entity.position.z = town.position.z + dz * s
+      entity.position.y = this.terrain.heightAt(entity.position.x, entity.position.z)
+    }
+
+    // Forced-remount countdown after on-foot hostiles: auto-mount on expiry. Ticks
+    // by dt here (not off `elapsed`) so a paused hub panel freezes the timer too.
+    if (this._remountSecondsLeft !== null) {
+      this._remountSecondsLeft -= deltaTime
+      if (this._remountSecondsLeft <= 0) {
+        this.mount()
+      }
+    }
+  }
+
+  /** Assemble the on-foot slice of frame info (NPC/anchor prompts + leash state). */
+  private buildOnFootInfo(pos: THREE.Vector3): OnFootFrameInfo {
+    const town = this._dismountTown
+    if (!town) {
+      return { townId: '', nearestNPC: null, nearestAnchor: null, outOfBounds: false, remountSecondsLeft: null }
+    }
+    const npc = town.nearestNPC(pos, NPC_INTERACT_RADIUS)
+    const anchor = town.nearestAnchor(pos, ANCHOR_INTERACT_RADIUS)
+    const dx = pos.x - town.position.x
+    const dz = pos.z - town.position.z
+    const dist = Math.sqrt(dx * dx + dz * dz)
+    const npcDist = npc ? Math.hypot(pos.x - npc.position.x, pos.z - npc.position.z) : 0
+    const anchorDist = anchor ? Math.hypot(pos.x - anchor.position.x, pos.z - anchor.position.z) : 0
+    return {
+      townId: town.id,
+      nearestNPC: npc ? { id: npc.id, name: npc.name, role: npc.role, anchor: npc.anchor, distance: npcDist } : null,
+      nearestAnchor: anchor ? { kind: anchor.kind, label: anchor.label, distance: anchorDist } : null,
+      outOfBounds: dist > ON_FOOT_TOWN_RADIUS,
+      remountSecondsLeft: this._remountSecondsLeft !== null ? Math.max(0, this._remountSecondsLeft) : null,
+    }
   }
 
   /** World-space aim direction from the camera's yaw/pitch (matches BattleScene). */
@@ -545,12 +713,192 @@ export class StoryWorld {
 
   /**
    * Begin the given quest's in-world encounter anchored at its town. Returns
-   * false if a town isn't found or an encounter is already active.
+   * false if a town isn't found or an encounter is already active. Combat quests
+   * (Hold/Sanction) are refused on foot (the combat interlock — you must be in the
+   * Frame to fight, §4.3/§6); an on-foot Recovery (`hidden_object`) IS allowed
+   * while dismounted — it is a decay-free walking search (§2.6/§4.2), driven from
+   * the pilot's position each frame (see updateOnFoot).
    */
   startQuest(quest: QuestDef, townId: string): boolean {
+    if (this._mode === 'onFoot' && quest.type !== 'hidden_object') return false
     const town = this.getTown(townId)
     if (!town) return false
     return this.combat.start(quest, town.position)
+  }
+
+  // --- On-foot / dismount (design §4) ---
+
+  /** Current body mode. */
+  getMode(): PilotMode {
+    return this._mode
+  }
+
+  isOnFoot(): boolean {
+    return this._mode === 'onFoot'
+  }
+
+  /** Where the Frame is parked (monument) while on foot, or null in the mech. */
+  getMechParkPosition(): THREE.Vector3 | null {
+    return this._mechPark ? this._mechPark.clone() : null
+  }
+
+  /**
+   * Whether a dismount is currently allowed: in the mech, no encounter is running
+   * (the combat interlock), and the active body is inside a town's decay radius
+   * (design §4.1 — `insideTownId` is the ready trigger).
+   */
+  canDismount(): boolean {
+    return this._mode === 'mech' && !this.combat.active && this._insideTownId !== null
+  }
+
+  /**
+   * Build (once) and configure the OnFootPhysics for the given town: point it at
+   * the town's pedestrian colliders + the terrain heightfield, and route its
+   * footsteps into the same camera dip/shake the mech uses (scaled down inside
+   * OnFootPhysics). Reused across dismounts — only the collider set changes.
+   */
+  private prepareOnFootPhysics(town: Town): OnFootPhysics {
+    if (!this._onFootPhysics) {
+      this._onFootPhysics = new OnFootPhysics()
+      this._onFootPhysics.setGroundHeightProvider((x, z) => this.terrain.heightAt(x, z))
+      this._onFootPhysics.onFootstep = (intensity) => this.camera.onFootstep(intensity)
+    }
+    this._onFootPhysics.setColliders(town.getPedestrianColliders())
+    return this._onFootPhysics
+  }
+
+  /**
+   * Spawn the pilot body at `spawn` facing `yaw`, add it to the scene, repoint the
+   * camera onto it and play the ~0.8s god→person drop (design §4.1). Shared by
+   * dismount() and restoreOnFoot().
+   */
+  private spawnPilot(spawn: THREE.Vector3, yaw: number, town: Town): void {
+    const pilot = new OnFootEntity(spawn)
+    pilot.rotation.y = yaw
+    pilot.mesh.rotation.y = yaw
+    this._onFootEntity = pilot
+    this.prepareOnFootPhysics(town)
+    this.scene.add(pilot.mesh)
+
+    // Pointer-swap the rig onto the pilot, then fall from the cockpit view to the
+    // human eye view. CameraController.target is PilotableEntity — no cast needed.
+    // The drop lands (§4.1) with a small boots-hit-dirt dust puff + a soft thud
+    // (a gentle shake, further scaled down by the onFoot profile's 0.25 shakeScale)
+    // as the done callback fires at the end of the ~0.8s fall. restoreOnFoot()
+    // cancels the transition (setProfile) so a load lands silently, not with a puff.
+    this.camera.setTarget(pilot)
+    this.camera.mouseRotation.x = yaw
+    const feet = spawn.clone()
+    this.camera.playDismountTransition('mech', 'onFoot', () => {
+      this.particleSystem.spawnImpactSparks(feet, new THREE.Vector3(0, 1, 0), 'floor')
+      this.camera.triggerShake(0.4)
+    })
+
+    this._mode = 'onFoot'
+    this._dismountTown = town
+    this._remountSecondsLeft = null
+  }
+
+  /**
+   * Drop out of the cockpit (design §4.1). Parks the Frame where it stands as a
+   * static monument (its mesh stays in the scene), spawns the pilot there, and
+   * repoints the camera + physics onto the on-foot body. Fires onModeChange so the
+   * host persists the mode + park position (which drives the §4.2 decay pause).
+   * Returns false — leaving everything untouched — if a dismount isn't allowed.
+   */
+  dismount(): boolean {
+    if (!this.canDismount()) return false
+    const town = this._nearestTown
+    if (!town) return false
+
+    // Park the Frame as a monument where you left it (§4.1). Its mesh is never
+    // removed from the scene, so it stays visible from anywhere in the town.
+    this._mechPark = this._playerMech.position.clone()
+
+    // Climb down a few metres out IN FRONT of the parked Frame, snapped to the
+    // ground, and turn the pilot BACK to face it (§4.1): the god→person drop must
+    // land looking UP at the towering machine — not out at empty street — and the
+    // human must not spawn clipped inside the un-collided Frame geometry. The 4.5u
+    // offset keeps the pilot well inside the 8u remount radius (canRemount stays
+    // immediately true), so stepping right back in is never blocked.
+    const yaw = this.camera.mouseRotation.x
+    const spawn = this._playerMech.position.clone()
+    spawn.x += Math.sin(yaw) * DISMOUNT_SPAWN_OFFSET
+    spawn.z += Math.cos(yaw) * DISMOUNT_SPAWN_OFFSET
+    spawn.y = this.terrain.heightAt(spawn.x, spawn.z)
+    this.spawnPilot(spawn, yaw + Math.PI, town)
+    this.emitModeChange()
+    return true
+  }
+
+  /**
+   * Climb back into the parked Frame (design §4.1). Disposes the pilot body,
+   * repoints the camera + physics back onto the mech (still parked where you left
+   * it), and plays the climb-up transition. Fires onModeChange so the host resumes
+   * decay. Returns false if already mounted.
+   */
+  mount(): boolean {
+    if (this._mode !== 'onFoot') return false
+
+    if (this._onFootEntity) {
+      this.scene.remove(this._onFootEntity.mesh)
+      this._onFootEntity.dispose()
+      this._onFootEntity = null
+    }
+
+    this.camera.setTarget(this._playerMech)
+    this.camera.mouseRotation.x = this._playerMech.rotation.y
+    this.camera.playDismountTransition('onFoot', 'mech') // the climb back up
+
+    this._mode = 'mech'
+    this._dismountTown = null
+    this._remountSecondsLeft = null
+    this.emitModeChange()
+    return true
+  }
+
+  /**
+   * Restore the on-foot body on load (design §4 persistence). The host, seeing a
+   * saved run with pilotMode==='onFoot', places the Frame at its saved park spot
+   * (setPlayerPosition) then calls this to re-enter the dismounted state WITHOUT
+   * the inside-town / combat gating dismount() enforces. No-op if the town id is
+   * unknown; returns whether it restored. Snaps the camera to the on-foot profile
+   * (no drop transition — the player is loading INTO the state, not falling into it).
+   */
+  restoreOnFoot(townId: string): boolean {
+    if (this._mode === 'onFoot') return true
+    const town = this.getTown(townId)
+    if (!town) return false
+
+    this._mechPark = this._playerMech.position.clone()
+    const spawn = this._playerMech.position.clone()
+    spawn.y = this.terrain.heightAt(spawn.x, spawn.z)
+    this.spawnPilot(spawn, this.camera.mouseRotation.x, town)
+    this.camera.setProfile('onFoot') // instant — cancels the drop the spawn queued
+    // No emitModeChange: we are restoring FROM the persisted state, so re-persisting
+    // would be redundant.
+    return true
+  }
+
+  /**
+   * Signal that hostiles have appeared while the player is on foot (design §4.3
+   * combat interlock). Starts the generous forced-remount countdown; the pilot is
+   * auto-mounted when it expires (see updateOnFoot). The host surfaces the timer
+   * via frame-info.onFoot.remountSecondsLeft. No-op in the mech.
+   */
+  signalHostileWhileOnFoot(): void {
+    if (this._mode !== 'onFoot') return
+    if (this._remountSecondsLeft === null) {
+      this._remountSecondsLeft = ON_FOOT_HOSTILE_GRACE_SEC
+    }
+  }
+
+  /** Route a mode flip to the host for persistence (setPilotMode). */
+  private emitModeChange(): void {
+    this.onModeChange?.(this._mode, {
+      townId: this._dismountTown?.id ?? null,
+      mechPark: this._mechPark ? [this._mechPark.x, this._mechPark.y, this._mechPark.z] : null,
+    })
   }
 
   /** Abandon the active encounter (e.g. on teardown / give-up). */
@@ -577,7 +925,9 @@ export class StoryWorld {
     const rebuilt = new MechEntity(this._playerMech.id, this._playerMech.name, loadout, stats, true, pos)
     rebuilt.rotation.y = yaw
     this._playerMech = rebuilt
-    this.camera.target = rebuilt
+    // Only repoint the camera at the mech when actually driving it — a garage
+    // equip happens on foot (design §4.5), where the camera must stay on the pilot.
+    if (this._mode === 'mech') this.camera.target = rebuilt
     this.wirePlayerHooks(rebuilt)
     this.scene.add(rebuilt.mesh)
   }
@@ -616,6 +966,11 @@ export class StoryWorld {
 
     this.terrain.dispose()
 
+    if (this._onFootEntity) {
+      this.scene.remove(this._onFootEntity.mesh)
+      this._onFootEntity.dispose()
+      this._onFootEntity = null
+    }
     this._playerMech.cleanup()
 
     // Dispose remaining scene geometry/materials (ground, sky, lights, grid).

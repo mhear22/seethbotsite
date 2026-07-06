@@ -19,7 +19,7 @@ test('story mode starts a run and renders the 3D world', async ({ page }, testIn
   await page.goto('story', { waitUntil: 'domcontentloaded' })
 
   // Intro screen.
-  await expect(page.getByRole('heading', { name: 'Story Mode' })).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('heading', { name: /talus reach/i })).toBeVisible({ timeout: 30_000 })
 
   const newRunBtn = page.getByRole('button', { name: /new run/i })
   await expect(newRunBtn).toBeVisible()
@@ -68,6 +68,92 @@ test('story mode starts a run and renders the 3D world', async ({ page }, testIn
     after.distinctColors,
     `story canvas blank after movement: ${JSON.stringify(after)}`,
   ).toBeGreaterThanOrEqual(3)
+
+  expect(watcher.crashes, `page crashes/exceptions:\n${watcher.crashes.join('\n')}`).toEqual([])
+  expect(watcher.errors, `severe console errors during play:\n${watcher.errors.join('\n')}`).toEqual([])
+})
+
+/**
+ * Phase 4 dismount loop smoke (design §4). Reaching a town on foot by dead-
+ * reckoning across the 600u overworld is too fragile for a headless smoke, so we
+ * exercise the on-foot ↔ Frame transition through the §4 persistence seam: a fresh
+ * New Run writes a valid save, we patch its additive on-foot fields to place the
+ * pilot dismounted beside the parked Frame at town-0, Continue restores the hub,
+ * then we walk and remount. This drives the real HUD swap, on-foot locomotion and
+ * mount() in the browser.
+ *
+ * Flow:
+ *  1. New Run (persists a valid v3 save).
+ *  2. Reload to the intro (no world loop -> safe to patch localStorage).
+ *  3. Patch the save: pilotMode='onFoot', at town-0, Frame parked at its centre.
+ *  4. Continue Run -> world restores the pilot on foot at the parked Frame.
+ *  5. Assert the on-foot controls hint, walk ~2s (out and back), remount with F.
+ *  6. Assert the hint flips back to the in-Frame verbs; no severe console errors.
+ */
+test('story mode: dismount hub restores, walks, and remounts the Frame (§4)', async ({ page }, testInfo) => {
+  const watcher = watchConsole(page)
+
+  // 1. Fresh New Run -> a valid save lands in localStorage.
+  await page.goto('story', { waitUntil: 'domcontentloaded' })
+  await expect(page.getByRole('heading', { name: /talus reach/i })).toBeVisible({ timeout: 30_000 })
+  await page.getByRole('button', { name: /new run/i }).click()
+  await expect(page.locator('canvas.story-canvas')).toBeVisible({ timeout: 30_000 })
+  await waitForCanvasRender(page, 'canvas.story-canvas', { timeout: 40_000, minDistinctColors: 3 })
+
+  // 2. Reload to the intro screen: with no StoryWorld loop running, patching the
+  //    save cannot race a decay/teardown autosave.
+  await page.goto('story', { waitUntil: 'domcontentloaded' })
+  await expect(page.getByRole('heading', { name: /talus reach/i })).toBeVisible({ timeout: 30_000 })
+
+  // 3. Patch the additive on-foot fields (§4 persistence). town-0's centre is
+  //    townSpawnPosition(0) = [330, 0, 0]; parking the Frame there spawns the pilot
+  //    beside it so the F-remount affordance is live immediately.
+  const patched = await page.evaluate(() => {
+    const KEY = 'mech-story-v1'
+    const raw = localStorage.getItem(KEY)
+    if (!raw) return false
+    const run = JSON.parse(raw)
+    run.pilotMode = 'onFoot'
+    run.onFootTownId = 'town-0'
+    run.mechPark = [330, 0, 0]
+    localStorage.setItem(KEY, JSON.stringify(run))
+    return true
+  })
+  expect(patched, 'New Run did not persist a save to patch').toBe(true)
+
+  // 4. Continue Run -> restoreOnFoot places the pilot on foot at the parked Frame.
+  const continueBtn = page.getByRole('button', { name: /continue run/i })
+  await expect(continueBtn).toBeVisible({ timeout: 30_000 })
+  await continueBtn.click()
+
+  const canvas = page.locator('canvas.story-canvas')
+  await expect(canvas).toBeVisible({ timeout: 30_000 })
+  await waitForCanvasRender(page, 'canvas.story-canvas', { timeout: 40_000, minDistinctColors: 3 })
+
+  // On foot: the controls hint switches to the pedestrian verbs (§4.1).
+  const hint = page.locator('.story-controls-hint')
+  await expect(hint).toContainText('F mount up', { timeout: 15_000 })
+
+  await page.screenshot({ path: 'e2e/screenshots/story-onfoot.png' })
+  await page.screenshot({ path: testInfo.outputPath('story-onfoot.png') })
+
+  // 5. Walk the decay-free hub (§4.2): out for ~1s, then back so the pilot returns
+  //    within the parked-Frame remount radius (~8u).
+  await canvas.click({ position: { x: 640, y: 360 } }).catch(() => {})
+  await page.keyboard.down('KeyW')
+  await page.waitForTimeout(1000)
+  await page.keyboard.up('KeyW')
+  await page.keyboard.down('KeyS')
+  await page.waitForTimeout(1100)
+  await page.keyboard.up('KeyS')
+  await page.waitForTimeout(400)
+
+  // 6. Remount the parked Frame (F) -> back in the cockpit; the hint flips back.
+  await page.keyboard.press('KeyF')
+  await expect(hint).toContainText('E dismount', { timeout: 15_000 })
+
+  await page.screenshot({ path: 'e2e/screenshots/story-remount.png' })
+  await page.screenshot({ path: testInfo.outputPath('story-remount.png') })
 
   expect(watcher.crashes, `page crashes/exceptions:\n${watcher.crashes.join('\n')}`).toEqual([])
   expect(watcher.errors, `severe console errors during play:\n${watcher.errors.join('\n')}`).toEqual([])

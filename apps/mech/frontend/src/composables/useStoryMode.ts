@@ -170,6 +170,13 @@ export type TownId = string
 export type StoryPhase = 'exploring' | 'finale' | 'ended'
 
 /**
+ * Which body the player currently inhabits (design §4). `'mech'` is the default
+ * driving mode; `'onFoot'` is the dismounted pilot. The keystone rule (§4.2):
+ * while on foot the town does not decay and combat collateral cannot land.
+ */
+export type PilotMode = 'mech' | 'onFoot'
+
+/**
  * Narrative act, layered on top of the (unchanged) phase machine — design §2.5.
  * Derived from phase + progress, never a fourth independent state:
  *   act1 (Deployment) = exploring & no quests done yet
@@ -252,6 +259,15 @@ export interface StoryRun {
   realElapsedSec: number
   /** Cumulative run stats for the credits report. */
   stats: RunStats
+
+  // --- On-foot / dismount state (design §4). Additive optional fields on v3: a
+  //     v3 save written before Phase 4 simply lacks them and defaults to driving. ---
+  /** Body the player currently inhabits. Absent/undefined ⇒ 'mech'. */
+  pilotMode?: PilotMode
+  /** Town the player is dismounted inside (null in mech). Gates the decay pause. */
+  onFootTownId?: TownId | null
+  /** World-space position the Frame is parked/monumented at while on foot. */
+  mechPark?: [number, number, number] | null
 }
 
 // ============================================================================
@@ -467,6 +483,9 @@ export function createFreshRun(now: number = Date.now()): StoryRun {
     startedAt: now,
     realElapsedSec: 0,
     stats: freshStats(),
+    pilotMode: 'mech',
+    onFootTownId: null,
+    mechPark: null,
   }
 }
 
@@ -988,10 +1007,24 @@ export function deserializeRun(raw: string): StoryRun | null {
         bossesDefeated: stats?.bossesDefeated ?? 0,
         moneyEarned: stats?.moneyEarned ?? 0,
       },
+      // On-foot state (design §4). Additive on v3, so pre-Phase-4 saves and every
+      // older migrated save land on the driving defaults. A saved 'onFoot' run
+      // resumes dismounted with its Frame monument where it was parked.
+      pilotMode: migrated.pilotMode === 'onFoot' ? 'onFoot' : 'mech',
+      onFootTownId: typeof migrated.onFootTownId === 'string' ? migrated.onFootTownId : null,
+      mechPark: sanitizeVec3(migrated.mechPark),
     }
   } catch {
     return null
   }
+}
+
+/** Coerce an unknown value into a `[x,y,z]` tuple or null (save hardening). */
+function sanitizeVec3(v: unknown): [number, number, number] | null {
+  if (Array.isArray(v) && v.length === 3 && v.every((n) => typeof n === 'number' && Number.isFinite(n))) {
+    return [v[0], v[1], v[2]]
+  }
+  return null
 }
 
 // ============================================================================
@@ -1091,6 +1124,12 @@ export function useStoryMode() {
   function tickTownDecay(id: TownId, secondsPresent: number): number | undefined {
     const town = getTown(id)
     if (!town) return undefined
+    // THE KEYSTONE (design §4.2): the reactor idles, the weight is off the ground —
+    // while the player is on foot the town does not decay. Gating here means the
+    // pause holds no matter which caller drives the tick (the host loop, a test).
+    // Reading the mode (not just the id) freezes decay for any town while on foot;
+    // on foot you can only be inside your dismount town, so this is exactly §4.2.
+    if (run.value?.pilotMode === 'onFoot') return town.condition
     town.decaySecondsAccrued += secondsPresent
     town.condition = applyDecay(town.condition, secondsPresent)
     town.farms.alive = farmsAliveForCondition(town.condition, town.farms.total)
@@ -1168,6 +1207,32 @@ export function useStoryMode() {
   function tickElapsed(seconds: number): void {
     if (!run.value) return
     run.value.realElapsedSec += seconds
+  }
+
+  /**
+   * Record the player's body mode (design §4). StoryWorld.dismount()/mount() call
+   * this so the decay pause (§4.2) and save/load see a single source of truth.
+   *   - dismounting: setPilotMode('onFoot', { townId, mechPark: [x,y,z] })
+   *   - mounting:    setPilotMode('mech') — clears onFootTownId (park kept until reused)
+   * Persists so a run continued while dismounted resumes on foot with its Frame
+   * monument where it was parked.
+   */
+  function setPilotMode(
+    mode: PilotMode,
+    opts?: { townId?: TownId | null; mechPark?: [number, number, number] | null },
+  ): void {
+    if (!run.value) return
+    run.value.pilotMode = mode
+    if (mode === 'onFoot') {
+      run.value.onFootTownId = opts?.townId ?? run.value.onFootTownId ?? null
+      if (opts?.mechPark !== undefined) run.value.mechPark = opts.mechPark
+    } else {
+      run.value.onFootTownId = null
+      // Frame park position is left intact so it can be reused/inspected; the next
+      // dismount overwrites it. Callers that want it cleared pass mechPark:null.
+      if (opts?.mechPark !== undefined) run.value.mechPark = opts.mechPark
+    }
+    save()
   }
 
   // --- Quests ---
@@ -1448,6 +1513,10 @@ export function useStoryMode() {
     persist = true,
   ): number | undefined {
     if (!run.value) return undefined
+    // Collateral cannot land on foot (design §4.2): there is no combat loop out of
+    // the cockpit, so no stray ordnance chips the town. Defensive gate mirroring
+    // the decay pause — if something tries to tax a town while dismounted, no-op.
+    if (run.value.pilotMode === 'onFoot') return getTown(townId)?.condition
     const condition = applyCollateral(run.value, townId, severity)
     // Collateral is emitted every combat frame (§3.5); persisting on each one is a
     // full-run serialize + localStorage write per frame. Callers on the hot combat
@@ -1492,6 +1561,14 @@ export function useStoryMode() {
   const remainingFinaleTargets = computed(() => finaleTargets(towns.value))
   const stats = computed<RunStats>(() => run.value?.stats ?? freshStats())
   const realElapsedSec = computed(() => run.value?.realElapsedSec ?? 0)
+  /** Current body mode (design §4); defaults to driving when unset. */
+  const pilotMode = computed<PilotMode>(() => run.value?.pilotMode ?? 'mech')
+  /** True while the player is the dismounted pilot (decay paused, §4.2). */
+  const isOnFoot = computed(() => pilotMode.value === 'onFoot')
+  /** Town the player is dismounted inside, or null. */
+  const onFootTownId = computed<TownId | null>(() => run.value?.onFootTownId ?? null)
+  /** World-space Frame park position while on foot, or null. */
+  const mechPark = computed<[number, number, number] | null>(() => run.value?.mechPark ?? null)
   /** Number of towns the player made happy (helped) this run. */
   const townsHelped = computed(() => happyCount.value)
   /** Per-town damage reports for the credits screen. */
@@ -1523,6 +1600,11 @@ export function useStoryMode() {
     remainingFinaleTargets,
     stats,
     realElapsedSec,
+    // on-foot / dismount (Phase 4)
+    pilotMode,
+    isOnFoot,
+    onFootTownId,
+    mechPark,
     townsHelped,
     damageReports,
     avgDestruction,
@@ -1544,6 +1626,7 @@ export function useStoryMode() {
     refreshPhase,
     concludeRun,
     tickElapsed,
+    setPilotMode,
     // reputation / flags / consequence economy (Phase 3)
     adjustReputation,
     raiseFlag,

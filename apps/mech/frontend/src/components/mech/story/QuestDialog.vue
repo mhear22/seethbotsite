@@ -16,12 +16,15 @@
           @end="$emit('close')"
           @skip="$emit('close')"
         />
-        <button
-          v-if="seenBriefing"
-          class="qd-fastpath-toggle"
-          type="button"
-          @click="showBriefing = false"
-        >Skip briefing →</button>
+        <div class="qd-tree-footer">
+          <button class="qd-fastpath-toggle" type="button" @click="$emit('open-board')">Mission board →</button>
+          <button
+            v-if="seenBriefing"
+            class="qd-fastpath-toggle"
+            type="button"
+            @click="showBriefing = false"
+          >Skip briefing →</button>
+        </div>
       </template>
 
       <!-- ============ FAST PATH: repeat-visit accept/decline ============ -->
@@ -36,6 +39,7 @@
           </ul>
           <div class="qd-actions">
             <button class="qd-btn primary" type="button" @click="emit('accept', quest)">Accept</button>
+            <button class="qd-btn ghost" type="button" @click="emit('open-board')">Board</button>
             <button class="qd-btn ghost" type="button" @click="emit('open-garage')">Garage</button>
             <button class="qd-btn ghost" type="button" @click="$emit('close')">Stand down</button>
           </div>
@@ -43,6 +47,7 @@
         <template v-else>
           <p class="qd-flavor">No orders on the board. {{ townName }} holds.</p>
           <div class="qd-actions">
+            <button class="qd-btn ghost" type="button" @click="emit('open-board')">Board</button>
             <button class="qd-btn ghost" type="button" @click="$emit('close')">Mount up</button>
           </div>
         </template>
@@ -147,6 +152,8 @@ const props = withDefaults(
 const emit = defineEmits<{
   (e: 'accept', quest: QuestDef): void
   (e: 'open-garage'): void
+  /** Open the full warden-office mission board (the whole-chain view, §4.4/§4.5). */
+  (e: 'open-board'): void
   (e: 'close'): void
   /** Fired in tree mode for every selected choice; host applies effects. */
   (e: 'choice-selected', choice: DialogueChoice): void
@@ -401,6 +408,12 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey, true))
   letter-spacing: 0.04em;
   color: #94a3b8;
   text-transform: uppercase;
+}
+
+.qd-tree-footer {
+  display: flex;
+  gap: 18px;
+  align-items: center;
 }
 
 .qd-fastpath-toggle {
