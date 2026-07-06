@@ -19,6 +19,11 @@ import {
   type QuestDef,
   type ShopSlot,
 } from '../lib/story/quests'
+import {
+  evaluateChoice,
+  type DialogueChoice,
+  type ChoiceEvaluation,
+} from '../lib/story/dialogue'
 
 // ============================================================================
 // Constants (v1 tuning — see docs/STORY_MODE_DESIGN.md §0)
@@ -29,8 +34,11 @@ import {
  *  can read an older payload from the same slot and migrate it in place. */
 export const STORY_SAVE_KEY = 'mech-story-v1'
 
-/** Current save schema version. v1 -> v2 adds `run.inventory` (Phase 2 salvage). */
-export const SAVE_VERSION = 2 as const
+/** Current save schema version.
+ *  v1 -> v2 adds `run.inventory` (Phase 2 salvage).
+ *  v2 -> v3 (Phase 3): renames `money` -> `salvage`, adds `chapter`,
+ *  `storyFlags`, and the two-axis `commandRep`/`townRep`. */
+export const SAVE_VERSION = 3 as const
 
 // ---- Salvage economy tuning (Phase 2 §3.7). Documented defaults where the
 // design left the numbers open. ----
@@ -42,14 +50,95 @@ export const SALVAGE_SCRAP_FLOOR = 20
 /** Chance an *intact* enemy slot drops its part (pristine) on kill. */
 export const SALVAGE_INTACT_DROP_CHANCE = 0.25
 /** Chance a slot the player *destroyed* drops its part (damaged) on kill.
- *  1.0 = you shot the limb off, you always get the wreck to repair. */
-export const SALVAGE_DESTROYED_DROP_CHANCE = 1.0
+ *  Phase 3 counterweight (deferred P2 finding): lowered 1.0 -> 0.85 so a
+ *  free-install salvage wreck is no longer *guaranteed* — you still usually
+ *  keep the limb you shot off, but not every time, which (with the fitting fee
+ *  + reputation-gated shop tiers + death repair debt) stops salvage from
+ *  collapsing the garage economy. */
+export const SALVAGE_DESTROYED_DROP_CHANCE = 0.85
 /** Repair fee for a damaged part, as a fraction of its shop price. */
 export const REPAIR_PRICE_FRACTION = 0.35
 /** Sell refund fraction of shop price for a pristine inventory part. */
 export const SELL_PRICE_FRACTION_PRISTINE = 0.4
 /** Sell refund fraction of shop price for a damaged inventory part. */
 export const SELL_PRICE_FRACTION_DAMAGED = 0.2
+/** Scrap fitting fee to install an inventory part, as a fraction of shop price.
+ *  Phase 3 counterweight: even a *free* salvaged part costs a little to bolt on,
+ *  so hoarding wrecks and swapping loadout every fight is no longer costless. */
+export const INSTALL_FITTING_FEE_FRACTION = 0.1
+
+// ---- Two-axis reputation (Phase 3 §3.7). Command vs Town, both 0..100. ----
+
+/** Reputation floor / ceiling / neutral start (both axes begin at REP_START). */
+export const REP_MIN = 0
+export const REP_MAX = 100
+export const REP_START = 50
+
+/**
+ * ── The reputation / shop split (design §3.7) ─────────────────────────────
+ * Two DIFFERENT gates, deliberately kept separate:
+ *   • PER-TOWN `standing` (0..100, earned by that town's quest chain) gates
+ *     stock DEPTH — how deep a garage's shelves go (tiers T1/T2/T3). A town you
+ *     have helped opens up its rarer stock. This is LOCAL.
+ *   • GLOBAL `commandRep` / `townRep` gate PRICE modifiers and RARE/restricted
+ *     hardware — military parts need Command standing, civilian/support parts
+ *     need Town standing, and your rep on the matching axis discounts (or
+ *     surcharges) them. This is GLOBAL and follows you between towns.
+ * Neither axis touches the finale gate (that is per-town `standing` only — see
+ * isFinaleUnlocked + the regression test).
+ */
+
+/** Per-town standing at/above which garage stock tier 2 / tier 3 unlocks. */
+export const SHOP_TIER_T2_STANDING = 60
+export const SHOP_TIER_T3_STANDING = 80
+
+/** Global commandRep needed to buy restricted military hardware (railgun, fusion). */
+export const MILITARY_REP_UNLOCK = 65
+/** Global townRep needed to buy restricted civilian/support hardware (repair, shield). */
+export const CIVILIAN_REP_UNLOCK = 65
+/** Max price swing from rep on a part's axis: ±this fraction (rep 100 -> -20%, rep 0 -> +20%). */
+export const REP_PRICE_SWING = 0.2
+
+// ---- Collateral tax (Phase 3 §3.5). GENTLE by design. ----
+
+/**
+ * ── The collateral severity contract (design §3.5) ────────────────────────
+ * `applyCollateral(run, townId, severity)` converts an abstract "severity"
+ * budget into a small, one-way town-condition decrement (mirrors tickTownDecay).
+ *
+ * The integrator (StoryCombat / StoryModePage) is responsible for EMITTING
+ * severity, and MUST feed it from the design's event mix — collateral is
+ * dominated by **hits the player takes** and **combat-seconds spent near town**,
+ * and is NEVER driven by the player landing shots or by kill explosions:
+ *
+ *   severity source                         per-event severity   taxed?
+ *   ─────────────────────────────────────   ──────────────────   ──────
+ *   an enemy hit landing on the player      PER_PLAYER_HIT (1.0)   YES
+ *   each second of active combat near town  PER_COMBAT_SECOND(.35) YES
+ *   the player landing a shot on an enemy   0                      NO
+ *   an enemy/kill explosion detonating      0                      NO
+ *
+ * Each emitted event is distance-tapered toward the town centre at emission
+ * (StoryCombat.emitCollateral) before reaching applyCollateral. Calibrated so a
+ * clean fast fight costs a town < 1 condition and a full sloppy fight < ~8 (see
+ * the collateral test, which models both mixes against these coefficients).
+ */
+export const COLLATERAL_CONDITION_PER_SEVERITY = 0.25
+export const COLLATERAL_SEVERITY_PER_PLAYER_HIT = 1.0
+export const COLLATERAL_SEVERITY_PER_COMBAT_SECOND = 0.35
+/** Explicitly zero — landing your own shots is never taxed (design §3.5 FIX). */
+export const COLLATERAL_SEVERITY_PER_PLAYER_SHOT = 0
+/** Explicitly zero — kill/AoE explosions are never taxed (the disposable P2 shape). */
+export const COLLATERAL_SEVERITY_PER_ENEMY_KILL = 0
+
+// ---- Death stakes (Phase 3 §3.7). Downed, not game-over. ----
+
+/** Fraction of carried salvage lost when the player's Frame is downed. */
+export const DEATH_SALVAGE_LOSS_FRACTION = 0.25
+/** Condition the defended town loses when you go down (enemies overrun it). */
+export const DEATH_TOWN_CONDITION_HIT = 8
+/** Per-town standing lost when you fail its defence by being downed. */
+export const DEATH_STANDING_HIT = 10
 
 /** Number of towns scattered across the open map (Q1). */
 export const TOWN_COUNT = 5
@@ -79,6 +168,15 @@ export const WORLD_HALF_EXTENT = 600
 
 export type TownId = string
 export type StoryPhase = 'exploring' | 'finale' | 'ended'
+
+/**
+ * Narrative act, layered on top of the (unchanged) phase machine — design §2.5.
+ * Derived from phase + progress, never a fourth independent state:
+ *   act1 (Deployment) = exploring & no quests done yet
+ *   act2 (The Grind)  = exploring, mid-campaign
+ *   act3 (The Order)  = finale / tribunal
+ */
+export type Chapter = 'act1' | 'act2' | 'act3'
 
 export interface TownState {
   id: TownId
@@ -133,13 +231,22 @@ export interface InventoryItem {
 export interface StoryRun {
   /** Schema version for forward-compatible migrations (see deserializeRun). */
   version: typeof SAVE_VERSION
-  money: number
+  /** Scrap currency (Phase 3 rename of `money`; earned from salvage + quests). */
+  salvage: number
   /** Owned-but-unequipped parts (bought or salvaged). Equipping pulls from here. */
   inventory: InventoryItem[]
   /** The mech being built up this run (starts from the Starter, Q10). */
   loadout: MechLoadout
   towns: TownState[]
   phase: StoryPhase
+  /** Narrative act (design §2.5), derived from phase + progress; see deriveChapter. */
+  chapter: Chapter
+  /** Set of narrative flags raised by dialogue choices / beats (design §2.5). */
+  storyFlags: string[]
+  /** Global reputation with the Directorate chain of command (0..100, start 50). */
+  commandRep: number
+  /** Global reputation with the Reach's towns/civilians (0..100, start 50). */
+  townRep: number
   startedAt: number
   /** Total real seconds elapsed in the run (accrued while playing). */
   realElapsedSec: number
@@ -151,13 +258,15 @@ export interface StoryRun {
 // Pure helpers (testable — no Vue / no DOM)
 // ============================================================================
 
-/** Funny town names (Q16). Index order is stable so positions stay deterministic. */
+/** Talus Reach settlement names (design §2.4 re-skin). Index order is stable so
+ *  positions — and any saved run's town ids — stay deterministic across the
+ *  whimsy→war rename. */
 export const TOWN_NAMES = [
-  'Dunderhollow',
-  'Lower Wobbleton',
-  'Crumpetshire',
-  'Gravy Falls',
-  'Mudpuddle Crossing',
+  "Warden's Rest",
+  'Sump',
+  'The Kiln',
+  'Longwater',
+  'Halberd Station',
 ] as const
 
 /**
@@ -346,15 +455,227 @@ export function freshStats(): RunStats {
 export function createFreshRun(now: number = Date.now()): StoryRun {
   return {
     version: SAVE_VERSION,
-    money: 0,
+    salvage: 0,
     inventory: [],
     loadout: buildStarterLoadout(),
     towns: createTowns(),
     phase: 'exploring',
+    chapter: 'act1',
+    storyFlags: [],
+    commandRep: REP_START,
+    townRep: REP_START,
     startedAt: now,
     realElapsedSec: 0,
     stats: freshStats(),
   }
+}
+
+// ============================================================================
+// Chapter (act) derivation + story flags — pure (design §2.5)
+// ============================================================================
+
+/**
+ * Derive the narrative act from the (unchanged) phase machine + progress.
+ *   finale/ended -> act3 (The Order / Tribunal)
+ *   exploring, nothing done yet -> act1 (Deployment)
+ *   exploring, mid-campaign -> act2 (The Grind)
+ * Kept a pure function of observable run state so `chapter` is never a
+ * fourth state that can desync from the phase machine.
+ */
+export function deriveChapter(
+  phase: StoryPhase,
+  questsCompleted: number,
+): Chapter {
+  if (phase === 'finale' || phase === 'ended') return 'act3'
+  return questsCompleted === 0 ? 'act1' : 'act2'
+}
+
+/** True if a narrative flag has been raised on the run. */
+export function hasFlag(run: Pick<StoryRun, 'storyFlags'>, flag: string): boolean {
+  return run.storyFlags.includes(flag)
+}
+
+/** Raise a narrative flag (idempotent — no duplicates). */
+export function setFlag(run: Pick<StoryRun, 'storyFlags'>, flag: string): void {
+  if (!run.storyFlags.includes(flag)) run.storyFlags.push(flag)
+}
+
+// ============================================================================
+// Two-axis reputation — pure helpers (design §3.7)
+// ============================================================================
+
+/** Clamp a reputation value into [REP_MIN, REP_MAX]. */
+export function clampRep(value: number): number {
+  return Math.max(REP_MIN, Math.min(REP_MAX, value))
+}
+
+/**
+ * Apply a reputation delta on either/both axes (clamped). Mutates `run`. A
+ * Command-sanctioned quest typically passes `{ commandRep: +x }`; helping a town
+ * beyond orders (or refusing a bad one) passes `{ townRep: +x, commandRep: -y }`.
+ * CONTENT wires the specific numbers via quest defs / dialogue effects.
+ */
+export function adjustRep(
+  run: Pick<StoryRun, 'commandRep' | 'townRep'>,
+  delta: { commandRep?: number; townRep?: number },
+): void {
+  if (typeof delta.commandRep === 'number') run.commandRep = clampRep(run.commandRep + delta.commandRep)
+  if (typeof delta.townRep === 'number') run.townRep = clampRep(run.townRep + delta.townRep)
+}
+
+// ---- Shop stock DEPTH: gated by PER-TOWN standing (local). ----
+
+/** Garage stock tier a town's standing unlocks (T1 always, T2/T3 with standing). */
+export function shopTier(townStanding: number): 1 | 2 | 3 {
+  if (townStanding >= SHOP_TIER_T3_STANDING) return 3
+  if (townStanding >= SHOP_TIER_T2_STANDING) return 2
+  return 1
+}
+
+/** The shelf tier a part sits on, by rarity (common T1, uncommon T2, rare+ T3). */
+export function partShopTier(part: MechPart): 1 | 2 | 3 {
+  if (part.rarity === 'rare' || part.rarity === 'legendary') return 3
+  if (part.rarity === 'uncommon') return 2
+  return 1
+}
+
+/** Whether a town (by its standing) stocks this part on its shelves at all. */
+export function isPartStocked(part: MechPart, townStanding: number): boolean {
+  return partShopTier(part) <= shopTier(townStanding)
+}
+
+// ---- Restricted hardware + prices: gated by GLOBAL rep axes. ----
+
+/**
+ * Which reputation axis a restricted part is gated behind, or null if it is
+ * freely available. Only rare/legendary parts are restricted; among those,
+ * support/defensive/mobility logistics are Town-gated (civilian hardware —
+ * shields, repair drones, hover legs) and everything else military hardware
+ * (railgun, fusion core, targeting arrays) is Command-gated. CONTENT may refine.
+ */
+export function partRepAxis(part: MechPart): 'command' | 'town' | null {
+  if (part.rarity !== 'rare' && part.rarity !== 'legendary') return null
+  const tags = part.synergyTags ?? []
+  if ((part as ArmPart).weaponType === 'support') return 'town'
+  if (tags.includes('support') || tags.includes('defensive') || tags.includes('mobility')) return 'town'
+  return 'command'
+}
+
+/** Whether the run's global reputation clears a restricted part's rep gate. */
+export function isPartRepUnlocked(part: MechPart, commandRep: number, townRep: number): boolean {
+  const axis = partRepAxis(part)
+  if (axis === 'command') return commandRep >= MILITARY_REP_UNLOCK
+  if (axis === 'town') return townRep >= CIVILIAN_REP_UNLOCK
+  return true
+}
+
+/**
+ * Price multiplier a restricted part gets from the run's rep on its axis:
+ * neutral (rep 50) -> 1.0, maxed (rep 100) -> 1 - REP_PRICE_SWING (a discount),
+ * tanked (rep 0) -> 1 + REP_PRICE_SWING (a surcharge). Unrestricted parts: 1.0.
+ */
+export function repPriceModifier(part: MechPart, commandRep: number, townRep: number): number {
+  const axis = partRepAxis(part)
+  if (!axis) return 1
+  const rep = axis === 'command' ? commandRep : townRep
+  return 1 - ((rep - REP_START) / (REP_MAX - REP_START)) * REP_PRICE_SWING
+}
+
+// ============================================================================
+// Collateral tax — pure (design §3.5). Mirrors applyDecay's one-way ratchet.
+// ============================================================================
+
+/**
+ * Register combat collateral against a town: convert an emitted `severity`
+ * budget (see the COLLATERAL_* contract above) into a small, one-way condition
+ * decrement, and re-derive the town's farms/population counts (mirrors
+ * tickTownDecay). Mutates the town in `run.towns`. Returns the new condition, or
+ * undefined if the town id is unknown. Severity is expected to already be
+ * distance-tapered by the emitter; negative/zero severity is a no-op.
+ */
+export function applyCollateral(run: StoryRun, townId: TownId, severity: number): number | undefined {
+  const town = run.towns.find((t) => t.id === townId)
+  if (!town) return undefined
+  if (severity <= 0) return town.condition
+  const drop = severity * COLLATERAL_CONDITION_PER_SEVERITY
+  town.condition = Math.max(0, town.condition - drop)
+  town.farms.alive = farmsAliveForCondition(town.condition, town.farms.total)
+  town.population.current = populationForCondition(town.condition, town.population.initial)
+  return town.condition
+}
+
+// ============================================================================
+// Death stakes — pure (design §3.7). Downed, not game-over.
+// ============================================================================
+
+/** Outcome of the player being downed; the caller surfaces it + applies respawn. */
+export interface DefeatResult {
+  /** Scrap lost (25% of carried salvage), already deducted from run. */
+  salvageLost: number
+  /** Condition removed from the defended town (0 if none / no town). */
+  townConditionHit: number
+  /** Per-town standing removed from the defended town (0 if none / no town). */
+  standingHit: number
+  /** Always true — a defeat downs the pilot rather than ending the run. */
+  downed: true
+  /** Total scrap owed to repair the limbs knocked to `damaged` on redeploy. */
+  repairFeeOwed: number
+  /** Loadout slots emptied into the inventory as damaged (must be repaired + refit). */
+  damagedSlots: ShopSlot[]
+}
+
+/**
+ * Resolve a player defeat (design §3.7): lose 25% salvage; if the defeat
+ * happened defending a town, that town takes a condition + standing hit (the
+ * enemies overran it); and any limb slot destroyed in the lost fight is stripped
+ * off the loadout into the inventory as `damaged`, so it must be repaired (and
+ * re-installed) before redeploy — the "re-buy destroyed limbs at repair pricing"
+ * stake. Pure w.r.t. state (mutates `run`); `destroyedSlots` comes from the live
+ * MechEntity's destroyedSlots at the moment it died.
+ */
+export function handlePlayerDefeated(
+  run: StoryRun,
+  townId?: TownId,
+  destroyedSlots: ShopSlot[] = [],
+): DefeatResult {
+  // --- 25% salvage loss. ---
+  const salvageLost = Math.floor(run.salvage * DEATH_SALVAGE_LOSS_FRACTION)
+  run.salvage = Math.max(0, run.salvage - salvageLost)
+
+  // --- Town takes the hit you failed to prevent. ---
+  let townConditionHit = 0
+  let standingHit = 0
+  if (townId) {
+    const town = run.towns.find((t) => t.id === townId)
+    if (town) {
+      const before = town.condition
+      town.condition = Math.max(0, town.condition - DEATH_TOWN_CONDITION_HIT)
+      town.farms.alive = farmsAliveForCondition(town.condition, town.farms.total)
+      town.population.current = populationForCondition(town.condition, town.population.initial)
+      townConditionHit = before - town.condition
+      const standingBefore = town.standing
+      town.standing = Math.max(0, town.standing - DEATH_STANDING_HIT)
+      standingHit = standingBefore - town.standing
+    }
+  }
+
+  // --- Strip destroyed limbs into the inventory as damaged (repair debt). ---
+  let repairFeeOwed = 0
+  const damagedSlots: ShopSlot[] = []
+  for (const slot of destroyedSlots) {
+    const part = run.loadout[slot]
+    if (!part) continue
+    run.inventory.push({
+      instanceId: nextInstanceId(run.inventory),
+      partId: part.id,
+      condition: 'damaged',
+    })
+    repairFeeOwed += repairPrice(part)
+    run.loadout = { ...run.loadout, [slot]: null }
+    damagedSlots.push(slot)
+  }
+
+  return { salvageLost, townConditionHit, standingHit, downed: true, repairFeeOwed, damagedSlots }
 }
 
 // ============================================================================
@@ -458,6 +779,11 @@ export function repairPrice(part: MechPart): number {
   return Math.max(20, Math.round((partPrice(part) * REPAIR_PRICE_FRACTION) / 10) * 10)
 }
 
+/** Scrap fitting fee to install an inventory part (small fraction of shop price). */
+export function fittingFee(part: MechPart): number {
+  return Math.max(10, Math.round((partPrice(part) * INSTALL_FITTING_FEE_FRACTION) / 10) * 10)
+}
+
 /** Scrap refunded for selling an owned part; damaged parts fetch less. */
 export function salvageSellPrice(part: MechPart, condition: InstanceCondition): number {
   const frac = condition === 'damaged' ? SELL_PRICE_FRACTION_DAMAGED : SELL_PRICE_FRACTION_PRISTINE
@@ -521,7 +847,7 @@ export function awardSalvage(
   }
 
   // --- Commit to the run. ---
-  run.money += scrap
+  run.salvage += scrap
   run.stats.moneyEarned += scrap
   for (const d of drops) run.inventory.push(d)
 
@@ -597,10 +923,32 @@ function migrateV1toV2(data: Record<string, unknown>): Record<string, unknown> {
 }
 
 /**
+ * Migrate a v2 payload up to v3 (Phase 3): `money` becomes `salvage` (1:1), the
+ * narrative fields appear at their neutral defaults — no flags, both rep axes at
+ * REP_START, chapter derived from the existing phase + quest progress so an
+ * in-progress v2 save lands in the right act. Pure — returns a new object.
+ */
+function migrateV2toV3(data: Record<string, unknown>): Record<string, unknown> {
+  const stats = data.stats as Partial<RunStats> | undefined
+  const phase = (data.phase as StoryPhase) ?? 'exploring'
+  return {
+    ...data,
+    version: 3,
+    salvage: typeof data.salvage === 'number'
+      ? data.salvage
+      : typeof data.money === 'number' ? data.money : 0,
+    storyFlags: Array.isArray(data.storyFlags) ? data.storyFlags : [],
+    commandRep: typeof data.commandRep === 'number' ? data.commandRep : REP_START,
+    townRep: typeof data.townRep === 'number' ? data.townRep : REP_START,
+    chapter: (data.chapter as Chapter) ?? deriveChapter(phase, stats?.questsCompleted ?? 0),
+  }
+}
+
+/**
  * Parse + migrate a saved run. Returns null on anything unusable — malformed JSON,
  * a missing towns array, or an unknown/future schema version — so a bad slot fails
  * cleanly (caller starts fresh) rather than crashing. Known older versions are run
- * through the migration chain (v1 -> v2 -> …) before the run is rebuilt.
+ * through the full migration chain (v1 -> v2 -> v3) before the run is rebuilt.
  */
 export function deserializeRun(raw: string): StoryRun | null {
   try {
@@ -609,22 +957,34 @@ export function deserializeRun(raw: string): StoryRun | null {
 
     // --- Migration chain: step any known older schema up to SAVE_VERSION. ---
     let migrated: Record<string, unknown>
-    if (data.version === 1) migrated = migrateV1toV2(data)
+    if (data.version === 1) migrated = migrateV2toV3(migrateV1toV2(data))
+    else if (data.version === 2) migrated = migrateV2toV3(data)
     else if (data.version === SAVE_VERSION) migrated = data
     else return null // unknown / future version -> clean rejection, never a crash
 
     const stats = migrated.stats as Partial<RunStats> | undefined
+    const phase = (migrated.phase as StoryPhase) ?? 'exploring'
+    const salvage = typeof migrated.salvage === 'number'
+      ? migrated.salvage
+      : typeof migrated.money === 'number' ? migrated.money : 0
+    const questsCompleted = stats?.questsCompleted ?? 0
     return {
       version: SAVE_VERSION,
-      money: typeof migrated.money === 'number' ? migrated.money : 0,
+      salvage,
       inventory: sanitizeInventory(migrated.inventory),
       loadout: deserializeLoadout(migrated.loadout as SerializedLoadout),
       towns: migrated.towns as TownState[],
-      phase: (migrated.phase as StoryPhase) ?? 'exploring',
+      phase,
+      chapter: (migrated.chapter as Chapter) ?? deriveChapter(phase, questsCompleted),
+      storyFlags: Array.isArray(migrated.storyFlags)
+        ? (migrated.storyFlags as unknown[]).filter((f): f is string => typeof f === 'string')
+        : [],
+      commandRep: typeof migrated.commandRep === 'number' ? clampRep(migrated.commandRep) : REP_START,
+      townRep: typeof migrated.townRep === 'number' ? clampRep(migrated.townRep) : REP_START,
       startedAt: (migrated.startedAt as number) ?? Date.now(),
       realElapsedSec: (migrated.realElapsedSec as number) ?? 0,
       stats: {
-        questsCompleted: stats?.questsCompleted ?? 0,
+        questsCompleted,
         bossesDefeated: stats?.bossesDefeated ?? 0,
         moneyEarned: stats?.moneyEarned ?? 0,
       },
@@ -710,12 +1070,14 @@ export function useStoryMode() {
 
   // --- Mutations ---
 
-  function addMoney(amount: number): void {
+  function addSalvage(amount: number): void {
     if (!run.value) return
-    run.value.money = Math.max(0, run.value.money + amount)
+    run.value.salvage = Math.max(0, run.value.salvage + amount)
     if (amount > 0) run.value.stats.moneyEarned += amount
     save()
   }
+  /** @deprecated Phase 3 rename — kept so existing callers keep compiling. Use addSalvage. */
+  const addMoney = addSalvage
 
   function getTown(id: TownId): TownState | undefined {
     return run.value?.towns.find((t) => t.id === id)
@@ -770,16 +1132,36 @@ export function useStoryMode() {
     save()
   }
 
-  /** Re-evaluate phase from town state: unlock finale at >=3 happy; end when all targets cleared. */
+  /** Re-evaluate phase from town state: unlock finale at >=3 happy; end when all
+   *  targets cleared. Also re-derives the narrative `chapter` from the (unchanged)
+   *  phase machine + quest progress so the act tracks the phase without being an
+   *  independent, desyncable state (design §2.5). */
   function refreshPhase(): void {
-    if (!run.value || run.value.phase === 'ended') return
-    const towns = run.value.towns
-    if (run.value.phase === 'exploring') {
-      if (isFinaleUnlocked(towns)) run.value.phase = 'finale'
+    if (!run.value) return
+    if (run.value.phase !== 'ended') {
+      const towns = run.value.towns
+      if (run.value.phase === 'exploring') {
+        if (isFinaleUnlocked(towns)) run.value.phase = 'finale'
+      }
+      if (run.value.phase === 'finale') {
+        if (finaleTargets(towns).length === 0) run.value.phase = 'ended'
+      }
     }
-    if (run.value.phase === 'finale') {
-      if (finaleTargets(towns).length === 0) run.value.phase = 'ended'
-    }
+    run.value.chapter = deriveChapter(run.value.phase, run.value.stats.questsCompleted)
+  }
+
+  /**
+   * Force the run to conclude (design §2.5 Act III withdrawal). When the player
+   * obeys Vaun's scorched-withdrawal order they leave the un-reclaimed towns to
+   * the aces, which the phase machine cannot reach on its own (it only ends when
+   * every finale target is *cleared*). This flips the run to 'ended' so the
+   * tribunal rolls with the abandoned towns still on the ledger. Idempotent.
+   */
+  function concludeRun(): void {
+    if (!run.value) return
+    run.value.phase = 'ended'
+    refreshPhase() // keeps 'ended', re-derives chapter -> act3
+    save()
   }
 
   /** Accrue total real elapsed time (called by the world loop). */
@@ -879,9 +1261,18 @@ export function useStoryMode() {
     if (!slotsForPart(part).includes(slot)) {
       return { ok: false, reason: 'That part cannot go in that slot.' }
     }
-    const price = partPrice(part)
-    if (run.value.money < price) {
-      return { ok: false, reason: `Not enough money (need ${price}).` }
+    // Charge the REPUTATION-ADJUSTED shop price — the exact figure the Garage
+    // shows and gates its Buy button on (garagePriceModifier / Garage.displayPrice
+    // both = max(0, round(base * repPriceModifier))). Charging raw base instead
+    // (a) makes the §3.7 rep-priced tier cosmetic, (b) lets a rep discount enable
+    // a Buy the charge then rejects, and (c) blocks a rep surcharge the player can
+    // actually afford at base. See findings — shown price must equal charge.
+    const price = Math.max(
+      0,
+      Math.round(partPrice(part) * repPriceModifier(part, run.value.commandRep, run.value.townRep)),
+    )
+    if (run.value.salvage < price) {
+      return { ok: false, reason: `Not enough salvage (need ${price}).` }
     }
 
     // Build a candidate loadout with the part equipped and validate it.
@@ -890,7 +1281,7 @@ export function useStoryMode() {
     if (reason) return { ok: false, reason }
 
     run.value.loadout = candidate
-    run.value.money -= price
+    run.value.salvage -= price
     save()
     return { ok: true }
   }
@@ -923,26 +1314,31 @@ export function useStoryMode() {
   function buyPart(part: MechPart): { ok: boolean; reason?: string; item?: InventoryItem } {
     if (!run.value) return { ok: false, reason: 'No active run.' }
     const price = partPrice(part)
-    if (run.value.money < price) return { ok: false, reason: `Not enough salvage (need ${price}).` }
+    if (run.value.salvage < price) return { ok: false, reason: `Not enough salvage (need ${price}).` }
     const item: InventoryItem = {
       instanceId: nextInstanceId(run.value.inventory),
       partId: part.id,
       condition: 'pristine',
     }
     run.value.inventory.push(item)
-    run.value.money -= price
+    run.value.salvage -= price
     save()
     return { ok: true, item }
   }
 
   /**
    * Install an owned (pristine) inventory instance into a slot. Validates slot
-   * fit + loadout legality (same rules as buyAndEquip). On success the instance is
-   * consumed and any displaced part is returned to the inventory (pristine), so a
-   * swap never destroys the part you took off. Damaged parts are refused until
-   * repaired. Caller applies the new loadout to the world (StoryWorld.applyLoadout).
+   * fit + loadout legality (same rules as buyAndEquip) and charges a small scrap
+   * FITTING FEE (Phase 3 counterweight — even a free salvaged part costs a little
+   * to bolt on). On success the instance is consumed and any displaced part is
+   * returned to the inventory (pristine), so a swap never destroys the part you
+   * took off. Damaged parts are refused until repaired. Caller applies the new
+   * loadout to the world (StoryWorld.applyLoadout). Returns the fee charged.
    */
-  function installFromInventory(instanceId: string, slot: ShopSlot): { ok: boolean; reason?: string } {
+  function installFromInventory(
+    instanceId: string,
+    slot: ShopSlot,
+  ): { ok: boolean; reason?: string; fee?: number } {
     if (!run.value) return { ok: false, reason: 'No active run.' }
     const idx = run.value.inventory.findIndex((i) => i.instanceId === instanceId)
     if (idx < 0) return { ok: false, reason: 'That part is not in your inventory.' }
@@ -959,6 +1355,9 @@ export function useStoryMode() {
     const reason = loadoutInvalidReason(candidate)
     if (reason) return { ok: false, reason }
 
+    const fee = fittingFee(part)
+    if (run.value.salvage < fee) return { ok: false, reason: `Not enough salvage for the fitting fee (need ${fee}).` }
+
     const displaced = run.value.loadout[slot]
     run.value.inventory.splice(idx, 1)
     if (displaced) {
@@ -969,8 +1368,9 @@ export function useStoryMode() {
       })
     }
     run.value.loadout = candidate
+    run.value.salvage -= fee
     save()
-    return { ok: true }
+    return { ok: true, fee }
   }
 
   /** Repair a damaged inventory instance to pristine for scrap. */
@@ -982,8 +1382,8 @@ export function useStoryMode() {
     const part = findPartById(item.partId)
     if (!part) return { ok: false, reason: 'Unknown part.' }
     const cost = repairPrice(part)
-    if (run.value.money < cost) return { ok: false, reason: `Not enough salvage to repair (need ${cost}).` }
-    run.value.money -= cost
+    if (run.value.salvage < cost) return { ok: false, reason: `Not enough salvage to repair (need ${cost}).` }
+    run.value.salvage -= cost
     item.condition = 'pristine'
     save()
     return { ok: true, cost }
@@ -1002,12 +1402,90 @@ export function useStoryMode() {
     return { ok: true, refund }
   }
 
+  // --- Reputation / flags / collateral / death (Phase 3 §3.5, §3.7) ---
+
+  /** Apply a reputation delta on either/both axes (clamped) + persist. */
+  function adjustReputation(delta: { commandRep?: number; townRep?: number }): void {
+    if (!run.value) return
+    adjustRep(run.value, delta)
+    save()
+  }
+
+  /** Raise a narrative flag (idempotent) + persist. */
+  function raiseFlag(flag: string): void {
+    if (!run.value) return
+    setFlag(run.value, flag)
+    save()
+  }
+
+  /** Whether a narrative flag is set on the active run. */
+  function hasStoryFlag(flag: string): boolean {
+    return run.value ? hasFlag(run.value, flag) : false
+  }
+
+  /**
+   * Route a chosen dialogue choice through the shared-contract evaluator: gate on
+   * requirements, then (if available) apply its flag/rep effects to the run and
+   * surface the host action + next node. No-op (available:false) if gated out.
+   * The one seam CONTENT/UI use to run a dialogue tree against run state.
+   */
+  function chooseDialogue(choice: DialogueChoice): ChoiceEvaluation {
+    if (!run.value) return { available: false }
+    const evaluation = evaluateChoice(run.value, choice)
+    if (evaluation.available) save()
+    return evaluation
+  }
+
+  /**
+   * Register combat collateral against a town (design §3.5). The integrator wires
+   * StoryCombat.onCollateral(severity, pos) -> this. Applies the gentle one-way
+   * condition decrement, re-derives phase (collateral can't unlock the finale —
+   * that's standing-only — but keeps the machine consistent) + persists.
+   */
+  function applyTownCollateral(
+    townId: TownId,
+    severity: number,
+    persist = true,
+  ): number | undefined {
+    if (!run.value) return undefined
+    const condition = applyCollateral(run.value, townId, severity)
+    // Collateral is emitted every combat frame (§3.5); persisting on each one is a
+    // full-run serialize + localStorage write per frame. Callers on the hot combat
+    // loop pass persist:false and throttle the save themselves (mirrors the decay
+    // save throttle). Default true keeps the wrapper self-persisting elsewhere.
+    if (persist) save()
+    return condition
+  }
+
+  /**
+   * Resolve a player defeat (design §3.7). The integrator calls this from
+   * StoryCombat.onPlayerDefeated, passing the town being defended (if any) and the
+   * dead Frame's destroyedSlots. Applies the salvage loss, town condition/standing
+   * hit, and limb repair debt, then persists. Returns the ledger for a HUD/garage
+   * "downed" screen. Redeploy is gated on isLoadoutValid(run.loadout) afterwards.
+   */
+  function playerDefeated(townId?: TownId, destroyedSlots: ShopSlot[] = []): DefeatResult {
+    if (!run.value) {
+      return { salvageLost: 0, townConditionHit: 0, standingHit: 0, downed: true, repairFeeOwed: 0, damagedSlots: [] }
+    }
+    const result = handlePlayerDefeated(run.value, townId, destroyedSlots)
+    refreshPhase()
+    save()
+    return result
+  }
+
   // --- Getters ---
 
-  const money = computed(() => run.value?.money ?? 0)
+  const salvage = computed(() => run.value?.salvage ?? 0)
+  /** @deprecated Phase 3 rename — kept so existing UI (`story.money.value`) compiles. Use `salvage`. */
+  const money = salvage
   const inventory = computed<InventoryItem[]>(() => run.value?.inventory ?? [])
   const towns = computed<TownState[]>(() => run.value?.towns ?? [])
   const phase = computed<StoryPhase>(() => run.value?.phase ?? 'exploring')
+  const chapter = computed<Chapter>(() => run.value?.chapter ?? 'act1')
+  const commandRep = computed(() => run.value?.commandRep ?? REP_START)
+  const townRep = computed(() => run.value?.townRep ?? REP_START)
+  const storyFlags = computed<string[]>(() => run.value?.storyFlags ?? [])
   const loadout = computed<MechLoadout | null>(() => run.value?.loadout ?? null)
   const happyCount = computed(() => happyTownCount(towns.value))
   const finaleUnlocked = computed(() => isFinaleUnlocked(towns.value))
@@ -1030,10 +1508,15 @@ export function useStoryMode() {
     run,
     activeQuest,
     // getters
-    money,
+    salvage,
+    money, // deprecated alias of salvage
     inventory,
     towns,
     phase,
+    chapter,
+    commandRep,
+    townRep,
+    storyFlags,
     loadout,
     happyCount,
     finaleUnlocked,
@@ -1052,13 +1535,22 @@ export function useStoryMode() {
     hasSavedRun,
     clearSavedRun,
     // mutations
-    addMoney,
+    addSalvage,
+    addMoney, // deprecated alias of addSalvage
     getTown,
     tickTownDecay,
     completeQuest,
     clearTown,
     refreshPhase,
+    concludeRun,
     tickElapsed,
+    // reputation / flags / consequence economy (Phase 3)
+    adjustReputation,
+    raiseFlag,
+    hasStoryFlag,
+    chooseDialogue,
+    applyTownCollateral,
+    playerDefeated,
     // quests
     getCurrentQuest,
     startQuest,

@@ -16,6 +16,10 @@ import type { AIDifficulty } from '../../composables/useGameSettings'
 import type { MechSlot } from '../../shared/types/MechTypes'
 import type { MechLoadout } from '../../composables/useMechBuilder'
 import type { QuestDef } from './quests'
+import {
+  COLLATERAL_SEVERITY_PER_PLAYER_HIT,
+  COLLATERAL_SEVERITY_PER_COMBAT_SECOND,
+} from '../../composables/useStoryMode'
 
 /**
  * Per-enemy bundle: the mech, its own AI brain, its weapon cooldowns, and the
@@ -125,17 +129,23 @@ export class StoryCombat {
 
   /** Fired when the encounter is fully complete (all enemies dead / object got). */
   onComplete?: (quest: QuestDef) => void
-  /** Fired when the player mech is destroyed during an encounter. */
-  onPlayerDefeated?: () => void
+  /**
+   * Fired when the player mech is destroyed during an encounter. Carries the
+   * limb slots the player lost in the fight (from MechEntity.destroyedSlots, core
+   * excluded) so the host can strip them into the inventory as damaged repair
+   * debt (§3.7 death stakes).
+   */
+  onPlayerDefeated?: (destroyedSlots: MechSlot[]) => void
   /** Camera shake hook (host wires CameraController.triggerShake). */
   onShake?: (amount: number) => void
   /**
-   * Collateral hook (§3.5): fired when combat harms the town — explosions and
-   * stray ordnance detonating inside COLLATERAL_RADIUS of the town centre.
-   * `amount` is a normalized severity (≈1.0 for a full-size explosion at the
-   * town centre, tapering to 0 at the radius edge); `position` is the world
-   * impact point. Phase 2 only EMITS this; Phase 3 routes it into a gentle
-   * town-condition decrement. The host multiplies by its own coefficient.
+   * Collateral hook (§3.5): fired when combat harms the town. Reshaped in Phase 3
+   * to the SYSTEMS severity contract — collateral is dominated by **hits the
+   * player takes** and **combat-seconds spent near town**, and is NEVER driven by
+   * the player landing shots or by kill/AoE explosions (those emit 0). `amount`
+   * is a distance-tapered severity (full weight at the town centre, tapering to 0
+   * at COLLATERAL_RADIUS); `position` is the world impact point. The host routes
+   * it into useStoryMode.applyTownCollateral (a gentle one-way condition drop).
    */
   onCollateral?: (amount: number, position: THREE.Vector3) => void
   /**
@@ -202,7 +212,7 @@ export class StoryCombat {
       // to totalCount when it arrives.
       this.totalCount = 1
       this.bossScale = quest.bossScale ?? 1
-      this.boss = this.spawnArchetypeEnemy('ace', this.bossScale, 0, true)
+      this.boss = this.spawnArchetypeEnemy('ace', this.bossScale, 0, true, quest.bossName)
     } else {
       // wave_defence: queue N enemies as a combined-arms composition, spawn the
       // first batch.
@@ -264,12 +274,15 @@ export class StoryCombat {
     scale: number,
     index: number,
     isBoss = false,
+    bossName?: string,
   ): CombatEnemy {
     const stats = archetypeStats(archetype, scale)
     const loadout = archetypeLoadout(archetype)
     const spawn = this.randomRingPoint(30, 45)
     const label = StoryCombat.ARCHETYPE_LABEL[archetype] ?? 'Raider'
-    const name = isBoss ? 'Town Bully' : `${label} ${index + 1}`
+    // Named Combine ace (§2.5): the boss carries the quest's identity so the HUD
+    // and the reinforcement callout read as a person, not a generic "Town Bully".
+    const name = isBoss ? (bossName ?? 'Combine Ace') : `${label} ${index + 1}`
     const mech = new MechEntity(`story-enemy-${this.elapsed}-${index}-${Math.random().toString(36).slice(2, 6)}`,
       name, loadout, stats, false, spawn)
     // Face the town centre.
@@ -431,6 +444,13 @@ export class StoryCombat {
     fire: { left: boolean; right: boolean; aimDir: THREE.Vector3 | null },
     battleTime: number,
   ): void {
+    // --- Collateral: time-in-combat-near-town (§3.5 contract) ---
+    // Each second of active combat inside the town taxes its condition a little,
+    // tapered by the player's proximity to the town centre. This (plus hits the
+    // player takes, below) is the dominant, deliberately-gentle collateral term.
+    // The player LANDING shots and kill/AoE explosions are explicitly untaxed.
+    this.emitCollateral(player.position, COLLATERAL_SEVERITY_PER_COMBAT_SECOND * deltaTime)
+
     // --- Player firing (mirrors BattleScene dual-arm cadence) ---
     const aim = fire.aimDir ?? player.getForwardDirection()
     // Cannot fire while boosting (design §3.1). PhysicsSystem sets isBoosting
@@ -510,19 +530,20 @@ export class StoryCombat {
 
       if (hit.target === player) {
         this.onShake?.(0.4)
-        // Enemy ordnance detonating on the player inside town is minor collateral
-        // (§3.5 groundwork — a stray-fire proxy, small coefficient).
-        this.emitCollateral(hit.target.position, 0.2)
+        // A hit LANDING ON THE PLAYER is the dominant collateral term (§3.5): the
+        // town pays for the fight you couldn't dodge. Full per-hit severity,
+        // tapered by proximity to the town centre.
+        this.emitCollateral(hit.target.position, COLLATERAL_SEVERITY_PER_PLAYER_HIT)
       } else {
         this.onShake?.(Math.min(0.4, 0.1 + hit.projectile.damage * 0.01))
       }
 
       if (defeated) {
-        this.spawnCollateralExplosion(hit.target.position.clone(), 1.8)
+        this.spawnDeathExplosion(hit.target.position.clone(), 1.8)
         this.onShake?.(1.0)
         hit.target.isDestroyed = true
         if (hit.target === player) {
-          this.onPlayerDefeated?.()
+          this.onPlayerDefeated?.(this.playerDestroyedLimbs(player))
           this.abort()
           return
         }
@@ -534,9 +555,9 @@ export class StoryCombat {
     // in the removal loop below). Design §3.2 flamer identity.
     if (player.stats.currentHealth <= 0 && !player.isDestroyed) {
       player.isDestroyed = true
-      this.spawnCollateralExplosion(player.position.clone(), 1.8)
+      this.spawnDeathExplosion(player.position.clone(), 1.8)
       this.onShake?.(1.0)
-      this.onPlayerDefeated?.()
+      this.onPlayerDefeated?.(this.playerDestroyedLimbs(player))
       this.abort()
       return
     }
@@ -565,7 +586,7 @@ export class StoryCombat {
       // A burn-out (currentHealth <= 0 with no explosion yet) counts as a kill.
       if (!e.mech.isDestroyed && e.mech.stats.currentHealth <= 0) {
         e.mech.isDestroyed = true
-        this.spawnCollateralExplosion(e.mech.position.clone(), 1.8)
+        this.spawnDeathExplosion(e.mech.position.clone(), 1.8)
       }
       if (e.mech.isDestroyed) {
         // Salvage (§3.6/§3.7): hand the host this enemy's loadout + the limbs it
@@ -610,21 +631,31 @@ export class StoryCombat {
   // --- Helpers ---
 
   /**
-   * Spawn an explosion AND register its collateral against the town (§3.5).
-   * Every death/AoE detonation goes through here so the collateral hook fires
-   * consistently from the same groundwork that already drove the VFX.
+   * Spawn a death/AoE explosion (VFX only). Kill explosions are NOT taxed as
+   * collateral (§3.5 contract — PER_ENEMY_KILL = 0): landing a kill should never
+   * feel like it hurts the town, so the disposable P2 kill-explosion collateral
+   * term was removed here. Collateral now comes only from hits-you-take and
+   * time-in-combat (see updateCombat).
    */
-  private spawnCollateralExplosion(position: THREE.Vector3, scale: number): void {
+  private spawnDeathExplosion(position: THREE.Vector3, scale: number): void {
     this.particles.spawnExplosion(position, scale)
-    this.emitCollateral(position, scale / 1.8) // normalize so a standard 1.8 blast ≈ 1.0
+  }
+
+  /** The limb slots the player lost this fight (core excluded — that IS the death),
+   *  handed to onPlayerDefeated so the host strips them into damaged repair debt. */
+  private playerDestroyedLimbs(player: MechEntity): MechSlot[] {
+    return [...player.destroyedSlots].filter((s) => s !== 'core')
   }
 
   /**
-   * Emit a normalized collateral severity, tapered by distance from the town
-   * centre. No-op when there is no listener or the impact is outside the town.
+   * Emit a distance-tapered collateral severity toward the town centre. No-op
+   * when there is no listener, the severity is non-positive, or the impact is
+   * outside COLLATERAL_RADIUS. The emitter feeds raw severity from the §3.5
+   * contract (hits-taken / combat-time); the host applies the condition-per-
+   * severity coefficient.
    */
   private emitCollateral(position: THREE.Vector3, severity: number): void {
-    if (!this.onCollateral) return
+    if (!this.onCollateral || severity <= 0) return
     const dx = position.x - this.anchor.x
     const dz = position.z - this.anchor.z
     const dist = Math.sqrt(dx * dx + dz * dz)

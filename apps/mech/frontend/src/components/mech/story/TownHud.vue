@@ -1,8 +1,18 @@
 <template>
-  <div class="town-hud" :class="{ inside }">
+  <div class="town-hud" :class="{ inside, 'collateral-flash': pulsing }">
     <div class="town-hud-header">
       <span class="town-hud-name">{{ name }}</span>
       <span class="town-hud-standing-tag" :class="{ happy }">{{ standingLabel }}</span>
+    </div>
+
+    <!-- Two-axis reputation strip: global Command vs this town's standing (Town). -->
+    <div class="town-hud-rep">
+      <span v-if="commandRep !== undefined" class="rep-chip cmd" title="Command reputation (global)">
+        <span class="rep-chip-key">CMD</span>{{ commandPercent }}
+      </span>
+      <span class="rep-chip town" title="Town standing (this settlement)">
+        <span class="rep-chip-key">TOWN</span>{{ standingPercent }}
+      </span>
     </div>
 
     <!-- Condition (physical health) bar — color coded by tier -->
@@ -14,6 +24,9 @@
           :style="{ width: conditionPercent + '%', background: conditionColor }"
         ></div>
         <span class="bar-text">{{ conditionPercent }}%</span>
+        <transition name="col-cue">
+          <span v-if="pulsing" class="collateral-cue">COLLATERAL</span>
+        </transition>
       </div>
     </div>
 
@@ -29,40 +42,66 @@
       </div>
     </div>
 
-    <!-- Distance / decay cue -->
+    <!-- Distance / presence-cost cue -->
     <div v-if="inside" class="town-hud-decay">
       <span class="decay-pulse"></span>
-      Your mech is wrecking this place just by being here…
+      Presence load — {{ name }} bleeds condition while your Frame idles here.
     </div>
-    <div v-else class="town-hud-dist">{{ Math.round(distance) }}m away</div>
+    <div v-else class="town-hud-dist">{{ Math.round(distance) }}m to settlement</div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch, onUnmounted } from 'vue'
 import { HAPPY_STANDING_THRESHOLD } from '../../../composables/useStoryMode'
 
 const props = defineProps<{
   name: string
   /** 0..100 physical condition. */
   condition: number
-  /** 0..100 mood/standing toward the player. */
+  /** 0..100 mood/standing toward the player (this town's Town-axis standing). */
   standing: number
   /** Centre distance to the town in world units. */
   distance: number
   /** True while the player is inside the decay radius. */
   inside: boolean
+  /** Global Command reputation (0..100). Optional — omit to hide the CMD chip. */
+  commandRep?: number
+  /**
+   * Monotonic collateral-tax counter. When it INCREASES, the HUD flashes a
+   * collateral cue so the player sees the tax tick. SYSTEMS owns the value.
+   */
+  collateralTick?: number
 }>()
 
 const conditionPercent = computed(() => Math.round(Math.max(0, Math.min(100, props.condition))))
 const standingPercent = computed(() => Math.round(Math.max(0, Math.min(100, props.standing))))
+const commandPercent = computed(() =>
+  Math.round(Math.max(0, Math.min(100, props.commandRep ?? 0))),
+)
 const happy = computed(() => props.standing >= HAPPY_STANDING_THRESHOLD)
 
 const standingLabel = computed(() => {
-  if (happy.value) return 'Happy ♥'
-  if (props.standing <= 0) return 'Indifferent'
+  if (happy.value) return 'Loyal'
+  if (props.standing <= 0) return 'Cold'
   if (props.standing < 50) return 'Wary'
-  return 'Warming up'
+  return 'Thawing'
+})
+
+// Collateral pulse: flash briefly whenever the tax counter climbs.
+const pulsing = ref(false)
+let pulseTimer: ReturnType<typeof setTimeout> | null = null
+watch(
+  () => props.collateralTick,
+  (next, prev) => {
+    if (next === undefined || prev === undefined || next <= prev) return
+    pulsing.value = true
+    if (pulseTimer) clearTimeout(pulseTimer)
+    pulseTimer = setTimeout(() => (pulsing.value = false), 750)
+  },
+)
+onUnmounted(() => {
+  if (pulseTimer) clearTimeout(pulseTimer)
 })
 
 // Color-code the condition bar: green (thriving) → amber (damaged) → red (ruined).
@@ -95,6 +134,59 @@ const conditionColor = computed(() => {
   border-color: rgba(248, 113, 113, 0.55);
   box-shadow: 0 0 22px rgba(220, 38, 38, 0.28);
 }
+
+/* Collateral tax just ticked — brief hard flash. */
+.town-hud.collateral-flash {
+  border-color: rgba(239, 68, 68, 0.9);
+  box-shadow: 0 0 30px rgba(239, 68, 68, 0.6);
+}
+
+/* Two-axis reputation chips */
+.town-hud-rep {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.rep-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: 'SFMono-Regular', ui-monospace, monospace;
+  font-size: 0.74rem;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.rep-chip-key {
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  opacity: 0.7;
+}
+
+.rep-chip.cmd { color: #fca5a5; border-color: rgba(248, 113, 113, 0.35); }
+.rep-chip.town { color: #a5b4fc; border-color: rgba(129, 140, 248, 0.35); }
+
+.collateral-cue {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #fecaca;
+  text-shadow: 0 0 6px rgba(239, 68, 68, 0.9);
+  pointer-events: none;
+}
+
+.col-cue-enter-active { transition: opacity 0.1s ease; }
+.col-cue-leave-active { transition: opacity 0.4s ease; }
+.col-cue-enter-from,
+.col-cue-leave-to { opacity: 0; }
 
 .town-hud-header {
   display: flex;

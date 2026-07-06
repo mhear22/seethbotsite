@@ -71,13 +71,41 @@ const NO_INPUT: InputState = {
 describe('per-slot overlay HP init (design §3.3 table)', () => {
   it('derives limb HP from part stats × the design multipliers', () => {
     const m = makeMech()
-    // autocannon arm health 10 ×3, bipedal legs 80 ×2, standard head 30 ×2.
+    // autocannon arm health 10 ×8, bipedal legs 80 ×2, standard head 30 ×3.
     expect(m.slotMaxHP.leftArm).toBe(10 * SLOT_HP_MULTIPLIER.leftArm)
     expect(m.slotMaxHP.rightArm).toBe(10 * SLOT_HP_MULTIPLIER.rightArm)
     expect(m.slotMaxHP.legs).toBe(80 * SLOT_HP_MULTIPLIER.legs)
     expect(m.slotMaxHP.head).toBe(30 * SLOT_HP_MULTIPLIER.head)
     // core is the death pool — no independent overlay.
     expect(m.slotMaxHP.core).toBeUndefined()
+  })
+
+  // ── Phase 3 coordinated tuning-pass pins (the delimb/TTK triangle) ────────
+  // These lock the chosen numbers so a future edit that reverts the "delimb is
+  // near-free" fix trips a test. See MechEntity.SLOT_HP_MULTIPLIER for the full
+  // rationale block.
+  it('pins the Phase 3 multipliers: arms 8, head 3, legs 2 (arms/head raised)', () => {
+    expect(SLOT_HP_MULTIPLIER.leftArm).toBe(8)
+    expect(SLOT_HP_MULTIPLIER.rightArm).toBe(8)
+    expect(SLOT_HP_MULTIPLIER.head).toBe(3)
+    expect(SLOT_HP_MULTIPLIER.legs).toBe(2)
+    expect(SLOT_CORE_BLEED).toBe(0.35)
+  })
+
+  it('makes an arm delimb cost meaningful focused fire (~35% of the core-kill TTK)', () => {
+    // Representative starter: autocannon arms (health 10), diesel core, bipedal
+    // legs, standard head. maxHealth = sum(part health) = 10+10+100+80+30 = 230.
+    // A core-aimed kill drains 230; delimbing the arm drains its overlay pool.
+    // Ratio = armPool / coreKillPool must land in the design's 35-45% band, and
+    // sit far above the old near-free ~7% (10×3 / 230).
+    const m = makeMech(makeLoadout(), { maxHealth: 230, currentHealth: 230, armor: 0 })
+    const armPool = m.slotMaxHP.leftArm! // 10 × 8 = 80
+    const coreKillPool = m.stats.maxHealth // 230
+    const ratio = armPool / coreKillPool
+    expect(ratio).toBeGreaterThan(0.3)
+    expect(ratio).toBeLessThan(0.5)
+    // Strictly dearer than the pre-Phase-3 near-free delimb (mult 3 → 30/230).
+    expect(armPool).toBeGreaterThan((30 / 230) * coreKillPool)
   })
 })
 

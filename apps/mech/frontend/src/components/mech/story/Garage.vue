@@ -2,8 +2,8 @@
   <div class="garage-backdrop" @click.self="$emit('close')">
     <div class="garage">
       <div class="g-header">
-        <h2>Garage</h2>
-        <div class="g-money">💰 {{ money }}</div>
+        <h2>Rooker’s Garage</h2>
+        <div class="g-money">◈ {{ money }} <span class="g-money-cap">salvage</span></div>
         <button class="g-close" type="button" @click="$emit('close')">✕</button>
       </div>
 
@@ -28,6 +28,7 @@
       <p class="g-sub">
         Spend salvage to bolt on better parts. Builds must stay legal:
         a core, legs, a head, at least one weapon, and no energy deficit.
+        <span v-if="fittingFee > 0" class="g-fee-note">Rooker’s labour: ◈{{ fittingFee }} to fit any part.</span>
       </p>
 
       <!-- Slot selector -->
@@ -51,7 +52,7 @@
           v-for="(entry, i) in slotCatalogue"
           :key="entry.part.id"
           class="g-part"
-          :class="{ equipped: isEquipped(entry.part.id), selected: i === selectedPart, [entry.part.rarity]: true }"
+          :class="{ equipped: isEquipped(entry.part.id), selected: i === selectedPart, locked: entry.locked, [entry.part.rarity]: true }"
           @mouseenter="selectedPart = i"
         >
           <div class="part-main">
@@ -66,21 +67,35 @@
             <span v-if="entry.part.stats.speed" class="stat sp">SP {{ entry.part.stats.speed }}</span>
             <span class="stat en" :class="{ neg: entry.part.stats.energy < 0 }">EN {{ entry.part.stats.energy }}</span>
           </div>
+
+          <!-- Reputation tier lock -->
+          <div v-if="entry.locked" class="tier-lock">🔒 {{ entry.lockReason }}</div>
+
           <div class="part-foot">
-            <span class="part-price" :class="{ afford: money >= entry.price }">💰 {{ entry.price }}</span>
+            <span class="part-price" :class="{ afford: entry.affordable && !entry.locked }">
+              <span v-if="entry.discounted || entry.surcharged" class="price-base">◈{{ entry.base }}</span>
+              <span :class="{ discounted: entry.discounted, surcharged: entry.surcharged }">◈ {{ entry.price }}</span>
+              <span v-if="fittingFee > 0" class="fee-add">+{{ fittingFee }} fit</span>
+            </span>
             <button
               v-if="isEquipped(entry.part.id)"
               class="buy-btn equipped-btn"
               type="button"
               disabled
-            >Equipped</button>
+            >Fitted</button>
+            <button
+              v-else-if="entry.locked"
+              class="buy-btn"
+              type="button"
+              disabled
+            >Locked</button>
             <button
               v-else
               class="buy-btn"
               type="button"
-              :disabled="money < entry.price"
+              :disabled="!entry.affordable"
               @click="emitEquip(entry.part)"
-            >Buy &amp; Equip</button>
+            >Buy &amp; Fit</button>
           </div>
         </div>
       </div>
@@ -126,7 +141,7 @@
                   type="button"
                   :disabled="money < row.repairCost"
                   @click="emitRepair(row.instanceId)"
-                >Repair 💰{{ row.repairCost }}</button>
+                >Repair ◈{{ row.repairCost }}</button>
               </template>
               <!-- Pristine: install into each valid slot. -->
               <template v-else>
@@ -135,14 +150,16 @@
                   :key="s.key"
                   class="buy-btn"
                   type="button"
+                  :disabled="money < fittingFee"
+                  :title="fittingFee > 0 ? `Fitting fee ◈${fittingFee}` : ''"
                   @click="emitInstall(row.instanceId, s.key)"
-                >Install {{ s.label }}</button>
+                >Fit {{ s.label }}<span v-if="fittingFee > 0" class="fee-inline"> ◈{{ fittingFee }}</span></button>
               </template>
               <button
                 class="buy-btn sell-btn"
                 type="button"
                 @click="emitSell(row.instanceId)"
-              >Sell 💰{{ row.sellPrice }}</button>
+              >Sell ◈{{ row.sellPrice }}</button>
             </div>
           </div>
         </div>
@@ -188,8 +205,25 @@ const props = withDefaults(
     /** Last action result, surfaced as a banner. */
     message?: string
     messageError?: boolean
+    /**
+     * Reputation-adjusted price. SYSTEMS OWNS THE MATH — this callback maps a
+     * part's base shop price to its actual price given Command/Town rep and town
+     * discounts. Omit for base prices (identity).
+     */
+    priceModifier?: (part: MechPart, base: number) => number
+    /**
+     * Tier lock. Returns a lock (with a reason string) when a part is gated
+     * behind a reputation tier the player hasn't reached, else null. Locked
+     * parts show a badge + reason and cannot be bought. SYSTEMS owns the gates.
+     */
+    partLock?: (part: MechPart) => { reason: string } | null
+    /**
+     * Flat fitting fee added to every install/equip (Rooker's labour). Display
+     * only — SYSTEMS charges it on the emitted action. 0 hides the fee UI.
+     */
+    fittingFee?: number
   }>(),
-  { inventory: () => [] },
+  { inventory: () => [], fittingFee: 0 },
 )
 
 const emit = defineEmits<{
@@ -258,10 +292,34 @@ const selectedPart = ref(0)
 
 const catalogue = buildShopCatalogue()
 
+/** Reputation-adjusted display price for a part (falls back to base). */
+function displayPrice(part: MechPart): number {
+  const base = partPrice(part)
+  if (!props.priceModifier) return base
+  return Math.max(0, Math.round(props.priceModifier(part, base)))
+}
+
 const slotCatalogue = computed(() =>
   catalogue
     .filter((part) => slotsForPart(part).includes(activeSlot.value))
-    .map((part) => ({ part, price: partPrice(part) })),
+    .map((part) => {
+      const base = partPrice(part)
+      const price = displayPrice(part)
+      const lock = props.partLock ? props.partLock(part) : null
+      // What actually leaves your account: adjusted part price + fitting fee.
+      const total = price + props.fittingFee
+      return {
+        part,
+        base,
+        price,
+        total,
+        discounted: price < base,
+        surcharged: price > base,
+        locked: !!lock,
+        lockReason: lock?.reason ?? '',
+        affordable: props.money >= total,
+      }
+    }),
 )
 
 function equippedName(slot: ShopSlot): string {
@@ -287,12 +345,13 @@ function cycleSlot(dir: number): void {
   activeSlot.value = SLOTS[next].key
 }
 
-/** Buy & equip the highlighted part if it's affordable and not already equipped. */
+/** Buy & equip the highlighted part if it's affordable, unlocked, not equipped. */
 function confirmSelected(): void {
   const entry = slotCatalogue.value[selectedPart.value]
   if (!entry) return
   if (isEquipped(entry.part.id)) return
-  if (props.money < entry.price) return
+  if (entry.locked) return
+  if (!entry.affordable) return
   emitEquip(entry.part)
 }
 
@@ -394,6 +453,56 @@ onUnmounted(() => window.removeEventListener('keydown', handleKey, true))
 .g-money {
   font-weight: 800;
   color: #fcd34d;
+}
+
+.g-money-cap {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.g-fee-note {
+  display: block;
+  margin-top: 4px;
+  color: #fcd34d;
+  font-weight: 600;
+}
+
+/* Reputation tier lock */
+.g-part.locked {
+  opacity: 0.68;
+}
+
+.tier-lock {
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #fca5a5;
+  margin-bottom: 8px;
+}
+
+.price-base {
+  text-decoration: line-through;
+  color: #64748b;
+  font-size: 0.72rem;
+  margin-right: 5px;
+}
+
+.discounted { color: #6ee7b7; }
+.surcharged { color: #fca5a5; }
+
+.fee-add {
+  margin-left: 5px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: #94a3b8;
+}
+
+.fee-inline {
+  font-size: 0.66rem;
+  opacity: 0.85;
 }
 
 .g-close {

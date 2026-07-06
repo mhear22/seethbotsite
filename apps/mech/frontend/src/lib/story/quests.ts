@@ -6,12 +6,26 @@
  * prices garage parts by their power tier (design doc Q8/Q12). The in-world
  * encounter logic (spawning enemies/objects, combat) lives in StoryCombat /
  * StoryWorld; this module only describes WHAT a quest is and its payouts.
+ *
+ * Phase 3 (GRINDER §2.6): the whimsical procedural flavor is gone. Each quest
+ * slot now pulls AUTHORED military content — a warden hook, a 2-4 sentence
+ * briefing, a completion beat, and the two-axis reputation deltas (§3.7) — from
+ * `campaign.ts`, while the deterministic type/id/reward machinery is unchanged.
+ * The three archetypes re-skin as: wave_defence -> Hold (Combine raids),
+ * hidden_object -> Recovery (on-foot black-box/cache/survivor), boss_hunt ->
+ * Sanction (named Combine aces).
  */
 
 import type { MechPart, ArmPart } from '../../shared/types/MechTypes'
 import { ALL_PARTS } from '../../shared/data/MechParts'
 import { QUESTS_PER_CHAIN } from '../../composables/useStoryMode'
 import type { AIDifficulty } from '../../composables/useGameSettings'
+import {
+  questContent,
+  townIdentity,
+  aceForTown,
+  type QuestContent,
+} from './campaign'
 
 // ============================================================================
 // Quest model
@@ -27,9 +41,22 @@ export interface QuestDef {
   index: number
   type: QuestType
   title: string
-  /** Quest-giver flavor line (playful tone, Q16). */
+  /** Quest-giver's terse spoken hook (authored, §2.6). Kept named `flavor` for
+   *  UI compatibility (QuestDialog reads it). */
   flavor: string
-  /** Money paid on completion. */
+  /** 2-4 sentence mission briefing shown when accepting (authored, §2.6). */
+  briefing: string
+  /** Completion beat — the line that advances the town's arc (authored, §2.6). */
+  completion: string
+  /** Who briefs it (warden name, or the ace's callsign for a finale). */
+  giver: string
+  /** Command-sanctioned (Hold/Sanction under orders) vs town-initiated (Recovery). §3.7 */
+  sanctioned: boolean
+  /** Command reputation delta applied on completion (§3.7 axis effects). */
+  commandRep: number
+  /** Town reputation delta applied on completion (§3.7 axis effects). */
+  townRep: number
+  /** Salvage paid on completion. */
   reward: number
   // --- Type-specific params (only the relevant ones are populated) ---
   /** Wave Defence: number of escalating enemy mechs to clear. */
@@ -38,6 +65,9 @@ export interface QuestDef {
   difficulty?: AIDifficulty
   /** Boss Hunt: stat multiplier applied to the boss profile. */
   bossScale?: number
+  /** Boss Hunt: the target's callsign (StoryCombat names the boss mech with it,
+   *  so the HUD + reinforcement callout read as a person). */
+  bossName?: string
   /** Hidden Object: the flavor name of the thing to find. */
   objectName?: string
   /** Hidden Object: search radius (world units) the object hides within. */
@@ -50,27 +80,17 @@ export interface QuestDef {
 
 /** A town's quest types cycle through the three kinds in a fixed order so each
  *  town has one of each across its 3-quest chain. Offset by town index so the
- *  *first* quest a player meets varies town to town. */
+ *  *first* quest a player meets varies town to town. The authored content in
+ *  campaign.ts (CAMPAIGN_QUESTS[townIndex][slot]) is written to match the type
+ *  this order produces for every slot — pinned by a determinism test. */
 const QUEST_TYPE_ORDER: QuestType[] = ['wave_defence', 'hidden_object', 'boss_hunt']
 
-const WAVE_TITLES = ['Hold the Line', 'They Keep Coming', 'Last Stand at the Gate']
-const HIDDEN_TITLES = ['Lost & Found', 'The Missing Heirloom', 'X Marks the Spot']
-const BOSS_TITLES = ['Bully on the Hill', 'The Big One', 'Final Eviction Notice']
-
-const HIDDEN_OBJECTS = ['the Mayor’s prize turnip', 'a runaway gravy barrel', 'Granny’s lucky wrench']
-
-const WAVE_FLAVOR = [
-  'Bandits incoming! Stomp them before they trample the petunias.',
-  'More of ’em! Keep them off the farms, would you kindly?',
-]
-const HIDDEN_FLAVOR = [
-  'We lost something precious out in the weeds. Be a dear and fetch it?',
-  'It’s round here somewhere. Walk about until you trip over it.',
-]
-const BOSS_FLAVOR = [
-  'A right nasty mech is squatting nearby. Could you… un-squat it?',
-  'One big bully left. Send it packing and we’re square.',
-]
+/** The type this deterministic machinery assigns to a (townIndex, slot). Exposed
+ *  so the content-vs-machinery determinism test can assert the authored
+ *  CAMPAIGN_QUESTS entries never drift from it. */
+export function questTypeFor(townIndex: number, slot: number): QuestType {
+  return QUEST_TYPE_ORDER[(slot + townIndex) % QUEST_TYPE_ORDER.length]
+}
 
 /**
  * Reward for a quest scales with chain depth (later quests pay more) and type
@@ -93,21 +113,52 @@ function difficultyForIndex(index: number): AIDifficulty {
   return index <= 0 ? 'easy' : index === 1 ? 'medium' : 'hard'
 }
 
+/**
+ * Fallback content if a town/slot has no authored entry (e.g. a 6th town beyond
+ * the five Talus Reach settlements). Keeps buildQuest total — content should
+ * always be authored for the shipping five, guarded by the determinism test.
+ */
+function fallbackContent(type: QuestType): QuestContent {
+  return {
+    type,
+    title: type === 'wave_defence' ? 'Hold' : type === 'boss_hunt' ? 'Sanction' : 'Recovery',
+    hook: 'There is work here. Take it or leave it.',
+    briefing: 'A Combine action threatens the settlement. Resolve it and move on.',
+    completion: 'The action is resolved. The settlement holds, for now.',
+    sanctioned: type !== 'hidden_object',
+    commandRep: type === 'hidden_object' ? -2 : 8,
+    townRep: type === 'hidden_object' ? 12 : 6,
+    objectName: type === 'hidden_object' ? 'the recovery target' : undefined,
+  }
+}
+
 /** Build a single quest def for a town slot. Pure + deterministic. */
 export function buildQuest(townId: string, townIndex: number, slot: number): QuestDef {
-  const type = QUEST_TYPE_ORDER[(slot + townIndex) % QUEST_TYPE_ORDER.length]
+  const type = questTypeFor(townIndex, slot)
   const id = `${townId}-quest-${slot}`
   const reward = questReward(type, slot)
+  const content = questContent(townIndex, slot) ?? fallbackContent(type)
+  const giver = townIdentity(townIndex)?.warden.name ?? 'The warden'
+
+  const common = {
+    id,
+    townId,
+    index: slot,
+    type,
+    title: content.title,
+    flavor: content.hook,
+    briefing: content.briefing,
+    completion: content.completion,
+    giver,
+    sanctioned: content.sanctioned,
+    commandRep: content.commandRep,
+    townRep: content.townRep,
+    reward,
+  }
 
   if (type === 'wave_defence') {
     return {
-      id,
-      townId,
-      index: slot,
-      type,
-      title: WAVE_TITLES[slot % WAVE_TITLES.length],
-      flavor: WAVE_FLAVOR[slot % WAVE_FLAVOR.length],
-      reward,
+      ...common,
       waveCount: 2 + slot, // 2, 3, 4 enemies across the chain
       difficulty: difficultyForIndex(slot),
     }
@@ -115,28 +166,17 @@ export function buildQuest(townId: string, townIndex: number, slot: number): Que
 
   if (type === 'boss_hunt') {
     return {
-      id,
-      townId,
-      index: slot,
-      type,
-      title: BOSS_TITLES[slot % BOSS_TITLES.length],
-      flavor: BOSS_FLAVOR[slot % BOSS_FLAVOR.length],
-      reward,
+      ...common,
       difficulty: 'boss',
       bossScale: 1 + slot * 0.25, // tougher boss deeper in the chain
+      bossName: content.target ?? `${content.title} target`,
     }
   }
 
-  // hidden_object
+  // hidden_object (Recovery)
   return {
-    id,
-    townId,
-    index: slot,
-    type,
-    title: HIDDEN_TITLES[slot % HIDDEN_TITLES.length],
-    flavor: HIDDEN_FLAVOR[slot % HIDDEN_FLAVOR.length],
-    reward,
-    objectName: HIDDEN_OBJECTS[slot % HIDDEN_OBJECTS.length],
+    ...common,
+    objectName: content.objectName ?? 'the recovery target',
     searchRadius: 28,
   }
 }
@@ -165,34 +205,42 @@ export const FINALE_BOSS_SCALE = 2.0
 /** Reward for clearing a finale boss (best payout in the game). */
 export const FINALE_BOSS_REWARD = 500
 
-const FINALE_BOSS_TITLES = [
-  'The Iron Warlord',
-  'Old Rustjaw',
-  'The Crusher',
-  'Lady Havoc',
-  'The Final Tyrant',
-] as const
-
-const FINALE_BOSS_FLAVOR =
-  'A monstrous war machine has rolled in and claimed the ruins. End its reign.'
-
 /**
- * A finale boss encounter for a town the player never helped. It is a single
- * very strong boss-hunt quest (StoryCombat.start handles any QuestDef). The id is
- * suffixed `-finale` so it never collides with the town's chain quest ids and so
- * the host can tell finale completions from chain completions.
+ * A finale boss encounter for a town the player never helped — a named Combine
+ * ace who moved in when Command wrote the town off (§2.5). The ace identity
+ * (name, epithet, intro) comes from campaign.CAMPAIGN_ACES; the ace's `name`
+ * becomes the quest title, which StoryCombat threads onto the boss mech so the
+ * reinforcement callout and HUD read as a person, not "Town Bully". Clearing one
+ * against Vaun's withdrawal order is the Act III defiance beat, so it pays Town
+ * standing while costing Command standing (§3.7). The id is suffixed `-finale`
+ * so it never collides with a town's chain quest ids.
  */
 export function buildFinaleBoss(townId: string, townIndex: number): QuestDef {
+  const ace = aceForTown(townIndex)
+  const giver = townIdentity(townIndex)?.warden.name ?? 'The Reach'
+  const name = ace ? `${ace.name} "${ace.epithet}"` : 'Combine Warlord'
   return {
     id: `${townId}-finale`,
     townId,
     index: QUESTS_PER_CHAIN, // beyond the normal chain
     type: 'boss_hunt',
-    title: FINALE_BOSS_TITLES[townIndex % FINALE_BOSS_TITLES.length],
-    flavor: FINALE_BOSS_FLAVOR,
+    title: name,
+    flavor: ace?.intro ?? 'A Combine ace has claimed the ruins. End its hold.',
+    briefing:
+      ace?.intro ??
+      'A named Combine ace holds this settlement, seized after Command wrote it off. Take it back — off the books, against the withdrawal order.',
+    completion: ace
+      ? `${ace.name} is down and the town is yours again — held against orders, at the cost of your standing with Command. The Reach will remember who came back for it.`
+      : 'The ace is down and the town is reclaimed against orders.',
+    giver,
+    // Reclaiming an abandoned town defies Command (§3.7): Town loves it, Command does not.
+    sanctioned: false,
+    commandRep: -10,
+    townRep: 25,
     reward: FINALE_BOSS_REWARD,
     difficulty: 'boss',
     bossScale: FINALE_BOSS_SCALE,
+    bossName: name,
   }
 }
 
@@ -201,12 +249,12 @@ export function isFinaleBoss(quest: QuestDef): boolean {
   return quest.id.endsWith('-finale')
 }
 
-/** Short human label for a quest type (HUD / dialogue). */
+/** Short human label for a quest type, re-skinned to the fiction (§2.6). */
 export function questTypeLabel(type: QuestType): string {
   switch (type) {
-    case 'wave_defence': return 'Wave Defence'
-    case 'hidden_object': return 'Hidden Object'
-    case 'boss_hunt': return 'Boss Hunt'
+    case 'wave_defence': return 'Hold'
+    case 'hidden_object': return 'Recovery'
+    case 'boss_hunt': return 'Sanction'
   }
 }
 
@@ -214,11 +262,11 @@ export function questTypeLabel(type: QuestType): string {
 export function questObjective(quest: QuestDef, progress: number): string {
   switch (quest.type) {
     case 'wave_defence':
-      return `Defeat the attackers (${progress}/${quest.waveCount ?? 0})`
+      return `Repel the Combine push (${progress}/${quest.waveCount ?? 0})`
     case 'boss_hunt':
-      return `Defeat the boss mech`
+      return `Sanction the target`
     case 'hidden_object':
-      return progress > 0 ? 'Pick up the object (you found it!)' : `Find ${quest.objectName}`
+      return progress > 0 ? `Recover ${quest.objectName}` : `Locate ${quest.objectName}`
   }
 }
 

@@ -104,17 +104,22 @@ describe('run factory + serialization', () => {
     const run = createFreshRun(1000)
     expect(run.towns).toHaveLength(TOWN_COUNT)
     expect(run.phase).toBe('exploring')
-    expect(run.money).toBe(0)
+    expect(run.salvage).toBe(0)
+    // v3 defaults: neutral two-axis rep, act1, no flags.
+    expect(run.commandRep).toBe(50)
+    expect(run.townRep).toBe(50)
+    expect(run.chapter).toBe('act1')
+    expect(run.storyFlags).toEqual([])
     expect(run.towns.every((t) => t.condition === 100 && t.standing === 0)).toBe(true)
   })
 
   it('round-trips through serialize/deserialize preserving loadout part ids', () => {
     const run = createFreshRun(2000)
-    run.money = 500
+    run.salvage = 500
     run.towns[0].condition = 42
     const restored = deserializeRun(serializeRun(run))
     expect(restored).not.toBeNull()
-    expect(restored!.money).toBe(500)
+    expect(restored!.salvage).toBe(500)
     expect(restored!.towns[0].condition).toBe(42)
     expect(restored!.loadout.core?.id).toBe(run.loadout.core?.id)
     expect(restored!.loadout.leftArm?.id).toBe(run.loadout.leftArm?.id)

@@ -11,6 +11,7 @@ import { Terrain } from './Terrain'
 import { StoryCombat, type EnemyKill } from './StoryCombat'
 import type { QuestDef } from './quests'
 import type { MechLoadout } from '../../composables/useMechBuilder'
+import type { MechSlot } from '../../shared/types/MechTypes'
 import type { GraphicsSettings } from '../../composables/useGameSettings'
 import type { TownState } from '../../composables/useStoryMode'
 import { TOWN_DECAY_RADIUS, WORLD_HALF_EXTENT } from '../../composables/useStoryMode'
@@ -35,8 +36,9 @@ export interface StoryWorldConfig {
   onFrame?: (info: StoryFrameInfo) => void
   /** Fired when an active combat/object encounter completes (host pays + advances). */
   onQuestComplete?: (quest: QuestDef) => void
-  /** Fired when the player mech is destroyed during an encounter. */
-  onPlayerDefeated?: () => void
+  /** Fired when the player mech is destroyed during an encounter, with the limb
+   *  slots lost (core excluded) for the §3.7 death-stakes repair debt. */
+  onPlayerDefeated?: (destroyedSlots: MechSlot[]) => void
   /** Fired per enemy killed with its loadout + destroyed limbs (host awards salvage, §3.6). */
   onEnemyKilled?: (kill: EnemyKill) => void
   /** Fired when a named ace calls in its half-health reinforcement pair (§3.6 comms callout). */
@@ -109,7 +111,7 @@ export class StoryWorld {
 
   private onFrame?: (info: StoryFrameInfo) => void
   private onQuestComplete?: (quest: QuestDef) => void
-  private onPlayerDefeated?: () => void
+  private onPlayerDefeated?: (destroyedSlots: MechSlot[]) => void
   private onEnemyKilled?: (kill: EnemyKill) => void
   private onReinforcement?: (info: { bossName: string; count: number }) => void
   private onCollateral?: (amount: number, position: THREE.Vector3) => void
@@ -121,7 +123,7 @@ export class StoryWorld {
    * outermost town ring so every town sits on flat ground at y=0 (the mech
    * physics clamps to y=0, so the play area must read flat).
    */
-  private readonly terrain: TerrainParams = {
+  private readonly terrainParams: TerrainParams = {
     halfExtent: WORLD_HALF_EXTENT,
     maxHeight: 70,
     hillScale: 90,
@@ -208,7 +210,7 @@ export class StoryWorld {
     this.combat.setArenaBounds(WORLD_HALF_EXTENT)
     this.combat.onShake = (amount) => this.camera.triggerShake(amount)
     this.combat.onComplete = (quest) => this.onQuestComplete?.(quest)
-    this.combat.onPlayerDefeated = () => this.onPlayerDefeated?.()
+    this.combat.onPlayerDefeated = (slots) => this.onPlayerDefeated?.(slots)
     // Salvage + comms + collateral seams (§3.5/§3.6) — pass through to the host.
     this.combat.onEnemyKilled = (kill) => this.onEnemyKilled?.(kill)
     this.combat.onReinforcement = (info) => this.onReinforcement?.(info)
@@ -586,6 +588,17 @@ export class StoryWorld {
 
   getPlayerPosition(): THREE.Vector3 {
     return this.playerMech.position
+  }
+
+  /**
+   * Reposition the player mech (snapping to terrain height) and re-anchor the
+   * camera. Used by the §3.7 death-stakes flow to drop the ejected pilot's
+   * recovered Frame back at the edge of the town they were defending.
+   */
+  setPlayerPosition(x: number, z: number): void {
+    const y = this.terrain.heightAt(x, z)
+    this._playerMech.position.set(x, y, z)
+    this.camera.reanchor()
   }
 
   cleanup(): void {

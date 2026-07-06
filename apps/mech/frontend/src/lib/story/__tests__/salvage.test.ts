@@ -13,9 +13,12 @@ import {
   SAVE_VERSION,
   SALVAGE_SCRAP_FLOOR,
   SALVAGE_SCRAP_PER_POWER,
+  SALVAGE_DESTROYED_DROP_CHANCE,
   REPAIR_PRICE_FRACTION,
   SELL_PRICE_FRACTION_PRISTINE,
   SELL_PRICE_FRACTION_DAMAGED,
+  INSTALL_FITTING_FEE_FRACTION,
+  fittingFee,
   SLOT_KEYS,
   type StoryRun,
   type InventoryItem,
@@ -101,12 +104,12 @@ describe('awardSalvage (pure)', () => {
     for (const s of SLOT_KEYS) if (loadout[s]) power += partPowerScore(loadout[s]!)
     const expected = Math.max(SALVAGE_SCRAP_FLOOR, Math.round(power * SALVAGE_SCRAP_PER_POWER))
 
-    const before = run.money
+    const before = run.salvage
     const earnedBefore = run.stats.moneyEarned
     const result = awardSalvage(run, loadout, [], rngConst(0.99))
 
     expect(result.scrap).toBe(expected)
-    expect(run.money).toBe(before + expected)
+    expect(run.salvage).toBe(before + expected)
     expect(run.stats.moneyEarned).toBe(earnedBefore + expected)
   })
 
@@ -117,11 +120,12 @@ describe('awardSalvage (pure)', () => {
     expect(result.drops).toHaveLength(0)
   })
 
-  it('a destroyed slot always drops its part in damaged condition', () => {
+  it('a destroyed slot drops its part in damaged condition (0.85 chance)', () => {
     const loadout = killedLoadout()
-    // rng at 0.99 means intact slots (chance 0.25) never drop, so only the
-    // destroyed leftArm survives the roll — isolating the destroyed-drop rule.
-    const result = awardSalvage(run, loadout, ['leftArm'], rngConst(0.99))
+    // Phase 3: destroyed-drop chance is 0.85 (was 1.0). rng at 0.5 passes the
+    // destroyed roll (0.5 < 0.85) but fails every intact roll (0.5 >= 0.25), so
+    // only the destroyed leftArm survives — isolating the destroyed-drop rule.
+    const result = awardSalvage(run, loadout, ['leftArm'], rngConst(0.5))
     expect(result.drops).toHaveLength(1)
     expect(result.drops[0].condition).toBe('damaged')
     expect(result.drops[0].partId).toBe(loadout.leftArm!.id)
@@ -153,22 +157,70 @@ describe('awardSalvage (pure)', () => {
 })
 
 // ===========================================================================
-describe('save migration v1 -> v2', () => {
-  it('loads a v1 payload: empty inventory added, money carried over 1:1', () => {
+describe('save migration chain (v1 -> v2 -> v3)', () => {
+  it('loads a v1 payload up to v3: inventory added, money -> salvage 1:1, v3 defaults', () => {
     const run = createFreshRun(2000)
-    run.money = 250
-    // Shape a v1 raw from the current serializer (serialized loadout), then strip
-    // the v2-only fields to mimic an actual old save.
+    run.salvage = 250
+    // Shape a v1 raw from the current serializer, then strip the v2/v3-only
+    // fields and rename salvage back to money to mimic an actual old v1 save.
     const raw = JSON.parse(serializeRun(run)) as Record<string, unknown>
     raw.version = 1
+    raw.money = raw.salvage
+    delete raw.salvage
     delete raw.inventory
+    delete raw.commandRep
+    delete raw.townRep
+    delete raw.storyFlags
+    delete raw.chapter
     const restored = deserializeRun(JSON.stringify(raw))
 
     expect(restored).not.toBeNull()
-    expect(restored!.version).toBe(SAVE_VERSION)
-    expect(restored!.inventory).toEqual([])
-    expect(restored!.money).toBe(250) // 1:1 scrap conversion
+    expect(restored!.version).toBe(SAVE_VERSION) // 3
+    expect(restored!.inventory).toEqual([]) // v1->v2 gain
+    expect(restored!.salvage).toBe(250) // money -> salvage, 1:1
+    // v2->v3 neutral defaults appear.
+    expect(restored!.commandRep).toBe(50)
+    expect(restored!.townRep).toBe(50)
+    expect(restored!.storyFlags).toEqual([])
+    expect(restored!.chapter).toBe('act1')
     expect(restored!.loadout.leftArm?.id).toBe(run.loadout.leftArm?.id)
+  })
+
+  it('loads a v2 payload up to v3, carrying money -> salvage and deriving act', () => {
+    const run = createFreshRun(2500)
+    run.salvage = 400
+    const raw = JSON.parse(serializeRun(run)) as Record<string, unknown>
+    raw.version = 2
+    raw.money = raw.salvage
+    delete raw.salvage
+    delete raw.commandRep
+    delete raw.townRep
+    delete raw.storyFlags
+    delete raw.chapter
+    // A mid-campaign v2 save (a quest done, still exploring) derives to act2.
+    ;(raw.stats as { questsCompleted: number }).questsCompleted = 1
+    const restored = deserializeRun(JSON.stringify(raw))
+    expect(restored).not.toBeNull()
+    expect(restored!.version).toBe(SAVE_VERSION)
+    expect(restored!.salvage).toBe(400)
+    expect(restored!.commandRep).toBe(50)
+    expect(restored!.townRep).toBe(50)
+    expect(restored!.chapter).toBe('act2') // exploring + quests done -> The Grind
+  })
+
+  it('round-trips a v3 run preserving inventory + reputation + flags', () => {
+    const run = createFreshRun(2600)
+    run.commandRep = 72
+    run.townRep = 38
+    run.storyFlags = ['met-rooker', 'saw-kestrel-clean']
+    run.inventory.push({ instanceId: 'inst-0', partId: 'arm-railgun', condition: 'pristine' })
+    const restored = deserializeRun(serializeRun(run))
+    expect(restored).not.toBeNull()
+    expect(restored!.version).toBe(SAVE_VERSION)
+    expect(restored!.commandRep).toBe(72)
+    expect(restored!.townRep).toBe(38)
+    expect(restored!.storyFlags).toEqual(['met-rooker', 'saw-kestrel-clean'])
+    expect(restored!.inventory).toEqual(run.inventory)
   })
 
   it('round-trips a v2 run preserving inventory instances', () => {
@@ -202,8 +254,11 @@ describe('save migration v1 -> v2', () => {
   })
 
   it('rejects an unknown/future schema version cleanly (null, no throw)', () => {
-    expect(deserializeRun(JSON.stringify({ version: 3, towns: [] }))).toBeNull()
-    expect(deserializeRun(JSON.stringify({ version: 99, towns: [] }))).toBeNull()
+    // v3 is now the current known version; a future version is rejected. Include
+    // a loadout so the guard (not a downstream loadout parse) is what rejects it.
+    const futureLoadout = { core: null, legs: null, head: null, leftArm: null, rightArm: null, rack: null }
+    expect(deserializeRun(JSON.stringify({ version: 4, towns: [], loadout: futureLoadout }))).toBeNull()
+    expect(deserializeRun(JSON.stringify({ version: 99, towns: [], loadout: futureLoadout }))).toBeNull()
   })
 
   it('rejects corrupted payloads cleanly (null, no throw)', () => {
@@ -350,7 +405,7 @@ describe('composable: inventory & salvage', () => {
     const story = useStoryMode()
     story.newRun()
     const before = story.money.value
-    const result = story.awardKillSalvage(buildStarterLoadout(), ['leftArm'], rngConst(0.99))
+    const result = story.awardKillSalvage(buildStarterLoadout(), ['leftArm'], rngConst(0.5))
 
     expect(result.scrap).toBeGreaterThanOrEqual(SALVAGE_SCRAP_FLOOR)
     expect(story.money.value).toBe(before + result.scrap)
@@ -363,5 +418,51 @@ describe('composable: inventory & salvage', () => {
     expect(reloaded.load()).toBe(true)
     expect(reloaded.inventory.value).toEqual(story.inventory.value)
     expect(reloaded.money.value).toBe(story.money.value)
+  })
+})
+
+// ===========================================================================
+// Phase 3 salvage counterweights (deferred P2 findings): the destroyed-slot
+// drop is no longer guaranteed, and installing an inventory part costs a fee.
+describe('Phase 3 salvage counterweights', () => {
+  beforeEach(installMemoryStorage)
+
+  it('destroyed-slot drop chance is 0.85 and a high roll misses the wreck', () => {
+    expect(SALVAGE_DESTROYED_DROP_CHANCE).toBe(0.85)
+    const run = createFreshRun(4000)
+    // rng 0.9 >= 0.85 -> the destroyed slot fails its roll, no drop.
+    const result = awardSalvage(run, buildStarterLoadout(), ['leftArm'], rngConst(0.9))
+    expect(result.drops).toHaveLength(0)
+    expect(run.inventory).toHaveLength(0)
+  })
+
+  it('installFromInventory charges a scrap fitting fee (fraction of shop price)', () => {
+    expect(INSTALL_FITTING_FEE_FRACTION).toBe(0.1)
+    const story = useStoryMode()
+    story.newRun()
+    story.addSalvage(10_000)
+    const fusion = findPartById('core-fusion')!
+    story.buyPart(fusion)
+    const inst = story.inventory.value[0].instanceId
+    const before = story.salvage.value
+
+    const res = story.installFromInventory(inst, 'core')
+    expect(res.ok).toBe(true)
+    expect(res.fee).toBe(fittingFee(fusion))
+    expect(res.fee).toBeGreaterThan(0)
+    expect(story.salvage.value).toBe(before - fittingFee(fusion))
+  })
+
+  it('installFromInventory refuses when the pilot cannot afford the fitting fee', () => {
+    const story = useStoryMode()
+    story.newRun() // salvage 0
+    // Seed a pristine part directly so the only cost gating the install is the fee.
+    story.run.value!.inventory.push({ instanceId: 'inst-0', partId: 'core-fusion', condition: 'pristine' })
+    const res = story.installFromInventory('inst-0', 'core')
+    expect(res.ok).toBe(false)
+    expect(res.reason).toMatch(/fitting fee/i)
+    // Loadout unchanged, instance not consumed.
+    expect(story.run.value!.loadout.core?.id).not.toBe('core-fusion')
+    expect(story.inventory.value.find((i) => i.instanceId === 'inst-0')).toBeDefined()
   })
 })

@@ -1,22 +1,37 @@
 <template>
-  <div class="story-credits" role="dialog" aria-modal="true" aria-label="Run complete">
+  <div class="story-credits" role="dialog" aria-modal="true" aria-label="Tribunal record">
     <div class="credits-scroll">
       <div class="credits-inner">
-        <h1 class="credits-title">The End</h1>
+        <div class="credits-eyebrow">Directorate Tribunal · Talus Reach</div>
+        <h1 class="credits-title">{{ title }}</h1>
 
-        <!-- Overall verdict / grade -->
+        <!-- Overall verdict / tribunal finding -->
         <section class="verdict-block" :class="verdictClass">
-          <div class="verdict-label">Verdict</div>
+          <div class="verdict-label">Tribunal Finding</div>
           <div class="verdict-grade">{{ verdict }}</div>
-          <p class="verdict-flavor">{{ flavor }}</p>
+          <p class="verdict-flavor">{{ finding }}</p>
           <div class="verdict-meter">
-            Towns left {{ Math.round(avgDestruction) }}% destroyed on average.
+            Average settlement destruction on the record: {{ Math.round(avgDestruction) }}%.
           </div>
         </section>
 
-        <!-- Per-town damage report -->
+        <!-- storyFlag callouts — refused orders, reprisals, etc. (data-driven) -->
+        <section v-if="flags.length" class="findings-block">
+          <h2>On the Record</h2>
+          <ul class="findings-list">
+            <li v-for="(f, i) in flags" :key="i" class="finding-row">
+              <span class="finding-mark">▸</span>
+              <span class="finding-body">
+                <span class="finding-label">{{ f.label }}</span>
+                <span v-if="f.detail" class="finding-detail">{{ f.detail }}</span>
+              </span>
+            </li>
+          </ul>
+        </section>
+
+        <!-- Per-settlement damage — entered as evidence -->
         <section class="report-block">
-          <h2>Aftermath Report</h2>
+          <h2>Evidence · Per-Settlement Damage</h2>
           <div v-for="r in reports" :key="r.id" class="town-row">
             <div class="town-head">
               <span class="town-name">{{ r.name }}</span>
@@ -27,30 +42,30 @@
                 class="condition-fill"
                 :style="{ width: r.condition + '%', background: barColor(r.condition) }"
               ></div>
-              <span class="condition-text">{{ r.destroyedPct }}% destroyed</span>
+              <span class="condition-text">{{ r.destroyedPct }}% razed</span>
             </div>
             <div class="town-detail">
-              <span>👥 {{ r.residentsLost }}/{{ r.residentsInitial }} residents lost</span>
-              <span>🌾 {{ r.farmsLost }}/{{ r.farmsTotal }} farms lost</span>
+              <span>Casualties: {{ r.residentsLost }} of {{ r.residentsInitial }}</span>
+              <span>Infrastructure lost: {{ r.farmsLost }} of {{ r.farmsTotal }}</span>
             </div>
           </div>
         </section>
 
-        <!-- Run stats -->
+        <!-- Service record -->
         <section class="stats-block">
-          <h2>Run Stats</h2>
+          <h2>Service Record</h2>
           <div class="stat-grid">
-            <div class="stat"><span class="stat-num">{{ townsHelped }}</span><span class="stat-cap">towns helped</span></div>
-            <div class="stat"><span class="stat-num">{{ stats.questsCompleted }}</span><span class="stat-cap">quests done</span></div>
-            <div class="stat"><span class="stat-num">{{ stats.bossesDefeated }}</span><span class="stat-cap">bosses killed</span></div>
-            <div class="stat"><span class="stat-num">💰 {{ stats.moneyEarned }}</span><span class="stat-cap">money earned</span></div>
-            <div class="stat"><span class="stat-num">{{ elapsedLabel }}</span><span class="stat-cap">time piloted</span></div>
+            <div class="stat"><span class="stat-num">{{ townsHelped }}</span><span class="stat-cap">settlements held</span></div>
+            <div class="stat"><span class="stat-num">{{ stats.questsCompleted }}</span><span class="stat-cap">contracts filled</span></div>
+            <div class="stat"><span class="stat-num">{{ stats.bossesDefeated }}</span><span class="stat-cap">aces downed</span></div>
+            <div class="stat"><span class="stat-num">◈ {{ stats.moneyEarned }}</span><span class="stat-cap">salvage recovered</span></div>
+            <div class="stat"><span class="stat-num">{{ elapsedLabel }}</span><span class="stat-cap">time in the Frame</span></div>
           </div>
         </section>
 
         <div class="credits-footer">
-          <p>A walking disaster — Story Mode v1</p>
-          <button class="finish-btn" @click="$emit('finish')">Return to Menu</button>
+          <p>{{ footerNote }}</p>
+          <button class="finish-btn" @click="$emit('finish')">{{ finishLabel }}</button>
         </div>
       </div>
     </div>
@@ -66,18 +81,47 @@ import {
   type Verdict,
 } from '../../../composables/useStoryMode'
 
-const props = defineProps<{
-  reports: TownDamageReport[]
-  stats: RunStats
-  townsHelped: number
-  realElapsedSec: number
-  avgDestruction: number
-  verdict: Verdict
-}>()
+/** A single storyFlag callout on the tribunal record (CONTENT supplies copy). */
+interface TribunalFlag {
+  label: string
+  detail?: string
+}
+
+const props = withDefaults(
+  defineProps<{
+    reports: TownDamageReport[]
+    stats: RunStats
+    townsHelped: number
+    realElapsedSec: number
+    avgDestruction: number
+    verdict: Verdict
+    /** Headline of the record. */
+    title?: string
+    /**
+     * The tribunal finding prose. CONTENT owns campaign copy; omit to fall back
+     * to the built-in per-verdict flavor.
+     */
+    findingText?: string
+    /** storyFlag callouts (refused orders, reprisals…). Empty = section hidden. */
+    flags?: TribunalFlag[]
+    finishLabel?: string
+    footerNote?: string
+  }>(),
+  {
+    title: 'Tribunal Record',
+    findingText: undefined,
+    flags: () => [],
+    finishLabel: 'Close the file',
+    footerNote: 'Filed by the Directorate. Contested by no one still alive to contest it.',
+  },
+)
 
 defineEmits<{ (e: 'finish'): void }>()
 
-const flavor = computed(() => verdictFlavor(props.verdict))
+// Prefer CONTENT-supplied finding prose; fall back to the built-in flavor.
+const finding = computed(() => props.findingText ?? verdictFlavor(props.verdict))
+
+const flags = computed(() => props.flags ?? [])
 
 const verdictClass = computed(() => `verdict-${props.verdict.toLowerCase()}`)
 
@@ -130,13 +174,69 @@ function barColor(condition: number): string {
   gap: 32px;
 }
 
+.credits-eyebrow {
+  text-align: center;
+  font-family: 'SFMono-Regular', ui-monospace, monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  margin-bottom: -20px;
+}
+
 .credits-title {
   text-align: center;
   color: #fff;
-  font-size: 3rem;
-  letter-spacing: 0.06em;
-  text-shadow: 0 0 24px rgba(245, 158, 11, 0.6);
+  font-size: 2.6rem;
+  letter-spacing: 0.05em;
+  text-shadow: 0 0 24px rgba(245, 158, 11, 0.5);
   margin: 0;
+}
+
+/* storyFlag callouts */
+.findings-block {
+  padding: 22px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.findings-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.finding-row {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.finding-mark {
+  color: #f59e0b;
+  flex: 0 0 auto;
+}
+
+.finding-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.finding-label {
+  color: #f1f5f9;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.finding-detail {
+  color: #94a3b8;
+  font-size: 0.82rem;
+  line-height: 1.45;
 }
 
 h2 {

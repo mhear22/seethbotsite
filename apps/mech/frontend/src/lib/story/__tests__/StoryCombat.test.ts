@@ -58,7 +58,11 @@ function makePlayer(): MechEntity {
 function quest(over: Partial<QuestDef>): QuestDef {
   return {
     id: 'town-0-quest-0', townId: 'town-0', index: 0,
-    type: 'wave_defence', title: 'T', flavor: 'F', reward: 100, ...over,
+    type: 'wave_defence', title: 'T', flavor: 'F', reward: 100,
+    // Phase 3 authored-content fields (default filler for the combat-seam tests).
+    briefing: 'B', completion: 'C', giver: 'G',
+    sanctioned: true, commandRep: 0, townRep: 0,
+    ...over,
   }
 }
 
@@ -187,26 +191,50 @@ describe('onCollateral emission (§3.5 groundwork)', () => {
     expect(events).toHaveLength(2)
   })
 
-  it('normalizes a standard 1.8-scale death blast at the centre to ~1.0 severity', () => {
+  // Phase 3 reshape (§3.5 contract): kill/AoE explosions are UNTAXED. Landing a
+  // kill must never feel like it hurts the town, so a death blast emits nothing.
+  it('does NOT tax the town for a death/AoE explosion (kills are untaxed)', () => {
     const { combat } = makeRig()
     const amounts: number[] = []
     combat.onCollateral = (amount) => amounts.push(amount)
     combat.start(quest({ type: 'wave_defence', waveCount: 1, difficulty: 'easy' }), new THREE.Vector3(0, 0, 0))
     amounts.length = 0
-    ;(combat as any).spawnCollateralExplosion(new THREE.Vector3(0, 0, 0), 1.8)
-    expect(amounts).toHaveLength(1)
-    expect(amounts[0]).toBeCloseTo(1.0, 5)
+    ;(combat as any).spawnDeathExplosion(new THREE.Vector3(0, 0, 0), 1.8)
+    expect(amounts).toHaveLength(0)
   })
 
-  it('fires onCollateral when an enemy is destroyed inside the town', () => {
+  // Phase 3 (§3.5): collateral is dominated by time-in-combat-near-town. Each
+  // update tick inside the town accrues a small, distance-tapered severity.
+  it('accrues time-in-combat collateral each tick, tapered by proximity', () => {
     const { combat, player, enemies } = makeRig()
-    let fired = false
-    let maxAmount = 0
-    combat.onCollateral = (amount) => { fired = true; maxAmount = Math.max(maxAmount, amount) }
+    const amounts: number[] = []
+    combat.onCollateral = (amount) => amounts.push(amount)
     combat.start(quest({ type: 'wave_defence', waveCount: 1, difficulty: 'easy' }), new THREE.Vector3(0, 0, 0))
-    enemies()[0].mech.stats.currentHealth = 0
-    combat.update(0.05, player, NO_FIRE, 1)
-    expect(fired).toBe(true)
-    expect(maxAmount).toBeGreaterThan(0)
+    // Keep the enemy alive so the encounter does not complete this tick, and put
+    // the player at the town centre so proximity = 1.
+    enemies()[0].mech.stats.currentHealth = enemies()[0].mech.stats.maxHealth
+    player.position.set(0, 0, 0)
+    amounts.length = 0
+    combat.update(0.1, player, NO_FIRE, 1)
+    // PER_COMBAT_SECOND (0.35) * dt (0.1) * proximity (1) = 0.035.
+    expect(amounts.length).toBeGreaterThanOrEqual(1)
+    expect(amounts[0]).toBeCloseTo(0.035, 5)
+  })
+
+  // The player LANDING shots never taxes the town (design §3.5 FIX). With the
+  // player firing but no hits landing on the player, only the (tiny) time term
+  // registers — never a per-shot term.
+  it('never taxes the player for firing their own weapons', () => {
+    const { combat, player, enemies } = makeRig()
+    const amounts: number[] = []
+    combat.onCollateral = (amount) => amounts.push(amount)
+    combat.start(quest({ type: 'wave_defence', waveCount: 2, difficulty: 'easy' }), new THREE.Vector3(0, 0, 0))
+    enemies().forEach((e: any) => { e.mech.stats.currentHealth = e.mech.stats.maxHealth })
+    player.position.set(0, 0, 0)
+    amounts.length = 0
+    // Fire both arms; the only collateral this tick is the time term (0.035),
+    // not a per-shot term.
+    combat.update(0.1, player, { left: true, right: true, aimDir: null }, 100)
+    for (const a of amounts) expect(a).toBeLessThanOrEqual(0.035 + 1e-6)
   })
 })

@@ -27,6 +27,12 @@ import { ARM_PARTS, CORE_PARTS, LEGS_PARTS, HEAD_PARTS, RACK_PARTS } from '../..
 // The multiplier that was folded into the maxHealth numbers below, kept as a
 // documented constant so the rebalance intent is legible (the raw pre-Phase-1
 // values were 150/200/300/400/600).
+//
+// Phase 3 tuning-triangle re-check (see MechEntity.SLOT_HP_MULTIPLIER): HELD at
+// 1.4. The Phase 3 pass raised limb overlay HP, but a *core-aimed* medium-duel
+// TTK depends only on this core pool and the per-shot core damage — neither
+// changed — so medium-duel TTK stays within 0% of the P2 target. Only
+// limb-focused fire was re-taxed (by SLOT_HP_MULTIPLIER), which is the intent.
 export const HP_REBALANCE = 1.4
 
 /** Base difficulty stat archetypes (the ladder used by both arena + story). */

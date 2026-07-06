@@ -2,8 +2,10 @@ import { describe, it, expect } from 'vitest'
 import {
   buildQuest,
   buildQuestChain,
+  buildFinaleBoss,
   currentQuest,
   questReward,
+  questTypeFor,
   partPrice,
   partPowerScore,
   slotsForPart,
@@ -12,8 +14,9 @@ import {
   questObjective,
   type QuestType,
 } from '../quests'
+import { CAMPAIGN_QUESTS, TOWN_IDENTITIES, CAMPAIGN_ACES } from '../campaign'
 import { ARM_PARTS, CORE_PARTS, findPartById } from '../../../shared/data/MechParts'
-import { QUESTS_PER_CHAIN } from '../../../composables/useStoryMode'
+import { QUESTS_PER_CHAIN, TOWN_COUNT } from '../../../composables/useStoryMode'
 
 describe('quest chains', () => {
   it('builds a chain of QUESTS_PER_CHAIN deterministic quests', () => {
@@ -59,6 +62,63 @@ describe('quest chains', () => {
     const wave = buildQuest('town-0', 0, 0)
     // town-0 slot 0 is wave_defence
     expect(questObjective(wave, 1)).toContain('1/')
+  })
+})
+
+describe('authored campaign content (Phase 3 §2.6)', () => {
+  it('authored content type matches the deterministic machinery for every town/slot', () => {
+    // The determinism guard: CAMPAIGN_QUESTS is authored in slot order, and each
+    // entry MUST carry the type buildQuest derives for that (townIndex, slot) —
+    // otherwise the fiction silently drifts from the mechanics.
+    for (let t = 0; t < TOWN_COUNT; t++) {
+      for (let s = 0; s < QUESTS_PER_CHAIN; s++) {
+        expect(CAMPAIGN_QUESTS[t][s].type).toBe(questTypeFor(t, s))
+      }
+    }
+  })
+
+  it('every shipping town/slot resolves authored (non-fallback) content', () => {
+    for (let t = 0; t < TOWN_COUNT; t++) {
+      const chain = buildQuestChain(`town-${t}`, t)
+      for (const q of chain) {
+        expect(q.title).toBeTruthy()
+        expect(q.briefing.length).toBeGreaterThan(20)
+        expect(q.completion.length).toBeGreaterThan(20)
+        expect(q.giver).toBe(TOWN_IDENTITIES[t].warden.name)
+      }
+    }
+  })
+
+  it('carries two-axis reputation deltas; Recovery favours Town, Sanction favours Command', () => {
+    for (let t = 0; t < TOWN_COUNT; t++) {
+      for (const q of buildQuestChain(`town-${t}`, t)) {
+        if (q.type === 'hidden_object') {
+          // Recovery = on-foot help: town-initiated, Town-positive.
+          expect(q.sanctioned).toBe(false)
+          expect(q.townRep).toBeGreaterThan(0)
+        }
+        if (q.type === 'boss_hunt') {
+          expect(q.bossName).toBeTruthy() // named target, not a mission title
+          // A Command-sanctioned Sanction raises Command; a town-initiated one
+          // (e.g. Voss's "House Rules") does not — the axis tracks who ordered it.
+          if (q.sanctioned) expect(q.commandRep).toBeGreaterThan(0)
+          else expect(q.townRep).toBeGreaterThan(0)
+        }
+      }
+    }
+  })
+
+  it('finale bosses are named Combine aces with defiance rep + a boss callsign', () => {
+    for (let t = 0; t < TOWN_COUNT; t++) {
+      const boss = buildFinaleBoss(`town-${t}`, t)
+      expect(boss.id).toBe(`town-${t}-finale`)
+      expect(boss.title).toContain(CAMPAIGN_ACES[t].name)
+      expect(boss.bossName).toContain(CAMPAIGN_ACES[t].name)
+      // Reclaiming an abandoned town defies Command: Town up, Command down (§3.7).
+      expect(boss.townRep).toBeGreaterThan(0)
+      expect(boss.commandRep).toBeLessThan(0)
+      expect(boss.sanctioned).toBe(false)
+    }
   })
 })
 

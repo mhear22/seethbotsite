@@ -29,17 +29,45 @@ const JUMP_JET_BOOST_DURATION = 1.2   // seconds of boosted jump PhysicsSystem m
 const AMMO_FEED_DURATION = 5.0
 
 // ---- Hit-location tuning (design §3.3). ----
+// ┌─ THE DELIMB / TTK TUNING TRIANGLE (Phase 3 coordinated pass) ─────────────┐
+// │ Three knobs interact and are tuned together: SLOT_HP_MULTIPLIER (here),    │
+// │ SLOT_CORE_BLEED (here), and HP_REBALANCE (enemyGeneration.ts).             │
+// │                                                                            │
+// │ P2 finding: arm overlay HP was too small, so a limb popped off after ~7%  │
+// │ of a core-kill's focused fire — delimbing was near-free and had no cost.   │
+// │ Design §3.3 wants a delimb to cost *meaningful* focused fire: roughly      │
+// │ 35-45% of the fire needed for a core kill on the same target.              │
+// │                                                                            │
+// │ FIX: raise the ARM multiplier hard (3 → 8, +167%) and the HEAD one (2 → 3);│
+// │ LEGS stay ×2 (already meaningful — stranding is the biggest consequence,   │
+// │ so a durable leg pool is intended). On the representative starter build    │
+// │ (core-diesel + autocannon arms, maxHealth ≈ 230) the delimb-to-core-kill   │
+// │ fire ratio now lands: arm 80/230 ≈ 35%, head 90/230 ≈ 39%, legs 160/230 ≈  │
+// │ 70% (legs deliberately dear). Fragile precision arms (railgun health 5)    │
+// │ stay cheap to strip — that is the intended "kill the sniper's gun arm"     │
+// │ payoff, not a bug.                                                         │
+// │                                                                            │
+// │ WHY BLEED + HP_REBALANCE ARE UNCHANGED (the "re-check"): a *core-aimed*     │
+// │ medium-duel TTK = maxHealth / DPS is invariant to SLOT_HP_MULTIPLIER — a   │
+// │ core-aimed shot never touches a limb pool. Neither the enemy core pool     │
+// │ (HP_REBALANCE ×1.4) nor the per-shot core damage on a core hit changed, so │
+// │ the medium-duel TTK is within 0% of the P2 target (well inside the ±20%    │
+// │ band). SLOT_CORE_BLEED stays 0.35 so a limb hit still contributes ~a third │
+// │ of its damage to the kill; raising arm HP re-taxes *only* limb-focused     │
+// │ fire, which is precisely the behaviour the design asks for.                │
+// └────────────────────────────────────────────────────────────────────────┘
 /** Per-slot HP = part.stats.health × this multiplier (design §3.3 table). */
 export const SLOT_HP_MULTIPLIER: Record<Exclude<MechSlot, 'core'>, number> = {
-  leftArm: 3,   // arm.stats.health ×3
-  rightArm: 3,
-  legs: 2,      // legs.stats.health ×2
-  head: 2,      // head.stats.health ×2
+  leftArm: 8,   // arm.stats.health ×8 (raised 3 → 8: delimb costs real focused fire)
+  rightArm: 8,
+  legs: 2,      // legs.stats.health ×2 (unchanged — stranding is the big consequence)
+  head: 3,      // head.stats.health ×3 (raised 2 → 3)
 }
 /**
  * Fraction of a limb hit's post-mitigation damage that ALSO bleeds through to
  * the core death pool, so aiming at a limb still progresses the kill (design
  * §3.3: "core kills always progress"). A direct core / unresolved hit is 100%.
+ * Held at 0.35 in the Phase 3 tuning pass — see the triangle note above.
  */
 export const SLOT_CORE_BLEED = 0.35
 /**
