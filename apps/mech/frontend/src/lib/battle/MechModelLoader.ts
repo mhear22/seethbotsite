@@ -36,10 +36,38 @@ export class MechModelLoader {
   private gltfLoader: GLTFLoader
   private modelCache: Map<string, CachedModel> = new Map()
   private baseModelPath: string
+  // Session-cached "are any GLBs present?" probe. No .glb files ship by default,
+  // so a naive assemble fires 6 guaranteed-404 fetches every time. We probe ONCE
+  // (a single HEAD request) and, if nothing is there, go straight to procedural
+  // for the rest of the session. If real GLBs are later dropped into
+  // public/models (README workflow), a fresh loader / clearCache re-probes and
+  // loading resumes — so the fallback behaviour still upgrades for free.
+  private availabilityPromise: Promise<boolean> | null = null
 
   constructor(baseModelPath: string = '/models') {
     this.gltfLoader = new GLTFLoader()
     this.baseModelPath = baseModelPath
+  }
+
+  /** One cached HEAD probe per session for a sentinel GLB. */
+  private checkModelsAvailable(): Promise<boolean> {
+    if (!this.availabilityPromise) {
+      this.availabilityPromise = this.probeModels()
+    }
+    return this.availabilityPromise
+  }
+
+  private async probeModels(): Promise<boolean> {
+    if (typeof fetch !== 'function') return false
+    try {
+      // Sentinel = the first file the README lists. If it 200s, GLBs are present
+      // and we let per-part loads (each with its own fallback) proceed.
+      const sentinel = `${this.baseModelPath}/arms/autocannon.glb`
+      const res = await fetch(sentinel, { method: 'HEAD' })
+      return res.ok
+    } catch {
+      return false
+    }
   }
 
   /**
@@ -93,6 +121,9 @@ export class MechModelLoader {
    */
   async loadPartModel(part: MechPart | null): Promise<THREE.Group | null> {
     if (!part || !this.hasModel(part)) return null
+
+    // Skip the fetch entirely if this session has confirmed no GLBs are present.
+    if (!(await this.checkModelsAvailable())) return null
 
     try {
       const fullPath = part.modelPath.startsWith('/')
@@ -270,6 +301,8 @@ export class MechModelLoader {
       })
     })
     this.modelCache.clear()
+    // Re-probe next assemble so newly-added GLBs are picked up (README workflow).
+    this.availabilityPromise = null
   }
 
   /**

@@ -122,6 +122,9 @@ export class BattleScene {
   // Dual weapon cooldowns
   private lastLeftArmShot: number = 0
   private lastRightArmShot: number = 0
+  // Rising-edge latch for the rack-ability key: fire once per press, never every
+  // frame it is held (holding a key must not re-trigger on each cooldown expiry).
+  private rackAbilityHeld = false
 
   // Battle ending animation
   protected battleEnding: boolean = false
@@ -181,6 +184,19 @@ export class BattleScene {
     this.camera = new CameraController(this.playerMech)
     this.enemyAI = new EnemyAI(config.aiDifficulty ?? 'medium')
     this.audio = useAudio()
+
+    // Footfall / landing weight (design §3.1): PhysicsSystem detects strides and
+    // ground slams; route the weight-scaled intensity into the camera dip/shake.
+    // Inherited by MultiplayerBattleScene (same physics + camera instances).
+    this.physicsSystem.onFootstep = (intensity) => this.camera.onFootstep(intensity)
+    this.physicsSystem.onLanding = (intensity) => {
+      this.camera.onLanding(intensity)
+      // Fall-velocity × weight dust ring on landing (design §3.1 item 4).
+      const p = this.playerMech.position.clone()
+      this.particleSystem.spawnImpactSparks(p, new THREE.Vector3(0, 1, 0), 'floor')
+    }
+    // Smoke rack ability deploys a cloud + arms the EnemyAI accuracy debuff.
+    this.playerMech.onSmokeDeploy = (pos) => this.particleSystem.spawnSmokeScreen(pos)
 
     // Apply settings
     if (config.mouseSensitivity !== undefined) {
@@ -607,10 +623,12 @@ export class BattleScene {
     // Update rack ability cooldown
     this.playerMech.rackAbilityCooldown = Math.max(0, this.playerMech.rackAbilityCooldown - deltaTime)
 
-    // Handle rack ability input
-    if (input.useAbility) {
+    // Handle rack ability input (Q) — edge-triggered and distinct from boost (E),
+    // so sprinting never auto-wastes the rack ability the moment it comes off CD.
+    if (input.useRackAbility && !this.rackAbilityHeld) {
       this.playerMech.useRackAbility()
     }
+    this.rackAbilityHeld = input.useRackAbility
 
     // Dual weapon firing with separate cooldowns
     // When locked, compute per-arm aim from each arm's spawn position to target center
@@ -649,8 +667,12 @@ export class BattleScene {
       rightFireRate *= 0.5
     }
 
+    // Cannot fire while boosting (design §3.1): the thrust pool and the trigger
+    // compete for the same reactor draw.
+    const canFire = !this.playerMech.isBoosting
+
     // Left arm (right mouse button)
-    if (input.shootLeft && this.battleTime - this.lastLeftArmShot > leftFireRate) {
+    if (canFire && input.shootLeft && this.battleTime - this.lastLeftArmShot > leftFireRate) {
       if (this.playerMech.loadout.leftArm) {
         const aim = getAimDirection('left')
         const fired = this.projectileSystem.fireWeapon(this.playerMech, aim, 'left', this.enemyMech)
@@ -662,7 +684,7 @@ export class BattleScene {
     }
 
     // Right arm (left mouse button)
-    if (input.shootRight && this.battleTime - this.lastRightArmShot > rightFireRate) {
+    if (canFire && input.shootRight && this.battleTime - this.lastRightArmShot > rightFireRate) {
       if (this.playerMech.loadout.rightArm) {
         const aim = getAimDirection('right')
         const fired = this.projectileSystem.fireWeapon(this.playerMech, aim, 'right', this.enemyMech)
@@ -717,7 +739,11 @@ export class BattleScene {
 
     for (const hit of hits) {
       const damage = hit.projectile.damage
-      const defeated = hit.target.takeDamage(damage)
+      const defeated = hit.target.takeDamage(damage, hit.projectile.damageType, {
+        armorPierce: hit.projectile.armorPierce,
+        burn: hit.projectile.appliesBurn,
+        fromFront: hit.target.isHitFromFront(hit.projectile.velocity),
+      })
       const isPlayerShot = hit.target === this.enemyMech
       // Heuristic crit: high-damage hits (melee / heavy weapons) read as crits.
       const crit = damage >= 15
@@ -784,6 +810,23 @@ export class BattleScene {
         this.battleEnding = true
         this.battleEndTimer = 2.0
         this.battleEndResult = hit.target === this.playerMech ? 'defeat' : 'victory'
+      }
+    }
+
+    // Burn DoT (flamer) chips currentHealth in MechEntity.update() outside the
+    // projectile-hit path; register a burn-only death here so a mech that burns
+    // out doesn't linger until the next hit lands (design §3.2 flamer identity).
+    if (!this.battleEnding) {
+      for (const m of [this.enemyMech, this.playerMech]) {
+        if (!m.isDestroyed && m.stats.currentHealth <= 0) {
+          this.particleSystem.spawnExplosion(m.position.clone(), 1.8)
+          this.camera.triggerShake(1.0)
+          m.isDestroyed = true
+          this.battleEnding = true
+          this.battleEndTimer = 2.0
+          this.battleEndResult = m === this.playerMech ? 'defeat' : 'victory'
+          break
+        }
       }
     }
 
@@ -858,7 +901,7 @@ export class BattleScene {
     let fxType: 'ballistic' | 'energy' | 'missile'
     if (rawType === 'energy') {
       fxType = 'energy'
-    } else if (rawType === 'ballistic' && armPart?.id.includes('missile')) {
+    } else if (rawType === 'missile') {
       fxType = 'missile'
     } else {
       fxType = 'ballistic'
@@ -873,9 +916,9 @@ export class BattleScene {
    * speeds. Used by the AI to lead its shots. Missiles are ballistic parts whose
    * id contains 'missile'.
    */
-  private getWeaponProjectileSpeed(weaponType?: string, partId?: string): number {
+  private getWeaponProjectileSpeed(weaponType?: string, _partId?: string): number {
     if (weaponType === 'energy') return 400
-    if (weaponType === 'ballistic' && partId?.includes('missile')) return 240
+    if (weaponType === 'missile') return 200 // matches arm-missile-pod's projectileSpeed
     return 300 // ballistic / melee / support fallback
   }
 

@@ -78,9 +78,9 @@ function scaledStats(difficulty: AIDifficulty, scale: number): CombatStats {
 }
 
 /** Projectile speed for a weapon part (mirrors BattleScene.getWeaponProjectileSpeed). */
-function weaponProjectileSpeed(weaponType?: string, partId?: string): number {
+function weaponProjectileSpeed(weaponType?: string, _partId?: string): number {
   if (weaponType === 'energy') return 400
-  if (weaponType === 'ballistic' && partId?.includes('missile')) return 240
+  if (weaponType === 'missile') return 200 // matches arm-missile-pod's projectileSpeed
   return 300
 }
 
@@ -369,8 +369,16 @@ export class StoryCombat {
   ): void {
     // --- Player firing (mirrors BattleScene dual-arm cadence) ---
     const aim = fire.aimDir ?? player.getForwardDirection()
-    if (fire.left && player.loadout.leftArm) {
-      const rate = player.loadout.leftArm.fireRate ?? (player.loadout.leftArm.weaponType === 'melee' ? 1.5 : 0.25)
+    // Cannot fire while boosting (design §3.1). PhysicsSystem sets isBoosting
+    // on the player each frame from StoryWorld's movement update.
+    const canFire = !player.isBoosting
+    // Ammo-feed rack ability: doubled fire rate while active (design §3.4 — a
+    // fire-rate buff, not a magazine sim). Mirrors BattleScene so the rack works
+    // in the campaign, not just Build & Battle.
+    const ammoFeed = player.rackAbilityActive && player.loadout.rack?.id === 'rack-ammo-feed'
+    if (canFire && fire.left && player.loadout.leftArm) {
+      let rate = player.loadout.leftArm.fireRate ?? (player.loadout.leftArm.weaponType === 'melee' ? 1.5 : 0.25)
+      if (ammoFeed) rate *= 0.5
       if (battleTime - this.lastLeftShot > rate) {
         const target = this.nearestEnemyTo(player)
         const fired = this.projectiles.fireWeapon(player, this.armAim(player, 'left', aim), 'left', target?.mech)
@@ -380,8 +388,9 @@ export class StoryCombat {
         }
       }
     }
-    if (fire.right && player.loadout.rightArm) {
-      const rate = player.loadout.rightArm.fireRate ?? (player.loadout.rightArm.weaponType === 'melee' ? 1.5 : 0.25)
+    if (canFire && fire.right && player.loadout.rightArm) {
+      let rate = player.loadout.rightArm.fireRate ?? (player.loadout.rightArm.weaponType === 'melee' ? 1.5 : 0.25)
+      if (ammoFeed) rate *= 0.5
       if (battleTime - this.lastRightShot > rate) {
         const target = this.nearestEnemyTo(player)
         const fired = this.projectiles.fireWeapon(player, this.armAim(player, 'right', aim), 'right', target?.mech)
@@ -418,7 +427,11 @@ export class StoryCombat {
     this.projectiles.update(deltaTime, allMechs)
     const hits = this.projectiles.checkCollisions(allMechs)
     for (const hit of hits) {
-      const defeated = hit.target.takeDamage(hit.projectile.damage)
+      const defeated = hit.target.takeDamage(hit.projectile.damage, hit.projectile.damageType, {
+        armorPierce: hit.projectile.armorPierce,
+        burn: hit.projectile.appliesBurn,
+        fromFront: hit.target.isHitFromFront(hit.projectile.velocity),
+      })
       const impact = hit.target.position.clone()
       impact.y += 1.5
       this.particles.spawnHitEffect(impact, hit.projectile.type)
@@ -443,9 +456,26 @@ export class StoryCombat {
       }
     }
 
+    // Burn DoT (flamer) can reduce a mech to 0 HP in MechEntity.update() without
+    // a projectile hit. Register a burn-only player defeat here (enemies handled
+    // in the removal loop below). Design §3.2 flamer identity.
+    if (player.stats.currentHealth <= 0 && !player.isDestroyed) {
+      player.isDestroyed = true
+      this.particles.spawnExplosion(player.position.clone(), 1.8)
+      this.onShake?.(1.0)
+      this.onPlayerDefeated?.()
+      this.abort()
+      return
+    }
+
     // --- Remove dead enemies, refill wave, check completion ---
     const stillAlive: CombatEnemy[] = []
     for (const e of this.enemies) {
+      // A burn-out (currentHealth <= 0 with no explosion yet) counts as a kill.
+      if (!e.mech.isDestroyed && e.mech.stats.currentHealth <= 0) {
+        e.mech.isDestroyed = true
+        this.particles.spawnExplosion(e.mech.position.clone(), 1.8)
+      }
       if (e.mech.isDestroyed) {
         this.scene.remove(e.mech.mesh)
         e.mech.cleanup()
@@ -519,7 +549,7 @@ export class StoryCombat {
     const rawType = part?.weaponType ?? 'ballistic'
     let fxType: 'ballistic' | 'energy' | 'missile'
     if (rawType === 'energy') fxType = 'energy'
-    else if (rawType === 'ballistic' && part?.id.includes('missile')) fxType = 'missile'
+    else if (rawType === 'missile') fxType = 'missile'
     else fxType = 'ballistic'
     this.particles.spawnMuzzleFlash(player.getArmPosition(arm), fxType, aim)
   }

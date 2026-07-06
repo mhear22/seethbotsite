@@ -1,19 +1,42 @@
 import * as THREE from 'three'
 import type { MechEntity } from './MechEntity'
 import type { InputState } from './InputManager'
-import { JUMP_VELOCITY_BASE, JUMP_VELOCITY_JETS } from './constants'
-
-/**
- * How far above the ground the mech can be while still counting as "grounded"
- * (and therefore stuck to the terrain surface). Keeps walking over rolling
- * hills smooth; only larger drops (ledges, cliffs) trigger a real fall.
- */
-const GROUND_STICK_DISTANCE = 1.5
+import {
+  JUMP_VELOCITY_BASE,
+  JUMP_VELOCITY_JETS,
+  MOVEMENT,
+  WEIGHT_MOVEMENT,
+  LEG_MODIFIERS,
+  DASH,
+  BOOST,
+  JUMP,
+  FOOTFALL,
+} from './constants'
 
 export class PhysicsSystem {
   public speedMultiplier = 1.0
-  private arenaHalfW = 150
-  private arenaHalfD = 150
+  private arenaHalfW: number = MOVEMENT.DEFAULT_ARENA_HALF
+  private arenaHalfD: number = MOVEMENT.DEFAULT_ARENA_HALF
+
+  /**
+   * When true, dashing and boosting spend `mech.currentPower` (the single
+   * combat economy) and are blocked when the bar is empty. Single-player scenes
+   * leave this on. Multiplayer should set it false — power is server-authoritative
+   * there and local gating would fight reconciliation. See report notes.
+   */
+  public powerEconomyEnabled = true
+
+  /**
+   * Footfall / landing feedback hooks. The scene wires these to the camera (or
+   * audio / particles). `intensity` is a 0..~1.5 magnitude already scaled by the
+   * mech's weight class, so a heavy mech shakes harder per step and SLAMS on
+   * landing. Default no-op so multiplayer / headless callers are unaffected.
+   */
+  public onFootstep: ((intensity: number) => void) | null = null
+  public onLanding: ((intensity: number) => void) | null = null
+
+  // Footstep cadence accumulator (player instance only — enemies use EnemyAI).
+  private footstepAccumulator = 0
 
   /**
    * Ground height at a world (x, z). Defaults to a flat floor at y = 0 (battle
@@ -35,15 +58,32 @@ export class PhysicsSystem {
   updateMovement(mech: MechEntity, input: InputState, deltaTime: number): boolean {
     // Get leg type for special handling
     const legType = mech.loadout.legs?.mobilityType || 'bipedal'
+    const legMod = LEG_MODIFIERS[legType] ?? LEG_MODIFIERS.bipedal
 
-    // Calculate base speed with weight penalty
+    // Calculate base speed with weight penalty. Steady-state top speed is
+    // intentionally left on the shared formula so MP reconciliation stays matched.
     const speedStat = Math.max(10, mech.stats.speed) / 100
     const weightFactor = mech.weightPenalty // 0.5 to 1.0
-    const baseSpeed = 8 * this.speedMultiplier * speedStat * weightFactor
-    const targetSpeed = input.useAbility ? baseSpeed * 3 : baseSpeed
+    const baseSpeed = MOVEMENT.BASE_SPEED_FACTOR * this.speedMultiplier * speedStat * weightFactor
 
-    // Acceleration rate (units/s²) - how fast we reach target speed
-    const accelRate = 60 * weightFactor
+    // Boost drains power and cuts out when the bar is empty (the resource layer).
+    let boosting = input.useAbility
+    if (boosting && this.powerEconomyEnabled) {
+      if (mech.currentPower > 0) {
+        mech.currentPower = Math.max(0, mech.currentPower - BOOST.POWER_DRAIN * deltaTime)
+      } else {
+        boosting = false // out of power — no boost this frame
+      }
+    }
+    const targetSpeed = boosting ? baseSpeed * MOVEMENT.BOOST_MULTIPLIER : baseSpeed
+
+    // Momentum by weight class: heavier mechs spool up slower (lower accel) and
+    // coast further (lower friction). Leg type layers a friction multiplier on
+    // top (hover slides, tracked grips).
+    const weightCurve = WEIGHT_MOVEMENT[mech.weightClass] ?? WEIGHT_MOVEMENT.medium
+    const accelRate = weightCurve.accel
+    const frictionRate = weightCurve.friction * legMod.frictionMult
+    const backwardSpeedPenalty = legMod.backwardPenalty
 
     // Get movement directions relative to camera view
     const forward = new THREE.Vector3(0, 0, 1)
@@ -53,37 +93,13 @@ export class PhysicsSystem {
     forward.applyEuler(mech.rotation)
     right.applyEuler(mech.rotation)
 
-    // Leg-specific modifiers
-    // frictionRate: higher = stops faster. Expressed as decay per second.
-    let frictionRate = 8.0
-    let backwardSpeedPenalty = 0.6
-    let blockJump = false
-
-    switch (legType) {
-      case 'tracked':
-        frictionRate = 8.0
-        blockJump = true
-        break
-
-      case 'hover':
-        frictionRate = 2.0 // Slides more
-        // Oscillate vertically for hover effect
-        mech.position.y += Math.sin(performance.now() * 0.003) * 0.15 * deltaTime
-        break
-
-      case 'quadrupedal':
-        frictionRate = 6.0
-        backwardSpeedPenalty = 0.8
-        break
-
-      case 'bipedal':
-      default:
-        frictionRate = 8.0
-        break
+    // Hover legs oscillate vertically for effect
+    if (legType === 'hover') {
+      mech.position.y += Math.sin(performance.now() * 0.003) * 0.15 * deltaTime
     }
 
     // Block jump if tracked legs
-    if (blockJump && input.jump) {
+    if (legMod.blockJump && input.jump) {
       input = { ...input, jump: false }
     }
 
@@ -99,10 +115,13 @@ export class PhysicsSystem {
     if (moveDir.lengthSq() > 0) {
       moveDir.normalize()
 
-      // Detect counter-boost: boosting in opposite direction to current velocity
-      if (input.useAbility) {
+      // Detect counter-boost: boosting hard against current velocity.
+      if (boosting) {
         const currentHorizVel = new THREE.Vector3(mech.velocity.x, 0, mech.velocity.z)
-        if (currentHorizVel.length() > 2 && moveDir.dot(currentHorizVel.normalize()) < -0.5) {
+        if (
+          currentHorizVel.length() > BOOST.COUNTER_MIN_SPEED &&
+          moveDir.dot(currentHorizVel.normalize()) < BOOST.COUNTER_DOT_THRESHOLD
+        ) {
           counterBoostImpact = true
         }
       }
@@ -121,6 +140,19 @@ export class PhysicsSystem {
       mech.velocity.z *= frictionFactor
     }
 
+    // Counter-boost juke: a hard reverse-boost brakes momentum (breaks pursuit)
+    // and costs a chunk of power on top of the drain. The scene turns the flag
+    // into a screen-shake "brake" + thruster flare. The velocity brake is gated
+    // on the power economy: in multiplayer (powerEconomyEnabled === false) movement
+    // is server-authoritative and gets overwritten each snapshot, so braking the
+    // local velocity here would only rubber-band. The flag still returns for the
+    // (purely cosmetic) camera shake in every mode.
+    if (counterBoostImpact && this.powerEconomyEnabled) {
+      mech.velocity.x *= 1 - BOOST.COUNTER_BRAKE
+      mech.velocity.z *= 1 - BOOST.COUNTER_BRAKE
+      mech.currentPower = Math.max(0, mech.currentPower - BOOST.COUNTER_POWER_COST)
+    }
+
     // Apply velocity to position
     mech.position.add(mech.velocity.clone().multiplyScalar(deltaTime))
 
@@ -128,7 +160,46 @@ export class PhysicsSystem {
     mech.position.x = Math.max(-this.arenaHalfW, Math.min(this.arenaHalfW, mech.position.x))
     mech.position.z = Math.max(-this.arenaHalfD, Math.min(this.arenaHalfD, mech.position.z))
 
+    // Footfall cadence: while grounded and moving, fire a weight-scaled footstep
+    // on a speed-driven interval (faster movement = quicker steps).
+    this.updateFootsteps(mech, deltaTime)
+
+    // Expose resolved boost state (after the power-out cutout) so the firing
+    // path can suppress fire while boosting (design §3.1: "cannot fire while
+    // boosting"). Reads on MechEntity keep the scene/StoryCombat decoupled.
+    mech.isBoosting = boosting
+
     return counterBoostImpact
+  }
+
+  /**
+   * Advance the footstep timer and fire onFootstep when a stride completes.
+   * Grounded is approximated by !isJumping (updateJumpJets runs after this and
+   * owns the airborne state); enemies never call updateMovement so this is the
+   * player's cadence only.
+   */
+  private updateFootsteps(mech: MechEntity, deltaTime: number) {
+    const speed = Math.sqrt(mech.velocity.x ** 2 + mech.velocity.z ** 2)
+    if (mech.isJumping || speed < FOOTFALL.MIN_STEP_SPEED) {
+      // Reset toward "about to step" so the first step after moving lands quickly.
+      this.footstepAccumulator = FOOTFALL.MAX_STEP_INTERVAL
+      return
+    }
+
+    const interval = Math.max(
+      FOOTFALL.MIN_STEP_INTERVAL,
+      Math.min(FOOTFALL.MAX_STEP_INTERVAL, FOOTFALL.STRIDE_LENGTH / speed),
+    )
+    this.footstepAccumulator += deltaTime
+    if (this.footstepAccumulator >= interval) {
+      this.footstepAccumulator -= interval
+      if (this.onFootstep) {
+        const base = FOOTFALL.STEP_INTENSITY[mech.weightClass] ?? FOOTFALL.STEP_INTENSITY.medium
+        // Slightly stronger footfalls at higher speed.
+        const speedScale = 0.6 + 0.4 * Math.min(1, speed / 12)
+        this.onFootstep(base * speedScale)
+      }
+    }
   }
 
   // Returns true if a new dash was just initiated this frame
@@ -152,8 +223,10 @@ export class PhysicsSystem {
       return false
     }
 
-    // Initiate dash
-    if (input.dash && mech.dashCooldown <= 0) {
+    // Initiate dash — costs power (the dodge is the skill verb, and it spends
+    // the combat economy so it can't be spammed while firing).
+    const hasPower = !this.powerEconomyEnabled || mech.currentPower >= DASH.POWER_COST
+    if (input.dash && mech.dashCooldown <= 0 && hasPower) {
       // Determine dash direction from input, or forward by default
       const forward = new THREE.Vector3(0, 0, 1).applyEuler(mech.rotation)
       const right = new THREE.Vector3(1, 0, 0).applyEuler(mech.rotation)
@@ -170,13 +243,16 @@ export class PhysicsSystem {
       dashDir.normalize()
 
       // Dash speed and cooldown affected by weight
-      const dashSpeed = 30 * (1.0 + mech.weightPenalty) // Light mechs dash faster
-      const dashCooldown = 2.0 * (2.0 - mech.weightPenalty) // Heavy mechs have longer cooldown
+      const dashSpeed = DASH.SPEED_BASE + DASH.SPEED_WEIGHT_BONUS * mech.weightPenalty // Light mechs dash faster
+      const dashCooldown = DASH.COOLDOWN_BASE * (DASH.COOLDOWN_WEIGHT_OFFSET - mech.weightPenalty) // Heavy mechs have longer cooldown
 
       mech.velocity.copy(dashDir.multiplyScalar(dashSpeed))
       mech.isDashing = true
       mech.dashTimer = mech.DASH_DURATION
       mech.dashCooldown = dashCooldown
+      if (this.powerEconomyEnabled) {
+        mech.currentPower = Math.max(0, mech.currentPower - DASH.POWER_COST)
+      }
       return true // Signal that dash just started
     }
 
@@ -194,7 +270,11 @@ export class PhysicsSystem {
 
     // Basic jump for all mechs (no jets required)
     if (input.jump && !mech.isJumping) {
-      const jumpVelocity = hasJumpJets ? JUMP_VELOCITY_JETS * mech.weightPenalty : JUMP_VELOCITY_BASE * mech.weightPenalty
+      let jumpVelocity = hasJumpJets ? JUMP_VELOCITY_JETS * mech.weightPenalty : JUMP_VELOCITY_BASE * mech.weightPenalty
+      // Jump-jets rack ability: while its boost window is open, launch harder —
+      // this is the "boosted jump" the ability advertises (design §3.4). Without
+      // this the rack ability only refilled fuel and the extra lift was inert.
+      if (mech.jumpBoostTimer > 0) jumpVelocity *= JUMP.BOOST_MULTIPLIER
       mech.velocity.y = jumpVelocity
       mech.isJumping = true
     }
@@ -207,16 +287,16 @@ export class PhysicsSystem {
     // enough above the ground to have walked off a ledge. Otherwise the mech is
     // grounded and simply hugs the terrain — this keeps walking over rolling
     // hills smooth instead of falling-and-snapping every frame on a downslope.
-    const airborne = mech.isJumping || mech.velocity.y > 0 || aboveGround > GROUND_STICK_DISTANCE
+    const airborne = mech.isJumping || mech.velocity.y > 0 || aboveGround > MOVEMENT.GROUND_STICK_DISTANCE
 
     if (airborne) {
       // Apply gravity (increased for faster falling)
-      mech.velocity.y -= 50 * deltaTime
+      mech.velocity.y -= JUMP.GRAVITY * deltaTime
       mech.position.y += mech.velocity.y * deltaTime
 
       // Consume jump fuel while airborne and ascending (jump jets only)
       if (hasJumpJets && mech.isJumping && mech.velocity.y > 0) {
-        const fuelConsumption = 30 * (2.0 - mech.weightPenalty) // Heavy = 45/s, Light = 30/s
+        const fuelConsumption = JUMP.FUEL_CONSUMPTION_BASE * (2.0 - mech.weightPenalty) // Heavy = 45/s, Light = 30/s
         mech.jumpFuel -= deltaTime * fuelConsumption
         if (mech.jumpFuel < 0) {
           mech.jumpFuel = 0
@@ -225,9 +305,12 @@ export class PhysicsSystem {
 
       // Land when we reach the surface.
       if (mech.position.y <= groundY) {
+        // Capture impact BEFORE zeroing — a fast downward landing SLAMS.
+        const impactSpeed = Math.max(0, -mech.velocity.y)
         mech.position.y = groundY
         mech.velocity.y = 0
         mech.isJumping = false
+        this.emitLanding(mech, impactSpeed)
       }
     } else {
       // Grounded: stick to the terrain surface (smoothly follows slopes up/down).
@@ -238,62 +321,15 @@ export class PhysicsSystem {
 
     // Recharge fuel whenever grounded (y=0 or landed on building top last frame)
     if (!mech.isJumping && hasJumpJets) {
-      mech.jumpFuel = Math.min(mech.stats.energy, mech.jumpFuel + deltaTime * 15)
+      mech.jumpFuel = Math.min(mech.stats.energy, mech.jumpFuel + deltaTime * JUMP.FUEL_REGEN)
     }
   }
 
-  updateEnemyAI(enemy: MechEntity, player: MechEntity, deltaTime: number): boolean {
-    const distanceToPlayer = enemy.position.distanceTo(player.position)
-    const optimalRange = 15 // Prefer mid-range combat
-
-    // Calculate direction to player
-    const directionToPlayer = player.position.clone().sub(enemy.position)
-    directionToPlayer.y = 0 // Ignore vertical
-    directionToPlayer.normalize()
-
-    // Face player
-    enemy.rotation.y = Math.atan2(directionToPlayer.x, directionToPlayer.z)
-
-    // State machine
-    if (distanceToPlayer > optimalRange + 8) {
-      // Too far - chase player
-      enemy.aiState = 'chase'
-      const moveSpeed = (enemy.stats.speed / 100) * 6 * deltaTime
-      enemy.velocity.add(directionToPlayer.multiplyScalar(moveSpeed))
-    } else if (distanceToPlayer < optimalRange - 5) {
-      // Too close - back up
-      enemy.aiState = 'chase'
-      const moveSpeed = (enemy.stats.speed / 100) * 4 * deltaTime
-      enemy.velocity.add(directionToPlayer.multiplyScalar(-moveSpeed))
-    } else {
-      // Optimal range - strafe
-      enemy.aiState = 'strafe'
-      const strafeDirection = new THREE.Vector3(-directionToPlayer.z, 0, directionToPlayer.x)
-      const strafeSpeed = (enemy.stats.speed / 100) * 3 * deltaTime
-
-      // Randomly change strafe direction occasionally
-      if (Math.random() < 0.02) {
-        strafeDirection.multiplyScalar(-1)
-      }
-
-      enemy.velocity.add(strafeDirection.multiplyScalar(strafeSpeed))
-    }
-
-    // Apply velocity
-    enemy.position.add(enemy.velocity.clone().multiplyScalar(deltaTime))
-
-    // Apply friction
-    enemy.velocity.multiplyScalar(0.9)
-
-    // Clamp to arena bounds
-    enemy.position.x = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, enemy.position.x))
-    enemy.position.z = Math.max(-ARENA_HALF, Math.min(ARENA_HALF, enemy.position.z))
-
-    // Decide whether to shoot
-    // Fire rate based on accuracy (higher accuracy = more shots)
-    const fireChance = (enemy.stats.accuracy / 100) * deltaTime * 1.5
-    const shouldFire = Math.random() < fireChance && distanceToPlayer < 30
-
-    return shouldFire
+  /** Fire the landing hook with a weight-scaled intensity if the impact is hard enough. */
+  private emitLanding(mech: MechEntity, impactSpeed: number) {
+    if (!this.onLanding || impactSpeed < FOOTFALL.MIN_LANDING_IMPACT) return
+    const norm = Math.min(1, impactSpeed / FOOTFALL.LANDING_REFERENCE_IMPACT)
+    const weightMult = FOOTFALL.LANDING_INTENSITY[mech.weightClass] ?? FOOTFALL.LANDING_INTENSITY.medium
+    this.onLanding(norm * weightMult)
   }
 }

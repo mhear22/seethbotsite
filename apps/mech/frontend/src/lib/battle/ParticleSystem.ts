@@ -359,6 +359,37 @@ export class ParticleSystem {
    * trailing OPPOSITE the dash direction so a dash reads as movement, not a death.
    * @param direction the dash travel direction
    */
+  /**
+   * Deploy a smoke-screen cloud for the smoke rack ability (design §3.4). A
+   * dense puff of slow, dark, upward-drifting particles that lingers as visual
+   * cover — the diegetic counterpart to the EnemyAI accuracy debuff applied
+   * while a target's smokeScreenTimer is active.
+   */
+  spawnSmokeScreen(position: THREE.Vector3) {
+    const puffs = 26
+    for (let i = 0; i < puffs; i++) {
+      const shade = 0.14 + Math.random() * 0.14
+      this.addParticle({
+        position: position.clone().add(new THREE.Vector3(
+          (Math.random() - 0.5) * 4,
+          Math.random() * 2.5,
+          (Math.random() - 0.5) * 4,
+        )),
+        velocity: new THREE.Vector3(
+          (Math.random() - 0.5) * 1.2,
+          0.4 + Math.random() * 0.9,
+          (Math.random() - 0.5) * 1.2,
+        ),
+        life: 2.5 + Math.random() * 2.0,
+        color: new THREE.Color(shade, shade, shade),
+        size: 2.4 + Math.random() * 1.8,
+        gravity: -0.15,
+        drag: 0.97,
+        fadeIn: 0.4,
+      })
+    }
+  }
+
   spawnDashBurst(position: THREE.Vector3, direction: THREE.Vector3) {
     const back = direction.clone().normalize().negate()
     const count = 18

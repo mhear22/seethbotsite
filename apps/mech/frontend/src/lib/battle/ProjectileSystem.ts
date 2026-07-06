@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import type { MechEntity } from './MechEntity'
+import type { DamageType, WeaponType } from '../../shared/types/MechTypes'
 import { markRaw } from 'vue'
 
 export interface Projectile {
@@ -8,6 +9,13 @@ export interface Projectile {
   position: THREE.Vector3
   velocity: THREE.Vector3
   damage: number
+  // Combat channel this projectile deals; consumed by MechEntity.takeDamage for
+  // typed resistances. Distinct from `type` (which is a visual/physics channel).
+  damageType: DamageType
+  // If true, on-hit applies the flamer burn DoT (energy).
+  appliesBurn?: boolean
+  // If true, halves the target's flat armour (railgun).
+  armorPierce?: boolean
   ownerId: string
   lifetime: number
   mesh: THREE.Mesh
@@ -20,6 +28,28 @@ export interface Projectile {
   pooledGeometry?: boolean // geometry came from the shared pool; don't dispose per-shot
   pooledMaterial?: boolean // material came from the shared pool; don't dispose per-shot
   smokeTimer?: number // accumulator for missile smoke-trail emission
+}
+
+// ---- Combat tuning constants (design §3.2 / §3.4). Kept named, never inline. ----
+/** Floor on per-shot damage so a 0-firepower part still chips. */
+const MIN_WEAPON_DAMAGE = 5
+/** Melee weapons deal this multiple of their arm's firepower/10 (design §3.2). */
+const MELEE_DAMAGE_MULTIPLIER = 2.5
+/** Seconds a missile flies straight before homing engages (dodge window). */
+const MISSILE_HOMING_DELAY = 0.45
+/**
+ * Missile steering strength as a heading-lerp fraction per second. At ~2.2 a
+ * missile turns briskly but a well-timed dash (0.15s i-frames) or a hard
+ * perpendicular juke still shakes it — the intended "dodgeable" feel (§3.2).
+ */
+const MISSILE_HOMING_TURN = 2.2
+
+/** Map a weaponType to its default damage channel when a part omits damageType. */
+function defaultDamageType(weaponType: WeaponType): DamageType {
+  if (weaponType === 'energy') return 'energy'
+  if (weaponType === 'melee') return 'melee'
+  // ballistic, missile, support → kinetic
+  return 'kinetic'
 }
 
 // Cap on simultaneously-pooled missile PointLights. Excess missiles render
@@ -85,15 +115,29 @@ export class ProjectileSystem {
       return null
     }
 
+    // Support weapons (shield generator) fire no projectile. Instead they raise a
+    // held frontal block on the mech. Raising the shield is free; the power cost
+    // is paid PER POINT OF DAMAGE BLOCKED inside MechEntity.takeDamage (drains
+    // power instead of HP, design §3.4). Holding the button re-raises the block
+    // each frame, which is cheap. (Note: call sites don't gate a null return on
+    // cooldown, so this runs every frame while held — hence no per-call drain.)
+    if (weaponType === 'support') {
+      mech.activateShield()
+      return null
+    }
+
     // Consume power
     mech.currentPower -= powerCost
 
-    // Calculate damage based on firepower stat
-    let baseDamage = Math.max(5, mech.stats.firepower / 10)
+    // Per-arm firepower (design §3.2): damage is THIS arm's firepower, not the
+    // summed mech firepower. fp/10 reproduces the design's per-shot damage table
+    // exactly (autocannon 5, missile 10, flamer 24, railgun 40, pile driver 32→80).
+    let baseDamage = Math.max(MIN_WEAPON_DAMAGE, armPart.stats.firepower / 10)
+    const damageType: DamageType = armPart.damageType ?? defaultDamageType(weaponType)
 
     // Handle melee weapons specially
     if (weaponType === 'melee') {
-      baseDamage *= 2.5 // Melee deals 2.5x damage
+      baseDamage *= MELEE_DAMAGE_MULTIPLIER // Melee deals 2.5x its own arm's firepower
 
       // Very short range spawn position
       const spawnPosition = mech.getArmPosition(arm)
@@ -107,7 +151,7 @@ export class ProjectileSystem {
       mesh.position.copy(spawnPosition)
       this.scene.add(mesh)
 
-      // Lunge forward when attacking
+      // Lunge forward when attacking (relative to this mech/arm's facing)
       mech.velocity.add(mech.getForwardDirection().multiplyScalar(8))
 
       const projectile: Projectile = {
@@ -116,6 +160,7 @@ export class ProjectileSystem {
         position: spawnPosition,
         velocity: targetDirection.clone().multiplyScalar(80), // Slow projectile
         damage: baseDamage,
+        damageType,
         ownerId: mech.id,
         lifetime: 0.2, // Only 200ms to hit
         mesh,
@@ -128,14 +173,22 @@ export class ProjectileSystem {
       return projectile
     }
 
+    // Visual/physics channel for the projectile (narrower than WeaponType).
+    const projType: 'ballistic' | 'energy' | 'missile' =
+      weaponType === 'energy' ? 'energy'
+      : weaponType === 'missile' ? 'missile'
+      : 'ballistic'
+
     // Calculate distance to target for targeting bonus (use 50 as default for AI)
     const targetDistance = 50
     const isMoving = mech.velocity.length() > 1.0
     const targetingBonus = mech.getTargetingBonus(targetDistance, isMoving)
 
-    // Accuracy affects spread
+    // Accuracy affects spread. A weapon may override its base spread cone via
+    // armPart.spread (per-weapon identity, design §3.2); otherwise it derives
+    // from the accuracy stat as before.
     const accuracyFactor = Math.max(0.1, Math.min(1, (mech.stats.accuracy / 100) + targetingBonus))
-    const baseSpread = (1 - accuracyFactor) * 0.15
+    const baseSpread = armPart.spread ?? (1 - accuracyFactor) * 0.15
 
     // Check for multi-projectile weapons
     const projectileCount = armPart.projectileCount ?? 1
@@ -163,15 +216,17 @@ export class ProjectileSystem {
       const spawnPosition = mech.getArmPosition(arm)
 
       // Create projectile mesh from pooled geometry/material (not disposed per shot).
-      const geometry = this.getProjectileGeometry(weaponType)
-      const material = this.getProjectileMaterial(weaponType, mech.isPlayer)
+      const geometry = this.getProjectileGeometry(projType)
+      const material = this.getProjectileMaterial(projType, mech.isPlayer)
       const mesh = markRaw(new THREE.Mesh(geometry, material))
       mesh.position.copy(spawnPosition)
       this.scene.add(mesh)
 
-      const velocity = direction.clone().multiplyScalar(this.getProjectileSpeed(weaponType))
+      // Per-weapon muzzle velocity override, else per-projectile-type default.
+      const muzzleSpeed = armPart.projectileSpeed ?? this.getProjectileSpeed(projType)
+      const velocity = direction.clone().multiplyScalar(muzzleSpeed)
       const { light: missileLight, glow: missileGlow } = this.createProjectileVisuals(
-        weaponType,
+        projType,
         mech.isPlayer,
         spawnPosition,
         velocity,
@@ -180,10 +235,13 @@ export class ProjectileSystem {
 
       const projectile: Projectile = {
         id: `proj_${this.nextId++}`,
-        type: weaponType,
+        type: projType,
         position: spawnPosition,
         velocity,
         damage: baseDamage,
+        damageType,
+        appliesBurn: armPart.appliesBurn,
+        armorPierce: armPart.armorPierce,
         ownerId: mech.id,
         lifetime: 3, // 3 seconds
         mesh,
@@ -192,9 +250,9 @@ export class ProjectileSystem {
         pooledGeometry: true,
         pooledMaterial: true,
         smokeTimer: 0,
-        ...(weaponType === 'missile' && target ? {
+        ...(projType === 'missile' && target ? {
           targetId: target.id,
-          homingDelay: 0.4 // start homing after 0.4 seconds
+          homingDelay: MISSILE_HOMING_DELAY // fly straight briefly, then home
         } : {})
       }
 
@@ -378,8 +436,9 @@ export class ProjectileSystem {
             const targetPos = target.getCorePosition()
             const toTarget = targetPos.sub(proj.position).normalize()
             const speed = proj.velocity.length()
-            // Smoothly steer toward target (turn rate: ~180 deg/s)
-            const turnRate = Math.PI * deltaTime
+            // Smoothly steer toward target. Tuned (MISSILE_HOMING_TURN) to be
+            // brisk but shakeable by a dash i-frame or a hard perpendicular juke.
+            const turnRate = MISSILE_HOMING_TURN * deltaTime
             proj.velocity.normalize().lerp(toTarget, Math.min(1, turnRate)).normalize().multiplyScalar(speed)
           }
         }
@@ -561,6 +620,9 @@ export class ProjectileSystem {
       position: pos,
       velocity: vel,
       damage,
+      // Network projectiles carry no part metadata; derive a sensible channel.
+      // (MP damage is server-authoritative, so this only tints client resistances.)
+      damageType: type === 'energy' ? 'energy' : 'kinetic',
       ownerId,
       lifetime: 5,
       mesh,

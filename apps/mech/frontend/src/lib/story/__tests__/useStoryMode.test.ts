@@ -28,6 +28,7 @@ import {
   FINALE_UNLOCK_HAPPY_TOWNS,
   QUESTS_PER_CHAIN,
   TOWN_COUNT,
+  WORLD_HALF_EXTENT,
   type TownState,
 } from '../../../composables/useStoryMode'
 import { findPartById } from '../../../shared/data/MechParts'
@@ -128,10 +129,12 @@ describe('run factory + serialization', () => {
     const a = townSpawnPosition(0)
     const b = townSpawnPosition(0)
     expect(a).toEqual(b)
+    // Towns sit on rings scaled off WORLD_HALF_EXTENT (outer ring = 0.78×), so
+    // they must stay strictly inside the world bound — not a hard-coded radius.
     for (let i = 0; i < TOWN_COUNT; i++) {
       const [x, , z] = townSpawnPosition(i)
-      expect(Math.abs(x)).toBeLessThan(400)
-      expect(Math.abs(z)).toBeLessThan(400)
+      expect(Math.abs(x)).toBeLessThan(WORLD_HALF_EXTENT)
+      expect(Math.abs(z)).toBeLessThan(WORLD_HALF_EXTENT)
     }
   })
 })

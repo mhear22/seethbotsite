@@ -98,6 +98,81 @@ const DIFFICULTY_PROFILES: Record<AIDifficulty, DifficultyProfile> = {
   },
 }
 
+/**
+ * Enemy archetypes (GRINDER §3.6). These are pure DATA rows mapped onto the
+ * existing DifficultyProfile fields — no new AI code. They give the squad
+ * combat of later phases distinct "roles" by re-weighting the same knobs the
+ * difficulty ladder already uses (range discipline, dodge frequency, lead,
+ * aim skill, combat style). Loadout (hover/tracked/quad + weapon) is assigned
+ * by the enemy generator, not here; this only shapes behaviour.
+ *
+ *  - skirmisher: fast hover kiter, high dodge, harasses at range.
+ *  - line:       balanced bipedal grunt, the baseline pressure unit.
+ *  - bulwark:    tracked brawler wall — low dodge, high aim, closes and grinds.
+ *  - sniper:     extreme-range shot-leader (the "lancer") — big aimed shots,
+ *                low cadence, kites hard; the reason to want cover / smoke.
+ *  - ace:        named-pilot boss profile (Kestrel / Kass), mixed loadout.
+ */
+export type EnemyArchetype = 'skirmisher' | 'line' | 'bulwark' | 'sniper' | 'ace'
+
+export const ARCHETYPE_PROFILES: Record<EnemyArchetype, DifficultyProfile> = {
+  skirmisher: {
+    aimSkill: 0.5,
+    reactionTime: 0.2,
+    evadeFrequency: 0.85,
+    strafeAggression: 1.5,
+    optimalRange: 20,
+    rangeDiscipline: 8,
+    fireRateMult: 1.6,
+    combatStyle: 'kite',
+    leadFactor: 0.7,
+  },
+  line: {
+    aimSkill: 0.55,
+    reactionTime: 0.3,
+    evadeFrequency: 0.45,
+    strafeAggression: 1.0,
+    optimalRange: 15,
+    rangeDiscipline: 8,
+    fireRateMult: 1.4,
+    combatStyle: 'balanced',
+    leadFactor: 0.6,
+  },
+  bulwark: {
+    aimSkill: 0.8,
+    reactionTime: 0.25,
+    evadeFrequency: 0.15,
+    strafeAggression: 0.5,
+    optimalRange: 10,
+    rangeDiscipline: 6,
+    fireRateMult: 1.3,
+    combatStyle: 'brawl',
+    leadFactor: 0.5,
+  },
+  sniper: {
+    aimSkill: 0.9,
+    reactionTime: 0.2,
+    evadeFrequency: 0.4,
+    strafeAggression: 0.7,
+    optimalRange: 34,
+    rangeDiscipline: 10,
+    fireRateMult: 0.6,
+    combatStyle: 'kite',
+    leadFactor: 1.0,
+  },
+  ace: {
+    aimSkill: 0.95,
+    reactionTime: 0.08,
+    evadeFrequency: 0.9,
+    strafeAggression: 1.6,
+    optimalRange: 16,
+    rangeDiscipline: 5,
+    fireRateMult: 2.3,
+    combatStyle: 'kite',
+    leadFactor: 1.0,
+  },
+}
+
 export class EnemyAI {
   private state: AIState = 'flank'
   private strafeDir: number = 1
@@ -141,6 +216,16 @@ export class EnemyAI {
     this.profile = DIFFICULTY_PROFILES[difficulty] ?? DIFFICULTY_PROFILES.medium
   }
 
+  /**
+   * Adopt an archetype behaviour profile (§3.6). Additive to setDifficulty —
+   * the caller (enemy generator / StoryCombat) picks whichever it wants as the
+   * source of this AI's DifficultyProfile. No behaviour code changes; only the
+   * profile knobs swap.
+   */
+  setArchetype(archetype: EnemyArchetype): void {
+    this.profile = ARCHETYPE_PROFILES[archetype] ?? DIFFICULTY_PROFILES.medium
+  }
+
   setArenaBounds(halfWidth: number, halfDepth: number): void {
     this.arenaHalf = Math.min(halfWidth, halfDepth)
   }
@@ -180,7 +265,10 @@ export class EnemyAI {
     const dir = aimPoint.clone().sub(spawn).normalize()
     // At aimSkill 1 -> ~0 spread; at 0 -> ~0.18 rad cone half-angle.
     const maxConeRad = 0.18
-    const coneHalf = maxConeRad * (1 - this.profile.aimSkill)
+    let coneHalf = maxConeRad * (1 - this.profile.aimSkill)
+    // Smoke screen (design §3.4): a target hidden in smoke is much harder to
+    // hit — widen the aim-error cone substantially while its screen is active.
+    if (player.smokeScreenTimer > 0) coneHalf += 0.22
     if (coneHalf > 0) {
       // Random small rotation off the perfect direction (random axis + angle).
       const axis = new THREE.Vector3(
@@ -309,11 +397,14 @@ export class EnemyAI {
       this.pickNewWaypoint(enemy.position)
     }
 
-    // Match player physics: targetSpeed = 8 * speedStat * weightFactor
+    // Approximate player locomotion: same steady-state top speed formula, with
+    // an acceleration in the ballpark of the player's weight-class curve
+    // (PhysicsSystem now tunes accel per weight class; enemies keep a simple
+    // single accel so their behaviour tuning stays independent and stable).
     const speedStat = Math.max(10, enemy.stats.speed) / 100
     const weightFactor = enemy.weightPenalty
     const maxSpeed = 8 * speedStat * weightFactor
-    const accel = 60 * weightFactor // units/s² — same as PhysicsSystem
+    const accel = 60 * weightFactor // units/s²
 
     const strafeVec = new THREE.Vector3(-dirToPlayer.z, 0, dirToPlayer.x)
       .multiplyScalar(this.strafeDir)
@@ -460,7 +551,9 @@ export class EnemyAI {
 
     // Better aim skill also lets the AI hold fire for cleaner shots (only shoot
     // when the player is reasonably within the firing arc at higher skill).
-    const fireChance = (enemy.stats.accuracy / 100) * deltaTime * fireRateMult
+    let fireChance = (enemy.stats.accuracy / 100) * deltaTime * fireRateMult
+    // Smoke screen also makes the AI hold fire more often (loss of a clean lock).
+    if (player.smokeScreenTimer > 0) fireChance *= 0.4
     return Math.random() < fireChance && distanceToPlayer < 30
   }
 }

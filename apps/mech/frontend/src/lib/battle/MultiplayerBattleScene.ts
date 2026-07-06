@@ -77,6 +77,11 @@ export class MultiplayerBattleScene extends BattleScene {
     this.yourPlayerId = config.yourPlayerId;
     this.opponentId = config.opponentId;
 
+    // MP power is server-authoritative and overwritten from snapshots each frame.
+    // Disable the local power economy so dash/boost aren't gated on a momentarily
+    // low predicted power bar (a visual hiccup); the server drives the real costs.
+    this.physicsSystem.powerEconomyEnabled = false;
+
     // Solo survival echoes the player as their own "opponent". There is no real
     // opponent mech to render in that case, so hide the placeholder enemy mesh
     // (server-driven AI mechs are added separately). PvP is unaffected.

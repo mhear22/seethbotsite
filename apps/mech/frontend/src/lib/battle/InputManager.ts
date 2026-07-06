@@ -8,13 +8,14 @@ export interface InputState {
   shootLeft: boolean   // Right mouse button (fires left arm)
   shootRight: boolean  // Left mouse button (fires right arm)
   dash: boolean
-  useAbility: boolean  // E key (rack ability)
+  useAbility: boolean       // E key (boost — the 3× sprint / thrust pool)
+  useRackAbility: boolean   // Q key (rack ability: smoke / repair / shield / etc.)
   mouseX: number
   mouseY: number
 }
 
 /** Virtual action buttons a touch/gamepad overlay can drive. */
-export type VirtualButton = 'shootLeft' | 'shootRight' | 'jump' | 'dash' | 'useAbility'
+export type VirtualButton = 'shootLeft' | 'shootRight' | 'jump' | 'dash' | 'useAbility' | 'useRackAbility'
 
 export class InputManager {
   private keys: Map<string, boolean> = new Map()
@@ -130,6 +131,7 @@ export class InputManager {
         shootRight: false,
         dash: false,
         useAbility: false,
+        useRackAbility: false,
         mouseX: 0,
         mouseY: 0,
       }
@@ -154,6 +156,9 @@ export class InputManager {
       shootRight: this.mouseButtons.get(0) || vb.get('shootRight') || false, // Left mouse button
       dash: this.keys.get(this.keyBindings.dash) || this.keys.get('ShiftRight') || vb.get('dash') || false,
       useAbility: this.keys.get('KeyE') || vb.get('useAbility') || false,
+      // Rack ability is a SEPARATE verb from boost (E) so holding boost never
+      // auto-dumps smoke/repair/shield the instant they leave cooldown.
+      useRackAbility: this.keys.get('KeyQ') || vb.get('useRackAbility') || false,
       // Mouse look (under pointer lock) PLUS virtual look (touch drag, no lock needed).
       mouseX: this.mouseMovement.x + this.virtualLook.x,
       mouseY: this.mouseMovement.y + this.virtualLook.y

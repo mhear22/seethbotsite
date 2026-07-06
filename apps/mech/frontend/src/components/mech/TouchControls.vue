@@ -63,6 +63,14 @@
         @touchend.prevent="release('useAbility')"
         @touchcancel.prevent="release('useAbility')"
       >E</button>
+      <!-- Rack ability (smoke / repair / shield / jump-jets) — a separate verb
+           from boost (E) so it can't be triggered by holding sprint. -->
+      <button
+        class="tc-btn rack"
+        @touchstart.prevent="press('useRackAbility')"
+        @touchend.prevent="release('useRackAbility')"
+        @touchcancel.prevent="release('useRackAbility')"
+      >Q</button>
     </div>
   </div>
 </template>
@@ -282,4 +290,5 @@ onUnmounted(() => props.input?.clearVirtualInput())
 .tc-btn.dash { right: 84px; bottom: 0; }
 .tc-btn.interact,
 .tc-btn.ability { right: 150px; bottom: 36px; background: rgba(216, 163, 43, 0.5); }
+.tc-btn.rack { right: 150px; bottom: 108px; background: rgba(72, 148, 194, 0.5); }
 </style>

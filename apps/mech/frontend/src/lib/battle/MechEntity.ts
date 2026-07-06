@@ -1,7 +1,39 @@
 import * as THREE from 'three'
 import type { MechLoadout } from '../../composables/useMechBuilder'
+import type { DamageType } from '../../shared/types/MechTypes'
 import { markRaw } from 'vue'
 import { getMechModelLoader, MODEL_ATTACH_POINTS } from './MechModelLoader'
+
+// ---- Combat / damage tuning constants (design §3.2 / §3.4). Never inline. ----
+/** Flat-armour reduction ceiling. Dropped 0.90 → 0.75 so nothing is unkillable. */
+export const ARMOR_CAP = 0.75
+/** Max magnitude of summed typed resistance (both resist and weakness). */
+export const RESISTANCE_CLAMP = 0.6
+/** Flamer burn DoT. Short, dt-driven, refreshes on re-hit. */
+const BURN_DURATION = 2.0
+const BURN_DPS = 6
+/** Smoke: seconds enemy AI aiming at this mech should suffer an accuracy debuff. */
+const SMOKE_SCREEN_DURATION = 6.0
+/** Held directional shield block (support weapon). */
+const SHIELD_HOLD_DURATION = 0.4      // block window; refreshed each support trigger
+const SHIELD_BLOCK_FRACTION = 0.7     // fraction of frontal damage blocked (design §3.4)
+/** dot(forward, incomingDir) below this counts as a frontal hit (≈120° frontal
+ *  arc). Hits from the flanks/rear bypass the shield so it stays "a wall you
+ *  flank" (design §3.6), not a 360° mitigator. */
+const SHIELD_FRONTAL_DOT = -0.5
+const SHIELD_POWER_PER_DAMAGE = 1.5   // power drained per point of damage blocked
+/** Jump-jet rack ability. */
+const JUMP_JET_COOLDOWN = 10          // matches the part's flavour text
+const JUMP_JET_BOOST_DURATION = 1.2   // seconds of boosted jump PhysicsSystem may read
+/** Ammo-feed rack ability: dt-driven fire-rate buff window (replaces setTimeout). */
+const AMMO_FEED_DURATION = 5.0
+
+/** Options carried from a projectile into takeDamage. */
+export interface DamageOptions {
+  armorPierce?: boolean          // halve target's flat armour (railgun)
+  burn?: boolean                 // apply the flamer burn DoT
+  fromFront?: boolean            // hit came from the mech's frontal arc (default true)
+}
 
 export interface CombatStats {
   maxHealth: number
@@ -46,10 +78,33 @@ export class MechEntity {
   // Rack ability state
   rackAbilityCooldown: number = 0
   rackAbilityActive: boolean = false
+  // dt-driven window for the ammo-feed fire-rate buff (replaces the old setTimeout
+  // so it respects pause/hitstop). Decremented in update(); clears rackAbilityActive.
+  private rackAbilityActiveTimer: number = 0
+
+  // ---- Status effects (all dt-driven in update(); respect pause since update
+  // is only called while unpaused) ----
+  /** Flamer burn DoT remaining seconds; ticks BURN_DPS while > 0. */
+  burnTimer: number = 0
+  private burnDps: number = 0
+  /** Smoke screen active window. Seam: EnemyAI should reduce accuracy vs a target whose smokeScreenTimer > 0. */
+  smokeScreenTimer: number = 0
+  /** Held frontal shield window (support weapon). Blocks a fraction of incoming, drained from power. */
+  shieldTimer: number = 0
+  /** Boosted jump-jet window. Seam: PhysicsSystem may read this for extra jump thrust. */
+  jumpBoostTimer: number = 0
+
+  /** Optional hook so the scene can spawn smoke particles when the smoke rack fires. */
+  onSmokeDeploy?: (position: THREE.Vector3) => void
 
   // Destruction animation - random velocities per mesh child
   private destroyVelocities: THREE.Vector3[] = []
   private destroyRotations: THREE.Vector3[] = []
+
+  /** Set each frame by PhysicsSystem.updateMovement; true while actively boosting
+   *  (and not cut out by an empty power bar). The firing path reads this to
+   *  suppress fire while boosting (design §3.1). */
+  isBoosting: boolean = false
 
   // Dash state
   isDashing: boolean = false
@@ -208,6 +263,84 @@ export class MechEntity {
 
     // Decay emissive damage flash
     this.updateDamageFlash(deltaTime)
+
+    // Tick dt-driven status effects (all pause-safe: update() is skipped while paused).
+    this.updateStatusEffects(deltaTime)
+  }
+
+  /**
+   * Advance all timed combat statuses. dt-driven so they honour pause/hitstop
+   * (the host stops calling update() when paused).
+   */
+  private updateStatusEffects(deltaTime: number) {
+    // Flamer burn DoT.
+    if (this.burnTimer > 0 && !this.isDestroyed) {
+      this.burnTimer = Math.max(0, this.burnTimer - deltaTime)
+      this.stats.currentHealth = Math.max(0, this.stats.currentHealth - this.burnDps * deltaTime)
+      // Reuse the hit flash so burn reads visually.
+      if (this.damageFlash < 0.4) this.damageFlash = 0.4
+    }
+
+    // Smoke screen window (enemy-AI accuracy debuff flag).
+    if (this.smokeScreenTimer > 0) this.smokeScreenTimer = Math.max(0, this.smokeScreenTimer - deltaTime)
+
+    // Held shield window (must be re-triggered to persist).
+    if (this.shieldTimer > 0) this.shieldTimer = Math.max(0, this.shieldTimer - deltaTime)
+
+    // Boosted jump-jet window.
+    if (this.jumpBoostTimer > 0) this.jumpBoostTimer = Math.max(0, this.jumpBoostTimer - deltaTime)
+
+    // Ammo-feed fire-rate buff window (dt-driven replacement for setTimeout).
+    if (this.rackAbilityActiveTimer > 0) {
+      this.rackAbilityActiveTimer = Math.max(0, this.rackAbilityActiveTimer - deltaTime)
+      if (this.rackAbilityActiveTimer === 0) this.rackAbilityActive = false
+    }
+  }
+
+  /** True while the dash i-frame window is active (design §3.1 skill-dodge). */
+  get isInvulnerable(): boolean {
+    return this.isDashing
+  }
+
+  /** Raise/refresh the held frontal shield block (called by ProjectileSystem for support weapons). */
+  activateShield() {
+    this.shieldTimer = SHIELD_HOLD_DURATION
+  }
+
+  /**
+   * Whether a projectile travelling in `incomingDir` strikes this mech's frontal
+   * arc (design §3.4/§3.6: the shield only blocks the front, so it can be flanked).
+   * A frontal hit travels roughly opposite the mech's facing — into its face.
+   * Callers pass the projectile velocity so the shield block can be directional.
+   */
+  isHitFromFront(incomingDir: THREE.Vector3): boolean {
+    const dir = incomingDir.clone()
+    dir.y = 0
+    if (dir.lengthSq() < 1e-6) return true // unknown direction — treat as frontal
+    dir.normalize()
+    const forward = this.getForwardDirection()
+    forward.y = 0
+    if (forward.lengthSq() < 1e-6) return true
+    forward.normalize()
+    return forward.dot(dir) < SHIELD_FRONTAL_DOT
+  }
+
+  /**
+   * Summed typed resistance from every equipped part for a damage channel,
+   * clamped to ±RESISTANCE_CLAMP. Positive = resistant, negative = weak. Melee
+   * callers never reach here (melee is "resisted only by range", design §3.2).
+   */
+  getResistance(damageType: DamageType): number {
+    let total = 0
+    const parts = [
+      this.loadout.leftArm, this.loadout.rightArm, this.loadout.core,
+      this.loadout.legs, this.loadout.head, this.loadout.rack,
+    ]
+    for (const part of parts) {
+      const r = part?.resistances?.[damageType]
+      if (typeof r === 'number') total += r
+    }
+    return Math.max(-RESISTANCE_CLAMP, Math.min(RESISTANCE_CLAMP, total))
   }
 
   /**
@@ -371,17 +504,57 @@ export class MechEntity {
     return this.position.clone().setY(this.position.y + MODEL_ATTACH_POINTS.core.y)
   }
 
-  takeDamage(damage: number): boolean {
-    // Apply armor reduction (armor is %)
-    const armorReduction = Math.min(0.9, this.stats.armor / 100) // Cap at 90%
-    const actualDamage = damage * (1 - armorReduction)
+  /**
+   * Single damage choke point (design §3.2). Applies, in order:
+   *  1. Dash i-frames — full invulnerability during the 0.15s dash window.
+   *  2. Held shield block — a fraction of frontal, non-melee damage is drained
+   *     from power instead of HP (fails when power runs out).
+   *  3. Flat armour — capped at ARMOR_CAP (75%); halved by armour-piercing hits.
+   *  4. Typed resistance — chassis parts resist/are weak to kinetic/energy;
+   *     melee ignores this ("resisted only by range").
+   *  5. Flamer burn — starts/refreshes a dt-driven DoT (ticked in update()).
+   *
+   * `damageType`/`opts` are optional so legacy call sites (`takeDamage(dmg)`)
+   * still compile; the integrator should pass the projectile's damageType and
+   * `{ armorPierce, burn }` from the hit to activate typed combat.
+   */
+  takeDamage(damage: number, damageType: DamageType = 'kinetic', opts?: DamageOptions): boolean {
+    // 1. Dash i-frames: fully invulnerable mid-dash (the skill dodge, §3.1).
+    if (this.isInvulnerable) return false
 
+    let incoming = damage
+
+    // 2. Held directional shield: block a fraction, drained from power not HP.
+    //    Blocks ranged damage from the front (default true if direction unknown).
+    if (this.shieldTimer > 0 && damageType !== 'melee' && (opts?.fromFront ?? true) && this.currentPower > 0) {
+      const wanted = incoming * SHIELD_BLOCK_FRACTION
+      const affordable = this.currentPower / SHIELD_POWER_PER_DAMAGE
+      const blocked = Math.min(wanted, affordable)
+      this.currentPower = Math.max(0, this.currentPower - blocked * SHIELD_POWER_PER_DAMAGE)
+      incoming -= blocked
+    }
+
+    // 3. Flat armour reduction (cap 75%; armour-piercing sees half the armour).
+    const effectiveArmor = opts?.armorPierce ? this.stats.armor / 2 : this.stats.armor
+    const armorReduction = Math.min(ARMOR_CAP, effectiveArmor / 100)
+    let actualDamage = incoming * (1 - armorReduction)
+
+    // 4. Typed resistance (melee excluded).
+    if (damageType !== 'melee') {
+      actualDamage *= (1 - this.getResistance(damageType))
+    }
+
+    actualDamage = Math.max(0, actualDamage)
     this.stats.currentHealth -= actualDamage
+
+    // 5. Flamer burn: start/refresh the DoT.
+    if (opts?.burn) {
+      this.burnTimer = BURN_DURATION
+      this.burnDps = BURN_DPS
+    }
 
     // Visual feedback - flash red
     this.flashDamage()
-
-    console.log(`${this.name} took ${actualDamage.toFixed(1)} damage (raw: ${damage}, armor: ${armorReduction * 100}%)`)
 
     if (this.stats.currentHealth <= 0) {
       this.stats.currentHealth = 0
@@ -532,17 +705,25 @@ export class MechEntity {
 
     switch (this.loadout.rack.id) {
       case 'rack-jump-jets':
-        // Already implemented via jump input
-        return false
+        // Refill jump fuel and open a boosted-jump window. PhysicsSystem owns the
+        // actual thrust; it can read jumpBoostTimer/jumpFuel for extra lift (seam).
+        this.jumpFuel = this.stats.energy
+        this.jumpBoostTimer = JUMP_JET_BOOST_DURATION
+        this.rackAbilityCooldown = JUMP_JET_COOLDOWN
+        return true
       case 'rack-smoke-launcher':
-        // Trigger smoke cloud
+        // Deploy a smoke screen: sets an enemy-AI accuracy-debuff window on this
+        // mech and asks the scene to spawn the obscuring particle cloud.
+        this.smokeScreenTimer = SMOKE_SCREEN_DURATION
+        this.onSmokeDeploy?.(this.getCorePosition())
         this.rackAbilityCooldown = 15
         return true
       case 'rack-ammo-feed':
-        // Activate burst fire mode
+        // Fire-rate buff (NOT a magazine sim — power stays the only economy, §6).
+        // dt-driven window so it respects pause/hitstop (replaces setTimeout).
         this.rackAbilityActive = true
+        this.rackAbilityActiveTimer = AMMO_FEED_DURATION
         this.rackAbilityCooldown = 20
-        setTimeout(() => { this.rackAbilityActive = false }, 5000)
         return true
       case 'rack-repair-drone':
         // Instant heal

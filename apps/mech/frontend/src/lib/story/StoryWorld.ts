@@ -122,6 +122,8 @@ export class StoryWorld {
   private elapsed: number = 0
   /** Combat clock for weapon cooldown bookkeeping (mirrors BattleScene.battleTime). */
   private battleTime: number = 0
+  // Rising-edge latch for the rack-ability key (fire once per press, see BattleScene).
+  private rackAbilityHeld = false
   /** Suspends decay/free-roam input while a dialogue/garage UI is open. */
   private paused: boolean = false
 
@@ -172,6 +174,19 @@ export class StoryWorld {
     this.projectileSystem.onMissileSmoke = (p: THREE.Vector3) => {
       this.particleSystem.spawnImpactSparks(p, new THREE.Vector3(0, 1, 0), 'floor')
     }
+
+    // Footfall / landing weight (design §3.1): route PhysicsSystem's weight-scaled
+    // strides and ground slams into the camera dip/shake + a landing dust ring.
+    this.physicsSystem.onFootstep = (intensity) => this.camera.onFootstep(intensity)
+    this.physicsSystem.onLanding = (intensity) => {
+      this.camera.onLanding(intensity)
+      this.particleSystem.spawnImpactSparks(
+        this.playerMech.position.clone(), new THREE.Vector3(0, 1, 0), 'floor',
+      )
+    }
+    // Smoke rack ability deploys a cloud + arms the EnemyAI accuracy debuff.
+    this.playerMech.onSmokeDeploy = (pos) => this.particleSystem.spawnSmokeScreen(pos)
+
     this.combat = new StoryCombat(this.scene, this.projectileSystem, this.particleSystem)
     // Encounters are local to a town; bound the AI to a generous play radius.
     this.combat.setArenaBounds(WORLD_HALF_EXTENT)
@@ -342,6 +357,15 @@ export class StoryWorld {
     this.physicsSystem.updateJumpJets(this.playerMech, input, deltaTime)
     this.playerMech.update(deltaTime)
     this.playerMech.updatePower(deltaTime)
+
+    // Rack ability (smoke / shield / jump-jets / repair) — mirrors BattleScene so
+    // the finished rack abilities (design §3.4) are reachable in story combat too.
+    // Bound to Q and edge-triggered so holding boost (E) never auto-dumps it.
+    this.playerMech.rackAbilityCooldown = Math.max(0, this.playerMech.rackAbilityCooldown - deltaTime)
+    if (input.useRackAbility && !this.rackAbilityHeld) {
+      this.playerMech.useRackAbility()
+    }
+    this.rackAbilityHeld = input.useRackAbility
 
     // Re-anchor the camera to the mech's new position this frame so the view
     // tracks the mech as it moves (movement above shifts playerMech.position).

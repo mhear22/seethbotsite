@@ -20,8 +20,16 @@ export const ARM_PARTS: ArmPart[] = [
     description: '20mm rotary cannon with high rate of fire',
     stats: { health: 10, armor: 5, speed: 0, energy: -10, firepower: 50, accuracy: 15 },
     weight: 8,
-    powerDraw: 5,
+    // 1.5/shot at 0.12s cadence ≈ 12.5 power/s — the LOWEST sustained draw of any
+    // weapon (below the missile pod's 15/s), which is the autocannon's whole
+    // identity: lower DPS than the missile but its power-efficient sustain answer.
+    // Was 5/shot (≈42/s), which made it strictly dominated by the missile pod.
+    powerDraw: 1.5,
     fireRate: 0.12,
+    // Sustained-pressure kinetic. Fast forgiving tracer, tight base spread.
+    damageType: 'kinetic',
+    projectileSpeed: 340,
+    spread: 0.02,
     pros: ['High rate of fire', 'Good accuracy', 'Low energy draw'],
     cons: ['Limited range', 'Ammo dependent'],
     rarity: 'common',
@@ -40,6 +48,11 @@ export const ARM_PARTS: ArmPart[] = [
     weight: 12,
     powerDraw: 25,
     fireRate: 2.0,
+    // One devastating aimed shot. Near-hitscan velocity, pinpoint, armour-piercing.
+    damageType: 'energy',
+    projectileSpeed: 700,
+    spread: 0.0,
+    armorPierce: true,
     pros: ['Armor piercing', 'Extreme range', 'High velocity'],
     cons: ['High energy cost', 'Slow rate of fire', 'Heavy'],
     rarity: 'rare',
@@ -57,6 +70,9 @@ export const ARM_PARTS: ArmPart[] = [
     stats: { health: 20, armor: 15, speed: 5, energy: -5, firepower: 320, accuracy: 10 },
     weight: 15,
     powerDraw: 10,
+    // Brawler finisher. Melee channel (ignores ranged resistances); slow heavy swing + lunge.
+    fireRate: 1.5,
+    damageType: 'melee',
     pros: ['No ammo', 'Structural damage', 'Bonus armor'],
     cons: ['Melee only', 'Close range required'],
     rarity: 'uncommon',
@@ -68,14 +84,19 @@ export const ARM_PARTS: ArmPart[] = [
     id: 'arm-missile-pod',
     name: 'SRM-6 Missile Pod',
     type: 'arm',
-    weaponType: 'ballistic',
+    // 'missile' activates the homing path in ProjectileSystem (steering + trail).
+    weaponType: 'missile',
     icon: 'missile-pod',
-    description: 'Six-tube launcher fires full salvo for devastating alpha strikes',
+    description: 'Six-tube launcher fires a homing salvo for devastating alpha strikes',
     stats: { health: 8, armor: 3, speed: 0, energy: -15, firepower: 100, accuracy: 8 },
     weight: 10,
     powerDraw: 15,
     fireRate: 1.0,
     projectileCount: 6,
+    // Burst alpha, now homing. Slow enough to out-dash if you time it; salvo cone.
+    damageType: 'kinetic',
+    projectileSpeed: 200,
+    spread: 0.06,
     pros: ['Massive burst damage', 'Area effect', 'Good against groups'],
     cons: ['Low accuracy', 'Ammo limited', 'Reload time'],
     rarity: 'uncommon',
@@ -94,6 +115,11 @@ export const ARM_PARTS: ArmPart[] = [
     weight: 9,
     powerDraw: 20,
     fireRate: 0.4,
+    // Short-range energy shredder + area denial. Slow wide cone, applies burn DoT.
+    damageType: 'energy',
+    projectileSpeed: 120,
+    spread: 0.12,
+    appliesBurn: true,
     pros: ['Area denial', 'No ammo', 'Persistent damage'],
     cons: ['Very short range', 'High energy use', 'Collateral damage'],
     rarity: 'common',
@@ -110,7 +136,9 @@ export const ARM_PARTS: ArmPart[] = [
     description: 'Directional energy shield projector',
     stats: { health: 15, armor: 25, speed: -3, energy: -25, firepower: 0, accuracy: 0 },
     weight: 7,
-    powerDraw: 0,
+    powerDraw: 0, // raising the block is free; power is spent per damage blocked in takeDamage
+    // Passive energy resistance on top of the held directional block (see MechEntity shield handling).
+    resistances: { energy: 0.2 },
     pros: ['Blocks incoming fire', 'Energy resistant', 'Regenerates'],
     cons: ['No offensive capability', 'High energy drain', 'Directional only'],
     rarity: 'rare',
@@ -227,6 +255,8 @@ export const LEGS_PARTS: LegsPart[] = [
     stats: { health: 120, armor: 40, speed: -5, energy: 0, firepower: 0, accuracy: 10 },
     weight: 30,
     powerCapacity: 120,
+    // Tracked/reinforced = kinetic-resistant, energy-weak (design §3.2).
+    resistances: { kinetic: 0.25, energy: -0.2 },
     pros: ['Extreme stability', 'Heavy armor', 'Perfect firing platform'],
     cons: ['Slow', 'Difficult terrain penalties', 'Heavy'],
     rarity: 'uncommon',
@@ -244,6 +274,8 @@ export const LEGS_PARTS: LegsPart[] = [
     stats: { health: 50, armor: 10, speed: 25, energy: -20, firepower: 0, accuracy: -5 },
     weight: 15,
     powerCapacity: 80,
+    // Hover/scout = energy-resistant, kinetic-weak (design §3.2).
+    resistances: { energy: 0.25, kinetic: -0.2 },
     pros: ['Very fast', 'Ignores terrain', 'Evasion bonus'],
     cons: ['Fragile', 'Energy drain', 'Unstable firing platform'],
     rarity: 'rare',
@@ -261,6 +293,8 @@ export const LEGS_PARTS: LegsPart[] = [
     stats: { health: 100, armor: 25, speed: 8, energy: 0, firepower: 0, accuracy: 8 },
     weight: 25,
     powerCapacity: 110,
+    // Stable heavy platform: mild kinetic resistance.
+    resistances: { kinetic: 0.1 },
     pros: ['Very stable', 'Excellent terrain handling', 'Good load capacity'],
     cons: ['Complex mechanics', 'Maintenance intensive', 'Slower than bipedal'],
     rarity: 'uncommon',
@@ -319,6 +353,8 @@ export const HEAD_PARTS: HeadPart[] = [
     description: 'Heavily armored cockpit for survivability',
     stats: { health: 60, armor: 30, speed: 0, energy: 0, firepower: 0, accuracy: 5 },
     weight: 15,
+    // Reinforced = kinetic-resistant, slightly energy-weak (design §3.2).
+    resistances: { kinetic: 0.2, energy: -0.05 },
     pros: ['Very durable', 'Pilot protection', 'EMP resistant'],
     cons: ['Limited sensors', 'Heavy', 'Reduced visibility'],
     rarity: 'uncommon',
@@ -337,6 +373,8 @@ export const HEAD_PARTS: HeadPart[] = [
     description: 'Long-range reconnaissance sensors',
     stats: { health: 20, armor: 5, speed: 5, energy: -10, firepower: 0, accuracy: 15 },
     weight: 5,
+    // Scout = energy-resistant, kinetic-weak (design §3.2).
+    resistances: { energy: 0.15, kinetic: -0.15 },
     pros: ['Extended range', 'Multi-spectrum', 'Threat detection'],
     cons: ['Very fragile', 'No armor', 'Vulnerable to EMP'],
     rarity: 'uncommon',

@@ -9,7 +9,9 @@ export default defineConfig({
     // Pure-logic + three.js math runs fine in node. No DOM/WebGL needed.
     environment: 'node',
     include: ['**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
-    exclude: ['node_modules', 'dist', '.idea', '.git', '.cache'],
+    // Exclude the Playwright suite (its own runner, run via `pnpm playtest`).
+    // vitest cannot execute Playwright's test() and crashes collecting them.
+    exclude: ['node_modules', 'dist', '.idea', '.git', '.cache', 'e2e/**'],
   },
   resolve: {
     alias: {

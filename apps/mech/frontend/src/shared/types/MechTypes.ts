@@ -21,9 +21,32 @@ export interface MechStats {
 // ============================================================================
 
 export type PartType = 'arm' | 'core' | 'legs' | 'head' | 'rack'
-export type WeaponType = 'ballistic' | 'energy' | 'melee' | 'support'
+// 'missile' is a first-class weapon type: it drives the homing-missile projectile
+// path in ProjectileSystem (steering + trail). It is distinct from 'ballistic'
+// (dumb-fire kinetic rounds) even though both are physically kinetic damage.
+export type WeaponType = 'ballistic' | 'energy' | 'melee' | 'support' | 'missile'
 export type MobilityType = 'bipedal' | 'quadrupedal' | 'hover' | 'tracked'
 export type Rarity = 'common' | 'uncommon' | 'rare' | 'legendary'
+
+// ============================================================================
+// Damage typing & resistances
+// ============================================================================
+
+/**
+ * The three combat damage channels. A weapon deals exactly one; a chassis can
+ * resist or be weak to each independently. Melee is intentionally its own
+ * channel: per design it is "resisted only by range", so armour parts never
+ * grant a melee resistance (see DamageResistances usage in MechEntity).
+ */
+export type DamageType = 'kinetic' | 'energy' | 'melee'
+
+/**
+ * Per-part resistance contribution, keyed by damage channel. Values are signed
+ * fractions applied AFTER flat armour: +0.25 = take 25% less of that type,
+ * -0.20 = take 20% more (a weakness). Contributions from every equipped part
+ * sum, then clamp (see MechEntity.getResistance). Omitted channels contribute 0.
+ */
+export type DamageResistances = Partial<Record<DamageType, number>>
 
 // Base part interface
 export interface MechPart {
@@ -40,6 +63,7 @@ export interface MechPart {
   manufacturer?: string                // Lore element
   synergyTags?: string[]              // Tags for synergy matching
   modelPath?: string                   // Path to 3D model file (e.g., '/models/arms/autocannon.glb')
+  resistances?: DamageResistances      // Signed per-damage-type resistance this part grants (see DamageResistances)
 }
 
 // Specialized part types
@@ -49,6 +73,13 @@ export interface ArmPart extends MechPart {
   powerDraw: number                    // Power consumed per shot
   fireRate?: number                    // Optional custom fire rate in seconds (cooldown between shots)
   projectileCount?: number             // Optional number of projectiles per shot (default: 1)
+  // ---- Per-weapon combat identity (design §3.2 / §3.4). All optional so parts
+  // that omit them fall back to per-weapon-type defaults in ProjectileSystem. ----
+  damageType?: DamageType              // Combat channel this weapon deals (default derived from weaponType)
+  projectileSpeed?: number             // Override muzzle velocity (u/s); default is per-projectile-type
+  spread?: number                      // Override base inaccuracy cone (radians of half-jitter); default derives from accuracy
+  armorPierce?: boolean                // If true, target's flat armour is halved against this weapon
+  appliesBurn?: boolean                // If true, on-hit applies the flamer burn DoT (energy)
 }
 
 export interface CorePart extends MechPart {
@@ -221,6 +252,7 @@ export function serializeLoadout(loadout: MechLoadout): SerializedLoadout {
  */
 export function toNetworkWeaponType(weaponType: WeaponType, partId: string): WeaponConfig['type'] {
   // Map arm part weapon types to network weapon types
+  if (weaponType === 'missile') return 'missile_launcher'
   if (weaponType === 'ballistic') {
     if (partId.includes('missile')) return 'missile_launcher'
     return 'autocannon'
