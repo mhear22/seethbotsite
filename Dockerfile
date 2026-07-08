@@ -28,6 +28,7 @@ FROM base AS manifests
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json .npmrc ./
 COPY backend/package.json ./backend/
 COPY frontend/package.json ./frontend/
+COPY apps/mech/backend/package.json ./apps/mech/backend/
 COPY apps/mech/frontend/package.json ./apps/mech/frontend/
 COPY apps/tickets/frontend/package.json ./apps/tickets/frontend/
 COPY apps/datacenter/frontend/package.json ./apps/datacenter/frontend/
@@ -87,6 +88,15 @@ COPY apps/mech/frontend/ ./apps/mech/frontend/
 RUN pnpm --filter ./apps/mech/frontend run build
 
 # ---------------------------------------------------------------------------
+# Stage: build mech backend (TypeScript) — standalone game API + WebSocket
+# service. Runs as its own process; main reverse-proxies mech traffic to it.
+# ---------------------------------------------------------------------------
+FROM deps AS mech-backend-builder
+COPY apps/mech/backend/tsconfig.json ./apps/mech/backend/
+COPY apps/mech/backend/src ./apps/mech/backend/src/
+RUN pnpm --filter ./apps/mech/backend run build
+
+# ---------------------------------------------------------------------------
 # Stage: build tickets frontend app (relies on hoisted @vue/tsconfig from workspace)
 # Note: tickets imports @frontend/* (alias -> ../../../frontend), so the main
 # frontend source must be present.
@@ -116,6 +126,14 @@ RUN --mount=type=cache,target=/tmp/prisma \
     cd /prod && ./node_modules/.bin/prisma generate
 
 # ---------------------------------------------------------------------------
+# Stage: mech backend production dependencies — self-contained prod-only deps
+# for the standalone mech game backend via `pnpm deploy`.
+# ---------------------------------------------------------------------------
+FROM deps AS mech-prod-deps
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
+    pnpm --filter ./apps/mech/backend deploy --legacy --prod /prod-mech
+
+# ---------------------------------------------------------------------------
 # Stage: production image (minimal)
 # ---------------------------------------------------------------------------
 FROM node:24-slim
@@ -139,6 +157,13 @@ COPY --from=backend-builder /app/backend/prisma.config.ts ./
 COPY --from=backend-builder /app/backend/scripts/start.sh ./scripts/start.sh
 RUN chmod +x ./scripts/start.sh
 
+# Mech game backend (standalone process launched by start.sh). Self-contained
+# prod node_modules + package.json from pnpm deploy, plus its built dist.
+# Runtime path must match MECH_DIR in scripts/start.sh (/app/apps/mech/backend).
+COPY --from=mech-prod-deps /prod-mech/node_modules /app/apps/mech/backend/node_modules
+COPY --from=mech-prod-deps /prod-mech/package.json /app/apps/mech/backend/
+COPY --from=mech-backend-builder /app/apps/mech/backend/dist /app/apps/mech/backend/dist
+
 # Frontend builds (each app's `build` emits into backend/<app>-webdist)
 COPY --from=frontend-builder /app/frontend/dist ./webdist
 COPY --from=mech-frontend-builder /app/backend/mech-webdist ./mech-webdist
@@ -151,6 +176,8 @@ RUN mkdir -p /app/backend/data
 ENV GIT_HASH=${GIT_HASH}
 ENV GIT_BRANCH=${GIT_BRANCH}
 ENV PORT=3000
+# Mech game backend port (main reverse-proxies mech traffic to localhost:MECH_PORT)
+ENV MECH_PORT=3011
 
 EXPOSE 3000
 

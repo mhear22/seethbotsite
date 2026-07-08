@@ -17,7 +17,11 @@ services:
       - "8081:3000"
     environment:
       NODE_ENV: production
+      # Shared by BOTH the main and mech backend processes (both run in this
+      # container via start.sh) so mech validates tokens minted by main.
       SEETHBOT_JWT_SECRET: ${SEETHBOT_JWT_SECRET}
+      # Port the standalone mech backend listens on; main reverse-proxies to it.
+      MECH_PORT: ${MECH_PORT:-3011}
       SEETHBOT_API_KEYS: ${SEETHBOT_API_KEYS:-}
       CORS_ORIGINS: ${CORS_ORIGINS:-}
       DATABASE_URL: ${DATABASE_URL:-postgresql://seethbot:${POSTGRES_PASSWORD:-seethbot_secret_change_me}@postgres:5432/seethbot?schema=public}

@@ -11,7 +11,7 @@ const crypto = require('crypto');
  * Run this as part of the build process to catch out-of-sync files early.
  *
  * There are THREE copies of the shared network/map contract in this repo:
- *   1. backend/src/shared             — server-authoritative source of truth
+ *   1. apps/mech/backend/src/shared   — server-authoritative source of truth
  *   2. frontend/shared                — the (main-site) root frontend copy
  *   3. apps/mech/frontend/src/shared  — the LIVE mech SPA copy (deployed to /mech/)
  * Every pair below carries an optional `appsMech` path so the live SPA copy is
@@ -35,49 +35,49 @@ const crypto = require('crypto');
 const SHARED_FILE_PAIRS = [
   // Types
   {
-    backend: 'backend/src/shared/types/MapDefinition.ts',
+    backend: 'apps/mech/backend/src/shared/types/MapDefinition.ts',
     frontend: 'frontend/shared/types/MapDefinition.ts',
     appsMech: 'apps/mech/frontend/src/shared/types/MapDefinition.ts',
   },
   {
-    backend: 'backend/src/shared/types/NetworkMessages.ts',
+    backend: 'apps/mech/backend/src/shared/types/NetworkMessages.ts',
     frontend: 'frontend/shared/types/NetworkMessages.ts',
     appsMech: 'apps/mech/frontend/src/shared/types/NetworkMessages.ts',
   },
   // Constants
   {
-    backend: 'backend/src/shared/constants/GameConstants.ts',
+    backend: 'apps/mech/backend/src/shared/constants/GameConstants.ts',
     frontend: 'frontend/shared/constants/GameConstants.ts',
     appsMech: 'apps/mech/frontend/src/shared/constants/GameConstants.ts',
   },
   // Maps
   {
-    backend: 'backend/src/shared/maps/defaultArena.ts',
+    backend: 'apps/mech/backend/src/shared/maps/defaultArena.ts',
     frontend: 'frontend/shared/maps/defaultArena.ts',
     appsMech: 'apps/mech/frontend/src/shared/maps/defaultArena.ts',
   },
   {
-    backend: 'backend/src/shared/maps/ruinedHighway.ts',
+    backend: 'apps/mech/backend/src/shared/maps/ruinedHighway.ts',
     frontend: 'frontend/shared/maps/ruinedHighway.ts',
     appsMech: 'apps/mech/frontend/src/shared/maps/ruinedHighway.ts',
   },
   {
-    backend: 'backend/src/shared/maps/reactorCore.ts',
+    backend: 'apps/mech/backend/src/shared/maps/reactorCore.ts',
     frontend: 'frontend/shared/maps/reactorCore.ts',
     appsMech: 'apps/mech/frontend/src/shared/maps/reactorCore.ts',
   },
   {
-    backend: 'backend/src/shared/maps/megaFactory.ts',
+    backend: 'apps/mech/backend/src/shared/maps/megaFactory.ts',
     frontend: 'frontend/shared/maps/megaFactory.ts',
     appsMech: 'apps/mech/frontend/src/shared/maps/megaFactory.ts',
   },
   {
-    backend: 'backend/src/shared/maps/spaceColony.ts',
+    backend: 'apps/mech/backend/src/shared/maps/spaceColony.ts',
     frontend: 'frontend/shared/maps/spaceColony.ts',
     appsMech: 'apps/mech/frontend/src/shared/maps/spaceColony.ts',
   },
   {
-    backend: 'backend/src/shared/maps/index.ts',
+    backend: 'apps/mech/backend/src/shared/maps/index.ts',
     frontend: 'frontend/shared/maps/index.ts',
     appsMech: 'apps/mech/frontend/src/shared/maps/index.ts',
   },

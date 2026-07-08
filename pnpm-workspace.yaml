@@ -1,6 +1,7 @@
 packages:
   - 'frontend'
   - 'backend'
+  - 'apps/mech/backend'
   - 'apps/mech/frontend'
   - 'apps/tickets/frontend'
   - 'apps/datacenter/frontend'

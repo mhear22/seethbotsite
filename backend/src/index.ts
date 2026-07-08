@@ -45,11 +45,14 @@ import busTrackerController from './controllers/bus-tracker.controller';
 import dataCenterRunsController from './controllers/datacenter-runs.controller';
 import videosController from './controllers/videos.controller';
 import { setupWebSocketServer } from './controllers/presence.controller';
-import { multiplayerApiRouter, setupMechWebSockets } from './modules/mech';
+import { createProxyMiddleware, fixRequestBody } from 'http-proxy-middleware';
 import { createServer } from 'http';
 
 const app: Express = express();
 const PORT = process.env.PORT || 3000;
+// The mech game backend runs as a separate process; main reverse-proxies to it.
+const MECH_PORT = process.env.MECH_PORT || 3011;
+const MECH_TARGET = `http://localhost:${MECH_PORT}`;
 // In production Docker: __dirname is /app/backend/dist, webdist is at /app/backend/webdist
 // In development: __dirname is /backend/src, webdist is at /backend/webdist
 const SERVE_ROOT = process.env.SERVE_ROOT || path.join(__dirname, '..', 'webdist');
@@ -166,9 +169,24 @@ app.use('/api', busTrackerController);
 app.use('/api', dataCenterRunsController);
 app.use('/api', videosController);
 
-// Mech multiplayer API routes (canonical + legacy compatibility alias)
-app.use('/api/mech/multiplayer', multiplayerApiRouter);
-app.use('/api/multiplayer', multiplayerApiRouter);
+// Mech multiplayer API routes are served by the standalone mech backend process.
+// Reverse-proxy the canonical + legacy paths to it. Rate limiting + auth logging
+// above have already run before traffic is forwarded.
+const isMechHttpPath = (pathname: string) =>
+  pathname.startsWith('/api/mech/multiplayer') || pathname.startsWith('/api/multiplayer');
+
+app.use(
+  createProxyMiddleware({
+    target: MECH_TARGET,
+    changeOrigin: true,
+    pathFilter: (pathname) => isMechHttpPath(pathname),
+    on: {
+      // Body-parser (express.json/urlencoded) has consumed the request stream;
+      // re-stream the parsed body so proxied POST/PUT requests are not truncated.
+      proxyReq: fixRequestBody,
+    },
+  })
+);
 
 // Serve raw OpenAPI JSON spec for type generation
 app.get('/api/openapi.json', (req: Request, res: Response) => {
@@ -231,8 +249,17 @@ const server = createServer(app);
 // Setup WebSocket server for user presence BEFORE server starts listening
 setupWebSocketServer(server);
 
-// Setup multiplayer WebSocket server
-setupMechWebSockets(server);
+// Reverse-proxy mech multiplayer WebSocket upgrades to the standalone mech backend.
+// The pathFilter ensures non-mech upgrades (e.g. /ws presence) are left untouched
+// for the presence upgrade handler registered above.
+const mechWsProxy = createProxyMiddleware({
+  target: MECH_TARGET,
+  changeOrigin: true,
+  ws: true,
+  pathFilter: (pathname) =>
+    pathname.startsWith('/ws/mech/multiplayer') || pathname.startsWith('/ws/multiplayer'),
+});
+server.on('upgrade', mechWsProxy.upgrade!);
 
 // Note: Prisma client is initialized automatically, no need for separate DB initialization
 
