@@ -9,7 +9,6 @@ module.exports = {
   moduleFileExtensions: ['ts', 'js', 'json'],
   verbose: true,
   testTimeout: 30000,
-  forceExit: true,
   maxWorkers: 1,
   // Sets SEETHBOT_JWT_SECRET before modules load (multiplayer.controller asserts it).
   // No DB setup — these suites are pure unit tests.

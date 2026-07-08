@@ -41,8 +41,11 @@ app.use('/api/multiplayer', multiplayerApiRouter);
 const server = createServer(app);
 setupMechWebSockets(server);
 
-server.listen(PORT, () => {
-  console.log(`🤖 Mech game server running on http://localhost:${PORT}`);
+// Bind to loopback only: this service is reachable exclusively via the main
+// backend's reverse proxy (which applies rate limiting + auth logging). Binding
+// 127.0.0.1 enforces that at the OS level rather than relying on port publishing.
+server.listen(Number(PORT), '127.0.0.1', () => {
+  console.log(`🤖 Mech game server running on http://127.0.0.1:${PORT}`);
   console.log('🎮 Multiplayer WebSocket: /ws/mech/multiplayer (and /ws/multiplayer legacy)');
 });
 

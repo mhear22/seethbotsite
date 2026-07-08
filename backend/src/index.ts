@@ -52,7 +52,9 @@ const app: Express = express();
 const PORT = process.env.PORT || 3000;
 // The mech game backend runs as a separate process; main reverse-proxies to it.
 const MECH_PORT = process.env.MECH_PORT || 3011;
-const MECH_TARGET = `http://localhost:${MECH_PORT}`;
+// Use 127.0.0.1 (not "localhost"): the mech backend binds IPv4 loopback only,
+// and Node may resolve "localhost" to ::1 first, which would ECONNREFUSED.
+const MECH_TARGET = `http://127.0.0.1:${MECH_PORT}`;
 // In production Docker: __dirname is /app/backend/dist, webdist is at /app/backend/webdist
 // In development: __dirname is /backend/src, webdist is at /backend/webdist
 const SERVE_ROOT = process.env.SERVE_ROOT || path.join(__dirname, '..', 'webdist');
@@ -172,8 +174,13 @@ app.use('/api', videosController);
 // Mech multiplayer API routes are served by the standalone mech backend process.
 // Reverse-proxy the canonical + legacy paths to it. Rate limiting + auth logging
 // above have already run before traffic is forwarded.
+// Match on a path-segment boundary so a future sibling route (e.g.
+// /api/multiplayer-history) is NOT silently swallowed by the proxy.
+const atSegmentBoundary = (pathname: string, base: string) =>
+  pathname === base || pathname.startsWith(base + '/');
 const isMechHttpPath = (pathname: string) =>
-  pathname.startsWith('/api/mech/multiplayer') || pathname.startsWith('/api/multiplayer');
+  atSegmentBoundary(pathname, '/api/mech/multiplayer') ||
+  atSegmentBoundary(pathname, '/api/multiplayer');
 
 app.use(
   createProxyMiddleware({
@@ -252,14 +259,29 @@ setupWebSocketServer(server);
 // Reverse-proxy mech multiplayer WebSocket upgrades to the standalone mech backend.
 // The pathFilter ensures non-mech upgrades (e.g. /ws presence) are left untouched
 // for the presence upgrade handler registered above.
+const isMechWsPath = (pathname: string) =>
+  atSegmentBoundary(pathname, '/ws/mech/multiplayer') ||
+  atSegmentBoundary(pathname, '/ws/multiplayer');
 const mechWsProxy = createProxyMiddleware({
   target: MECH_TARGET,
   changeOrigin: true,
   ws: true,
-  pathFilter: (pathname) =>
-    pathname.startsWith('/ws/mech/multiplayer') || pathname.startsWith('/ws/multiplayer'),
+  pathFilter: (pathname) => isMechWsPath(pathname),
 });
 server.on('upgrade', mechWsProxy.upgrade!);
+
+// Final upgrade fallback: destroy sockets for any path handled by NEITHER the
+// presence handler (/ws, /presence) nor the mech proxy, so unknown upgrade
+// requests don't leak half-open sockets. Runs last; only touches paths the
+// prior handlers deliberately ignored.
+server.on('upgrade', (req, socket) => {
+  const pathname = new URL(req.url || '', `http://${req.headers.host}`).pathname;
+  const handled =
+    pathname === '/ws' || pathname === '/presence' || isMechWsPath(pathname);
+  if (!handled) {
+    socket.destroy();
+  }
+});
 
 // Note: Prisma client is initialized automatically, no need for separate DB initialization
 

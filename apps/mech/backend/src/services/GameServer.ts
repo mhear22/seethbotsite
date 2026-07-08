@@ -45,6 +45,9 @@ export class GameServer {
     this.matchmakingInterval = setInterval(() => {
       this.attemptMatches();
     }, MATCHMAKING.MATCHMAKING_INTERVAL);
+    // Don't let this housekeeping timer keep the event loop alive on its own
+    // (the HTTP server keeps the process running in prod; lets tests exit).
+    this.matchmakingInterval.unref?.();
   }
 
   /**

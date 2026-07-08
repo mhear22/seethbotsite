@@ -44,10 +44,17 @@ FROM manifests AS deps
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     pnpm install --frozen-lockfile
 
-# Shared files + validation script used by backend/frontend prebuild checks
-# (validate-shared-files.js compares backend/src/shared vs frontend/shared)
+# Shared-contract trees + validator for the backend/frontend prebuild sync check.
+# validate-shared-files.js resolves every path from the workspace root (/app):
+#   apps/mech/backend/src/shared   = server-authoritative source of truth
+#   frontend/shared                = main-frontend copy
+#   apps/mech/frontend/src/shared  = mech-frontend copy
+# All three must be present in any stage whose build triggers the prebuild check.
 FROM deps AS shared-src
 COPY scripts/validate-shared-files.js ./scripts/validate-shared-files.js
+COPY apps/mech/backend/src/shared ./apps/mech/backend/src/shared/
+COPY frontend/shared ./frontend/shared/
+COPY apps/mech/frontend/src/shared ./apps/mech/frontend/src/shared/
 
 # ---------------------------------------------------------------------------
 # Stage: build backend (TypeScript) — generates dist/openapi.json for frontend
@@ -59,11 +66,10 @@ ARG BUILD_COUNT
 # Generate Prisma client (engines installed via deps)
 RUN --mount=type=cache,target=/tmp/prisma \
     pnpm --filter ./backend exec prisma generate
-# Backend + shared sources
+# Backend sources (shared-contract trees are inherited from shared-src)
 COPY backend/tsconfig.json ./backend/
 COPY backend/scripts ./backend/scripts/
 COPY backend/src ./backend/src/
-COPY frontend/shared ./frontend/shared/
 RUN GIT_HASH="${GIT_HASH}" GIT_BRANCH="${GIT_BRANCH}" BUILD_COUNT="${BUILD_COUNT}" \
     pnpm --filter ./backend run build
 
@@ -73,10 +79,10 @@ RUN GIT_HASH="${GIT_HASH}" GIT_BRANCH="${GIT_BRANCH}" BUILD_COUNT="${BUILD_COUNT
 FROM shared-src AS frontend-builder
 # Backend OpenAPI spec for type generation
 COPY --from=backend-builder /app/backend/dist/openapi.json ./backend/dist/openapi.json
-# Frontend source + backend shared tree at repo-root path (for prebuild validation,
-# which resolves backend/src/shared & frontend/shared relative to the workspace root)
+# Frontend source (shared-contract trees for the prebuild sync check are
+# inherited from shared-src; the frontend/ copy below overlaps frontend/shared
+# harmlessly with identical content).
 COPY frontend/ ./frontend/
-COPY backend/src/shared ./backend/src/shared/
 RUN --mount=type=cache,target=/app/frontend/public/assets/images/resized \
     pnpm --filter ./frontend run build
 

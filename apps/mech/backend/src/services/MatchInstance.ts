@@ -214,6 +214,7 @@ export class MatchInstance {
         this.startGameLoop();
       }
     }, 1000);
+    countdownInterval.unref?.();
   }
 
   /**
@@ -265,6 +266,7 @@ export class MatchInstance {
     this.tickInterval = setInterval(() => {
       this.tick();
     }, NETWORK.SNAPSHOT_INTERVAL);
+    this.tickInterval.unref?.();
   }
 
   /**

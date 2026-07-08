@@ -21,9 +21,6 @@ console.log = (...args: any[]) => {
   // Only suppress known noisy prefixes; pass through unexpected logs
   const msg = args[0]?.toString?.() ?? '';
   if (
-    msg.startsWith('[GameServer]') ||
-    msg.startsWith('[Match ') ||
-    msg.startsWith('[Matchmaking]') ||
     msg.startsWith('[Auth]') ||
     msg.startsWith('prisma:') ||
     msg.startsWith('Setting up test database') ||
@@ -35,8 +32,6 @@ console.log = (...args: any[]) => {
 console.warn = (...args: any[]) => {
   const msg = args[0]?.toString?.() ?? '';
   if (
-    msg.startsWith('[GameServer]') ||
-    msg.startsWith('[Match ') ||
     msg.startsWith('[Auth]')
   ) return;
   originalConsoleWarn(...args);

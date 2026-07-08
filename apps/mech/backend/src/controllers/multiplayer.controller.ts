@@ -110,6 +110,7 @@ export function setupMultiplayerWebSocket(server: any) {
           clearInterval(pingInterval);
         }
       }, 30000); // 30 seconds
+      pingInterval.unref?.();
 
       ws.on('close', () => {
         clearInterval(pingInterval);
