@@ -183,7 +183,8 @@ onUnmounted(() => {
 
 .fps-counter {
   position: absolute;
-  top: 8px;
+  /* Below the enemy health bar block so the readout never overlaps it. */
+  top: 72px;
   right: 12px;
   font-family: monospace;
   font-size: 14px;

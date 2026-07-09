@@ -1,6 +1,7 @@
 <template>
   <div class="multiplayer-battle-wrapper">
     <canvas ref="canvasRef" class="battle-canvas"></canvas>
+    <div v-if="showFPS" class="fps-counter">{{ fps }} FPS</div>
 
     <!-- Multiplayer HUD -->
     <MultiplayerHUD
@@ -61,6 +62,8 @@ const emit = defineEmits<{
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 let battleScene: MultiplayerBattleScene | null = null
 const gameSettings = useGameSettings()
+const fps = ref(0)
+const showFPS = computed(() => gameSettings.settings.value.graphics.showFPS)
 
 // Multiplayer state
 const connectionStatus = ref<'connected' | 'connecting' | 'disconnected' | 'error'>('connecting')
@@ -98,6 +101,7 @@ onMounted(() => {
     invertMouseX: gameSettings.settings.value.invertMouseX,
     invertMouseY: gameSettings.settings.value.invertMouseY,
     keyBindings: gameSettings.settings.value.keyBindings,
+    graphics: gameSettings.settings.value.graphics,
     mapId: props.matchData.mapId,
     authToken: props.authToken,
     matchId: props.matchData.matchId,
@@ -140,6 +144,7 @@ onMounted(() => {
   // Emit time + HUD updates periodically
   hudUpdateInterval = setInterval(() => {
     if (battleScene) {
+      fps.value = battleScene.getFPS()
       matchTime.value = battleScene.getBattleTime()
       emit('time-update', matchTime.value)
 
@@ -209,5 +214,20 @@ onUnmounted(() => {
   width: 100%;
   height: 100%;
   cursor: none;
+}
+
+.fps-counter {
+  position: absolute;
+  /* Below the enemy health bar block so the readout never overlaps it. */
+  top: 72px;
+  right: 12px;
+  font-family: monospace;
+  font-size: 14px;
+  font-weight: bold;
+  color: #00ff88;
+  text-shadow: 0 0 6px rgba(0, 255, 136, 0.6);
+  pointer-events: none;
+  user-select: none;
+  z-index: 10;
 }
 </style>

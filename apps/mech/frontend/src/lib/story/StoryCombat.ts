@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { markRaw } from 'vue'
 import { MechEntity } from '../battle/MechEntity'
-import { EnemyAI, type EnemyArchetype } from '../battle/EnemyAI'
+import { EnemyAI, type EnemyArchetype, type IncomingThreat } from '../battle/EnemyAI'
 import { ProjectileSystem } from '../battle/ProjectileSystem'
 import { ParticleSystem } from '../battle/ParticleSystem'
 import {
@@ -176,6 +176,8 @@ export class StoryCombat {
   private particles: ParticleSystem
 
   private enemies: CombatEnemy[] = []
+  // Scratch list for AI threat feeding, refilled each frame (no allocations).
+  private incomingThreats: IncomingThreat[] = []
   private quest: QuestDef | null = null
   /** Town centre the encounter is anchored to. */
   private anchor = new THREE.Vector3()
@@ -744,10 +746,14 @@ export class StoryCombat {
       }
     }
 
-    // Feed AI the player's in-flight projectiles so it can dodge.
-    const threats = this.projectiles.getProjectiles()
-      .filter((p) => p.ownerId === player.id)
-      .map((p) => ({ position: p.position, velocity: p.velocity }))
+    // Feed AI the player's in-flight projectiles so it can dodge. Reuse one
+    // array and pass projectiles directly (they satisfy IncomingThreat
+    // structurally) — no per-frame array/wrapper allocations.
+    this.incomingThreats.length = 0
+    for (const p of this.projectiles.getProjectiles()) {
+      if (p.ownerId === player.id) this.incomingThreats.push(p)
+    }
+    const threats = this.incomingThreats
 
     // --- Enemy AI + firing ---
     for (const e of this.enemies) {

@@ -1,6 +1,58 @@
 import * as THREE from 'three'
 import type { TownState } from '../../composables/useStoryMode'
-import { farmsAliveForCondition, populationForCondition } from '../../composables/useStoryMode'
+import { TOWN_DECAY_RADIUS, farmsAliveForCondition, populationForCondition } from '../../composables/useStoryMode'
+
+// ============================================================================
+// Shared geometry/material assets. Every town is built from the same shapes, so
+// tessellate each one once at module scope instead of per Town instance (5 towns
+// re-building ~30 identical geometries each was pure duplicate GPU-buffer churn,
+// and identical materials defeat the renderer's draw-state batching). These are
+// intentionally NOT tracked in any town's ownedMaterials: they live for the app
+// session and must never be disposed by Town.dispose().
+// Materials are only shared when setCondition never writes to them — anything
+// condition-tinted stays per-town (per-mesh where needed) so towns can diverge.
+// ============================================================================
+
+/** Box geometries keyed by dimensions (buildings, rubble, pillars, anchors). */
+const SHARED_BOX_GEOS = new Map<string, THREE.BoxGeometry>()
+function sharedBoxGeo(w: number, h: number, d: number): THREE.BoxGeometry {
+  const key = `${w}x${h}x${d}`
+  let geo = SHARED_BOX_GEOS.get(key)
+  if (!geo) {
+    geo = new THREE.BoxGeometry(w, h, d)
+    SHARED_BOX_GEOS.set(key, geo)
+  }
+  return geo
+}
+
+const SHARED = {
+  padGeo: new THREE.CircleGeometry(34, 40),
+  padMat: new THREE.MeshStandardMaterial({ color: 0x6b5d4f, roughness: 0.95, metalness: 0.0 }),
+  /** Base building material; cloned per building (setCondition tints per mesh). */
+  buildingBaseMat: new THREE.MeshStandardMaterial({ color: 0xb08968, roughness: 0.85, metalness: 0.05 }),
+  /** Rubble is never tinted (colour matches Town.BUILDING_RUBBLE). */
+  rubbleMat: new THREE.MeshStandardMaterial({ color: 0x4a3f37, roughness: 1.0, metalness: 0.0 }),
+  farmGeo: new THREE.PlaneGeometry(12, 9),
+  cropGeo: new THREE.ConeGeometry(0.35, 1.4, 5),
+  /** Townsfolk and NPC figures share one capsule. */
+  capsuleGeo: new THREE.CapsuleGeometry(0.4, 1.0, 4, 8),
+  markerGeo: new THREE.ConeGeometry(1.2, 3, 6),
+  markerMat: new THREE.MeshStandardMaterial({
+    color: 0xffd54f,
+    emissive: 0xffb300,
+    emissiveIntensity: 0.8,
+    roughness: 0.4,
+    metalness: 0.2,
+  }),
+  berthGeo: new THREE.RingGeometry(3.2, 4.2, 24),
+  berthMat: new THREE.MeshStandardMaterial({
+    color: 0xd6b24a, roughness: 0.7, metalness: 0.1,
+    emissive: 0x4a3a00, emissiveIntensity: 0.3,
+  }),
+  mastGeo: new THREE.CylinderGeometry(0.5, 0.8, 11, 6),
+  dishGeo: new THREE.SphereGeometry(2.2, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2),
+  wellGeo: new THREE.CylinderGeometry(1.8, 2.0, 1.6, 16),
+}
 
 // ============================================================================
 // Pedestrian-scale types (design §4.4). Consumed by the on-foot ENTITY cluster:
@@ -65,8 +117,18 @@ export class Town {
   readonly position: THREE.Vector3
   /** Root group; add this to the scene. */
   readonly group: THREE.Group
+  /** Small props (crops, folk, rubble, NPCs, berth, well) culled by distance. */
+  private readonly detail: THREE.Group
+  private detailVisible = true
 
   private condition: number = 100
+  /**
+   * Last condition applied to the visuals, quantized to whole points (NaN until
+   * the first apply). setCondition runs every frame while the player is inside
+   * a town (tickTownDecay), but the visuals only move fractions of a point per
+   * second — sub-point re-applies of ~100 material writes are skipped.
+   */
+  private lastAppliedCondition = Number.NaN
 
   // Sub-parts kept for condition-driven updates.
   private buildings: THREE.Mesh[] = []
@@ -101,11 +163,20 @@ export class Town {
     commons: { x: 0, z: 5, label: 'The Commons' },
   }
 
-  // Shared geometries/materials owned by this town (disposed on teardown).
-  private ownedGeometries: THREE.BufferGeometry[] = []
+  // Materials owned by this town (disposed on teardown). Geometries are all
+  // module-shared (SHARED/sharedBoxGeo) and never town-owned.
   private ownedMaterials: THREE.Material[] = []
 
   private static readonly CROWD_SIZE = 8
+
+  /**
+   * Beyond this XZ distance the `detail` sub-group is hidden: a crop tuft or
+   * townsfolk capsule is only a few pixels tall out here but still costs a
+   * main-pass and a shadow-pass draw call each (~40 meshes per town). The
+   * town's silhouette (buildings, gate, mast) and the quest-marker beacon stay
+   * visible at any range so navigation is unaffected and nothing pops in view.
+   */
+  private static readonly DETAIL_CULL_RADIUS_SQ = (TOWN_DECAY_RADIUS * 4) ** 2
 
   // --- Condition thresholds (0..100). Shared by all visual transitions so the
   //     intact → damaged → rubble / green → wilting → dead stages are explicit. ---
@@ -135,13 +206,15 @@ export class Town {
     this.group.name = `town-${state.id}`
     this.group.position.copy(this.position)
 
+    // Small props live in a sub-group so distant towns can drop them from both
+    // the main and shadow passes (see updateDetailVisibility) without hiding
+    // the town silhouette or the quest marker.
+    this.detail = new THREE.Group()
+    this.detail.name = `town-${state.id}-detail`
+    this.group.add(this.detail)
+
     this.build()
     this.setCondition(state.condition ?? 100)
-  }
-
-  private trackGeo<T extends THREE.BufferGeometry>(g: T): T {
-    this.ownedGeometries.push(g)
-    return g
   }
 
   private trackMat<T extends THREE.Material>(m: T): T {
@@ -151,32 +224,20 @@ export class Town {
 
   private build(): void {
     // --- Ground pad so the town reads as a distinct region ---
-    const padGeo = this.trackGeo(new THREE.CircleGeometry(34, 40))
-    const padMat = this.trackMat(new THREE.MeshStandardMaterial({
-      color: 0x6b5d4f,
-      roughness: 0.95,
-      metalness: 0.0,
-    }))
-    const pad = new THREE.Mesh(padGeo, padMat)
+    const pad = new THREE.Mesh(SHARED.padGeo, SHARED.padMat)
     pad.rotation.x = -Math.PI / 2
     pad.position.y = 0.02
     pad.receiveShadow = true
     this.group.add(pad)
 
     // --- Buildings (a couple) ---
-    const buildingMat = this.trackMat(new THREE.MeshStandardMaterial({
-      color: 0xb08968,
-      roughness: 0.85,
-      metalness: 0.05,
-    }))
     const buildingDefs: Array<{ w: number; h: number; d: number; x: number; z: number }> = [
       { w: 8, h: 9, d: 8, x: -8, z: -6 },
       { w: 10, h: 6, d: 7, x: 9, z: -4 },
     ]
     for (const b of buildingDefs) {
-      const geo = this.trackGeo(new THREE.BoxGeometry(b.w, b.h, b.d))
-      const mesh = new THREE.Mesh(geo, buildingMat.clone())
-      this.ownedMaterials.push(mesh.material as THREE.Material)
+      // Per-building material clone: setCondition tints each shell individually.
+      const mesh = new THREE.Mesh(sharedBoxGeo(b.w, b.h, b.d), this.trackMat(SHARED.buildingBaseMat.clone()))
       mesh.position.set(b.x, b.h / 2, b.z)
       mesh.castShadow = true
       mesh.receiveShadow = true
@@ -193,15 +254,9 @@ export class Town {
 
       // Rubble debris around the footprint, hidden until the building collapses.
       const rubblePieces: THREE.Mesh[] = []
-      const rubbleMat = this.trackMat(new THREE.MeshStandardMaterial({
-        color: Town.BUILDING_RUBBLE,
-        roughness: 1.0,
-        metalness: 0.0,
-      }))
       for (let r = 0; r < 5; r++) {
         const s = 1.2 + (r % 3) * 0.7
-        const rubGeo = this.trackGeo(new THREE.BoxGeometry(s, s * 0.6, s))
-        const rub = new THREE.Mesh(rubGeo, rubbleMat)
+        const rub = new THREE.Mesh(sharedBoxGeo(s, s * 0.6, s), SHARED.rubbleMat)
         const ra = (r / 5) * Math.PI * 2
         const rr = b.w * 0.32
         rub.position.set(b.x + Math.cos(ra) * rr, (s * 0.6) / 2, b.z + Math.sin(ra) * rr)
@@ -210,7 +265,7 @@ export class Town {
         rub.receiveShadow = true
         rub.visible = false
         rubblePieces.push(rub)
-        this.group.add(rub)
+        this.detail.add(rub)
       }
       this.buildingRubble.push(rubblePieces)
     }
@@ -220,14 +275,21 @@ export class Town {
       { x: -14, z: 12 },
       { x: 14, z: 13 },
     ]
+    // One crop material per town: applyFarms writes the same wilt colour to every
+    // alive tuft, and dead plots hide their tufts, so both plots can share it.
+    const cropMat = this.trackMat(new THREE.MeshStandardMaterial({
+      color: Town.CROP_GREEN,
+      roughness: 0.9,
+      metalness: 0.0,
+    }))
     for (const f of farmDefs) {
-      const geo = this.trackGeo(new THREE.PlaneGeometry(12, 9))
+      // Per-plot material: applyFarms colours alive/dead plots differently.
       const mat = this.trackMat(new THREE.MeshStandardMaterial({
         color: 0x4caf50,
         roughness: 1.0,
         metalness: 0.0,
       }))
-      const farm = new THREE.Mesh(geo, mat)
+      const farm = new THREE.Mesh(SHARED.farmGeo, mat)
       farm.rotation.x = -Math.PI / 2
       farm.position.set(f.x, 0.05, f.z)
       farm.receiveShadow = true
@@ -237,27 +299,20 @@ export class Town {
       // Crop tufts standing on the plot — they wilt (shrink + brown) then vanish
       // as the plot dies, giving the farm a readable green → dead transition.
       const crops: THREE.Mesh[] = []
-      const cropGeo = this.trackGeo(new THREE.ConeGeometry(0.35, 1.4, 5))
-      const cropMat = this.trackMat(new THREE.MeshStandardMaterial({
-        color: Town.CROP_GREEN,
-        roughness: 0.9,
-        metalness: 0.0,
-      }))
       for (let cx = -1; cx <= 1; cx++) {
         for (let cz = -1; cz <= 1; cz++) {
-          const crop = new THREE.Mesh(cropGeo, cropMat)
+          const crop = new THREE.Mesh(SHARED.cropGeo, cropMat)
           crop.position.set(f.x + cx * 3.2, 0.8, f.z + cz * 2.4)
           crop.castShadow = true
           crop.userData.baseY = 0.8
           crops.push(crop)
-          this.group.add(crop)
+          this.detail.add(crop)
         }
       }
       this.farmCrops.push(crops)
     }
 
     // --- Townsfolk (small crowd of simple figures) ---
-    const folkGeo = this.trackGeo(new THREE.CapsuleGeometry(0.4, 1.0, 4, 8))
     for (let i = 0; i < Town.CROWD_SIZE; i++) {
       // Per-folk material so an individual can fade out as the crowd thins.
       const folkMat = this.trackMat(new THREE.MeshStandardMaterial({
@@ -269,23 +324,15 @@ export class Town {
       }))
       const angle = (i / Town.CROWD_SIZE) * Math.PI * 2
       const r = 5 + (i % 3) * 1.5
-      const folk = new THREE.Mesh(folkGeo, folkMat)
+      const folk = new THREE.Mesh(SHARED.capsuleGeo, folkMat)
       folk.position.set(Math.cos(angle) * r, 0.9, Math.sin(angle) * r)
       folk.castShadow = true
       this.townsfolk.push(folk)
-      this.group.add(folk)
+      this.detail.add(folk)
     }
 
     // --- Quest-giver marker (floating beacon) ---
-    const markerGeo = this.trackGeo(new THREE.ConeGeometry(1.2, 3, 6))
-    const markerMat = this.trackMat(new THREE.MeshStandardMaterial({
-      color: 0xffd54f,
-      emissive: 0xffb300,
-      emissiveIntensity: 0.8,
-      roughness: 0.4,
-      metalness: 0.2,
-    }))
-    this.marker = new THREE.Mesh(markerGeo, markerMat)
+    this.marker = new THREE.Mesh(SHARED.markerGeo, SHARED.markerMat)
     this.markerBaseY = 6
     this.marker.position.set(0, this.markerBaseY, 0)
     this.marker.rotation.x = Math.PI // point down
@@ -321,7 +368,7 @@ export class Town {
     const stoneMat = this.trackMat(new THREE.MeshStandardMaterial({
       color: 0x8d8377, roughness: 0.9, metalness: 0.05,
     }))
-    const pillarGeo = this.trackGeo(new THREE.BoxGeometry(1.6, 8, 1.6))
+    const pillarGeo = sharedBoxGeo(1.6, 8, 1.6)
     for (const side of [-1, 1]) {
       const pillar = new THREE.Mesh(pillarGeo, stoneMat)
       pillar.position.set(gate.x + side * 5, 4, gate.z)
@@ -335,24 +382,18 @@ export class Town {
         radius: 1.1, height: 8,
       })
     }
-    const lintelGeo = this.trackGeo(new THREE.BoxGeometry(12, 1.4, 2))
-    const lintel = new THREE.Mesh(lintelGeo, stoneMat)
+    const lintel = new THREE.Mesh(sharedBoxGeo(12, 1.4, 2), stoneMat)
     lintel.position.set(gate.x, 8.3, gate.z)
     lintel.castShadow = true
     lintel.userData.baseHeight = 1.4
     this.anchorStructures.push(lintel)
     this.group.add(lintel)
     // Dismount pad ring on the ground so the berth reads as the Frame's spot.
-    const padGeo = this.trackGeo(new THREE.RingGeometry(3.2, 4.2, 24))
-    const padMat = this.trackMat(new THREE.MeshStandardMaterial({
-      color: 0xd6b24a, roughness: 0.7, metalness: 0.1,
-      emissive: 0x4a3a00, emissiveIntensity: 0.3,
-    }))
-    const berth = new THREE.Mesh(padGeo, padMat)
+    const berth = new THREE.Mesh(SHARED.berthGeo, SHARED.berthMat)
     berth.rotation.x = -Math.PI / 2
     berth.position.set(gate.x, 0.06, gate.z)
     berth.receiveShadow = true
-    this.group.add(berth)
+    this.detail.add(berth)
 
     // --- Garage: a wide, open-fronted hangar (Rooker) ---
     this.buildAnchorBox('garage', L.garage.x, L.garage.z, 11, 6, 9, 0x7a6f63)
@@ -364,15 +405,13 @@ export class Town {
     const mastMat = this.trackMat(new THREE.MeshStandardMaterial({
       color: 0x556070, roughness: 0.6, metalness: 0.4,
     }))
-    const mastGeo = this.trackGeo(new THREE.CylinderGeometry(0.5, 0.8, 11, 6))
-    const mast = new THREE.Mesh(mastGeo, mastMat)
+    const mast = new THREE.Mesh(SHARED.mastGeo, mastMat)
     mast.position.set(comms.x, 5.5, comms.z)
     mast.castShadow = true
     mast.userData.baseHeight = 11
     this.anchorStructures.push(mast)
     this.group.add(mast)
-    const dishGeo = this.trackGeo(new THREE.SphereGeometry(2.2, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2))
-    const dish = new THREE.Mesh(dishGeo, mastMat)
+    const dish = new THREE.Mesh(SHARED.dishGeo, mastMat)
     dish.position.set(comms.x, 11, comms.z)
     dish.rotation.set(Math.PI * 0.7, 0, 0)
     dish.castShadow = true
@@ -389,14 +428,13 @@ export class Town {
     const wellMat = this.trackMat(new THREE.MeshStandardMaterial({
       color: 0x8d8377, roughness: 0.95, metalness: 0.0,
     }))
-    const wellGeo = this.trackGeo(new THREE.CylinderGeometry(1.8, 2.0, 1.6, 16))
-    const well = new THREE.Mesh(wellGeo, wellMat)
+    const well = new THREE.Mesh(SHARED.wellGeo, wellMat)
     well.position.set(commons.x, 0.8, commons.z)
     well.castShadow = true
     well.receiveShadow = true
     well.userData.baseHeight = 1.6
     this.anchorStructures.push(well)
-    this.group.add(well)
+    this.detail.add(well)
     this.colliders.push({
       kind: 'cylinder',
       center: new THREE.Vector3(this.position.x + commons.x, 0.8, this.position.z + commons.z),
@@ -416,8 +454,7 @@ export class Town {
     kind: AnchorKind, x: number, z: number, w: number, h: number, d: number, color: number,
   ): void {
     const mat = this.trackMat(new THREE.MeshStandardMaterial({ color, roughness: 0.85, metalness: 0.05 }))
-    const geo = this.trackGeo(new THREE.BoxGeometry(w, h, d))
-    const mesh = new THREE.Mesh(geo, mat)
+    const mesh = new THREE.Mesh(sharedBoxGeo(w, h, d), mat)
     mesh.position.set(x, h / 2, z)
     mesh.castShadow = true
     mesh.receiveShadow = true
@@ -437,14 +474,13 @@ export class Town {
     const mat = this.trackMat(new THREE.MeshStandardMaterial({
       color, roughness: 0.8, metalness: 0.0, transparent: true, opacity: 1,
     }))
-    const geo = this.trackGeo(new THREE.CapsuleGeometry(0.4, 1.0, 4, 8))
-    const mesh = new THREE.Mesh(geo, mat)
+    const mesh = new THREE.Mesh(SHARED.capsuleGeo, mat)
     mesh.position.set(x, 0.9, z)
     mesh.castShadow = true
     mesh.userData.baseY = 0.9
     mesh.name = `npc-${role}`
     this.npcMeshes.push(mesh)
-    this.group.add(mesh)
+    this.detail.add(mesh)
     this.npcs.push({
       id: `${this.id}-${role}`,
       townId: this.id,
@@ -467,6 +503,15 @@ export class Town {
    */
   setCondition(condition: number): void {
     this.condition = Math.max(0, Math.min(100, condition))
+
+    // Decay ticks call this every frame with a fractionally-changed value; the
+    // lerps below are imperceptible at sub-point granularity, so skip the full
+    // re-apply until the whole-point value moves. (NaN sentinel means the first
+    // call — including the constructor's — always applies.)
+    const quantized = Math.round(this.condition)
+    if (quantized === this.lastAppliedCondition) return
+    this.lastAppliedCondition = quantized
+
     const c = this.condition
 
     this.applyFarms(c)
@@ -605,15 +650,38 @@ export class Town {
     return this.condition
   }
 
-  /** Squared XZ distance from a world position to the town centre. */
+  /**
+   * Squared XZ distance from a world position to the town centre.
+   *
+   * StoryWorld calls this every frame with the active body's position, so it
+   * doubles as the distance-cull hook for the small-prop `detail` group (the
+   * explicit alternative is passing playerPos to update()). The side effect is
+   * a cached-boolean compare — effectively free.
+   */
   distanceSqTo(pos: THREE.Vector3): number {
     const dx = pos.x - this.position.x
     const dz = pos.z - this.position.z
-    return dx * dx + dz * dz
+    const dSq = dx * dx + dz * dz
+    this.updateDetailVisibility(dSq)
+    return dSq
   }
 
-  /** Animate the quest marker (bob + slow spin). Called from the render loop. */
-  update(elapsed: number): void {
+  /** Hide/show the small-prop group when the cull threshold is crossed. */
+  private updateDetailVisibility(dSq: number): void {
+    const visible = dSq < Town.DETAIL_CULL_RADIUS_SQ
+    if (visible !== this.detailVisible) {
+      this.detailVisible = visible
+      this.detail.visible = visible
+    }
+  }
+
+  /**
+   * Animate the quest marker (bob + slow spin). Called from the render loop.
+   * Pass `playerPos` to also drive the small-prop distance cull from here
+   * (otherwise the per-frame distanceSqTo() call covers it).
+   */
+  update(elapsed: number, playerPos?: THREE.Vector3): void {
+    if (playerPos) this.distanceSqTo(playerPos) // applies the detail cull
     if (this.marker) {
       this.marker.position.y = this.markerBaseY + Math.sin(elapsed * 2) * 0.5
       this.marker.rotation.y += 0.01
@@ -693,11 +761,13 @@ export class Town {
     return best
   }
 
-  /** Dispose all geometries/materials owned by this town. */
+  /**
+   * Dispose all materials owned by this town. Geometries/materials in the
+   * module-scope SHARED/SHARED_BOX_GEOS pool are deliberately left alive — they
+   * are used by every town for the whole app session.
+   */
   dispose(): void {
-    for (const g of this.ownedGeometries) g.dispose()
     for (const m of this.ownedMaterials) m.dispose()
-    this.ownedGeometries = []
     this.ownedMaterials = []
     this.buildings = []
     this.buildingRubble = []
@@ -709,6 +779,7 @@ export class Town {
     this.anchors = []
     this.npcs = []
     this.colliders = []
+    this.detail.clear()
     this.group.clear()
   }
 }

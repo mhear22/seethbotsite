@@ -30,7 +30,9 @@ const DISK_FRAG = `
   }
   float fbm(vec2 p) {
     float v = 0.0; float a = 0.5;
-    for (int i = 0; i < 5; i++) {
+    // 3 octaves (down from the orbital page's 5): the two lost octaves only add
+    // sub-pixel grain on a rotating disk, and this shader runs 3x per fragment.
+    for (int i = 0; i < 3; i++) {
       v += a * noise(p);
       p = p * 2.1 + vec2(1.3, 0.7);
       a *= 0.5;
@@ -150,8 +152,10 @@ function makeBlackHole(
   const sphereMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
   group.add(new THREE.Mesh(sphereGeo, sphereMat));
 
-  // Accretion disk — exact orbital page shader
-  const diskGeo = new THREE.RingGeometry(diskInner, diskOuter, 256, 64);
+  // Accretion disk — exact orbital page shader. The ring is flat and all the
+  // detail comes from the fragment shader, so modest tessellation (96x24 vs the
+  // orbital page's 256x64) reads identically at ~1/7th the triangle count.
+  const diskGeo = new THREE.RingGeometry(diskInner, diskOuter, 96, 24);
   const diskMat = new THREE.ShaderMaterial({
     uniforms: {
       time:        { value: 0.0 },
@@ -179,7 +183,13 @@ function makeBlackHole(
 export function createEndOfUniverseSky(
   scene: THREE.Scene,
   rendererSize: { width: number; height: number },
-): { group: THREE.Group; diskMaterials: THREE.ShaderMaterial[]; lensing: LensingSetup } {
+): {
+  group: THREE.Group;
+  diskMaterials: THREE.ShaderMaterial[];
+  lensing: LensingSetup;
+  /** Objects safe to omit from the reflective floor's scene re-render */
+  reflectionExcluded: THREE.Object3D[];
+} {
   const group = new THREE.Group();
   const diskMaterials: THREE.ShaderMaterial[] = [];
 
@@ -237,11 +247,19 @@ export function createEndOfUniverseSky(
   group.userData.skyMat = skyMat;
 
   // ── Gravitational lensing post-processing ────────────────────────────────
-  const target = new THREE.WebGLRenderTarget(rendererSize.width, rendererSize.height, {
-    minFilter: THREE.LinearFilter,
-    magFilter: THREE.LinearFilter,
-    format: THREE.RGBAFormat,
-  });
+  // Half-resolution offscreen target: the fullscreen lensing quad upsamples it
+  // with linear filtering, and a slightly soft distortion pass is imperceptible
+  // while quartering the offscreen fill cost. MapRenderer.resize() keeps the
+  // same 1/2 ratio on window resize.
+  const target = new THREE.WebGLRenderTarget(
+    Math.max(1, Math.floor(rendererSize.width / 2)),
+    Math.max(1, Math.floor(rendererSize.height / 2)),
+    {
+      minFilter: THREE.LinearFilter,
+      magFilter: THREE.LinearFilter,
+      format: THREE.RGBAFormat,
+    },
+  );
 
   const lensingMat = new THREE.ShaderMaterial({
     uniforms: {
@@ -271,7 +289,13 @@ export function createEndOfUniverseSky(
     bh2: bh2.group,
   };
 
-  return { group, diskMaterials, lensing };
+  // The star sphere is near-black (background ~vec3(0.008)) so its mirror image
+  // is invisible on the dark floor, yet it fills every background pixel of the
+  // reflection target with a shader eval. The black holes/disks — the actual
+  // signature reflection — are NOT excluded.
+  const reflectionExcluded: THREE.Object3D[] = [skySphere];
+
+  return { group, diskMaterials, lensing, reflectionExcluded };
 }
 
 /**

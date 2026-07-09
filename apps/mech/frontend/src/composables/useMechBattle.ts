@@ -1,4 +1,4 @@
-import { ref, computed } from 'vue'
+import { ref, markRaw, getCurrentScope, onScopeDispose } from 'vue'
 import * as THREE from 'three'
 import { MechEntity, type CombatStats } from '../lib/battle/MechEntity'
 import type { MechLoadout, MechStats } from './useMechBuilder'
@@ -89,17 +89,22 @@ export function useMechBattle() {
       : new THREE.Vector3(0, 0, 15)
     const facingAngle = playerSpawn?.facingAngle ?? Math.PI
 
-    battleState.value.player = new MechEntity(
+    // markRaw: MechEntity holds THREE vectors/eulers the battle loop mutates
+    // hundreds of times per frame — deep Vue reactivity over them costs multiple
+    // ms/frame. HUD-facing values are mirrored into plain refs (syncHudRefs).
+    const player = markRaw(new MechEntity(
       'player',
       'Your Mech',
       playerLoadout,
       combatStats,
       true, // isPlayer
       spawnPos
-    )
-    battleState.value.player.rotation.y = facingAngle
+    ))
+    player.rotation.y = facingAngle
+    battleState.value.player = player
 
     battleState.value.phase = 'ready'
+    syncHudRefs()
   }
 
   function generateEnemy(
@@ -121,17 +126,21 @@ export function useMechBattle() {
       : new THREE.Vector3(0, 0, -15)
     const facingAngle = enemySpawn?.facingAngle ?? 0
 
-    const enemy = new MechEntity(
+    // markRaw for the same reason as the player (see initializeBattle). The
+    // property-level assignment below still triggers watchers on enemy identity
+    // (e.g. BattleCanvas's survival-wave respawn watch).
+    const enemy = markRaw(new MechEntity(
       'enemy',
       name,
       loadout,
       stats,
       false, // Not player
       spawnPos
-    )
+    ))
     enemy.rotation.y = facingAngle
 
     battleState.value.enemy = enemy
+    syncHudRefs()
   }
 
   // Survival context — remembered so each wave can re-spawn an escalating enemy
@@ -219,6 +228,9 @@ export function useMechBattle() {
 
   function endBattle(result: 'victory' | 'defeat', time: number) {
     battleState.value.time = time
+    // Snapshot final health into the HUD refs so results screens are exact
+    // (the 10Hz poll could otherwise lag the killing blow by up to 100ms).
+    syncHudRefs()
 
     // Calculate score for any victory (accumulates across survival waves).
     if (result === 'victory') {
@@ -272,13 +284,33 @@ export function useMechBattle() {
       bestWave: loadBestWave(),
       betweenWaves: false
     }
+    syncHudRefs()
   }
 
-  // Computed properties
-  const playerHealth = computed(() => battleState.value.player?.stats.currentHealth ?? 0)
-  const playerMaxHealth = computed(() => battleState.value.player?.stats.maxHealth ?? 100)
-  const enemyHealth = computed(() => battleState.value.enemy?.stats.currentHealth ?? 0)
-  const enemyMaxHealth = computed(() => battleState.value.enemy?.stats.maxHealth ?? 100)
+  // HUD mirrors. The entities are markRaw'd (see initializeBattle), so health
+  // can't be a computed over deep-reactive state anymore — instead these plain
+  // numeric refs are polled from the raw entities at ~10Hz below. Writes with
+  // an unchanged value short-circuit in Vue's ref setter, so idle polls are free.
+  const playerHealth = ref(0)
+  const playerMaxHealth = ref(100)
+  const enemyHealth = ref(0)
+  const enemyMaxHealth = ref(100)
+
+  function syncHudRefs() {
+    const state = battleState.value
+    playerHealth.value = state.player?.stats.currentHealth ?? 0
+    playerMaxHealth.value = state.player?.stats.maxHealth ?? 100
+    enemyHealth.value = state.enemy?.stats.currentHealth ?? 0
+    enemyMaxHealth.value = state.enemy?.stats.maxHealth ?? 100
+  }
+
+  // ~10Hz poll keeps the health bars live during combat. Only started inside a
+  // component/effect scope (tests call this composable outside one) and torn
+  // down with it.
+  if (getCurrentScope()) {
+    const hudSyncInterval = setInterval(syncHudRefs, 100)
+    onScopeDispose(() => clearInterval(hudSyncInterval))
+  }
 
   return {
     battleState,
@@ -291,7 +323,7 @@ export function useMechBattle() {
     endBattle,
     addDamageDealt,
     resetBattle,
-    // Computed
+    // HUD mirrors (plain refs polled at ~10Hz from the raw entities)
     playerHealth,
     playerMaxHealth,
     enemyHealth,

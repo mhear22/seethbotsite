@@ -42,6 +42,8 @@
         <div class="hud-phase">{{ phaseLabel }} · {{ happyCount }}/3 held</div>
       </div>
 
+      <div v-if="showFPS" class="fps-counter">{{ fps }} FPS</div>
+
       <!-- In-mech Town HUD: name, condition bar, both reputation axes, cues. -->
       <TownHud
         v-if="nearestTownName && pilotMode === 'mech'"
@@ -167,8 +169,10 @@
         @close="closeGarage"
       />
 
-      <!-- Pause menu (§5): resume / settings / save-exit / abandon (with confirm). -->
-      <div v-if="isPauseOpen" class="story-pause-backdrop" @click.self="resumeFromPause">
+      <!-- Pause menu (§5): resume / settings / save-exit / abandon (with confirm).
+           Hidden while Settings is open so the (lower-z) settings modal is on top
+           and interactive instead of trapped behind this backdrop. -->
+      <div v-if="isPauseOpen && !isSettingsOpen" class="story-pause-backdrop" @click.self="resumeFromPause">
         <div class="story-pause-panel" role="dialog" aria-modal="true" aria-label="Paused">
           <h2 class="pause-title">Paused</h2>
           <div class="pause-actions">
@@ -212,7 +216,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, shallowRef, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import * as THREE from 'three'
 import { MechEntity } from '../../lib/battle/MechEntity'
@@ -300,6 +304,8 @@ const isSettingsOpen = ref(false)
 const confirmAbandon = ref(false)
 
 // Live HUD state fed by the world's per-frame callback.
+const fps = ref(0)
+const showFPS = computed(() => gameSettings.settings.value.graphics.showFPS)
 const nearestTownName = ref<string | null>(null)
 const nearestTownDistance = ref(0)
 const insideTown = ref(false)
@@ -321,7 +327,10 @@ const activeQuestUrgent = ref(false)
 // --- Phase 4: on-foot / dismount state (fed by handleFrame) ---
 const pilotMode = ref<'mech' | 'onFoot'>('mech')
 const canDismount = ref(false)
-const onFootInfo = ref<OnFootFrameInfo | null>(null)
+// shallowRef + change-gated assignment (see handleFrame): StoryWorld allocates
+// a fresh OnFootFrameInfo every frame, so a plain unconditional write would
+// re-render the whole page template at 60Hz while on foot.
+const onFootInfo = shallowRef<OnFootFrameInfo | null>(null)
 // The town id the active body is inside the decay radius of (mech or pilot).
 const currentInsideTownId = ref<string | null>(null)
 // True on foot when close enough to the parked Frame to climb back in (F prompt).
@@ -381,6 +390,11 @@ let toastTimer: ReturnType<typeof setTimeout> | null = null
 let world: StoryWorld | null = null
 // Throttle saves: persist decay roughly once per second of accrual.
 let saveAccumulator = 0
+// Throttles for the HUD refs whose source values change on every frame (town
+// distance, fps). Most other per-frame ref writes carry an unchanged primitive
+// and short-circuit in Vue's ref setter, so only these need explicit gating.
+let hudDistanceAccum = 0
+let fpsAccum = 0
 
 const salvage = computed(() => story.salvage.value)
 const commandRep = computed(() => story.commandRep.value)
@@ -586,6 +600,7 @@ function handleKey(e: KeyboardEvent) {
     if (showBoard.value) closeBoard()
     else if (showGarage.value) closeGarage()
     else if (showDialog.value) closeDialog()
+    else if (isSettingsOpen.value) isSettingsOpen.value = false
     else if (isPauseOpen.value) resumeFromPause()
     else if (!anyModalOpen.value) openPause()
     return
@@ -904,10 +919,43 @@ function onStoryDialogueEnd(): void {
   }
 }
 
+/**
+ * Change check for the on-foot HUD slice, keyed to what the template/prompts
+ * actually render: town, out-of-bounds nudge, nearest NPC/anchor identity and
+ * the whole-second remount countdown. Distances are never displayed, so a
+ * fresh-but-equivalent frame object must NOT replace the stored one (that
+ * identity change alone would re-render the page every frame while on foot).
+ */
+function sameOnFootInfo(a: OnFootFrameInfo | null, b: OnFootFrameInfo | null): boolean {
+  if (a === b) return true
+  if (!a || !b) return false
+  return (
+    a.townId === b.townId &&
+    a.outOfBounds === b.outOfBounds &&
+    (a.nearestNPC?.id ?? null) === (b.nearestNPC?.id ?? null) &&
+    (a.nearestAnchor?.kind ?? null) === (b.nearestAnchor?.kind ?? null) &&
+    (a.remountSecondsLeft === null) === (b.remountSecondsLeft === null) &&
+    Math.ceil(a.remountSecondsLeft ?? 0) === Math.ceil(b.remountSecondsLeft ?? 0)
+  )
+}
+
 function handleFrame(info: StoryFrameInfo) {
-  // HUD updates.
+  // HUD updates. Ref writes whose value hasn't changed are free (Vue's setter
+  // short-circuits), so the rarely-changing primitives below can be assigned
+  // every frame; the continuously-varying sources (fps, town distance, the
+  // per-frame onFoot object) are throttled/gated so the large page template
+  // doesn't re-render at 60Hz.
+  fpsAccum += info.deltaTime
+  if (fpsAccum >= 0.5) { // ~2Hz is plenty for a debug readout
+    fpsAccum = 0
+    fps.value = world?.getFPS() ?? 0
+  }
   nearestTownName.value = info.nearestTownName
-  nearestTownDistance.value = info.nearestTownDistance
+  hudDistanceAccum += info.deltaTime
+  if (hudDistanceAccum >= 0.1) { // ~10Hz; TownHud rounds to whole metres anyway
+    hudDistanceAccum = 0
+    nearestTownDistance.value = Math.round(info.nearestTownDistance)
+  }
   insideTown.value = info.insideTownId !== null
   questGiverTownId.value = info.questGiverTownId
   encounterActive.value = info.encounterActive
@@ -915,7 +963,9 @@ function handleFrame(info: StoryFrameInfo) {
   // --- Phase 4 body-mode state (drives the HUD swap + prompts) ---
   pilotMode.value = info.mode
   canDismount.value = info.canDismount
-  onFootInfo.value = info.onFoot
+  if (!sameOnFootInfo(onFootInfo.value, info.onFoot)) {
+    onFootInfo.value = info.onFoot
+  }
   currentInsideTownId.value = info.insideTownId
   // Remount affordance (F): close enough to the parked Frame monument to climb in,
   // or standing at the gate. World-space distance to the mech park spot.
@@ -1798,6 +1848,21 @@ function abandonRun() {
 }
 
 /* In-world HUD */
+.fps-counter {
+  position: fixed;
+  /* Below the ☰ Menu pill (top: 18px, right: 20px) so the two never overlap. */
+  top: 62px;
+  right: 20px;
+  z-index: 2200;
+  font-family: monospace;
+  font-size: 14px;
+  font-weight: bold;
+  color: #00ff88;
+  text-shadow: 0 0 6px rgba(0, 255, 136, 0.6);
+  pointer-events: none;
+  user-select: none;
+}
+
 .story-hud {
   position: fixed;
   top: 18px;

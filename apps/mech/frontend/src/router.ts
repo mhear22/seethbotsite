@@ -32,6 +32,11 @@ const routes = [
     component: () => import('./components/pages/StoryModePage.vue')
   },
   {
+    path: '/showcase',
+    name: 'mech-showcase',
+    component: () => import('./components/pages/MechShowcasePage.vue')
+  },
+  {
     path: '/auth',
     name: 'auth',
     component: AuthRedirectPage

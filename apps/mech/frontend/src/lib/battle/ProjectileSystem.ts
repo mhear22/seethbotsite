@@ -24,11 +24,21 @@ export interface Projectile {
   // Homing missile fields
   targetId?: string
   homingDelay?: number // seconds before homing kicks in
+  // Cached homing target (resolved once from targetId; avoids a mechs.find per
+  // missile per frame). isDestroyed is still re-checked every frame.
+  homingTarget?: MechEntity
   // Visual-only fields
   pooledGeometry?: boolean // geometry came from the shared pool; don't dispose per-shot
   pooledMaterial?: boolean // material came from the shared pool; don't dispose per-shot
   smokeTimer?: number // accumulator for missile smoke-trail emission
 }
+
+// ---- Module-level scratch objects (perf): reused across calls, never retained
+// past the expression they appear in. setFromUnitVectors/dot do not mutate
+// their arguments, so the shared axes are safe in this single-threaded loop.
+const _Y_AXIS = new THREE.Vector3(0, 1, 0)
+const _Z_AXIS = new THREE.Vector3(0, 0, 1)
+const _scratchDir = new THREE.Vector3()
 
 // ---- Combat tuning constants (design §3.2 / §3.4). Kept named, never inline. ----
 /** Floor on per-shot damage so a 0-firepower part still chips. */
@@ -52,10 +62,14 @@ function defaultDamageType(weaponType: WeaponType): DamageType {
   return 'kinetic'
 }
 
-// Cap on simultaneously-pooled missile PointLights. Excess missiles render
+// Cap on simultaneously-lit missile PointLights. Excess missiles render
 // without a light (they still have a glow sprite) to avoid blowing past the
-// renderer's light limit / GPU cost.
-const MAX_MISSILE_LIGHTS = 6
+// renderer's light limit: every point light in the scene is evaluated per lit
+// fragment whether or not a missile is nearby, so this cap is a permanent
+// whole-scene lighting cost once the pool exists.
+const MAX_MISSILE_LIGHTS = 3
+/** Intensity a missile light runs at while its missile is in flight. */
+const MISSILE_LIGHT_INTENSITY = 40
 
 export class ProjectileSystem {
   private projectiles: Projectile[] = []
@@ -70,9 +84,24 @@ export class ProjectileSystem {
   // Shared sprite texture + materials for trails.
   private trailTexture: THREE.Texture
   private trailMaterialPool: Map<string, THREE.SpriteMaterial> = new Map()
-  // Pool of reusable missile PointLights.
-  private missileLightPool: THREE.PointLight[] = []
-  private activeMissileLights: number = 0
+  // Pool of idle projectile Meshes keyed by `${type}:${isPlayer}` — the Mesh
+  // wrappers themselves are reused across shots (geometry/material are already
+  // shared via the pools above).
+  private meshPool: Map<string, THREE.Mesh[]> = new Map()
+  // Pool of idle glow Sprites keyed by colour (mirrors trailMaterialPool keys).
+  private spritePool: Map<number, THREE.Sprite[]> = new Map()
+  // ALL missile PointLights, added to the scene in one batch on the FIRST
+  // missile shot and never scene.add/removed again — adding or removing a
+  // light at runtime changes the renderer's light count, which invalidates
+  // the program cache key of every lit material and forces scene-wide shader
+  // recompiles mid-combat. Creating the pool lazily-but-atomically means one
+  // program switch on the first volley instead of churn on every shot, and
+  // scenes that never fire a missile never pay the per-fragment cost of the
+  // extra lights at all. (visible=false would reintroduce the count churn,
+  // so live lights are dimmed exclusively via intensity.)
+  private missileLights: THREE.PointLight[] = []
+  // Subset of missileLights currently at intensity 0 and free for reuse.
+  private freeMissileLights: THREE.PointLight[] = []
 
   // Optional callback so the integration layer can spawn smoke particles for
   // missile trails without ProjectileSystem depending on ParticleSystem.
@@ -81,6 +110,17 @@ export class ProjectileSystem {
   constructor(scene: THREE.Scene) {
     this.scene = scene
     this.trailTexture = this.createTrailTexture()
+  }
+
+  /** Add the whole missile-light pool in one batch (see field comment above). */
+  private ensureMissileLights(): void {
+    if (this.missileLights.length > 0) return
+    for (let i = 0; i < MAX_MISSILE_LIGHTS; i++) {
+      const light = markRaw(new THREE.PointLight(0xff6600, 0, 60))
+      this.scene.add(light)
+      this.missileLights.push(light)
+      this.freeMissileLights.push(light)
+    }
   }
 
   /** Soft radial-gradient texture used for additive trail/streak sprites. */
@@ -148,14 +188,9 @@ export class ProjectileSystem {
       // Very short range spawn position
       const spawnPosition = mech.getArmPosition(arm)
 
-      // Create melee projectile (short-lived, slow)
-      const geometry = new THREE.BoxGeometry(1, 1, 1)
-      const material = new THREE.MeshStandardMaterial({
-        color: mech.isPlayer ? 0xff6600 : 0xff0066
-      })
-      const mesh = markRaw(new THREE.Mesh(geometry, material))
+      // Create melee projectile (short-lived, slow) from the pooled mesh path.
+      const mesh = this.acquireProjectileMesh('melee', mech.isPlayer)
       mesh.position.copy(spawnPosition)
-      this.scene.add(mesh)
 
       // Lunge forward when attacking (relative to this mech/arm's facing)
       mech.velocity.add(mech.getForwardDirection().multiplyScalar(8))
@@ -170,9 +205,8 @@ export class ProjectileSystem {
         ownerId: mech.id,
         lifetime: 0.2, // Only 200ms to hit
         mesh,
-        // Melee uses its own throwaway geom/material (not pooled).
-        pooledGeometry: false,
-        pooledMaterial: false,
+        pooledGeometry: true,
+        pooledMaterial: true,
       }
 
       this.projectiles.push(projectile)
@@ -216,17 +250,14 @@ export class ProjectileSystem {
 
       // Apply cone spread for multi-projectile weapons
       if (spreadAngle !== 0) {
-        direction.applyAxisAngle(new THREE.Vector3(0, 1, 0), spreadAngle)
+        direction.applyAxisAngle(_Y_AXIS, spreadAngle)
       }
 
       const spawnPosition = mech.getArmPosition(arm)
 
-      // Create projectile mesh from pooled geometry/material (not disposed per shot).
-      const geometry = this.getProjectileGeometry(projType)
-      const material = this.getProjectileMaterial(projType, mech.isPlayer)
-      const mesh = markRaw(new THREE.Mesh(geometry, material))
+      // Pooled projectile mesh (shared geometry/material, reused Mesh wrapper).
+      const mesh = this.acquireProjectileMesh(projType, mech.isPlayer)
       mesh.position.copy(spawnPosition)
-      this.scene.add(mesh)
 
       // Per-weapon muzzle velocity override, else per-projectile-type default.
       const muzzleSpeed = armPart.projectileSpeed ?? this.getProjectileSpeed(projType)
@@ -284,6 +315,7 @@ export class ProjectileSystem {
    *  - ballistic: small elongated tracer (stretched along travel axis)
    *  - energy:    glowing sphere
    *  - missile:   tapered cylinder body
+   *  - melee:     unit cube swipe
    */
   private getProjectileGeometry(type: string): THREE.BufferGeometry {
     const cached = this.geometryPool.get(type)
@@ -296,6 +328,9 @@ export class ProjectileSystem {
         break
       case 'missile':
         geom = new THREE.CylinderGeometry(0.3, 0.15, 1.2, 8)
+        break
+      case 'melee':
+        geom = new THREE.BoxGeometry(1, 1, 1)
         break
       default: { // ballistic - thin elongated tracer
         // Cylinder oriented along +Z so the mesh can be aimed down the velocity.
@@ -332,12 +367,77 @@ export class ProjectileSystem {
       case 'missile':
         mat = new THREE.MeshBasicMaterial({ color: 0xff6600 })
         break
+      case 'melee':
+        mat = new THREE.MeshStandardMaterial({ color: isPlayer ? 0xff6600 : 0xff0066 })
+        break
       default: // ballistic - bright tracer
         mat = new THREE.MeshBasicMaterial({ color: isPlayer ? 0xbfdcff : 0xffd0d0 })
         break
     }
     this.materialPool.set(key, mat)
     return mat
+  }
+
+  /**
+   * Fetch (or lazily create) a pooled projectile Mesh for this type+team and
+   * add it to the scene. Geometry/material are the shared pooled instances, so
+   * a released mesh is reusable as-is. Return via releaseProjectileMesh —
+   * never dispose per shot.
+   */
+  private acquireProjectileMesh(type: string, isPlayer: boolean): THREE.Mesh {
+    const key = `${type}:${isPlayer}`
+    let mesh = this.meshPool.get(key)?.pop()
+    if (!mesh) {
+      mesh = markRaw(new THREE.Mesh(
+        this.getProjectileGeometry(type),
+        this.getProjectileMaterial(type, isPlayer),
+      ))
+      mesh.userData.poolKey = key
+    }
+    // Reset pose from any previous flight (spawn paths re-aim as needed).
+    mesh.quaternion.identity()
+    this.scene.add(mesh)
+    return mesh
+  }
+
+  /** Detach a pooled projectile mesh from the scene and shelve it for reuse. */
+  private releaseProjectileMesh(mesh: THREE.Mesh) {
+    this.scene.remove(mesh)
+    const key = mesh.userData.poolKey as string
+    let pool = this.meshPool.get(key)
+    if (!pool) {
+      pool = []
+      this.meshPool.set(key, pool)
+    }
+    pool.push(mesh)
+  }
+
+  /**
+   * Fetch (or lazily create) a pooled glow Sprite for this trail colour and
+   * add it to the scene. Return via releaseGlowSprite.
+   */
+  private acquireGlowSprite(colorHex: number, size: number, position: THREE.Vector3): THREE.Sprite {
+    let sprite = this.spritePool.get(colorHex)?.pop()
+    if (!sprite) {
+      sprite = markRaw(new THREE.Sprite(this.getTrailMaterial(colorHex)))
+      sprite.userData.poolColor = colorHex
+    }
+    sprite.scale.set(size, size, 1)
+    sprite.position.copy(position)
+    this.scene.add(sprite)
+    return sprite
+  }
+
+  /** Detach a pooled glow sprite from the scene and shelve it for reuse. */
+  private releaseGlowSprite(sprite: THREE.Sprite) {
+    this.scene.remove(sprite)
+    const colorHex = sprite.userData.poolColor as number
+    let pool = this.spritePool.get(colorHex)
+    if (!pool) {
+      pool = []
+      this.spritePool.set(colorHex, pool)
+    }
+    pool.push(sprite)
   }
 
   /** Pooled additive trail/streak sprite material keyed by colour. */
@@ -372,26 +472,22 @@ export class ProjectileSystem {
     if (type === 'missile') {
       // Aim the body down the velocity now so the spawn frame looks correct.
       mesh.quaternion.setFromUnitVectors(
-        new THREE.Vector3(0, 1, 0),
-        velocity.clone().normalize(),
+        _Y_AXIS,
+        _scratchDir.copy(velocity).normalize(),
       )
 
-      let light: THREE.PointLight | undefined
-      if (this.activeMissileLights < MAX_MISSILE_LIGHTS) {
-        light = this.missileLightPool.pop()
-        if (!light) {
-          light = markRaw(new THREE.PointLight(0xff6600, 40, 60))
-        }
+      // Grab a free pooled light (pool is created in one batch on the first
+      // missile — see ensureMissileLights). Position BEFORE raising intensity
+      // so it never glows for a frame at its previous spot.
+      this.ensureMissileLights()
+      const light = this.freeMissileLights.pop()
+      if (light) {
         light.position.copy(spawnPosition)
-        this.scene.add(light)
-        this.activeMissileLights++
+        light.intensity = MISSILE_LIGHT_INTENSITY
       }
 
-      // Billboard glow sprite (pooled material).
-      const glow = markRaw(new THREE.Sprite(this.getTrailMaterial(0xff8800)))
-      glow.scale.set(6, 6, 1)
-      glow.position.copy(spawnPosition)
-      this.scene.add(glow)
+      // Billboard glow sprite (pooled sprite + material).
+      const glow = this.acquireGlowSprite(0xff8800, 6, spawnPosition)
 
       return { light, glow }
     }
@@ -406,16 +502,15 @@ export class ProjectileSystem {
       : (isPlayer ? 0x99ccff : 0xffb0b0)
     const glowSize = type === 'energy' ? 1.8 : 0.9
 
-    const glow = markRaw(new THREE.Sprite(this.getTrailMaterial(glowColor)))
-    glow.scale.set(glowSize, glowSize, 1)
-    glow.position.copy(spawnPosition)
-    this.scene.add(glow)
+    const glow = this.acquireGlowSprite(glowColor, glowSize, spawnPosition)
 
     // Orient the ballistic bolt mesh along its velocity for an elongated tracer.
+    // Velocity is constant after spawn for non-homing rounds, so this is the
+    // ONLY aim for local ballistic shots (syncFromSnapshot re-aims MP rounds).
     if (type === 'ballistic') {
       mesh.quaternion.setFromUnitVectors(
-        new THREE.Vector3(0, 0, 1),
-        velocity.clone().normalize(),
+        _Z_AXIS,
+        _scratchDir.copy(velocity).normalize(),
       )
     }
 
@@ -441,8 +536,14 @@ export class ProjectileSystem {
       if (proj.type === 'missile' && proj.targetId && proj.homingDelay !== undefined) {
         proj.homingDelay -= deltaTime
         if (proj.homingDelay <= 0 && mechs) {
-          const target = mechs.find(m => m.id === proj.targetId && !m.isDestroyed)
-          if (target) {
+          // Resolve the target once and cache it on the projectile (avoids a
+          // mechs.find scan per missile per frame). Destruction is permanent,
+          // so re-checking isDestroyed each frame matches the old predicate.
+          if (!proj.homingTarget) {
+            proj.homingTarget = mechs.find(m => m.id === proj.targetId)
+          }
+          const target = proj.homingTarget
+          if (target && !target.isDestroyed) {
             const targetPos = target.getCorePosition()
             const toTarget = targetPos.sub(proj.position).normalize()
             const speed = proj.velocity.length()
@@ -454,8 +555,8 @@ export class ProjectileSystem {
         }
       }
 
-      // Update position
-      proj.position.add(proj.velocity.clone().multiplyScalar(deltaTime))
+      // Update position (allocation-free integration)
+      proj.position.addScaledVector(proj.velocity, deltaTime)
       proj.mesh.position.copy(proj.position)
 
       // Glow trail follows every projectile that has one (energy/ballistic/missile).
@@ -464,10 +565,12 @@ export class ProjectileSystem {
       }
 
       if (proj.type === 'missile') {
-        // Rotate missile body to face direction of travel.
+        // Rotate missile body to face direction of travel (homing steers the
+        // velocity per frame, so this must re-aim every frame — scratch vector
+        // keeps it allocation-free).
         proj.mesh.quaternion.setFromUnitVectors(
-          new THREE.Vector3(0, 1, 0),
-          proj.velocity.clone().normalize()
+          _Y_AXIS,
+          _scratchDir.copy(proj.velocity).normalize()
         )
         if (proj.light) {
           proj.light.position.copy(proj.position)
@@ -480,13 +583,10 @@ export class ProjectileSystem {
             this.onMissileSmoke(proj.position.clone())
           }
         }
-      } else if (proj.type === 'ballistic') {
-        // Keep the elongated tracer aligned with its travel direction.
-        proj.mesh.quaternion.setFromUnitVectors(
-          new THREE.Vector3(0, 0, 1),
-          proj.velocity.clone().normalize()
-        )
       }
+      // Ballistic tracers fly straight, so their orientation is set once at
+      // spawn (createProjectileVisuals) — no per-frame re-aim needed. Server
+      // velocity corrections re-aim in syncFromSnapshot.
 
       // Update lifetime
       proj.lifetime -= deltaTime
@@ -519,12 +619,10 @@ export class ProjectileSystem {
         // Mech dimensions based on procedural models:
         // - Width/Depth: ~2.5 units (body + arm reach)
         // - Height: ~5 units (legs + torso + head)
-        const mechCenter = mech.position.clone()
-        mechCenter.y += 2.5 // Center of mech vertically
-
-        const dx = proj.position.x - mechCenter.x
-        const dy = proj.position.y - mechCenter.y
-        const dz = proj.position.z - mechCenter.z
+        // (raw components — no clone; +2.5 centres the mech vertically)
+        const dx = proj.position.x - mech.position.x
+        const dy = proj.position.y - (mech.position.y + 2.5)
+        const dz = proj.position.z - mech.position.z
 
         // Horizontal distance (XZ plane) - cylinder radius
         const horizontalDist = Math.sqrt(dx * dx + dz * dz)
@@ -563,7 +661,7 @@ export class ProjectileSystem {
 
     // Torso band: split arms (flanks) from core (centre) by lateral offset along
     // the mech's own right vector (attach points put arms at |x| ≈ 1.3).
-    const toHit = proj.position.clone().sub(mech.position)
+    const toHit = _scratchDir.copy(proj.position).sub(mech.position)
     const lateral = toHit.dot(mech.getRightDirection())
     const ARM_LATERAL_THRESHOLD = 0.7
     if (lateral <= -ARM_LATERAL_THRESHOLD) return 'leftArm'  // left arm attaches at -x
@@ -572,30 +670,35 @@ export class ProjectileSystem {
   }
 
   /**
-   * Tear down a projectile's scene objects. Pooled geometry/materials are NOT
-   * disposed (they are shared and reused); only per-projectile-owned resources
-   * (melee throwaway geom/material, missile glow sprite) are disposed. Missile
-   * PointLights are returned to the pool for reuse.
+   * Tear down a projectile's scene objects. Meshes/sprites are returned to
+   * their pools (nothing is disposed per shot); missile PointLights are dimmed
+   * to intensity 0 but STAY in the scene so the renderer's light count never
+   * changes (removing a light forces scene-wide shader recompiles).
    */
   private disposeProjectileVisuals(proj: Projectile) {
-    this.scene.remove(proj.mesh)
-    if (proj.pooledGeometry !== true) {
-      proj.mesh.geometry.dispose()
-    }
-    if (proj.pooledMaterial !== true && proj.mesh.material instanceof THREE.Material) {
-      proj.mesh.material.dispose()
+    if (typeof proj.mesh.userData.poolKey === 'string') {
+      // Pooled mesh: detach and shelve for reuse (geometry/material are shared).
+      this.releaseProjectileMesh(proj.mesh)
+    } else {
+      // Fallback for any non-pooled mesh (none today; kept for safety).
+      this.scene.remove(proj.mesh)
+      if (proj.pooledGeometry !== true) {
+        proj.mesh.geometry.dispose()
+      }
+      if (proj.pooledMaterial !== true && proj.mesh.material instanceof THREE.Material) {
+        proj.mesh.material.dispose()
+      }
     }
     if (proj.light) {
-      this.scene.remove(proj.light)
-      // Return to pool (material is the shared light, safe to reuse).
-      if (this.missileLightPool.length < MAX_MISSILE_LIGHTS) {
-        this.missileLightPool.push(proj.light)
-      }
-      this.activeMissileLights = Math.max(0, this.activeMissileLights - 1)
+      // Dim and free — never scene.remove, never visible=false (both change
+      // the renderer's light count and re-trigger program churn).
+      proj.light.intensity = 0
+      this.freeMissileLights.push(proj.light)
+      proj.light = undefined // guard against double-release
     }
     if (proj.glow) {
-      this.scene.remove(proj.glow)
-      // Glow uses a POOLED sprite material - do not dispose it here.
+      this.releaseGlowSprite(proj.glow)
+      proj.glow = undefined // guard against double-release
     }
   }
 
@@ -621,8 +724,20 @@ export class ProjectileSystem {
     for (const mat of this.trailMaterialPool.values()) mat.dispose()
     this.trailMaterialPool.clear()
     this.trailTexture.dispose()
-    this.missileLightPool = []
-    this.activeMissileLights = 0
+
+    // Idle pooled meshes/sprites are already detached from the scene; their
+    // geometry/materials were disposed above, so just drop the wrappers.
+    this.meshPool.clear()
+    this.spritePool.clear()
+
+    // Remove the persistent missile lights (if the pool was ever created) so
+    // they don't leak across battle instances.
+    for (const light of this.missileLights) {
+      this.scene.remove(light)
+      light.dispose()
+    }
+    this.missileLights = []
+    this.freeMissileLights = []
   }
 
   getProjectiles(): Projectile[] {
@@ -641,13 +756,10 @@ export class ProjectileSystem {
     damage: number,
     isLocalPlayer: boolean
   ): Projectile {
-    const geometry = this.getProjectileGeometry(type)
-    const material = this.getProjectileMaterial(type, isLocalPlayer)
-    const mesh = markRaw(new THREE.Mesh(geometry, material))
+    const mesh = this.acquireProjectileMesh(type, isLocalPlayer)
     const pos = new THREE.Vector3(position[0], position[1], position[2])
     const vel = new THREE.Vector3(velocity[0], velocity[1], velocity[2])
     mesh.position.copy(pos)
-    this.scene.add(mesh)
 
     // Same weapon-distinct visuals (glow/streak, missile light+glow) as the
     // single-player fire path. Purely cosmetic; does not touch network data.
@@ -707,6 +819,14 @@ export class ProjectileSystem {
         existing.position.set(sp.position[0], sp.position[1], sp.position[2])
         existing.velocity.set(sp.velocity[0], sp.velocity[1], sp.velocity[2])
         existing.mesh.position.copy(existing.position)
+        // Ballistic tracers are only aimed at spawn now, so a server velocity
+        // change must re-aim the mesh here (missiles re-aim every update()).
+        if (existing.type === 'ballistic' && existing.velocity.lengthSq() > 1e-8) {
+          existing.mesh.quaternion.setFromUnitVectors(
+            _Z_AXIS,
+            _scratchDir.copy(existing.velocity).normalize()
+          )
+        }
       } else {
         // Spawn new projectile
         this.spawnFromNetwork(

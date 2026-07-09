@@ -25,55 +25,6 @@
       </div>
     </div>
 
-    <!-- Loadouts: starter presets + saved builds -->
-    <div class="loadouts-bar">
-      <div class="starter-presets">
-        <span class="loadouts-label">Quick Start:</span>
-        <button
-          v-for="preset in STARTER_PRESETS"
-          :key="preset.id"
-          class="preset-chip"
-          :title="preset.description"
-          @click="applyPreset(preset.id)"
-        >
-          <MechIcons :icon="preset.icon" :size="18" />
-          {{ preset.name }}
-        </button>
-      </div>
-      <button class="my-builds-toggle" @click="showBuildsPanel = !showBuildsPanel">
-        💾 My Builds ({{ savedBuilds.length }})
-      </button>
-    </div>
-
-    <div v-if="showBuildsPanel" class="my-builds-panel">
-      <div class="save-row">
-        <input
-          v-model="newBuildName"
-          class="build-name-input"
-          type="text"
-          placeholder="Name this build…"
-          @keyup.enter="saveCurrentBuild"
-        />
-        <button class="save-build-btn" @click="saveCurrentBuild">Save Current Build</button>
-      </div>
-
-      <div v-if="savedBuilds.length === 0" class="no-builds">
-        No saved builds yet. Save your current loadout to reuse it later.
-      </div>
-      <div v-else class="saved-builds-list">
-        <div v-for="(build, idx) in savedBuilds" :key="build.timestamp" class="saved-build-item">
-          <div class="saved-build-info">
-            <span class="saved-build-name">{{ build.name }}</span>
-            <span class="saved-build-date">{{ new Date(build.timestamp).toLocaleDateString() }}</span>
-          </div>
-          <div class="saved-build-actions">
-            <button class="load-build-btn" @click="loadBuild(idx)">Load</button>
-            <button class="delete-build-btn" @click="deleteBuild(idx)">Delete</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <!-- Progress Steps -->
     <div class="progress-steps">
       <div
@@ -93,7 +44,8 @@
       </div>
     </div>
 
-    <!-- Main Content Area -->
+    <!-- Main Content Area: wizard steps + persistent mech preview -->
+    <div class="builder-layout">
     <div class="wizard-content">
       <CoreSelectionStep
         v-if="currentStep === 0"
@@ -155,6 +107,10 @@
           ← Previous
         </button>
 
+        <button @click="showLoadModal = true" class="nav-btn load-btn">
+          📂 Load
+        </button>
+
         <button @click="resetBuild" class="nav-btn reset-btn">
           Reset Build
         </button>
@@ -192,6 +148,28 @@
       </div>
     </div>
 
+    <aside class="preview-panel">
+      <div class="preview-panel-header">
+        <span>Preview</span>
+        <span class="preview-build-score">Score: {{ buildScore }}</span>
+      </div>
+      <div class="preview-panel-canvas">
+        <MechPreview3D :loadout="loadout" />
+      </div>
+    </aside>
+    </div>
+
+    <LoadBuildModal
+      v-if="showLoadModal"
+      :presets="STARTER_PRESETS"
+      :saved-builds="savedBuilds"
+      @close="showLoadModal = false"
+      @load-preset="onLoadPreset"
+      @load-build="onLoadBuild"
+      @delete-build="deleteBuild"
+      @save="saveCurrentBuild"
+    />
+
     <!-- Arm Selection Modal -->
     <div v-if="showArmModal" class="modal-overlay" @click="showArmModal = false">
       <div class="modal-content" @click.stop>
@@ -225,6 +203,8 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useMechBuilder, type ArmPart } from '../../composables/useMechBuilder'
 import MechIcons from '../mech/MechIcons.vue'
+import MechPreview3D from '../mech/MechPreview3D.vue'
+import LoadBuildModal from '../mech/builder/LoadBuildModal.vue'
 import CoreSelectionStep from '../mech/builder/steps/CoreSelectionStep.vue'
 import LegsSelectionStep from '../mech/builder/steps/LegsSelectionStep.vue'
 import HeadSelectionStep from '../mech/builder/steps/HeadSelectionStep.vue'
@@ -270,18 +250,21 @@ const showArmModal = ref(false)
 const pendingArm = ref<ArmPart | null>(null)
 const showShareNotification = ref(false)
 
-// My Builds panel state
-const showBuildsPanel = ref(false)
-const newBuildName = ref('')
+// Load modal state
+const showLoadModal = ref(false)
 
-function saveCurrentBuild() {
-  const name = newBuildName.value.trim() || `Build ${savedBuilds.value.length + 1}`
-  saveBuild(name)
-  newBuildName.value = ''
+function saveCurrentBuild(name: string) {
+  saveBuild(name || `Build ${savedBuilds.value.length + 1}`)
 }
 
-function applyPreset(presetId: string) {
+function onLoadPreset(presetId: string) {
   loadPresetBuild(presetId)
+  showLoadModal.value = false
+}
+
+function onLoadBuild(index: number) {
+  loadBuild(index)
+  showLoadModal.value = false
 }
 
 const steps = [
@@ -519,216 +502,6 @@ onMounted(() => {
   text-align: right;
 }
 
-/* Loadouts bar: starter presets + my builds toggle */
-.loadouts-bar {
-  max-width: 1200px;
-  margin: 0 auto var(--mech-space-4);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--mech-space-4);
-  flex-wrap: wrap;
-  background: var(--mech-surface);
-  backdrop-filter: var(--mech-blur);
-  border: 1px solid var(--mech-border);
-  border-radius: var(--mech-radius-lg);
-  padding: var(--mech-space-3) var(--mech-space-4);
-  box-shadow: var(--mech-shadow-sm);
-}
-
-.starter-presets {
-  display: flex;
-  align-items: center;
-  gap: var(--mech-space-2);
-  flex-wrap: wrap;
-}
-
-.loadouts-label {
-  font-weight: 700;
-  color: var(--mech-text-dim);
-  font-size: 14px;
-  text-transform: uppercase;
-  letter-spacing: var(--mech-tracking-wide);
-}
-
-.preset-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 14px;
-  border: 1px solid var(--mech-border-strong);
-  border-radius: var(--mech-radius-pill);
-  background: var(--mech-surface-2);
-  color: var(--mech-text);
-  font-weight: 600;
-  font-size: 13px;
-  cursor: pointer;
-  transition: all var(--mech-transition);
-}
-
-.preset-chip:hover {
-  border-color: var(--mech-border-accent);
-  background: var(--mech-accent-soft);
-  transform: translateY(-1px);
-}
-
-.preset-chip:focus-visible {
-  outline: 2px solid var(--mech-accent);
-  outline-offset: 2px;
-}
-
-.my-builds-toggle {
-  padding: 8px 16px;
-  border: 1px solid var(--mech-purple);
-  border-radius: var(--mech-radius-sm);
-  background: rgba(124, 58, 237, 0.16);
-  color: var(--mech-purple);
-  font-weight: 700;
-  font-size: 13px;
-  cursor: pointer;
-  transition: all var(--mech-transition);
-}
-
-.my-builds-toggle:hover {
-  background: rgba(124, 58, 237, 0.28);
-}
-
-.my-builds-panel {
-  max-width: 1200px;
-  margin: 0 auto var(--mech-space-4);
-  background: var(--mech-surface);
-  backdrop-filter: var(--mech-blur);
-  border: 1px solid var(--mech-border);
-  border-radius: var(--mech-radius-lg);
-  padding: var(--mech-space-4);
-  box-shadow: var(--mech-shadow-sm);
-}
-
-.save-row {
-  display: flex;
-  gap: var(--mech-space-3);
-  margin-bottom: var(--mech-space-3);
-}
-
-.build-name-input {
-  flex: 1;
-  padding: 10px 14px;
-  border: 1px solid var(--mech-border-strong);
-  border-radius: var(--mech-radius-sm);
-  background: var(--mech-surface-2);
-  color: var(--mech-text);
-  font-size: 14px;
-  transition: all var(--mech-transition);
-}
-
-.build-name-input::placeholder {
-  color: var(--mech-text-muted);
-}
-
-.build-name-input:focus {
-  outline: none;
-  border-color: var(--mech-accent);
-  box-shadow: 0 0 0 3px var(--mech-accent-soft);
-}
-
-.save-build-btn {
-  padding: 10px 18px;
-  border: none;
-  border-radius: var(--mech-radius-sm);
-  background: var(--mech-success-grad);
-  color: #fff;
-  font-weight: 600;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all var(--mech-transition);
-}
-
-.save-build-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 16px var(--mech-success-glow);
-}
-
-.no-builds {
-  text-align: center;
-  color: var(--mech-text-muted);
-  padding: var(--mech-space-4);
-  font-size: 14px;
-}
-
-.saved-builds-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--mech-space-2);
-}
-
-.saved-build-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 14px;
-  background: var(--mech-surface-2);
-  border: 1px solid var(--mech-border);
-  border-radius: var(--mech-radius-sm);
-  transition: border-color var(--mech-transition);
-}
-
-.saved-build-item:hover {
-  border-color: var(--mech-border-strong);
-}
-
-.saved-build-info {
-  display: flex;
-  flex-direction: column;
-}
-
-.saved-build-name {
-  font-weight: 600;
-  color: var(--mech-text);
-  font-size: 14px;
-}
-
-.saved-build-date {
-  font-size: 12px;
-  color: var(--mech-text-muted);
-}
-
-.saved-build-actions {
-  display: flex;
-  gap: var(--mech-space-2);
-}
-
-.load-build-btn {
-  padding: 6px 14px;
-  border: none;
-  border-radius: var(--mech-radius-sm);
-  background: var(--mech-accent-grad);
-  color: #fff;
-  font-weight: 600;
-  font-size: 13px;
-  cursor: pointer;
-  transition: all var(--mech-transition);
-}
-
-.load-build-btn:hover {
-  box-shadow: 0 4px 12px var(--mech-accent-glow);
-}
-
-.delete-build-btn {
-  padding: 6px 14px;
-  border: 1px solid var(--mech-danger-glow);
-  border-radius: var(--mech-radius-sm);
-  background: rgba(239, 68, 68, 0.12);
-  color: var(--mech-danger);
-  font-weight: 600;
-  font-size: 13px;
-  cursor: pointer;
-  transition: all var(--mech-transition);
-}
-
-.delete-build-btn:hover {
-  background: rgba(239, 68, 68, 0.22);
-}
-
 .progress-steps {
   max-width: 1200px;
   margin: 0 auto var(--mech-space-5);
@@ -809,9 +582,64 @@ onMounted(() => {
   color: var(--mech-success);
 }
 
-.wizard-content {
+.builder-layout {
   max-width: 1200px;
   margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: var(--mech-space-4);
+  align-items: start;
+}
+
+.preview-panel {
+  position: sticky;
+  top: var(--mech-space-4);
+  background: var(--mech-surface);
+  backdrop-filter: var(--mech-blur);
+  border: 1px solid var(--mech-border);
+  border-radius: var(--mech-radius-lg);
+  box-shadow: var(--mech-shadow-md);
+  overflow: hidden;
+}
+
+.preview-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--mech-space-3) var(--mech-space-4);
+  border-bottom: 1px solid var(--mech-border);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--mech-text-dim);
+  text-transform: uppercase;
+  letter-spacing: var(--mech-tracking-wide);
+}
+
+.preview-build-score {
+  color: var(--mech-accent);
+}
+
+.preview-panel-canvas {
+  height: 460px;
+}
+
+@media (max-width: 1024px) {
+  .builder-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .preview-panel {
+    position: static;
+    order: -1;
+  }
+
+  .preview-panel-canvas {
+    height: 320px;
+  }
+}
+
+.wizard-content {
+  min-width: 0;
   background: var(--mech-surface);
   backdrop-filter: var(--mech-blur);
   border: 1px solid var(--mech-border);
@@ -857,6 +685,16 @@ onMounted(() => {
 .prev-btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+.load-btn {
+  background: var(--mech-surface-raised);
+  color: var(--mech-text);
+  border: 1px solid var(--mech-border-strong);
+}
+
+.load-btn:hover {
+  border-color: var(--mech-border-accent);
 }
 
 .reset-btn {

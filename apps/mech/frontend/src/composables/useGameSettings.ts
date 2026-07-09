@@ -74,7 +74,7 @@ const DEFAULT_SETTINGS: GameSettings = {
     shadowQuality: 'medium',
     antialias: true,
     renderScale: 1.0,
-    showFPS: false,
+    showFPS: true,
     // Honour the OS accessibility preference on first run; the user can override
     // it either way in Settings and the choice then persists.
     reducedMotion: prefersReducedMotion(),

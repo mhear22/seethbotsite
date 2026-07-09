@@ -186,12 +186,32 @@ export class MechModelLoader {
         const attachPoint = this.getAttachPoint(partType)
         model.position.copy(attachPoint)
 
-        // Apply team color tint to all meshes in the group
+        // Apply team color tint to all meshes in the group. Baked parts share
+        // one source material across many merged meshes (and across mechs via
+        // the module cache), so clone once per unique source material rather
+        // than per mesh. Clones stay private to this part — damage flash and
+        // limb blackening mutate them, so they must never be shared across
+        // mechs or slots.
+        const tint = new THREE.Color(color)
+        const tintedMaterials = new Map<THREE.MeshStandardMaterial, THREE.MeshStandardMaterial>()
         model.traverse((child) => {
           if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
-            // Lightly tint with team color while preserving material identity
-            child.material = child.material.clone()
-            child.material.color.lerp(new THREE.Color(color), 0.2)
+            // Lightly tint with team color while preserving material identity.
+            if (child.name === 'thrust-glow') {
+              // Per-frame emissive animation target (MechEntity.animateWalk) —
+              // give it its own instance so pulsing never leaks to sensors
+              // sharing the same source glow material.
+              child.material = child.material.clone()
+              child.material.color.lerp(tint, 0.2)
+              return
+            }
+            let tinted = tintedMaterials.get(child.material)
+            if (!tinted) {
+              tinted = child.material.clone()
+              tinted.color.lerp(tint, 0.2)
+              tintedMaterials.set(child.material, tinted)
+            }
+            child.material = tinted
           }
         })
 

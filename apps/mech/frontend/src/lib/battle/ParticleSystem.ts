@@ -29,6 +29,11 @@ interface MeshEffect {
 // flashes, dash trails) don't starve each other.
 const MAX_PARTICLES = 1500
 
+// Cap on pooled shockwave meshes. Beyond this a multi-kill simply skips the
+// extra rings (flash/fire particles still spawn) rather than allocating
+// materials mid-combat.
+const MAX_SHOCKWAVES = 8
+
 export class ParticleSystem {
   private particles: Particle[] = []
   private geometry: THREE.BufferGeometry
@@ -39,10 +44,18 @@ export class ParticleSystem {
   private meshEffects: MeshEffect[] = []
   // Pooled shared geometry for shockwave spheres (reused, never per-spawn).
   private shockwaveGeometry: THREE.SphereGeometry
+  // Idle pooled shockwave mesh+material pairs (created lazily up to
+  // MAX_SHOCKWAVES; hidden via visible=false, never allocated/disposed per
+  // explosion).
+  private freeShockwaves: Array<{ mesh: THREE.Mesh; material: THREE.MeshBasicMaterial }> = []
+  private shockwavesCreated = 0
 
   private positionAttr: THREE.BufferAttribute
   private colorAttr: THREE.BufferAttribute
   private sizeAttr: THREE.BufferAttribute
+  // Live-particle count written to the buffers last frame, so this frame only
+  // needs to zero/upload the slots that changed.
+  private lastLiveCount = 0
 
   constructor(scene: THREE.Scene) {
     this.scene = scene
@@ -102,7 +115,11 @@ export class ParticleSystem {
     return true
   }
 
-  /** Internal helper: spawn an expanding additive shockwave sphere. */
+  /**
+   * Internal helper: spawn an expanding additive shockwave sphere. Meshes and
+   * materials come from a small pool (lazily grown to MAX_SHOCKWAVES) and are
+   * reused via visible toggling instead of per-explosion new/dispose.
+   */
   private addShockwave(opts: {
     position: THREE.Vector3
     color: THREE.Color
@@ -111,18 +128,27 @@ export class ParticleSystem {
     endScale: number
     startOpacity: number
   }) {
-    const material = markRaw(new THREE.MeshBasicMaterial({
-      color: opts.color,
-      transparent: true,
-      opacity: opts.startOpacity,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-    }))
-    const mesh = markRaw(new THREE.Mesh(this.shockwaveGeometry, material))
+    let entry = this.freeShockwaves.pop()
+    if (!entry) {
+      if (this.shockwavesCreated >= MAX_SHOCKWAVES) return // pool exhausted - skip the ring
+      this.shockwavesCreated++
+      const material = markRaw(new THREE.MeshBasicMaterial({
+        transparent: true,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      }))
+      const mesh = markRaw(new THREE.Mesh(this.shockwaveGeometry, material))
+      this.scene.add(mesh)
+      entry = { mesh, material }
+    }
+    const { mesh, material } = entry
+    // Reset pooled state (callers may vary the colour).
+    material.color.copy(opts.color)
+    material.opacity = opts.startOpacity
     mesh.position.copy(opts.position)
     mesh.scale.setScalar(opts.startScale)
-    this.scene.add(mesh)
+    mesh.visible = true
 
     this.meshEffects.push({
       mesh,
@@ -503,20 +529,25 @@ export class ParticleSystem {
   }
 
   update(deltaTime: number) {
-    // Update particles
+    // Update particles. Dead ones are removed via swap-and-pop (order doesn't
+    // matter for additive, depth-write-off points) instead of O(n) splice.
+    // Iterating backward means the swapped-in tail element was already updated
+    // this frame, so nothing is skipped or double-ticked.
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i]
       p.life -= deltaTime
       if (p.life <= 0) {
-        this.particles.splice(i, 1)
+        const last = this.particles.length - 1
+        if (i !== last) this.particles[i] = this.particles[last]
+        this.particles.pop()
         continue
       }
 
       // Apply gravity (per-particle multiplier; negative = rises)
       p.velocity.y -= 10 * p.gravity * deltaTime
 
-      // Apply velocity
-      p.position.add(p.velocity.clone().multiplyScalar(deltaTime))
+      // Apply velocity (allocation-free integration)
+      p.position.addScaledVector(p.velocity, deltaTime)
 
       // Drag
       p.velocity.multiplyScalar(p.drag)
@@ -527,8 +558,9 @@ export class ParticleSystem {
       const e = this.meshEffects[i]
       e.life -= deltaTime
       if (e.life <= 0) {
-        this.scene.remove(e.mesh)
-        e.material.dispose()
+        // Return the mesh+material to the pool (hidden, never disposed here).
+        e.mesh.visible = false
+        this.freeShockwaves.push({ mesh: e.mesh, material: e.material })
         this.meshEffects.splice(i, 1)
         continue
       }
@@ -539,53 +571,77 @@ export class ParticleSystem {
       e.material.opacity = e.startOpacity * (1 - t)
     }
 
-    // Write to buffer attributes
+    // Write to buffer attributes — only the live prefix (drawRange hides the
+    // rest), instead of touching all MAX_PARTICLES slots every frame.
     const positions = this.positionAttr.array as Float32Array
     const colors = this.colorAttr.array as Float32Array
     const sizes = this.sizeAttr.array as Float32Array
+    const live = this.particles.length
 
-    for (let i = 0; i < MAX_PARTICLES; i++) {
-      if (i < this.particles.length) {
-        const p = this.particles[i]
-        const lifeFrac = p.life / p.maxLife // 1 -> 0
-        // Optional fade-in at the start of life (used for smoke).
-        let t = lifeFrac
-        if (p.fadeIn > 0) {
-          const age = 1 - lifeFrac // 0 -> 1
-          if (age < p.fadeIn) {
-            t = (age / p.fadeIn) * lifeFrac
-          }
+    for (let i = 0; i < live; i++) {
+      const p = this.particles[i]
+      const lifeFrac = p.life / p.maxLife // 1 -> 0
+      // Optional fade-in at the start of life (used for smoke).
+      let t = lifeFrac
+      if (p.fadeIn > 0) {
+        const age = 1 - lifeFrac // 0 -> 1
+        if (age < p.fadeIn) {
+          t = (age / p.fadeIn) * lifeFrac
         }
-
-        positions[i * 3] = p.position.x
-        positions[i * 3 + 1] = p.position.y
-        positions[i * 3 + 2] = p.position.z
-
-        colors[i * 3] = p.color.r * t
-        colors[i * 3 + 1] = p.color.g * t
-        colors[i * 3 + 2] = p.color.b * t
-
-        sizes[i] = p.size * t
-      } else {
-        // Hide unused particles
-        sizes[i] = 0
       }
+
+      positions[i * 3] = p.position.x
+      positions[i * 3 + 1] = p.position.y
+      positions[i * 3 + 2] = p.position.z
+
+      colors[i * 3] = p.color.r * t
+      colors[i * 3 + 1] = p.color.g * t
+      colors[i * 3 + 2] = p.color.b * t
+
+      sizes[i] = p.size * t
+    }
+    // Hide only the slots that were live last frame but died this frame (safety
+    // net in case drawRange is ever widened; slots beyond lastLiveCount are
+    // already zero).
+    for (let i = live; i < this.lastLiveCount; i++) {
+      sizes[i] = 0
     }
 
-    this.positionAttr.needsUpdate = true
-    this.colorAttr.needsUpdate = true
-    this.sizeAttr.needsUpdate = true
-    this.geometry.setDrawRange(0, this.particles.length)
+    // Upload only the touched prefix instead of all 1500 slots. Update ranges
+    // accumulate across frames, so clear them before adding this frame's.
+    const sizeSpan = Math.max(live, this.lastLiveCount)
+    this.positionAttr.clearUpdateRanges()
+    this.colorAttr.clearUpdateRanges()
+    this.sizeAttr.clearUpdateRanges()
+    if (live > 0) {
+      this.positionAttr.addUpdateRange(0, live * 3)
+      this.colorAttr.addUpdateRange(0, live * 3)
+      this.positionAttr.needsUpdate = true
+      this.colorAttr.needsUpdate = true
+    }
+    if (sizeSpan > 0) {
+      this.sizeAttr.addUpdateRange(0, sizeSpan)
+      this.sizeAttr.needsUpdate = true
+    }
+    this.lastLiveCount = live
+    this.geometry.setDrawRange(0, live)
   }
 
   cleanup() {
     this.geometry.dispose()
     this.material.dispose()
+    // Active effects and idle pooled shockwaves are disjoint; tear down both.
     for (const e of this.meshEffects) {
       this.scene.remove(e.mesh)
       e.material.dispose()
     }
     this.meshEffects = []
+    for (const s of this.freeShockwaves) {
+      this.scene.remove(s.mesh)
+      s.material.dispose()
+    }
+    this.freeShockwaves = []
+    this.shockwavesCreated = 0
     this.shockwaveGeometry.dispose()
   }
 }

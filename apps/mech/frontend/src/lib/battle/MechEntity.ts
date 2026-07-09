@@ -3,6 +3,7 @@ import type { MechLoadout } from '../../composables/useMechBuilder'
 import type { ArmPart, DamageType, MechSlot } from '../../shared/types/MechTypes'
 import { markRaw } from 'vue'
 import { getMechModelLoader, MODEL_ATTACH_POINTS } from './MechModelLoader'
+import { SHARED_GEOMETRY_FLAG } from './procedural/bakedParts'
 
 // ---- Combat / damage tuning constants (design §3.2 / §3.4). Never inline. ----
 /** Flat-armour reduction ceiling. Dropped 0.90 → 0.75 so nothing is unkillable. */
@@ -118,8 +119,13 @@ export class MechEntity {
 
   // Emissive-based damage flash (0 = none, 1 = full red). Decayed in update().
   private damageFlash: number = 0
-  // Cached base emissive per mesh so the flash never captures a transient colour.
-  private baseEmissive: WeakMap<THREE.Mesh, { color: number; intensity: number }> = new WeakMap()
+  // Flashable materials + their resting emissive, collected once per model
+  // (rebuilt on the async model swap) so the per-frame flash is a flat loop
+  // instead of a full mesh.traverse with per-mesh Color allocations. Materials
+  // are per-mech clones (MechModelLoader tinting) deduped here because baked
+  // parts share one material across many merged meshes.
+  private flashCache: Array<{ mat: THREE.MeshStandardMaterial; baseColor: number; baseIntensity: number }> | null = null
+  private static readonly FLASH_RED = new THREE.Color(0xff0000)
 
   // Power system
   currentPower: number = 100
@@ -242,15 +248,23 @@ export class MechEntity {
 
       const modelGroup = await loader.assembleMech(this.loadout, teamColor)
 
-      // Transfer position and rotation from old mesh
-      modelGroup.position.copy(this.position)
-      modelGroup.rotation.copy(this.rotation)
-
-      // Dispose old procedural geometry
+      // Dispose the old procedural geometry/materials still parented here.
       this.disposeMeshGroup()
 
-      // Replace with loaded model
-      this.mesh = markRaw(modelGroup)
+      // Swap in the loaded model WITHOUT replacing the group object. Scenes add
+      // `this.mesh` once at spawn and never re-add on model load, so reassigning
+      // the reference would orphan the old (disposed) group in the scene and
+      // leave the new model invisible — and unmoved, since update() would drive
+      // a group no longer in the scene. Adopt the assembled model's children
+      // into the existing group instead so its scene identity is preserved.
+      // assembleMech returns an identity-transform root, so no root transform is
+      // lost; update() keeps driving this.mesh.position/rotation from state.
+      this.mesh.clear()
+      for (const child of [...modelGroup.children]) {
+        this.mesh.add(child)
+      }
+      // The old model's materials are gone — re-collect flash targets lazily.
+      this.flashCache = null
     } catch (error) {
       // Silently keep procedural geometry on error
       console.debug('Model loading failed, using procedural geometry:', error)
@@ -273,7 +287,13 @@ export class MechEntity {
   private disposeMeshGroup(): void {
     this.mesh.traverse((child) => {
       if (child instanceof THREE.Mesh) {
-        child.geometry.dispose()
+        // Baked procedural geometry is shared by every mech using the same
+        // part (module-level cache) — disposing it here would evict the GPU
+        // buffers under all live clones. Materials are per-mech clones and
+        // safe to dispose.
+        if (!child.geometry.userData[SHARED_GEOMETRY_FLAG]) {
+          child.geometry.dispose()
+        }
         if (child.material instanceof THREE.Material) {
           child.material.dispose()
         }
@@ -442,21 +462,28 @@ export class MechEntity {
     this.damageFlash = Math.max(0, this.damageFlash - deltaTime * 5) // ~0.2s flash
 
     const flash = this.damageFlash
+    // Collect flash targets once per model (cache resting emissive before we
+    // ever modify it) instead of traversing + allocating per frame.
+    if (!this.flashCache) this.flashCache = this.collectFlashMaterials()
+    for (const entry of this.flashCache) {
+      // Lerp from base toward red proportional to the current flash value.
+      entry.mat.emissive.setHex(entry.baseColor).lerp(MechEntity.FLASH_RED, flash)
+      entry.mat.emissiveIntensity = entry.baseIntensity + flash * 1.5
+    }
+  }
+
+  /** One-off traverse gathering every flashable material and its resting emissive. */
+  private collectFlashMaterials(): Array<{ mat: THREE.MeshStandardMaterial; baseColor: number; baseIntensity: number }> {
+    const targets: Array<{ mat: THREE.MeshStandardMaterial; baseColor: number; baseIntensity: number }> = []
+    const seen = new Set<THREE.Material>()
     this.mesh.traverse((child) => {
       if (!(child instanceof THREE.Mesh)) return
       const mat = child.material
-      if (!(mat instanceof THREE.MeshStandardMaterial) || !mat.emissive) return
-
-      // Cache the resting emissive once, before we ever modify it.
-      if (!this.baseEmissive.has(child)) {
-        this.baseEmissive.set(child, { color: mat.emissive.getHex(), intensity: mat.emissiveIntensity })
-      }
-      const base = this.baseEmissive.get(child)!
-
-      // Lerp from base toward red proportional to the current flash value.
-      mat.emissive.setHex(base.color).lerp(new THREE.Color(0xff0000), flash)
-      mat.emissiveIntensity = base.intensity + flash * 1.5
+      if (!(mat instanceof THREE.MeshStandardMaterial) || !mat.emissive || seen.has(mat)) return
+      seen.add(mat)
+      targets.push({ mat, baseColor: mat.emissive.getHex(), baseIntensity: mat.emissiveIntensity })
     })
+    return targets
   }
 
   private animateWalk(deltaTime: number) {
@@ -702,12 +729,26 @@ export class MechEntity {
   private blackenSlotMesh(slot: MechSlot) {
     const node = this.findChildByName(this.mesh, slot)
     if (!node) return
+    // A material may be shared by several meshes within the part (baked merged
+    // geometry), so dedupe before mutating or the 0.2 darken would compound
+    // once per mesh. Materials are never shared across slots or mechs.
+    const mats = new Set<THREE.MeshStandardMaterial>()
     node.traverse((child) => {
       if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
-        child.material.color.multiplyScalar(0.2)
-        child.material.emissive?.setHex(0x000000)
+        mats.add(child.material)
       }
     })
+    for (const mat of mats) {
+      mat.color.multiplyScalar(0.2)
+      mat.emissive?.setHex(0x000000)
+    }
+    // Keep the damage-flash base cache in sync so the flash decay doesn't
+    // restore the knocked-out limb's emissive glow.
+    if (this.flashCache) {
+      for (const entry of this.flashCache) {
+        if (mats.has(entry.mat)) entry.baseColor = 0x000000
+      }
+    }
   }
 
   takeDamage(damage: number, damageType: DamageType = 'kinetic', opts?: DamageOptions): boolean {

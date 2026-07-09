@@ -17,6 +17,12 @@ import { getDynamicElementTransform, isHazardActive } from '@shared/types/MapDef
 import { createRingWorldSky, updateRingWorldSky } from './RingWorldSky';
 import { createEndOfUniverseSky, updateEndOfUniverseSky, type LensingSetup } from './EndOfUniverseSky';
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
+import { useGameSettings } from '../../composables/useGameSettings';
+
+// Same shadowQuality -> shadow map size mapping BattleScene uses for the
+// default arena light ('off' falls through to 1024; harmless since the
+// renderer's shadowMap.enabled stays false in that case).
+const SHADOW_MAP_SIZES: Record<string, number> = { low: 512, medium: 1024, high: 2048 };
 
 interface DynamicMeshEntry {
   element: DynamicElement;
@@ -40,10 +46,19 @@ export class MapRenderer {
   private endOfUniverseDiskMaterials: THREE.ShaderMaterial[] = [];
   private endOfUniverseLensing: LensingSetup | null = null;
   private renderer: THREE.WebGLRenderer | null = null;
+  /** Objects hidden during the reflective floor's scene re-render (sky-specific) */
+  private reflectionExcluded: THREE.Object3D[] = [];
+  /** Shadow map size for map-defined lights, resolved from shadowQuality */
+  private shadowMapSize: number;
 
-  constructor(scene: THREE.Scene, renderer?: THREE.WebGLRenderer) {
+  constructor(scene: THREE.Scene, renderer?: THREE.WebGLRenderer, shadowMapSize?: number) {
     this.scene = scene;
     this.renderer = renderer ?? null;
+    // Respect the user's shadowQuality setting instead of hardcoding 2048.
+    // Callers may plumb an already-resolved size; otherwise read the shared
+    // settings store directly (same source BattleScene's graphics config uses).
+    this.shadowMapSize =
+      shadowMapSize ?? SHADOW_MAP_SIZES[useGameSettings().settings.value.graphics.shadowQuality] ?? 1024;
   }
 
   /**
@@ -101,14 +116,41 @@ export class MapRenderer {
 
     // Floor
     if (env.reflectiveFloor) {
-      // Real mirror reflection via Reflector (secondary camera render)
+      // Real mirror reflection via Reflector (secondary camera render). A 512px
+      // target is plenty for a floor reflection viewed at grazing angles and
+      // quarters the reflection pass's fill cost vs the previous 1024.
       const reflector = new Reflector(new THREE.PlaneGeometry(arenaWidth, arenaDepth), {
         color: new THREE.Color(env.floorMaterial.color),
-        textureWidth: 1024,
-        textureHeight: 1024,
+        textureWidth: 512,
+        textureHeight: 512,
       });
       reflector.rotation.x = -Math.PI / 2;
       reflector.receiveShadow = true;
+      // Skip non-signature objects (see reflectionExcluded) during the
+      // Reflector's internal scene re-render by hiding them around its
+      // onBeforeRender hook. The main pass is unaffected: its render list is
+      // already built by the time this hook fires, and visibility is restored
+      // before any other object is processed.
+      const excluded = this.reflectionExcluded;
+      const baseOnBeforeRender = reflector.onBeforeRender;
+      reflector.onBeforeRender = (
+        renderer: THREE.WebGLRenderer,
+        scene: THREE.Scene,
+        camera: THREE.Camera,
+        geometry: THREE.BufferGeometry,
+        material: THREE.Material,
+        group: THREE.Group
+      ) => {
+        const hidden: THREE.Object3D[] = [];
+        for (const obj of excluded) {
+          if (obj.visible) {
+            obj.visible = false;
+            hidden.push(obj);
+          }
+        }
+        baseOnBeforeRender.call(reflector, renderer, scene, camera, geometry, material, group);
+        for (const obj of hidden) obj.visible = true;
+      };
       this.scene.add(reflector);
     } else {
       const floorGeo = new THREE.PlaneGeometry(arenaWidth, arenaDepth);
@@ -222,9 +264,11 @@ export class MapRenderer {
     const size = this.renderer
       ? { width: this.renderer.domElement.width, height: this.renderer.domElement.height }
       : { width: window.innerWidth, height: window.innerHeight };
-    const { group, diskMaterials, lensing } = createEndOfUniverseSky(this.scene, size);
+    const { group, diskMaterials, lensing, reflectionExcluded } = createEndOfUniverseSky(this.scene, size);
     this.endOfUniverseDiskMaterials = diskMaterials;
     this.endOfUniverseLensing = lensing;
+    // Near-invisible-in-mirror objects the reflective floor pass can skip
+    this.reflectionExcluded.push(...reflectionExcluded);
     // group holds no meshes itself (all added directly to scene), but store reference
     void group;
   }
@@ -235,13 +279,18 @@ export class MapRenderer {
   }
 
   /**
-   * Resize the gravitational-lensing offscreen render target to match the new
+   * Resize the gravitational-lensing offscreen render target to track the new
    * canvas size. Without this the lensing target keeps its initial resolution on
    * window resize, stretching/blurring the scene. No-op for non-lensing maps.
+   * The target runs at half resolution (see createEndOfUniverseSky), so keep
+   * the same 1/2 ratio here.
    */
   resize(width: number, height: number): void {
     if (this.endOfUniverseLensing) {
-      this.endOfUniverseLensing.target.setSize(width, height);
+      this.endOfUniverseLensing.target.setSize(
+        Math.max(1, Math.floor(width / 2)),
+        Math.max(1, Math.floor(height / 2)),
+      );
     }
   }
 
@@ -273,12 +322,17 @@ export class MapRenderer {
         light.position.set(def.position[0], def.position[1], def.position[2]);
         if (def.castShadow) {
           light.castShadow = true;
-          light.shadow.camera.left = -200;
-          light.shadow.camera.right = 200;
-          light.shadow.camera.top = 200;
-          light.shadow.camera.bottom = -200;
-          light.shadow.mapSize.width = 2048;
-          light.shadow.mapSize.height = 2048;
+          // ±90 (was ±200): a 400×400 shadow frustum forced every static caster
+          // in the arena through the shadow pass and spread the map thin. Combat
+          // stays near arena centre, so a 180×180 box covers the action with ~5x
+          // the texel density (sharper shadows) and far less shadow-pass work.
+          light.shadow.camera.left = -90;
+          light.shadow.camera.right = 90;
+          light.shadow.camera.top = 90;
+          light.shadow.camera.bottom = -90;
+          light.shadow.camera.updateProjectionMatrix();
+          light.shadow.mapSize.width = this.shadowMapSize;
+          light.shadow.mapSize.height = this.shadowMapSize;
         }
         this.scene.add(light);
         break;
@@ -475,6 +529,9 @@ export class MapRenderer {
     });
     const warningMesh = new THREE.Mesh(warningGeo, warningMat);
     warningMesh.position.set(hazard.position[0], hazard.position[1] + (hazard.height ?? 0) / 2, hazard.position[2]);
+    // Starts fully faded — hidden until updateHazardVisuals shows it (an
+    // opacity-0 transparent mesh still costs a draw call every frame).
+    warningMesh.visible = false;
 
     // Pulse mesh (semi-transparent, visible during active phase)
     const pulseMat = new THREE.MeshBasicMaterial({
@@ -485,6 +542,7 @@ export class MapRenderer {
     });
     const pulseMesh = new THREE.Mesh(pulseGeo, pulseMat);
     pulseMesh.position.copy(warningMesh.position);
+    pulseMesh.visible = false;
 
     this.scene.add(warningMesh);
     this.scene.add(pulseMesh);
@@ -538,17 +596,19 @@ export class MapRenderer {
       const warningMat = warningMesh.material as THREE.MeshBasicMaterial;
       const pulseMat = pulseMesh.material as THREE.MeshBasicMaterial;
 
+      // Hide fully-faded meshes instead of drawing them at opacity 0: an
+      // invisible transparent mesh still costs a draw call + transparent-sort
+      // entry per frame. active/warning are disjoint, so exactly one mesh (or
+      // neither, between cycles) is visible at a time.
+      warningMesh.visible = state.warning;
+      pulseMesh.visible = state.active;
+
       if (state.active) {
-        warningMat.opacity = 0;
         pulseMat.opacity = 0.3;
       } else if (state.warning) {
         // Pulsing warning effect
         const pulseSpeed = 4;
         warningMat.opacity = 0.3 + 0.2 * Math.sin(elapsedTime * pulseSpeed * Math.PI * 2);
-        pulseMat.opacity = 0;
-      } else {
-        warningMat.opacity = 0;
-        pulseMat.opacity = 0;
       }
     }
   }

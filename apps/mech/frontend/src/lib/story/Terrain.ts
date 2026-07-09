@@ -216,10 +216,13 @@ export class Terrain {
 
     this.applyBiomeColors(geo)
 
-    const mat = new THREE.MeshStandardMaterial({
+    // Lambert, not Standard: the terrain fills most of the screen, so this is
+    // the scene's dominant lit surface. It's matte (metalness 0, roughness 0.95)
+    // so GGX specular/IBL buys nothing — Lambert gives the same diffuse look for
+    // a fraction of the per-fragment cost. vertexColors, fog and receiveShadow
+    // all still apply; it just skips the expensive PBR math on every covered pixel.
+    const mat = new THREE.MeshLambertMaterial({
       vertexColors: true,
-      roughness: 0.95,
-      metalness: 0.0,
     })
     const mesh = new THREE.Mesh(geo, mat)
     mesh.receiveShadow = true
@@ -280,16 +283,17 @@ export class Terrain {
   private buildWater(size: number): THREE.Mesh {
     const geo = new THREE.PlaneGeometry(size, size, 1, 1)
     geo.rotateX(-Math.PI / 2)
-    const mat = new THREE.MeshStandardMaterial({
+    const mat = new THREE.MeshLambertMaterial({
       color: 0x2f6f96,
-      roughness: 0.25,
-      metalness: 0.1,
       transparent: true,
       opacity: 0.78,
     })
     const mesh = new THREE.Mesh(geo, mat)
     mesh.position.y = Terrain.WATER_LEVEL
-    mesh.receiveShadow = true
+    // No shadow receive on water: the surface sits below terrain and is 78%
+    // transparent, so cast shadows on it are invisible but cost a shadow-map
+    // sample per covered fragment in the transparent pass.
+    mesh.receiveShadow = false
     mesh.name = 'water'
     return mesh
   }

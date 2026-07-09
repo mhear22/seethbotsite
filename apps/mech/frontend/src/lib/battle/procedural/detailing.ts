@@ -52,16 +52,32 @@ export type PaletteColor = (typeof PALETTE)[keyof typeof PALETTE]
 /* ------------------------------------------------------------------ */
 /* MATERIAL FACTORIES                                                  */
 /* ------------------------------------------------------------------ */
-/* Factories return fresh materials so callers can tweak per-instance     */
-/* (e.g. emissiveIntensity) without mutating a shared singleton. They are  */
-/* cheap; reuse the returned material across meshes within one part.       */
+/* Factories return CACHED materials keyed by their parameters. Baked-part   */
+/* merging (bakedParts.ts) groups meshes by material REFERENCE, so sharing   */
+/* one instance per palette entry is what lets a whole part collapse into a  */
+/* few draws — a fresh material per rivet used to fragment every batch. Do   */
+/* NOT mutate a returned material in place; clone it first for per-instance  */
+/* tweaks (the loader's team tint already clones per mech).                  */
+
+/** Keyed material cache backing the factories below. */
+const materialCache = new Map<string, THREE.MeshStandardMaterial>()
+
+function cachedMaterial(key: string, make: () => THREE.MeshStandardMaterial): THREE.MeshStandardMaterial {
+  let mat = materialCache.get(key)
+  if (!mat) {
+    mat = make()
+    materialCache.set(key, mat)
+  }
+  return mat
+}
 
 /**
  * Dominant charcoal armor plate material (matte-ish gunmetal).
  * @param color override armor color (default PALETTE.armorDark)
  */
 export function armorMat(color: number = PALETTE.armorDark): THREE.MeshStandardMaterial {
-  return new THREE.MeshStandardMaterial({ color, metalness: 0.65, roughness: 0.52 })
+  return cachedMaterial(`armor:${color}`, () =>
+    new THREE.MeshStandardMaterial({ color, metalness: 0.65, roughness: 0.52 }))
 }
 
 /**
@@ -69,7 +85,8 @@ export function armorMat(color: number = PALETTE.armorDark): THREE.MeshStandardM
  * @param color override steel color (default PALETTE.frameSteel)
  */
 export function frameMat(color: number = PALETTE.frameSteel): THREE.MeshStandardMaterial {
-  return new THREE.MeshStandardMaterial({ color, metalness: 0.88, roughness: 0.3 })
+  return cachedMaterial(`frame:${color}`, () =>
+    new THREE.MeshStandardMaterial({ color, metalness: 0.88, roughness: 0.3 }))
 }
 
 /**
@@ -77,13 +94,13 @@ export function frameMat(color: number = PALETTE.frameSteel): THREE.MeshStandard
  * Faint emissive so red reads even in shadow.
  */
 export function accentRedMat(): THREE.MeshStandardMaterial {
-  return new THREE.MeshStandardMaterial({
+  return cachedMaterial('accentRed', () => new THREE.MeshStandardMaterial({
     color: PALETTE.accentRed,
     metalness: 0.4,
     roughness: 0.45,
     emissive: PALETTE.accentRed,
     emissiveIntensity: 0.12,
-  })
+  }))
 }
 
 /**
@@ -91,13 +108,13 @@ export function accentRedMat(): THREE.MeshStandardMaterial {
  * Metallic and slightly emissive so the thin lines catch light.
  */
 export function trimGoldMat(): THREE.MeshStandardMaterial {
-  return new THREE.MeshStandardMaterial({
+  return cachedMaterial('trimGold', () => new THREE.MeshStandardMaterial({
     color: PALETTE.trimGold,
     metalness: 0.9,
     roughness: 0.25,
     emissive: PALETTE.trimGold,
     emissiveIntensity: 0.08,
-  })
+  }))
 }
 
 /**
@@ -111,7 +128,8 @@ export function glowEyeMat(color: number = PALETTE.glowAmber): THREE.MeshStandar
 
 /** Deep matte material for vent cavities / recessed slats. */
 export function ventMat(): THREE.MeshStandardMaterial {
-  return new THREE.MeshStandardMaterial({ color: PALETTE.ventBlack, metalness: 0.5, roughness: 0.8 })
+  return cachedMaterial('vent', () =>
+    new THREE.MeshStandardMaterial({ color: PALETTE.ventBlack, metalness: 0.5, roughness: 0.8 }))
 }
 
 /* ------------------------------------------------------------------ */
@@ -362,13 +380,18 @@ export function ventSlats(
  * @param opts.mat   material (default frameMat(PALETTE.frameSteelLight))
  * @returns a Mesh
  */
+/** Shared unit bolt geometry (radius 1, 0.85 taper, depth 1) — every bolt is
+ *  the same shape, so scale the mesh instead of retessellating per rivet. The
+ *  scale (and taper ratio) gets baked into merged geometry by bakedParts.ts. */
+const BOLT_GEOMETRY = new THREE.CylinderGeometry(1, 0.85, 1, 6)
+
 export function bolt(
   radius: number = 0.03,
   opts: { depth?: number; mat?: THREE.Material } = {}
 ): THREE.Mesh {
   const { depth = radius * 0.6, mat = frameMat(PALETTE.frameSteelLight) } = opts
-  const geom = new THREE.CylinderGeometry(radius, radius * 0.85, depth, 6)
-  const mesh = new THREE.Mesh(geom, mat)
+  const mesh = new THREE.Mesh(BOLT_GEOMETRY, mat)
+  mesh.scale.set(radius, depth, radius) // cylinder axis is local Y pre-rotation
   mesh.rotation.x = Math.PI / 2 // flat face -> +Z
   return mesh
 }

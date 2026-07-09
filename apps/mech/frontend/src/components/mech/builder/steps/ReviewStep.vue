@@ -7,9 +7,6 @@
 
     <div class="review-layout">
       <div class="mech-visual">
-        <div class="preview-3d-container">
-          <MechPreview3D :loadout="loadout" />
-        </div>
         <div class="mech-diagram">
           <div class="mech-part mech-head">
             <MechIcons :icon="loadout.head?.icon || 'unknown'" :size="48" />
@@ -128,7 +125,6 @@
 <script setup lang="ts">
 import type { MechLoadout, MechStats, SynergyEffect } from '../../../../composables/useMechBuilder'
 import MechIcons from '../../../mech/MechIcons.vue'
-import MechPreview3D from '../../../mech/MechPreview3D.vue'
 import PartDeltaTooltip from './PartDeltaTooltip.vue'
 
 defineProps<{
@@ -157,14 +153,6 @@ defineProps<{
   border: 1px solid var(--mech-border-strong);
   border-radius: var(--mech-radius-md);
   padding: var(--mech-space-5);
-}
-
-.preview-3d-container {
-  width: 100%;
-  height: 400px;
-  margin-bottom: var(--mech-space-5);
-  border-radius: var(--mech-radius-sm);
-  overflow: hidden;
 }
 
 .mech-diagram {

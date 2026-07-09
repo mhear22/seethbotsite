@@ -176,6 +176,35 @@ export const ARCHETYPE_PROFILES: Record<EnemyArchetype, DifficultyProfile> = {
   },
 }
 
+// --- Module-level scratch vectors (perf) ---
+// Dodge detection and steering run every frame for every enemy; reusing these
+// avoids hundreds of Vector3 allocations per frame (pure GC churn). All maths
+// here is synchronous and per-call, so sharing across instances is safe —
+// values never escape a call except via an explicit .copy() into caller state.
+// Each register is used by exactly one site; never alias two within a call.
+const _enemyCenter = new THREE.Vector3()
+const _rel = new THREE.Vector3()
+const _vDir = new THREE.Vector3()
+const _closestPoint = new THREE.Vector3()
+const _perp = new THREE.Vector3()
+const _offset = new THREE.Vector3()
+const _bestDodge = new THREE.Vector3()
+const _instantVel = new THREE.Vector3()
+const _dirToPlayer = new THREE.Vector3()
+const _strafeVec = new THREE.Vector3()
+const _combatDir = new THREE.Vector3()
+const _toWaypoint = new THREE.Vector3()
+const _waypointDir = new THREE.Vector3()
+const _desiredDir = new THREE.Vector3()
+const _playerLookDir = new THREE.Vector3()
+const _playerToEnemy = new THREE.Vector3()
+
+// Squared-distance prefilter for dodge detection. Any threat that can pass the
+// detailed checks (along <= 60, miss <= 4) is within sqrt(60² + 4²) ≈ 60.13u,
+// so gating at 61u skips the closest-approach math for far threats without
+// changing behaviour.
+const MAX_THREAT_DIST_SQ = 61 * 61
+
 export class EnemyAI {
   private state: AIState = 'flank'
   private strafeDir: number = 1
@@ -308,39 +337,44 @@ export class EnemyAI {
   private detectIncomingDodge(enemy: MechEntity): THREE.Vector3 | null {
     if (this.threats.length === 0) return null
 
-    const enemyCenter = enemy.position.clone()
+    const enemyCenter = _enemyCenter.copy(enemy.position)
     enemyCenter.y += 2.5
 
-    let best: { dir: THREE.Vector3; closeness: number } | null = null
+    let bestCloseness = -1
 
     for (const threat of this.threats) {
-      const rel = enemyCenter.clone().sub(threat.position)
-      const speed = threat.velocity.length()
-      if (speed < 0.01) continue
-      const vDir = threat.velocity.clone().normalize()
+      const rel = _rel.subVectors(enemyCenter, threat.position)
+      // Cheap early-out: too far away to possibly pass the checks below.
+      if (rel.lengthSq() > MAX_THREAT_DIST_SQ) continue
+      if (threat.velocity.lengthSq() < 0.0001) continue
+      const vDir = _vDir.copy(threat.velocity).normalize()
 
       // Only consider projectiles heading roughly toward us.
       const along = rel.dot(vDir)
       if (along <= 0 || along > 60) continue // behind us or too far
 
       // Perpendicular miss distance (how close the projectile passes).
-      const closestPoint = threat.position.clone().add(vDir.clone().multiplyScalar(along))
+      // (Distinct scratch from vDir — vDir is still needed for perp below.)
+      const closestPoint = _closestPoint.copy(vDir).multiplyScalar(along).add(threat.position)
       const miss = closestPoint.distanceTo(enemyCenter)
       if (miss > 4) continue // will miss comfortably
 
       // Sidestep perpendicular to the incoming direction (flat).
-      const perp = new THREE.Vector3(-vDir.z, 0, vDir.x).normalize()
+      const perp = _perp.set(-vDir.z, 0, vDir.x).normalize()
       // Choose the side that moves away from the projectile path.
-      const offset = enemyCenter.clone().sub(closestPoint)
+      const offset = _offset.subVectors(enemyCenter, closestPoint)
       if (offset.dot(perp) < 0) perp.multiplyScalar(-1)
 
       const closeness = 1 - miss / 4
-      if (!best || closeness > best.closeness) {
-        best = { dir: perp, closeness }
+      if (closeness > bestCloseness) {
+        bestCloseness = closeness
+        _bestDodge.copy(perp)
       }
     }
 
-    return best ? best.dir : null
+    // Returns a shared scratch vector — the sole caller (update) copies it
+    // immediately; callers must never retain the reference across frames.
+    return bestCloseness >= 0 ? _bestDodge : null
   }
 
   /**
@@ -352,14 +386,15 @@ export class EnemyAI {
 
     // --- Estimate player velocity (for leading) from frame-to-frame movement. ---
     if (this.lastPlayerPos && deltaTime > 0) {
-      const instantVel = player.position.clone().sub(this.lastPlayerPos).divideScalar(deltaTime)
+      const instantVel = _instantVel.subVectors(player.position, this.lastPlayerPos).divideScalar(deltaTime)
       // Smooth to reduce jitter.
       this.playerVelEstimate.lerp(instantVel, 0.4)
     }
-    this.lastPlayerPos = player.position.clone()
+    if (this.lastPlayerPos) this.lastPlayerPos.copy(player.position)
+    else this.lastPlayerPos = player.position.clone()
 
     // Direction to player (flat)
-    const dirToPlayer = player.position.clone().sub(enemy.position)
+    const dirToPlayer = _dirToPlayer.subVectors(player.position, enemy.position)
     dirToPlayer.y = 0
     dirToPlayer.normalize()
 
@@ -420,33 +455,33 @@ export class EnemyAI {
     const maxSpeed = 8 * speedStat * weightFactor * strandMult
     const accel = 60 * weightFactor // units/s²
 
-    const strafeVec = new THREE.Vector3(-dirToPlayer.z, 0, dirToPlayer.x)
+    const strafeVec = _strafeVec.set(-dirToPlayer.z, 0, dirToPlayer.x)
       .multiplyScalar(this.strafeDir)
 
     // Compute a desired move direction that blends combat intent with roaming
-    let combatDir = new THREE.Vector3()
+    const combatDir = _combatDir.set(0, 0, 0)
 
     switch (this.state) {
       case 'chase': {
-        combatDir = dirToPlayer.clone()
+        combatDir.copy(dirToPlayer)
         break
       }
       case 'flank': {
         const closingBias = distanceToPlayer > optimalRange ? 0.3 : -0.2
-        combatDir = strafeVec.clone()
-          .add(dirToPlayer.clone().multiplyScalar(closingBias))
+        combatDir.copy(strafeVec)
+          .addScaledVector(dirToPlayer, closingBias)
           .normalize()
         break
       }
       case 'retreat': {
-        combatDir = strafeVec.clone()
-          .add(dirToPlayer.clone().multiplyScalar(-0.7))
+        combatDir.copy(strafeVec)
+          .addScaledVector(dirToPlayer, -0.7)
           .normalize()
         break
       }
       case 'aggressive': {
-        combatDir = dirToPlayer.clone()
-          .add(strafeVec.clone().multiplyScalar(0.3 * this.profile.strafeAggression))
+        combatDir.copy(dirToPlayer)
+          .addScaledVector(strafeVec, 0.3 * this.profile.strafeAggression)
           .normalize()
         break
       }
@@ -470,22 +505,24 @@ export class EnemyAI {
     }
 
     // Direction toward the current roam waypoint
-    const toWaypoint = this.waypoint.clone().sub(enemy.position)
+    const toWaypoint = _toWaypoint.subVectors(this.waypoint, enemy.position)
     toWaypoint.y = 0
     const distToWaypoint = toWaypoint.length()
-    const waypointDir = distToWaypoint > 0.5 ? toWaypoint.clone().normalize() : new THREE.Vector3()
+    const waypointDir = distToWaypoint > 0.5
+      ? _waypointDir.copy(toWaypoint).normalize()
+      : _waypointDir.set(0, 0, 0)
 
     // Blend: combat-heavy when engaged, waypoint-heavy when at ideal range
     // This ensures the AI keeps moving around the map even while fighting
     const roamBlend = this.state === 'chase' ? 0.2 : 0.5
-    const desiredDir = combatDir.clone()
+    const desiredDir = _desiredDir.copy(combatDir)
       .multiplyScalar(1 - roamBlend)
-      .add(waypointDir.clone().multiplyScalar(roamBlend))
+      .addScaledVector(waypointDir, roamBlend)
 
     // Active dodge overrides the blend with a strong sidestep impulse.
     if (this.dodgeTimer > 0) {
       this.dodgeTimer -= deltaTime
-      desiredDir.add(this.dodgeDir.clone().multiplyScalar(2.5 * this.profile.strafeAggression))
+      desiredDir.addScaledVector(this.dodgeDir, 2.5 * this.profile.strafeAggression)
     }
 
     if (desiredDir.lengthSq() > 0.001) desiredDir.normalize()
@@ -509,12 +546,12 @@ export class EnemyAI {
     this.jumpCooldown -= deltaTime
     if (this.jumpCooldown <= 0 && !enemy.isJumping && !enemy.legsDestroyed) {
       // Estimate if player is aimed toward us
-      const playerLookDir = new THREE.Vector3(
+      const playerLookDir = _playerLookDir.set(
         Math.sin(player.rotation.y),
         0,
         Math.cos(player.rotation.y),
       )
-      const playerToEnemy = enemy.position.clone().sub(player.position)
+      const playerToEnemy = _playerToEnemy.subVectors(enemy.position, player.position)
       playerToEnemy.y = 0
       playerToEnemy.normalize()
       const aimDot = playerLookDir.dot(playerToEnemy)

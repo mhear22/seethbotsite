@@ -84,17 +84,29 @@ export const MATERIALS = {
 /**
  * Energy glow material for weapon effects.
  *
- * Unchanged signature/behavior so existing call sites keep working. For the
- * art-bible amber sensor/eye glow, pass PALETTE.glowAmber (0xffc234).
+ * Unchanged signature so existing call sites keep working, but instances are
+ * now CACHED per color: baked-part merging (bakedParts.ts) batches meshes by
+ * material reference, so all same-color glows should share one instance. Do
+ * not mutate the returned material — clone it for per-instance tweaks (the
+ * loader's team tint clones per mech, and animated 'thrust-glow' meshes get
+ * their own clone there). For the art-bible amber sensor/eye glow, pass
+ * PALETTE.glowAmber (0xffc234).
  */
+const energyMaterialCache = new Map<number, THREE.MeshStandardMaterial>()
+
 export const createEnergyMaterial = (color: number): THREE.MeshStandardMaterial => {
-  return new THREE.MeshStandardMaterial({
-    color,
-    metalness: 0.2,
-    roughness: 0.1,
-    emissive: color,
-    emissiveIntensity: 0.8,
-    transparent: true,
-    opacity: 0.9,
-  })
+  let mat = energyMaterialCache.get(color)
+  if (!mat) {
+    mat = new THREE.MeshStandardMaterial({
+      color,
+      metalness: 0.2,
+      roughness: 0.1,
+      emissive: color,
+      emissiveIntensity: 0.8,
+      transparent: true,
+      opacity: 0.9,
+    })
+    energyMaterialCache.set(color, mat)
+  }
+  return mat
 }

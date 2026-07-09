@@ -5,11 +5,12 @@ import { CameraController } from './CameraController'
 import { PhysicsSystem } from './PhysicsSystem'
 import { InputManager, type InputState } from './InputManager'
 import { ParticleSystem } from './ParticleSystem'
-import { EnemyAI } from './EnemyAI'
+import { EnemyAI, type IncomingThreat } from './EnemyAI'
 import { weaponProjectileSpeed } from './enemyGeneration'
 import { MapRenderer } from './MapRenderer'
 import { applyWindowShaders, updateWindowShaders } from './WindowShader'
 import { createDamageShaderPass, decayDamageIntensity } from './DamageShader'
+import { SHARED_GEOMETRY_FLAG } from './procedural/bakedParts'
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
@@ -113,6 +114,13 @@ export class BattleScene {
   // Hitstop: when > 0, dt is scaled toward zero for a brief impact freeze.
   private hitstopTimer: number = 0
 
+  // Particle budget for missile smoke trails (see onMissileSmoke wiring):
+  // accrues per emission tick, spends ~13 particles per spawned puff.
+  private missileSmokeBudget: number = 0
+
+  // Scratch list for AI threat feeding, refilled each frame (no allocations).
+  private incomingThreats: IncomingThreat[] = []
+
   protected targetingState: TargetingState = {
     isTargeted: false,
     screenX: 0,
@@ -162,14 +170,21 @@ export class BattleScene {
     // Initialize Three.js scene
     this.scene = markRaw(new THREE.Scene())
 
-    // Initialize renderer
+    // Initialize renderer. Battle always renders offscreen-first (the
+    // EffectComposer below, or the lensing pipeline on lensing maps), so a
+    // multisampled canvas backbuffer would never antialias the scene — only a
+    // final fullscreen quad ever hits it. Create the context without MSAA and
+    // honor the antialias setting on the composer's render target instead.
     const gfx = config.graphics
     this.renderer = markRaw(new THREE.WebGLRenderer({
       canvas: config.canvas,
-      antialias: gfx?.antialias ?? true
+      antialias: false
     }))
     this.renderer.setSize(window.innerWidth, window.innerHeight)
-    this.renderer.setPixelRatio(window.devicePixelRatio * (gfx?.renderScale ?? 1.0))
+    // Cap the device pixel ratio at 2: beyond that the fill-rate cost (base pass
+    // + MSAA + bloom) quadruples for sharpness nobody can see, which tanks FPS on
+    // 4K/scaled displays. renderScale still lets users trade sharpness for speed.
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2) * (gfx?.renderScale ?? 1.0))
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
     this.renderer.toneMappingExposure = 1.0
 
@@ -196,8 +211,16 @@ export class BattleScene {
     this.particleSystem = new ParticleSystem(this.scene)
     // Wire missile smoke trails to a tiny grey rising spark puff. Safe no-op if
     // never called; ParticleSystem has no dedicated smoke helper so we reuse the
-    // low-intensity impact spark with an upward bias.
+    // low-intensity impact spark with an upward bias. The hook fires every
+    // 0.03s per missile and one puff is ~13 particles, which unthrottled is
+    // ~470 particles/s per missile — enough to saturate the whole particle
+    // pool and starve hit/explosion VFX. Accrue a time-based budget instead
+    // (each callback represents 0.03s of one missile's flight) and only spawn
+    // when a puff is covered, capping trails at ~60 particles/s per missile.
     this.projectileSystem.onMissileSmoke = (p: THREE.Vector3) => {
+      this.missileSmokeBudget += 0.03 * 60 // interval × target particles/s
+      if (this.missileSmokeBudget < 13) return
+      this.missileSmokeBudget -= 13 // ~particles per 'floor' spark puff
       this.particleSystem.spawnImpactSparks(p, new THREE.Vector3(0, 1, 0), 'floor')
     }
     this.camera = new CameraController(this.playerMech)
@@ -242,7 +265,7 @@ export class BattleScene {
       const mapDef = getMapById(config.mapId)
       if (mapDef) {
         this.mapDef = mapDef
-        this.mapRenderer = new MapRenderer(this.scene, this.renderer)
+        this.mapRenderer = new MapRenderer(this.scene, this.renderer, this._shadowMapSize)
         this.buildings = this.mapRenderer.loadMap(mapDef)
         // Update physics bounds to match map
         this.physicsSystem.setArenaBounds(mapDef.arena.width, mapDef.arena.depth)
@@ -259,8 +282,23 @@ export class BattleScene {
     } else {
       this.setupDefaultArena()
     }
-    // Post-processing composer (used when map has no lensing)
-    this.composer = markRaw(new EffectComposer(this.renderer))
+    // Post-processing composer (used when map has no lensing). Deliberately
+    // NOT multisampled: the old pipeline requested canvas MSAA that never
+    // applied to the composed scene (only the final quad hit the backbuffer),
+    // so samples:0 matches the shipped look while skipping the 4x bandwidth +
+    // resolve cost an MSAA half-float target would add every frame. pixelRatio
+    // already folds in renderScale, so the chain tracks the render-scale
+    // setting — raising renderScale is the supported way to buy edge quality.
+    const pixelRatio = this.renderer.getPixelRatio()
+    const bufW = window.innerWidth * pixelRatio
+    const bufH = window.innerHeight * pixelRatio
+    this.composer = markRaw(new EffectComposer(this.renderer, new THREE.WebGLRenderTarget(bufW, bufH, {
+      type: THREE.HalfFloatType,
+    })))
+    // With an explicit target the composer takes its logical size from the
+    // target (device pixels) but still multiplies by pixelRatio when sizing
+    // passes — reset it to CSS pixels so addPass/handleResize size correctly.
+    this.composer.setSize(window.innerWidth, window.innerHeight)
     this.composer.addPass(new RenderPass(this.scene, this.camera.camera))
 
     // Bloom — gated behind graphics quality (skip when shadows are off = "low
@@ -270,12 +308,16 @@ export class BattleScene {
     // which bypasses this composer, so bloom is not applied on those maps.
     if ((gfx?.shadowQuality ?? 'medium') !== 'off') {
       this.bloomPass = markRaw(new UnrealBloomPass(
-        new THREE.Vector2(window.innerWidth, window.innerHeight),
+        new THREE.Vector2(Math.floor(bufW / 2), Math.floor(bufH / 2)),
         0.6,   // strength (modest)
         0.4,   // radius
         0.85,  // threshold
       ))
       this.composer.addPass(this.bloomPass)
+      // Bloom is a low-frequency blur: run its whole mip chain at half the
+      // drawing-buffer resolution (visually near-identical, ~4x less fill).
+      // Must run AFTER addPass, which resizes every pass to full resolution.
+      this.bloomPass.setSize(Math.floor(bufW / 2), Math.floor(bufH / 2))
     }
 
     this.damagePass = markRaw(createDamageShaderPass())
@@ -563,7 +605,10 @@ export class BattleScene {
     this.camera.handleResize(w, h)
     this.renderer.setSize(w, h)
     this.composer?.setSize(w, h)
-    this.bloomPass?.setSize(w, h)
+    // Re-apply the half-resolution bloom chain (composer.setSize just reset
+    // every pass — bloom included — to the full drawing-buffer size).
+    const pixelRatio = this.renderer.getPixelRatio()
+    this.bloomPass?.setSize(Math.floor((w * pixelRatio) / 2), Math.floor((h * pixelRatio) / 2))
     // Resize the gravitational-lensing offscreen target so it tracks the canvas.
     this.mapRenderer?.resize(w, h)
   }
@@ -778,9 +823,13 @@ export class BattleScene {
 
     // Feed the AI the player's in-flight projectiles so it can dodge incoming
     // fire (single-player only; multiplayer uses MultiplayerBattleScene).
-    const incomingThreats = this.projectileSystem.getProjectiles()
-      .filter((p) => p.ownerId === this.playerMech.id)
-      .map((p) => ({ position: p.position, velocity: p.velocity }))
+    // Reuse one array and pass projectiles directly (they satisfy
+    // IncomingThreat structurally) — no per-frame array/wrapper allocations.
+    this.incomingThreats.length = 0
+    for (const p of this.projectileSystem.getProjectiles()) {
+      if (p.ownerId === this.playerMech.id) this.incomingThreats.push(p)
+    }
+    const incomingThreats = this.incomingThreats
 
     // Update each squad enemy with its own AI brain (player-vs-squad: every
     // enemy targets the single player mech).
@@ -1077,10 +1126,14 @@ export class BattleScene {
       m.cleanup()
     }
 
-    // Cleanup scene
+    // Cleanup scene. Baked mech part geometry is shared across mech instances
+    // via the module-level cache in procedural/bakedParts.ts — disposing it here
+    // would force a GPU re-upload for every mech in the next battle.
     this.scene.traverse((object) => {
       if (object instanceof THREE.Mesh) {
-        object.geometry.dispose()
+        if (!object.geometry.userData[SHARED_GEOMETRY_FLAG]) {
+          object.geometry.dispose()
+        }
         if (object.material instanceof THREE.Material) {
           object.material.dispose()
         }

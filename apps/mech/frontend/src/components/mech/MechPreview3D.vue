@@ -20,8 +20,8 @@
 import { ref, onMounted, onUnmounted, watch, markRaw } from 'vue'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
-import { getMechModelLoader, MODEL_ATTACH_POINTS } from '../../lib/battle/MechModelLoader'
-import { getProceduralModel } from '../../lib/battle/ProceduralModels'
+import { getMechModelLoader } from '../../lib/battle/MechModelLoader'
+import { buildProceduralMechGroup, disposeMechGroup } from '../../lib/battle/mechThumbnail'
 import type { MechLoadout } from '../../shared/types/MechTypes'
 import MechIcons from './MechIcons.vue'
 
@@ -45,65 +45,6 @@ let animationFrameId: number | null = null
 // Default team color (blue)
 const TEAM_COLOR = props.teamColor ?? 0x3b82f6
 
-// Create procedural preview mesh (fast, always available)
-function createProceduralPreview(): THREE.Group {
-  const group = new THREE.Group()
-
-  const addPart = (
-    partType: 'head' | 'core' | 'leftArm' | 'rightArm' | 'legs' | 'rack',
-    part: { id: string } | null
-  ) => {
-    if (part && part.id) {
-      const proceduralFn = getProceduralModel(part.id)
-      if (proceduralFn) {
-        const model = proceduralFn()
-        const attachPoint = MODEL_ATTACH_POINTS[partType]
-        model.position.copy(attachPoint)
-
-        // Apply team color tint
-        model.traverse((child) => {
-          if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
-            child.material = child.material.clone()
-            child.material.color.lerp(new THREE.Color(TEAM_COLOR), 0.2)
-          }
-        })
-
-        group.add(model)
-        return
-      }
-    }
-
-    // Fallback to simple boxes
-    const fallbacks: Record<string, { size: [number, number, number]; pos: THREE.Vector3 }> = {
-      head: { size: [1, 1, 1], pos: MODEL_ATTACH_POINTS.head.clone() },
-      core: { size: [2, 2, 1.5], pos: MODEL_ATTACH_POINTS.core.clone() },
-      leftArm: { size: [0.8, 2, 0.8], pos: MODEL_ATTACH_POINTS.leftArm.clone() },
-      rightArm: { size: [0.8, 2, 0.8], pos: MODEL_ATTACH_POINTS.rightArm.clone() },
-      legs: { size: [1.8, 2.8, 1.5], pos: MODEL_ATTACH_POINTS.legs.clone() },
-      rack: { size: [0.5, 0.5, 0.3], pos: MODEL_ATTACH_POINTS.rack.clone() },
-    }
-
-    const fallback = fallbacks[partType]
-    if (fallback) {
-      const geometry = new THREE.BoxGeometry(...fallback.size)
-      const material = new THREE.MeshStandardMaterial({ color: TEAM_COLOR })
-      const mesh = new THREE.Mesh(geometry, material)
-      mesh.position.copy(fallback.pos)
-      mesh.name = partType
-      group.add(mesh)
-    }
-  }
-
-  addPart('head', props.loadout.head)
-  addPart('core', props.loadout.core)
-  addPart('leftArm', props.loadout.leftArm)
-  addPart('rightArm', props.loadout.rightArm)
-  addPart('legs', props.loadout.legs)
-  addPart('rack', props.loadout.rack)
-
-  return group
-}
-
 async function loadModelsAsync() {
   if (!mechGroup) return
 
@@ -114,14 +55,7 @@ async function loadModelsAsync() {
     // Replace procedural with loaded model
     if (mechGroup && scene) {
       scene.remove(mechGroup)
-      mechGroup.traverse((child) => {
-        if (child instanceof THREE.Mesh) {
-          child.geometry.dispose()
-          if (child.material instanceof THREE.Material) {
-            child.material.dispose()
-          }
-        }
-      })
+      disposeMechGroup(mechGroup)
       mechGroup = markRaw(modelGroup)
       scene.add(mechGroup)
     }
@@ -204,7 +138,7 @@ function initScene() {
   controls.update()
 
   // Create procedural preview first (fast)
-  mechGroup = markRaw(createProceduralPreview())
+  mechGroup = markRaw(buildProceduralMechGroup(props.loadout, TEAM_COLOR))
   scene.add(mechGroup)
 
   // Start async model loading
@@ -269,14 +203,7 @@ function cleanup() {
   }
 
   if (mechGroup) {
-    mechGroup.traverse((child) => {
-      if (child instanceof THREE.Mesh) {
-        child.geometry.dispose()
-        if (child.material instanceof THREE.Material) {
-          child.material.dispose()
-        }
-      }
-    })
+    disposeMechGroup(mechGroup)
   }
 
   if (renderer) {
@@ -305,18 +232,11 @@ watch(
     // Remove existing mech
     if (mechGroup) {
       scene.remove(mechGroup)
-      mechGroup.traverse((child) => {
-        if (child instanceof THREE.Mesh) {
-          child.geometry.dispose()
-          if (child.material instanceof THREE.Material) {
-            child.material.dispose()
-          }
-        }
-      })
+      disposeMechGroup(mechGroup)
     }
 
     // Create new procedural preview
-    mechGroup = markRaw(createProceduralPreview())
+    mechGroup = markRaw(buildProceduralMechGroup(props.loadout, TEAM_COLOR))
     scene.add(mechGroup)
 
     // Load models async

@@ -45,6 +45,23 @@ export const DISMOUNT_SPAWN_OFFSET = 4.5
  */
 export const ON_FOOT_HOSTILE_GRACE_SEC = 12
 
+// --- Sun shadow follow-box (perf) ---
+/**
+ * Half-extent of the sun's shadow ortho frustum — a small box that follows the
+ * player instead of spanning the whole ±600u world, so distant towns' casters
+ * are frustum-culled out of the shadow pass and texel density improves ~8x.
+ */
+const SHADOW_FRUSTUM_HALF_EXTENT = 70
+
+/** Free-roam speed multiplier for the open world (combat resets to 1.0). The
+ *  overworld is ~1200u across with towns 300m+ apart, so arena speed felt slow. */
+const OVERWORLD_SPEED_MULT = 2.6
+/** Constant offset from the shadow target to the sun. Position and target move
+ *  together each frame (updateSunShadow), so the light DIRECTION never changes. */
+const SUN_SHADOW_OFFSET = new THREE.Vector3(120, 200, 80)
+/** Scratch for the per-frame shadow-frustum re-centre (never retained). */
+const _shadowCenter = new THREE.Vector3()
+
 /** On-foot slice of the per-frame info (null while in the mech). */
 export interface OnFootFrameInfo {
   /** Town the pilot is dismounted inside. */
@@ -192,6 +209,12 @@ export class StoryWorld {
 
   /** Animated sky shader material (drives drifting clouds); driven each frame. */
   private skyMaterial: THREE.ShaderMaterial | null = null
+  /** The sun light; its shadow frustum follows the player (see updateSunShadow). */
+  private sun: THREE.DirectionalLight | null = null
+  /** Constant world↔light-space rotation, used to texel-snap the shadow frustum
+   *  centre in updateSunShadow (built once in setupLighting). */
+  private readonly sunBasis = new THREE.Matrix4()
+  private readonly sunBasisInverse = new THREE.Matrix4()
   /**
    * Terrain shaping parameters. The inner `flatRadius` is kept clear of the
    * outermost town ring so every town sits on flat ground at y=0 (the mech
@@ -209,8 +232,13 @@ export class StoryWorld {
   private animationId: number | null = null
   private lastTime: number = 0
   private elapsed: number = 0
+  // FPS over a rolling 60-frame window (mirrors BattleScene) for the HUD counter.
+  private fpsFrameTimes: number[] = []
+  private currentFPS: number = 0
   /** Combat clock for weapon cooldown bookkeeping (mirrors BattleScene.battleTime). */
   private battleTime: number = 0
+  // Particle budget for missile smoke trails (mirrors BattleScene.missileSmokeBudget).
+  private missileSmokeBudget: number = 0
   // Rising-edge latch for the rack-ability key (fire once per press, see BattleScene).
   private rackAbilityHeld = false
   /** Suspends decay/free-roam input while a dialogue/garage UI is open. */
@@ -237,6 +265,41 @@ export class StoryWorld {
    * so opening a hub panel during the grace window doesn't silently burn it (§4.3).
    */
   private _remountSecondsLeft: number | null = null
+
+  // --- Reusable per-frame payloads (perf: no 60Hz allocation churn / GC hitches) ---
+  /**
+   * Reused StoryFrameInfo handed to onFrame every frame. Valid ONLY during the
+   * callback — consumers must copy anything they retain across frames. `onFoot`
+   * is the one exception and stays freshly allocated per frame (buildOnFootInfo):
+   * StoryModePage stores it in a ref and needs its identity to change to trigger
+   * Vue reactivity.
+   */
+  private readonly _frameInfo: StoryFrameInfo = {
+    mode: 'mech',
+    onFoot: null,
+    canDismount: false,
+    deltaTime: 0,
+    playerPosition: new THREE.Vector3(),
+    nearestTownId: null,
+    nearestTownName: null,
+    nearestTownDistance: Infinity,
+    insideTownId: null,
+    questGiverTownId: null,
+    encounterActive: false,
+    encounter: null,
+  }
+  /** Reused encounter sub-object of {@link _frameInfo}. Every field — including
+   *  the optional §5 variety ones — is reassigned each frame, so stale values
+   *  can never leak between quest types. */
+  private readonly _encounterInfo: NonNullable<StoryFrameInfo['encounter']> = {
+    questId: '',
+    cleared: 0,
+    total: 0,
+    found: false,
+    collected: false,
+  }
+  /** Scratch aim direction (reused each combat frame; see getAimDirection). */
+  private readonly _aimDir = new THREE.Vector3()
 
   private handleResizeBound: () => void
   private handleVisibilityBound: () => void
@@ -267,7 +330,9 @@ export class StoryWorld {
       antialias: gfx?.antialias ?? true,
     }))
     this.renderer.setSize(window.innerWidth, window.innerHeight)
-    this.renderer.setPixelRatio(window.devicePixelRatio * (gfx?.renderScale ?? 1.0))
+    // Cap the device pixel ratio at 2 (matches BattleScene): uncapped DPR on
+    // 4K/scaled displays quadruples fill-rate cost for imperceptible sharpness.
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2) * (gfx?.renderScale ?? 1.0))
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
     this.renderer.toneMappingExposure = 1.0
 
@@ -295,7 +360,13 @@ export class StoryWorld {
     // --- Combat systems (single-player only; mirrors BattleScene) ---
     this.projectileSystem = new ProjectileSystem(this.scene)
     this.particleSystem = new ParticleSystem(this.scene)
+    // Budget the smoke trail like BattleScene: unthrottled this hook fires every
+    // 0.03s per missile (~470 particles/s each), saturating the particle pool.
+    // Accrue time-based budget and spend ~13 particles per puff (~60/s cap).
     this.projectileSystem.onMissileSmoke = (p: THREE.Vector3) => {
+      this.missileSmokeBudget += 0.03 * 60 // interval × target particles/s
+      if (this.missileSmokeBudget < 13) return
+      this.missileSmokeBudget -= 13 // ~particles per 'floor' spark puff
       this.particleSystem.spawnImpactSparks(p, new THREE.Vector3(0, 1, 0), 'floor')
     }
 
@@ -405,18 +476,53 @@ export class StoryWorld {
     this.scene.add(new THREE.AmbientLight(0xffffff, 0.6))
 
     const sun = new THREE.DirectionalLight(0xfff4e0, 0.9)
-    sun.position.set(120, 200, 80)
+    sun.position.copy(SUN_SHADOW_OFFSET)
     sun.castShadow = this.shadowsEnabled
-    sun.shadow.camera.left = -WORLD_HALF_EXTENT
-    sun.shadow.camera.right = WORLD_HALF_EXTENT
-    sun.shadow.camera.top = WORLD_HALF_EXTENT
-    sun.shadow.camera.bottom = -WORLD_HALF_EXTENT
-    sun.shadow.camera.far = 1200
+    // A tight follow-box frustum instead of the whole ±600u world: only casters
+    // near the player enter the shadow pass (distant towns are frustum-culled),
+    // and texel density improves ~8x. Re-centred on the active body every frame
+    // in updateSunShadow(); the BOUNDS themselves never change after this (so no
+    // per-frame updateProjectionMatrix is needed).
+    sun.shadow.camera.left = -SHADOW_FRUSTUM_HALF_EXTENT
+    sun.shadow.camera.right = SHADOW_FRUSTUM_HALF_EXTENT
+    sun.shadow.camera.top = SHADOW_FRUSTUM_HALF_EXTENT
+    sun.shadow.camera.bottom = -SHADOW_FRUSTUM_HALF_EXTENT
+    // The light hovers ~247u from its target; 500 covers the follow-box plus
+    // terrain relief with margin (1200 wasted ortho depth precision).
+    sun.shadow.camera.far = 500
     sun.shadow.mapSize.width = this.shadowMapSize
     sun.shadow.mapSize.height = this.shadowMapSize
     this.scene.add(sun)
+    // The target moves with the player each frame; it MUST live in the scene
+    // graph or its matrixWorld never updates and the shadows silently break.
+    this.scene.add(sun.target)
+    this.sun = sun
+
+    // Constant light-space basis (the light direction never changes): Z points
+    // from the sun toward its target, X/Y span the shadow map's texel plane.
+    this.sunBasis.lookAt(SUN_SHADOW_OFFSET, new THREE.Vector3(0, 0, 0), THREE.Object3D.DEFAULT_UP)
+    this.sunBasisInverse.copy(this.sunBasis).invert()
 
     this.scene.add(new THREE.HemisphereLight(0xbfe3ff, 0x4a7a3a, 0.4))
+  }
+
+  /**
+   * Re-centre the sun's shadow follow-box on `center` (the active body). Target
+   * and light translate by the SAME offset, so the light direction is constant.
+   * The centre is snapped to whole shadow-map texels in light space — without
+   * this, sub-texel frustum movement re-rasterises every shadow edge each frame
+   * and static geometry's shadows shimmer/crawl as the player moves.
+   */
+  private updateSunShadow(center: THREE.Vector3): void {
+    const sun = this.sun
+    if (!sun || !this.shadowsEnabled) return
+    const worldUnitsPerTexel = (SHADOW_FRUSTUM_HALF_EXTENT * 2) / this.shadowMapSize
+    _shadowCenter.copy(center).applyMatrix4(this.sunBasisInverse)
+    _shadowCenter.x = Math.round(_shadowCenter.x / worldUnitsPerTexel) * worldUnitsPerTexel
+    _shadowCenter.y = Math.round(_shadowCenter.y / worldUnitsPerTexel) * worldUnitsPerTexel
+    _shadowCenter.applyMatrix4(this.sunBasis)
+    sun.target.position.copy(_shadowCenter)
+    sun.position.copy(_shadowCenter).add(SUN_SHADOW_OFFSET)
   }
 
   /**
@@ -441,7 +547,11 @@ export class StoryWorld {
     }))
     pads.push({ x: 0, z: 0, flatRadius: 32, blendRadius: 48, elevation: 0 })
 
-    this.terrain = new Terrain({ size, segments: 300, seed: 1337, pads })
+    // 160 segments (was 300): 180k→~51k tris on the un-cullable world-spanning
+    // ground mesh — the single biggest geometry in the open-world frame. The
+    // heightfield is gentle and towns sit on flat pads, so the silhouette loss
+    // is imperceptible while the vertex-shader cost drops ~3.5x.
+    this.terrain = new Terrain({ size, segments: 160, seed: 1337, pads })
     this.scene.add(this.terrain.mesh)
     this.scene.add(this.terrain.waterMesh)
   }
@@ -474,8 +584,21 @@ export class StoryWorld {
     this.elapsed += deltaTime
     this.battleTime += deltaTime
 
+    this.fpsFrameTimes.push(currentTime)
+    if (this.fpsFrameTimes.length > 60) {
+      this.fpsFrameTimes.shift()
+    }
+    if (this.fpsFrameTimes.length >= 2) {
+      const fpsElapsed = (currentTime - this.fpsFrameTimes[0]) / 1000
+      this.currentFPS = Math.round((this.fpsFrameTimes.length - 1) / fpsElapsed)
+    }
+
     this.update(deltaTime)
     this.render()
+  }
+
+  getFPS(): number {
+    return this.currentFPS
   }
 
   private update(deltaTime: number): void {
@@ -501,6 +624,10 @@ export class StoryWorld {
       // against the town's colliders. The Frame stays parked as a monument.
       this.updateOnFoot(input, deltaTime)
     } else {
+      // Overworld traversal is much larger than an arena (towns are 300m+ apart),
+      // so free-roam runs at OVERWORLD_SPEED_MULT; combat drops back to arena
+      // speed (1.0) so encounters keep their tuned feel.
+      this.physicsSystem.speedMultiplier = this.combat.active ? 1.0 : OVERWORLD_SPEED_MULT
       // Player movement (dash / move / jump) — same systems as battle.
       const dashStarted = this.physicsSystem.updateDash(this.playerMech, input, deltaTime)
       if (dashStarted) {
@@ -544,6 +671,8 @@ export class StoryWorld {
     // Towns: animate markers + find the nearest one to the ACTIVE body (mech or
     // pilot), so all proximity readouts follow whoever the camera is on.
     const activePos = this.activePosition()
+    // Keep the sun's shadow follow-box centred on whoever the camera is on.
+    this.updateSunShadow(activePos)
     let nearest: Town | null = null
     let nearestDistSq = Infinity
     for (const town of this.towns) {
@@ -564,36 +693,45 @@ export class StoryWorld {
     const prog = this.combat.active ? this.combat.getProgress() : null
     const activeQuest = this.combat.activeQuest
 
-    this.onFrame?.({
-      deltaTime,
-      mode: this._mode,
-      onFoot: this._mode === 'onFoot' ? this.buildOnFootInfo(activePos) : null,
-      canDismount: this.canDismount(),
-      playerPosition: activePos,
-      nearestTownId: nearest?.id ?? null,
-      nearestTownName: nearest?.name ?? null,
-      nearestTownDistance: nearest ? Math.sqrt(nearestDistSq) : Infinity,
-      insideTownId: insideRadius ? nearest!.id : null,
-      questGiverTownId: questGiverInRange ? nearest!.id : null,
-      encounterActive: this.combat.active,
-      encounter: prog && activeQuest ? {
-        questId: activeQuest.id,
-        cleared: prog.cleared,
-        total: prog.total,
-        found: prog.found,
-        collected: prog.collected,
-        // §5 variety readouts — forwarded verbatim (undefined for non-variety types).
-        crawlersAlive: prog.crawlersAlive,
-        crawlersArrived: prog.crawlersArrived,
-        crawlersTotal: prog.crawlersTotal,
-        waveIndex: prog.waveIndex,
-        waveTotal: prog.waveTotal,
-        barricadeFraction: prog.barricadeFraction,
-        extractionPhase: prog.extractionPhase,
-        secondsLeft: prog.secondsLeft,
-        perimeterFraction: prog.perimeterFraction,
-      } : null,
-    })
+    // Mutate the REUSED frame-info payload in place (no per-frame allocation;
+    // valid only during the callback — see the _frameInfo field doc). `onFoot`
+    // stays freshly allocated: the host retains it in a ref and relies on its
+    // identity changing to trigger reactivity.
+    const info = this._frameInfo
+    info.deltaTime = deltaTime
+    info.mode = this._mode
+    info.onFoot = this._mode === 'onFoot' ? this.buildOnFootInfo(activePos) : null
+    info.canDismount = this.canDismount()
+    info.playerPosition = activePos
+    info.nearestTownId = nearest?.id ?? null
+    info.nearestTownName = nearest?.name ?? null
+    info.nearestTownDistance = nearest ? Math.sqrt(nearestDistSq) : Infinity
+    info.insideTownId = insideRadius ? nearest!.id : null
+    info.questGiverTownId = questGiverInRange ? nearest!.id : null
+    info.encounterActive = this.combat.active
+    if (prog && activeQuest) {
+      const enc = this._encounterInfo
+      enc.questId = activeQuest.id
+      enc.cleared = prog.cleared
+      enc.total = prog.total
+      enc.found = prog.found
+      enc.collected = prog.collected
+      // §5 variety readouts — forwarded verbatim (undefined for non-variety
+      // types), which also clears stale values left by a previous quest type.
+      enc.crawlersAlive = prog.crawlersAlive
+      enc.crawlersArrived = prog.crawlersArrived
+      enc.crawlersTotal = prog.crawlersTotal
+      enc.waveIndex = prog.waveIndex
+      enc.waveTotal = prog.waveTotal
+      enc.barricadeFraction = prog.barricadeFraction
+      enc.extractionPhase = prog.extractionPhase
+      enc.secondsLeft = prog.secondsLeft
+      enc.perimeterFraction = prog.perimeterFraction
+      info.encounter = enc
+    } else {
+      info.encounter = null
+    }
+    this.onFrame?.(info)
   }
 
   /** World-space position of the body the camera is currently on. */
@@ -674,11 +812,15 @@ export class StoryWorld {
     }
   }
 
-  /** World-space aim direction from the camera's yaw/pitch (matches BattleScene). */
+  /**
+   * World-space aim direction from the camera's yaw/pitch (matches BattleScene).
+   * Returns a REUSED scratch vector, valid until the next call — every current
+   * consumer reads or clones it synchronously (fireWeapon clones into velocity).
+   */
   private getAimDirection(): THREE.Vector3 {
     const yaw = this.camera.mouseRotation.x
     const pitch = this.camera.mouseRotation.y
-    return new THREE.Vector3(
+    return this._aimDir.set(
       Math.sin(yaw) * Math.cos(pitch),
       Math.sin(pitch),
       Math.cos(yaw) * Math.cos(pitch),

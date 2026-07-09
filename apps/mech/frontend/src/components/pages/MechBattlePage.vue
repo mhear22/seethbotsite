@@ -381,7 +381,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed, watch, onUnmounted } from 'vue'
+import { ref, reactive, onMounted, computed, watch, onUnmounted, markRaw } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMechBuilder } from '../../composables/useMechBuilder'
 import { useMechBattle } from '../../composables/useMechBattle'
@@ -1027,7 +1027,10 @@ function createMultiplayerMechs(data: MatchFoundMessage) {
     data.yourSpawnPosition[2]
   )
 
-  multiplayerPlayerMech.value = new MechEntity(
+  // markRaw: MechEntity holds the whole Three.js subtree and is mutated by the
+  // 60Hz battle loop — deep Vue proxies there cost ms/frame. The HUD template
+  // reads (health/fuel) refresh anyway via the 20Hz hud-update re-render.
+  multiplayerPlayerMech.value = markRaw(new MechEntity(
     data.yourPlayerId,
     'Your Mech',
     builder.loadout.value,
@@ -1037,7 +1040,7 @@ function createMultiplayerMechs(data: MatchFoundMessage) {
     },
     true,
     playerSpawnPos
-  )
+  ))
 
   // Create opponent mech from their loadout
   const opponentSpawnPos = new THREE.Vector3(
@@ -1064,14 +1067,14 @@ function createMultiplayerMechs(data: MatchFoundMessage) {
     energy: 100
   }
 
-  multiplayerOpponentMech.value = new MechEntity(
+  multiplayerOpponentMech.value = markRaw(new MechEntity(
     data.opponentId,
     data.opponentName,
     opponentBuilderLoadout,
     opponentStats,
     false,
     opponentSpawnPos
-  )
+  ))
 }
 
 function handleMultiplayerBattleEnd(result: MatchEndMessage) {
