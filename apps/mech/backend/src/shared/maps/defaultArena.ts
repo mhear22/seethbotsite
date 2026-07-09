@@ -117,16 +117,14 @@ export const defaultArena: MapDefinition = {
     lights: [
       { type: 'directional', color: '#ffffff', intensity: 0.8, position: [50, 80, 50], castShadow: true },
       { type: 'hemisphere', color: '#87ceeb', intensity: 0.3, groundColor: '#2d3748' },
-      // Corner lamp floods - illuminate the cluster corners
-      { type: 'point', color: '#88aaff', intensity: 2.5, position: [-120, 16, -120], distance: 80, decay: 2 },
-      { type: 'point', color: '#88aaff', intensity: 2.5, position: [120, 16, -120], distance: 80, decay: 2 },
-      { type: 'point', color: '#88aaff', intensity: 2.5, position: [-120, 16, 120], distance: 80, decay: 2 },
-      { type: 'point', color: '#88aaff', intensity: 2.5, position: [120, 16, 120], distance: 80, decay: 2 },
-      // Mid beacon fills
-      { type: 'point', color: '#aaccff', intensity: 1.5, position: [-50, 11, 0], distance: 50, decay: 2 },
-      { type: 'point', color: '#aaccff', intensity: 1.5, position: [50, 11, 0], distance: 50, decay: 2 },
-      { type: 'point', color: '#aaccff', intensity: 1.5, position: [0, 11, -50], distance: 50, decay: 2 },
-      { type: 'point', color: '#aaccff', intensity: 1.5, position: [0, 11, 50], distance: 50, decay: 2 },
+      // Two diagonal corner floods for a hint of blue rim on the cluster. Reduced
+      // from 8 point lights to 2: the floor fills the screen and every real-time
+      // point light shades every covered fragment, so 8 of them dominated the
+      // frame. The lamp/beacon discs are emissive and stay visibly lit on their
+      // own; only the soft additive wash on nearby faces is trimmed. Corner
+      // intensity nudged up (2.5→3.0) to partly cover for the dropped fills.
+      { type: 'point', color: '#88aaff', intensity: 3.0, position: [-120, 16, -120], distance: 90, decay: 2 },
+      { type: 'point', color: '#88aaff', intensity: 3.0, position: [120, 16, 120], distance: 90, decay: 2 },
     ],
     floorMaterial: { color: '#2d3748', roughness: 0.8, metalness: 0.2 },
     showGrid: true,
