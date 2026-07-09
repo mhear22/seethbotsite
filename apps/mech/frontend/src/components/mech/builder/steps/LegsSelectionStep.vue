@@ -1,7 +1,7 @@
 <template>
   <div class="step-content">
     <h2>
-      <MechIcons icon="bipedal" :size="32" style="vertical-align: middle; margin-right: 8px" />
+      <MechIcons icon="bipedal" :size="16" style="vertical-align: middle; margin-right: 8px" />
       Select Your Legs
     </h2>
     <p class="step-description">Legs determine mobility, stability, and terrain handling.</p>
@@ -18,7 +18,7 @@
           }"
           @click="$emit('select', legs)"
         >
-          <MechIcons :icon="legs.icon" :size="48" />
+          <MechIcons :icon="legs.icon" :size="28" />
           <div class="part-list-info">
             <div class="part-name">{{ legs.name }}</div>
             <div class="part-manufacturer">{{ legs.manufacturer }}</div>
@@ -29,7 +29,7 @@
       <div class="part-details">
         <div v-if="selectedLegs" class="details-card">
           <div class="details-header">
-            <MechIcons :icon="selectedLegs.icon" :size="64" />
+            <MechIcons :icon="selectedLegs.icon" :size="36" />
             <div>
               <h3>{{ selectedLegs.name }}</h3>
               <div class="part-rarity">{{ selectedLegs.rarity }}</div>
@@ -66,27 +66,27 @@
             <h4>Modified Stats</h4>
             <div class="stats-preview">
               <div class="stat-item">
-                <MechIcons icon="health" :size="20" />
+                <MechIcons icon="health" :size="16" />
                 <span>{{ totalStats.health }}</span>
               </div>
               <div class="stat-item">
-                <MechIcons icon="armor" :size="20" />
+                <MechIcons icon="armor" :size="16" />
                 <span>{{ totalStats.armor }}</span>
               </div>
               <div class="stat-item">
-                <MechIcons icon="speed" :size="20" />
+                <MechIcons icon="speed" :size="16" />
                 <span>{{ totalStats.speed }}</span>
               </div>
               <div class="stat-item">
-                <MechIcons icon="energy" :size="20" />
+                <MechIcons icon="energy" :size="16" />
                 <span :class="{ negative: totalStats.energy < 0 }">{{ totalStats.energy }}</span>
               </div>
               <div class="stat-item">
-                <MechIcons icon="firepower" :size="20" />
+                <MechIcons icon="firepower" :size="16" />
                 <span>{{ totalStats.firepower }}</span>
               </div>
               <div class="stat-item">
-                <MechIcons icon="accuracy" :size="20" />
+                <MechIcons icon="accuracy" :size="16" />
                 <span>{{ totalStats.accuracy }}</span>
               </div>
             </div>

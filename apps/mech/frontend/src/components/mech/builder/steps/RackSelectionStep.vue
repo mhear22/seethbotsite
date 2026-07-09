@@ -1,7 +1,7 @@
 <template>
   <div class="step-content">
     <h2>
-      <MechIcons icon="smoke-launcher" :size="32" style="vertical-align: middle; margin-right: 8px" />
+      <MechIcons icon="smoke-launcher" :size="16" style="vertical-align: middle; margin-right: 8px" />
       Select Equipment Rack (Optional)
     </h2>
     <p class="step-description">Add special equipment for tactical advantages.</p>
@@ -30,7 +30,7 @@
           }"
           @click="$emit('select', rack)"
         >
-          <MechIcons :icon="rack.icon" :size="48" />
+          <MechIcons :icon="rack.icon" :size="28" />
           <div class="part-list-info">
             <div class="part-name">{{ rack.name }}</div>
             <div class="part-manufacturer">{{ rack.manufacturer }}</div>
@@ -41,7 +41,7 @@
       <div class="part-details">
         <div v-if="selectedRack" class="details-card">
           <div class="details-header">
-            <MechIcons :icon="selectedRack.icon" :size="64" />
+            <MechIcons :icon="selectedRack.icon" :size="36" />
             <div>
               <h3>{{ selectedRack.name }}</h3>
               <div class="part-rarity">{{ selectedRack.rarity }}</div>
@@ -65,27 +65,27 @@
             <h4>Modified Stats</h4>
             <div class="stats-preview">
               <div class="stat-item">
-                <MechIcons icon="health" :size="20" />
+                <MechIcons icon="health" :size="16" />
                 <span>{{ totalStats.health }}</span>
               </div>
               <div class="stat-item">
-                <MechIcons icon="armor" :size="20" />
+                <MechIcons icon="armor" :size="16" />
                 <span>{{ totalStats.armor }}</span>
               </div>
               <div class="stat-item">
-                <MechIcons icon="speed" :size="20" />
+                <MechIcons icon="speed" :size="16" />
                 <span>{{ totalStats.speed }}</span>
               </div>
               <div class="stat-item">
-                <MechIcons icon="energy" :size="20" />
+                <MechIcons icon="energy" :size="16" />
                 <span :class="{ negative: totalStats.energy < 0 }">{{ totalStats.energy }}</span>
               </div>
               <div class="stat-item">
-                <MechIcons icon="firepower" :size="20" />
+                <MechIcons icon="firepower" :size="16" />
                 <span>{{ totalStats.firepower }}</span>
               </div>
               <div class="stat-item">
-                <MechIcons icon="accuracy" :size="20" />
+                <MechIcons icon="accuracy" :size="16" />
                 <span>{{ totalStats.accuracy }}</span>
               </div>
             </div>
@@ -122,22 +122,22 @@ defineEmits<{
 }
 
 .skip-icon {
-  width: 48px;
-  height: 48px;
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 32px;
+  font-size: 20px;
   color: var(--mech-text-muted);
 }
 
 .special-ability {
-  margin-bottom: var(--mech-space-4);
-  padding: var(--mech-space-3);
+  margin-bottom: var(--mech-space-3);
+  padding: var(--mech-space-2);
   background: rgba(245, 158, 11, 0.12);
   border-left: 4px solid var(--mech-warn-strong);
   border-radius: var(--mech-radius-sm);
-  font-size: 14px;
+  font-size: 12px;
   color: var(--mech-warn);
 }
 

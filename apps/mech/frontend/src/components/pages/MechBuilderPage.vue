@@ -1,50 +1,71 @@
 <template>
   <div class="mech-builder-page">
-    <div class="flow-navigation" role="navigation" aria-label="Mech flow navigation">
-      <button type="button" class="flow-pill action" @click="goHome">← Menu</button>
-      <span class="flow-pill current">Builder</span>
-      <button
-        type="button"
-        class="flow-pill action"
-        :disabled="!canLaunchBattle"
-        @click="goToBattle"
-      >
-        Battle →
-      </button>
-    </div>
+    <!-- Toolbar: navigation, step tabs, actions -->
+    <div class="builder-toolbar" role="navigation" aria-label="Mech builder toolbar">
+      <div class="toolbar-left">
+        <button type="button" class="tb-btn" @click="goHome">← Menu</button>
+        <span class="toolbar-title">Mech Builder</span>
+      </div>
 
-    <!-- Header -->
-    <div class="header">
-      <h1>Mech Builder</h1>
-      <div class="threat-indicator">
-        <span class="threat-label">Threat Level:</span>
-        <div class="threat-bar-container">
-          <div class="threat-bar-fill" :style="{ width: threatLevel + '%' }"></div>
-        </div>
-        <span class="threat-value">{{ threatLevel }}</span>
+      <div class="toolbar-steps" aria-label="Builder steps">
+        <button
+          v-for="(step, index) in steps"
+          :key="step.id"
+          type="button"
+          class="step-tab"
+          :class="{
+            active: currentStep === index,
+            completed: isStepCompleted(index)
+          }"
+          :aria-current="currentStep === index ? 'step' : undefined"
+          @click="goToStep(index)"
+        >
+          <span v-if="isStepCompleted(index)" class="step-tab-check">✓</span>{{ step.label }}
+        </button>
+        <span class="step-counter">{{ currentStep + 1 }}/6</span>
+      </div>
+
+      <div class="toolbar-actions">
+        <button type="button" class="tb-btn" @click="showLoadModal = true">
+          📂 Load
+        </button>
+        <button type="button" class="tb-btn tb-reset" @click="resetBuild">
+          Reset
+        </button>
+        <button type="button" class="tb-btn tb-random" title="Random build" @click="randomizeBuild">
+          🎲
+        </button>
+        <button
+          v-if="currentStep < 5"
+          type="button"
+          class="tb-btn tb-next"
+          :disabled="!canProceed"
+          @click="nextStep"
+        >
+          Next →
+        </button>
+        <button
+          v-if="currentStep === 5"
+          type="button"
+          class="tb-btn tb-share"
+          :disabled="!canShare"
+          @click="shareBuild"
+        >
+          Share
+        </button>
+        <button
+          v-if="currentStep === 5"
+          type="button"
+          class="tb-btn tb-battle"
+          :disabled="!canLaunchBattle"
+          @click="goToBattle"
+        >
+          ⚔️ Battle
+        </button>
       </div>
     </div>
 
-    <!-- Progress Steps -->
-    <div class="progress-steps">
-      <div
-        v-for="(step, index) in steps"
-        :key="step.id"
-        class="step"
-        :class="{
-          active: currentStep === index,
-          completed: isStepCompleted(index),
-          available: true
-        }"
-        @click="goToStep(index)"
-      >
-        <div class="step-number">{{ index + 1 }}</div>
-        <div class="step-label">{{ step.label }}</div>
-        <MechIcons v-if="isStepCompleted(index)" icon="synergy-target" :size="16" class="step-check" />
-      </div>
-    </div>
-
-    <!-- Main Content Area: wizard steps + persistent mech preview -->
+    <!-- Main Content Area: wizard steps + dominant mech preview -->
     <div class="builder-layout">
     <div class="wizard-content">
       <CoreSelectionStep
@@ -100,52 +121,6 @@
         :build-score="buildScore"
         :warnings="warnings"
       />
-
-      <!-- Navigation Buttons -->
-      <div class="wizard-navigation">
-        <button @click="previousStep" :disabled="currentStep === 0" class="nav-btn prev-btn">
-          ← Previous
-        </button>
-
-        <button @click="showLoadModal = true" class="nav-btn load-btn">
-          📂 Load
-        </button>
-
-        <button @click="resetBuild" class="nav-btn reset-btn">
-          Reset Build
-        </button>
-
-        <button @click="randomizeBuild" class="nav-btn random-btn">
-          🎲 Random
-        </button>
-
-        <button
-          v-if="currentStep < 5"
-          @click="nextStep"
-          :disabled="!canProceed"
-          class="nav-btn next-btn"
-        >
-          Next →
-        </button>
-
-        <button
-          v-if="currentStep === 5"
-          @click="shareBuild"
-          :disabled="!canShare"
-          class="nav-btn share-btn"
-        >
-          Share Build
-        </button>
-
-        <button
-          v-if="currentStep === 5"
-          @click="goToBattle"
-          :disabled="!canLaunchBattle"
-          class="nav-btn battle-btn"
-        >
-          ⚔️ Battle!
-        </button>
-      </div>
     </div>
 
     <aside class="preview-panel">
@@ -202,7 +177,6 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useMechBuilder, type ArmPart } from '../../composables/useMechBuilder'
-import MechIcons from '../mech/MechIcons.vue'
 import MechPreview3D from '../mech/MechPreview3D.vue'
 import LoadBuildModal from '../mech/builder/LoadBuildModal.vue'
 import CoreSelectionStep from '../mech/builder/steps/CoreSelectionStep.vue'
@@ -220,7 +194,6 @@ const {
   totalStats,
   savedBuilds,
   activeSynergies,
-  threatLevel,
   warnings,
   buildScore,
   isComplete,
@@ -272,7 +245,7 @@ const steps = [
   { id: 'legs', label: 'Legs', required: true },
   { id: 'head', label: 'Head', required: true },
   { id: 'arms', label: 'Weapons', required: false },
-  { id: 'rack', label: 'Equipment', required: false },
+  { id: 'rack', label: 'Equip', required: false },
   { id: 'review', label: 'Review', required: false }
 ]
 
@@ -313,12 +286,6 @@ function goToStep(index: number) {
 function nextStep() {
   if (canProceed.value && currentStep.value < steps.length - 1) {
     currentStep.value++
-  }
-}
-
-function previousStep() {
-  if (currentStep.value > 0) {
-    currentStep.value--
   }
 }
 
@@ -400,200 +367,211 @@ onMounted(() => {
   font-family: var(--mech-font);
 }
 
-.flow-navigation {
-  max-width: 1200px;
+/* Toolbar */
+.builder-toolbar {
+  max-width: 1400px;
   margin: 0 auto var(--mech-space-4);
+  min-height: 52px;
   display: flex;
-  justify-content: flex-end;
-  gap: var(--mech-space-2);
-}
-
-.flow-pill {
-  border-radius: var(--mech-radius-pill);
-  padding: 10px 18px;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: var(--mech-tracking-wide);
-}
-
-.flow-pill.current {
-  background: var(--mech-accent-soft);
-  color: var(--mech-accent);
-  border: 1px solid var(--mech-border-accent);
-}
-
-.flow-pill.action {
-  border: 1px solid var(--mech-border-strong);
+  align-items: center;
+  gap: var(--mech-space-4);
+  padding: var(--mech-space-2) var(--mech-space-3);
   background: var(--mech-surface);
+  backdrop-filter: var(--mech-blur);
+  border: 1px solid var(--mech-border);
+  border-radius: var(--mech-radius-lg);
+  box-shadow: var(--mech-shadow-sm);
+}
+
+.toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: var(--mech-space-3);
+  flex-shrink: 0;
+}
+
+.toolbar-title {
+  font-size: 15px;
+  font-weight: 700;
   color: var(--mech-text);
+  letter-spacing: var(--mech-tracking-wide);
+  white-space: nowrap;
+}
+
+.toolbar-steps {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.step-tab {
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--mech-radius-sm);
+  background: transparent;
+  color: var(--mech-text-dim);
+  font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
   transition: all var(--mech-transition);
+  white-space: nowrap;
 }
 
-.flow-pill.action:hover:not(:disabled) {
-  background: var(--mech-surface-raised);
-  border-color: var(--mech-border-accent);
-  transform: translateY(-1px);
+.step-tab:hover {
+  background: var(--mech-surface-2);
+  color: var(--mech-text);
 }
 
-.flow-pill.action:focus-visible {
+.step-tab:focus-visible {
   outline: 2px solid var(--mech-accent);
   outline-offset: 2px;
 }
 
-.flow-pill.action:disabled {
+.step-tab.completed {
+  color: var(--mech-success);
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.step-tab.active {
+  background: var(--mech-accent-soft);
+  color: var(--mech-accent);
+  border-color: var(--mech-border-accent);
+}
+
+.step-tab-check {
+  margin-right: 4px;
+  font-size: 11px;
+}
+
+.step-counter {
+  margin-left: var(--mech-space-2);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--mech-text-muted);
+  white-space: nowrap;
+}
+
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--mech-space-2);
+  flex-shrink: 0;
+}
+
+/* Toolbar buttons */
+.tb-btn {
+  padding: 8px 14px;
+  border: 1px solid var(--mech-border-strong);
+  border-radius: var(--mech-radius-sm);
+  background: var(--mech-surface-raised);
+  color: var(--mech-text);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: var(--mech-tracking-wide);
+  cursor: pointer;
+  transition: all var(--mech-transition);
+  white-space: nowrap;
+}
+
+.tb-btn:hover:not(:disabled) {
+  border-color: var(--mech-border-accent);
+}
+
+.tb-btn:focus-visible {
+  outline: 2px solid var(--mech-accent);
+  outline-offset: 2px;
+}
+
+.tb-btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
 
-.header {
-  max-width: 1200px;
-  margin: 0 auto var(--mech-space-5);
-  padding: var(--mech-space-5);
-  background: var(--mech-surface);
-  backdrop-filter: var(--mech-blur);
-  border: 1px solid var(--mech-border-strong);
-  border-radius: var(--mech-radius-lg);
-  box-shadow: var(--mech-shadow-md);
+.tb-reset {
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--mech-danger);
+  border-color: var(--mech-danger-glow);
 }
 
-.header h1 {
-  margin: 0 0 var(--mech-space-4) 0;
-  color: var(--mech-text);
-  font-size: 32px;
-  font-weight: 700;
-  letter-spacing: var(--mech-tracking-wide);
+.tb-reset:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.22);
+  border-color: var(--mech-danger-glow);
 }
 
-.threat-indicator {
-  display: flex;
-  align-items: center;
-  gap: var(--mech-space-3);
+.tb-random {
+  background: rgba(124, 58, 237, 0.16);
+  color: var(--mech-purple);
+  border-color: var(--mech-purple);
 }
 
-.threat-label {
-  font-weight: 600;
-  color: var(--mech-text-dim);
-  font-size: 14px;
-  text-transform: uppercase;
-  letter-spacing: var(--mech-tracking-wide);
+.tb-random:hover:not(:disabled) {
+  background: rgba(124, 58, 237, 0.28);
+  border-color: var(--mech-purple);
 }
 
-.threat-bar-container {
-  flex: 1;
-  height: 20px;
-  background: var(--mech-surface-2);
-  border: 1px solid var(--mech-border);
-  border-radius: var(--mech-radius-pill);
-  overflow: hidden;
-}
-
-.threat-bar-fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--mech-success-strong) 0%, var(--mech-warn-strong) 50%, var(--mech-danger-strong) 100%);
-  transition: width 0.3s var(--mech-ease);
-}
-
-.threat-value {
-  font-weight: 700;
-  font-size: 18px;
-  color: var(--mech-text);
-  min-width: 40px;
-  text-align: right;
-}
-
-.progress-steps {
-  max-width: 1200px;
-  margin: 0 auto var(--mech-space-5);
-  display: flex;
-  justify-content: space-between;
-  background: var(--mech-surface);
-  backdrop-filter: var(--mech-blur);
-  border: 1px solid var(--mech-border);
-  border-radius: var(--mech-radius-lg);
-  padding: var(--mech-space-4);
-  box-shadow: var(--mech-shadow-sm);
-}
-
-.step {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--mech-space-2);
-  padding: var(--mech-space-3);
-  border-radius: var(--mech-radius-sm);
-  cursor: pointer;
-  transition: all var(--mech-transition);
-  position: relative;
-}
-
-.step:hover {
-  background: var(--mech-surface-2);
-}
-
-.step.active {
-  background: var(--mech-accent-soft);
-}
-
-.step.completed {
-  background: rgba(16, 185, 129, 0.12);
-}
-
-.step-number {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: var(--mech-surface-raised);
-  color: var(--mech-text-dim);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: 14px;
-  transition: all var(--mech-transition);
-}
-
-.step.active .step-number {
-  background: var(--mech-accent);
-  color: var(--mech-text-on-accent);
-  box-shadow: 0 0 12px var(--mech-accent-glow);
-}
-
-.step.completed .step-number {
-  background: var(--mech-success-strong);
+.tb-next {
+  background: var(--mech-accent-grad);
   color: #fff;
+  border-color: transparent;
 }
 
-.step-label {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--mech-text-dim);
+.tb-next:disabled {
+  background: var(--mech-surface-raised);
+  color: var(--mech-text-muted);
+  border-color: var(--mech-border-strong);
 }
 
-.step.active .step-label {
-  color: var(--mech-accent);
+.tb-share {
+  background: var(--mech-success-grad);
+  color: #fff;
+  border-color: transparent;
 }
 
-.step-check {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  color: var(--mech-success);
+.tb-share:disabled {
+  background: var(--mech-surface-raised);
+  color: var(--mech-text-muted);
+  border-color: var(--mech-border-strong);
 }
 
+.tb-battle {
+  background: var(--mech-danger-grad);
+  color: #fff;
+  border-color: transparent;
+}
+
+.tb-battle:disabled {
+  background: var(--mech-surface-raised);
+  color: var(--mech-text-muted);
+  border-color: var(--mech-border-strong);
+}
+
+/* Layout: narrow wizard column, dominant preview */
 .builder-layout {
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 380px;
+  grid-template-columns: minmax(340px, 420px) minmax(0, 1fr);
   gap: var(--mech-space-4);
   align-items: start;
 }
 
+.wizard-content {
+  min-width: 0;
+  background: var(--mech-surface);
+  backdrop-filter: var(--mech-blur);
+  border: 1px solid var(--mech-border);
+  border-radius: var(--mech-radius-lg);
+  box-shadow: var(--mech-shadow-md);
+  overflow: hidden;
+}
+
 .preview-panel {
+  min-width: 0;
   position: sticky;
-  top: var(--mech-space-4);
+  top: 68px;
   background: var(--mech-surface);
   backdrop-filter: var(--mech-blur);
   border: 1px solid var(--mech-border);
@@ -620,10 +598,20 @@ onMounted(() => {
 }
 
 .preview-panel-canvas {
-  height: 460px;
+  height: calc(100vh - 170px);
+  min-height: 420px;
 }
 
 @media (max-width: 1024px) {
+  .builder-toolbar {
+    flex-wrap: wrap;
+  }
+
+  .toolbar-steps {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
   .builder-layout {
     grid-template-columns: 1fr;
   }
@@ -635,131 +623,8 @@ onMounted(() => {
 
   .preview-panel-canvas {
     height: 320px;
+    min-height: 0;
   }
-}
-
-.wizard-content {
-  min-width: 0;
-  background: var(--mech-surface);
-  backdrop-filter: var(--mech-blur);
-  border: 1px solid var(--mech-border);
-  border-radius: var(--mech-radius-lg);
-  box-shadow: var(--mech-shadow-md);
-  overflow: hidden;
-}
-
-.wizard-navigation {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--mech-space-3);
-  padding: var(--mech-space-5);
-  border-top: 1px solid var(--mech-border);
-}
-
-.nav-btn {
-  padding: 12px 24px;
-  border: none;
-  border-radius: var(--mech-radius-sm);
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: var(--mech-tracking-wide);
-  cursor: pointer;
-  transition: all var(--mech-transition);
-}
-
-.nav-btn:focus-visible {
-  outline: 2px solid var(--mech-accent);
-  outline-offset: 3px;
-}
-
-.prev-btn {
-  background: var(--mech-surface-raised);
-  color: var(--mech-text);
-  border: 1px solid var(--mech-border-strong);
-}
-
-.prev-btn:hover:not(:disabled) {
-  border-color: var(--mech-border-accent);
-}
-
-.prev-btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.load-btn {
-  background: var(--mech-surface-raised);
-  color: var(--mech-text);
-  border: 1px solid var(--mech-border-strong);
-}
-
-.load-btn:hover {
-  border-color: var(--mech-border-accent);
-}
-
-.reset-btn {
-  background: rgba(239, 68, 68, 0.12);
-  color: var(--mech-danger);
-  border: 1px solid var(--mech-danger-glow);
-}
-
-.reset-btn:hover {
-  background: rgba(239, 68, 68, 0.22);
-}
-
-.random-btn {
-  background: rgba(124, 58, 237, 0.16);
-  color: var(--mech-purple);
-  border: 1px solid var(--mech-purple);
-}
-
-.random-btn:hover {
-  background: rgba(124, 58, 237, 0.28);
-}
-
-.next-btn {
-  background: var(--mech-accent-grad);
-  color: #fff;
-  margin-left: auto;
-}
-
-.next-btn:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 16px var(--mech-accent-glow);
-}
-
-.next-btn:disabled {
-  background: var(--mech-surface-raised);
-  color: var(--mech-text-muted);
-  cursor: not-allowed;
-}
-
-.share-btn {
-  background: var(--mech-success-grad);
-  color: #fff;
-  margin-left: auto;
-}
-
-.share-btn:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 16px var(--mech-success-glow);
-}
-
-.share-btn:disabled {
-  background: var(--mech-surface-raised);
-  color: var(--mech-text-muted);
-  cursor: not-allowed;
-}
-
-.battle-btn {
-  background: var(--mech-danger-grad);
-  color: #fff;
-  font-size: 16px;
-}
-
-.battle-btn:hover {
-  transform: translateY(-2px) scale(1.03);
-  box-shadow: 0 8px 24px var(--mech-danger-glow);
 }
 
 /* Modal Styles */

@@ -1,7 +1,7 @@
 <template>
   <div class="step-content">
     <h2>
-      <MechIcons icon="autocannon" :size="32" style="vertical-align: middle; margin-right: 8px" />
+      <MechIcons icon="autocannon" :size="16" style="vertical-align: middle; margin-right: 8px" />
       Select Your Weapons
     </h2>
     <p class="step-description">Choose weapons for left and right arms. Mix and match for asymmetric loadouts.</p>
@@ -19,7 +19,7 @@
           }"
           @click="$emit('select-arm', arm)"
         >
-          <MechIcons :icon="arm.icon" :size="48" />
+          <MechIcons :icon="arm.icon" :size="28" />
           <div class="part-list-info">
             <div class="part-name">{{ arm.name }}</div>
             <div class="part-manufacturer">{{ arm.manufacturer }}</div>
@@ -32,7 +32,7 @@
           <div class="arm-slot-mini">
             <h4>Left Arm</h4>
             <div v-if="leftArm" class="selected-arm-mini">
-              <MechIcons :icon="leftArm.icon" :size="24" />
+              <MechIcons :icon="leftArm.icon" :size="18" />
               <span>{{ leftArm.name }}</span>
               <button @click.stop="$emit('remove', 'leftArm')" class="remove-btn-mini">✕</button>
             </div>
@@ -41,7 +41,7 @@
           <div class="arm-slot-mini">
             <h4>Right Arm</h4>
             <div v-if="rightArm" class="selected-arm-mini">
-              <MechIcons :icon="rightArm.icon" :size="24" />
+              <MechIcons :icon="rightArm.icon" :size="18" />
               <span>{{ rightArm.name }}</span>
               <button @click.stop="$emit('remove', 'rightArm')" class="remove-btn-mini">✕</button>
             </div>
@@ -51,7 +51,7 @@
 
         <div v-if="previewArm" class="details-card">
           <div class="details-header">
-            <MechIcons :icon="previewArm.icon" :size="64" />
+            <MechIcons :icon="previewArm.icon" :size="36" />
             <div>
               <h3>{{ previewArm.name }}</h3>
               <div class="part-rarity">{{ previewArm.rarity }}</div>
@@ -88,27 +88,27 @@
             <h4>Modified Stats</h4>
             <div class="stats-preview">
               <div class="stat-item">
-                <MechIcons icon="health" :size="20" />
+                <MechIcons icon="health" :size="16" />
                 <span>{{ totalStats.health }}</span>
               </div>
               <div class="stat-item">
-                <MechIcons icon="armor" :size="20" />
+                <MechIcons icon="armor" :size="16" />
                 <span>{{ totalStats.armor }}</span>
               </div>
               <div class="stat-item">
-                <MechIcons icon="speed" :size="20" />
+                <MechIcons icon="speed" :size="16" />
                 <span>{{ totalStats.speed }}</span>
               </div>
               <div class="stat-item">
-                <MechIcons icon="energy" :size="20" />
+                <MechIcons icon="energy" :size="16" />
                 <span :class="{ negative: totalStats.energy < 0 }">{{ totalStats.energy }}</span>
               </div>
               <div class="stat-item">
-                <MechIcons icon="firepower" :size="20" />
+                <MechIcons icon="firepower" :size="16" />
                 <span>{{ totalStats.firepower }}</span>
               </div>
               <div class="stat-item">
-                <MechIcons icon="accuracy" :size="20" />
+                <MechIcons icon="accuracy" :size="16" />
                 <span>{{ totalStats.accuracy }}</span>
               </div>
             </div>
@@ -146,9 +146,9 @@ defineEmits<{
 .arm-slots-display {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: var(--mech-space-3);
-  margin-bottom: var(--mech-space-5);
-  padding: var(--mech-space-4);
+  gap: var(--mech-space-2);
+  margin-bottom: 12px;
+  padding: var(--mech-space-2) var(--mech-space-3);
   background: var(--mech-surface-2);
   border-radius: var(--mech-radius-sm);
 }
@@ -156,12 +156,12 @@ defineEmits<{
 .arm-slot-mini {
   display: flex;
   flex-direction: column;
-  gap: var(--mech-space-2);
+  gap: var(--mech-space-1);
 }
 
 .arm-slot-mini h4 {
   margin: 0;
-  font-size: 14px;
+  font-size: 12px;
   color: var(--mech-text);
   font-weight: 600;
 }
@@ -170,11 +170,11 @@ defineEmits<{
   display: flex;
   align-items: center;
   gap: var(--mech-space-2);
-  padding: 8px 12px;
+  padding: 6px 8px;
   background: var(--mech-surface-raised);
   border: 1px solid var(--mech-border-accent);
   border-radius: var(--mech-radius-sm);
-  font-size: 13px;
+  font-size: 12px;
   color: var(--mech-text);
 }
 
@@ -188,8 +188,8 @@ defineEmits<{
   color: #fff;
   border: none;
   border-radius: var(--mech-radius-sm);
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -204,13 +204,13 @@ defineEmits<{
 }
 
 .empty-slot-mini {
-  padding: var(--mech-space-3);
+  padding: var(--mech-space-2);
   background: var(--mech-surface-raised);
   border: 1px dashed var(--mech-border-strong);
   border-radius: var(--mech-radius-sm);
   text-align: center;
   color: var(--mech-text-muted);
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .in-synergy {

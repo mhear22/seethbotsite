@@ -1,7 +1,7 @@
 <template>
   <div class="step-content review-step">
     <h2>
-      <MechIcons icon="synergy-target" :size="32" style="vertical-align: middle; margin-right: 8px" />
+      <MechIcons icon="synergy-target" :size="20" style="vertical-align: middle; margin-right: 8px" />
       Review Your Build
     </h2>
 
@@ -9,34 +9,34 @@
       <div class="mech-visual">
         <div class="mech-diagram">
           <div class="mech-part mech-head">
-            <MechIcons :icon="loadout.head?.icon || 'unknown'" :size="48" />
+            <MechIcons :icon="loadout.head?.icon || 'unknown'" :size="36" />
             <span class="part-label">{{ loadout.head?.name || 'No Head' }}</span>
             <PartDeltaTooltip v-if="loadout.head" :part="loadout.head" />
           </div>
           <div class="mech-part mech-core">
-            <MechIcons :icon="loadout.core?.icon || 'unknown'" :size="64" />
+            <MechIcons :icon="loadout.core?.icon || 'unknown'" :size="48" />
             <span class="part-label">{{ loadout.core?.name || 'No Core' }}</span>
             <PartDeltaTooltip v-if="loadout.core" :part="loadout.core" />
           </div>
           <div class="mech-arms-row">
             <div class="mech-part mech-arm">
-              <MechIcons :icon="loadout.leftArm?.icon || 'unknown'" :size="48" />
+              <MechIcons :icon="loadout.leftArm?.icon || 'unknown'" :size="36" />
               <span class="part-label">{{ loadout.leftArm?.name || 'Empty' }}</span>
               <PartDeltaTooltip v-if="loadout.leftArm" :part="loadout.leftArm" />
             </div>
             <div class="mech-part mech-arm">
-              <MechIcons :icon="loadout.rightArm?.icon || 'unknown'" :size="48" />
+              <MechIcons :icon="loadout.rightArm?.icon || 'unknown'" :size="36" />
               <span class="part-label">{{ loadout.rightArm?.name || 'Empty' }}</span>
               <PartDeltaTooltip v-if="loadout.rightArm" :part="loadout.rightArm" />
             </div>
           </div>
           <div class="mech-part mech-legs">
-            <MechIcons :icon="loadout.legs?.icon || 'unknown'" :size="48" />
+            <MechIcons :icon="loadout.legs?.icon || 'unknown'" :size="36" />
             <span class="part-label">{{ loadout.legs?.name || 'No Legs' }}</span>
             <PartDeltaTooltip v-if="loadout.legs" :part="loadout.legs" />
           </div>
           <div v-if="loadout.rack" class="mech-part mech-rack">
-            <MechIcons :icon="loadout.rack.icon" :size="36" />
+            <MechIcons :icon="loadout.rack.icon" :size="28" />
             <span class="part-label">{{ loadout.rack.name }}</span>
             <PartDeltaTooltip :part="loadout.rack" />
           </div>
@@ -47,32 +47,32 @@
         <h3>Total Stats</h3>
         <div class="stats-grid">
           <div class="stat-item">
-            <MechIcons icon="health" :size="24" />
+            <MechIcons icon="health" :size="18" />
             <span class="stat-label">Health</span>
             <span class="stat-value">{{ totalStats.health }}</span>
           </div>
           <div class="stat-item">
-            <MechIcons icon="armor" :size="24" />
+            <MechIcons icon="armor" :size="18" />
             <span class="stat-label">Armor</span>
             <span class="stat-value">{{ totalStats.armor }}</span>
           </div>
           <div class="stat-item">
-            <MechIcons icon="speed" :size="24" />
+            <MechIcons icon="speed" :size="18" />
             <span class="stat-label">Speed</span>
             <span class="stat-value">{{ totalStats.speed }}</span>
           </div>
           <div class="stat-item">
-            <MechIcons icon="energy" :size="24" />
+            <MechIcons icon="energy" :size="18" />
             <span class="stat-label">Energy</span>
             <span class="stat-value" :class="{ negative: totalStats.energy < 0 }">{{ totalStats.energy }}</span>
           </div>
           <div class="stat-item">
-            <MechIcons icon="firepower" :size="24" />
+            <MechIcons icon="firepower" :size="18" />
             <span class="stat-label">Firepower</span>
             <span class="stat-value">{{ totalStats.firepower }}</span>
           </div>
           <div class="stat-item">
-            <MechIcons icon="accuracy" :size="24" />
+            <MechIcons icon="accuracy" :size="18" />
             <span class="stat-label">Accuracy</span>
             <span class="stat-value">{{ totalStats.accuracy }}</span>
           </div>
@@ -86,7 +86,7 @@
 
       <div class="synergies-section">
         <h3>
-          <MechIcons icon="synergy-bolt" :size="24" style="vertical-align: middle; margin-right: 8px" />
+          <MechIcons icon="synergy-bolt" :size="18" style="vertical-align: middle; margin-right: 8px" />
           Active Synergies
         </h3>
         <div v-if="activeSynergies.length === 0" class="no-synergies">
@@ -94,7 +94,7 @@
         </div>
         <div v-else class="synergy-list">
           <div v-for="synergy in activeSynergies" :key="synergy.id" class="synergy-card">
-            <MechIcons :icon="synergy.icon" :size="32" />
+            <MechIcons :icon="synergy.icon" :size="24" />
             <div class="synergy-info">
               <div class="synergy-name">{{ synergy.name }}</div>
               <div class="synergy-description">{{ synergy.description }}</div>
@@ -138,13 +138,13 @@ defineProps<{
 
 <style scoped>
 .review-step {
-  padding: var(--mech-space-5);
+  padding: var(--mech-space-4);
 }
 
 .review-layout {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--mech-space-5);
+  grid-template-columns: 1fr;
+  gap: 12px;
 }
 
 .mech-visual {
@@ -152,26 +152,26 @@ defineProps<{
   background: var(--mech-surface);
   border: 1px solid var(--mech-border-strong);
   border-radius: var(--mech-radius-md);
-  padding: var(--mech-space-5);
+  padding: var(--mech-space-3);
 }
 
 .mech-diagram {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--mech-space-3);
+  gap: var(--mech-space-2);
 }
 
 .mech-part {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: var(--mech-space-3);
+  gap: 4px;
+  padding: var(--mech-space-2);
   background: var(--mech-surface-2);
   border: 1px solid var(--mech-border-strong);
   border-radius: var(--mech-radius-sm);
-  min-width: 120px;
+  min-width: 100px;
   position: relative;
   cursor: help;
   transition: border-color var(--mech-transition);
@@ -183,11 +183,11 @@ defineProps<{
 
 .mech-arms-row {
   display: flex;
-  gap: var(--mech-space-5);
+  gap: var(--mech-space-3);
 }
 
 .part-label {
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--mech-text);
   text-align: center;
@@ -197,41 +197,41 @@ defineProps<{
   background: var(--mech-surface);
   border: 1px solid var(--mech-border-strong);
   border-radius: var(--mech-radius-md);
-  padding: var(--mech-space-5);
+  padding: 12px 14px;
 }
 
 .stats-summary h3 {
-  margin: 0 0 var(--mech-space-4) 0;
+  margin: 0 0 var(--mech-space-3) 0;
   color: var(--mech-text);
-  font-size: 20px;
+  font-size: 15px;
   letter-spacing: var(--mech-tracking-wide);
 }
 
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: var(--mech-space-4);
-  margin-bottom: var(--mech-space-5);
+  gap: var(--mech-space-2);
+  margin-bottom: var(--mech-space-3);
 }
 
 .stat-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--mech-space-2);
-  padding: var(--mech-space-4);
+  gap: 4px;
+  padding: var(--mech-space-2);
   background: var(--mech-surface-2);
   border-radius: var(--mech-radius-sm);
 }
 
 .stat-label {
-  font-size: 13px;
+  font-size: 11px;
   color: var(--mech-text-dim);
   font-weight: 500;
 }
 
 .stat-value {
-  font-size: 24px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--mech-text);
 }
@@ -244,19 +244,19 @@ defineProps<{
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: var(--mech-space-4);
+  padding: var(--mech-space-2) var(--mech-space-3);
   background: var(--mech-purple-grad);
   border-radius: var(--mech-radius-sm);
   color: #fff;
 }
 
 .score-label {
-  font-size: 16px;
+  font-size: 13px;
   font-weight: 600;
 }
 
 .score-value {
-  font-size: 32px;
+  font-size: 20px;
   font-weight: 700;
 }
 
@@ -264,33 +264,33 @@ defineProps<{
   background: var(--mech-surface);
   border: 1px solid var(--mech-border-strong);
   border-radius: var(--mech-radius-md);
-  padding: var(--mech-space-5);
+  padding: 12px 14px;
 }
 
 .synergies-section h3 {
-  margin: 0 0 var(--mech-space-4) 0;
+  margin: 0 0 var(--mech-space-3) 0;
   color: var(--mech-text);
-  font-size: 20px;
+  font-size: 15px;
   letter-spacing: var(--mech-tracking-wide);
 }
 
 .no-synergies {
   text-align: center;
-  padding: var(--mech-space-7);
+  padding: var(--mech-space-4);
   color: var(--mech-text-muted);
-  font-size: 16px;
+  font-size: 13px;
 }
 
 .synergy-list {
   display: flex;
   flex-direction: column;
-  gap: var(--mech-space-3);
+  gap: var(--mech-space-2);
 }
 
 .synergy-card {
   display: flex;
-  gap: var(--mech-space-4);
-  padding: var(--mech-space-4);
+  gap: var(--mech-space-3);
+  padding: var(--mech-space-2) var(--mech-space-3);
   background: rgba(245, 158, 11, 0.1);
   border: 1px solid var(--mech-warn-glow);
   border-radius: var(--mech-radius-sm);
@@ -302,35 +302,35 @@ defineProps<{
 
 .synergy-name {
   font-weight: 700;
-  font-size: 16px;
+  font-size: 13px;
   color: var(--mech-warn);
-  margin-bottom: 4px;
+  margin-bottom: 3px;
 }
 
 .synergy-description {
-  font-size: 14px;
+  font-size: 12px;
   color: var(--mech-text-dim);
-  margin-bottom: var(--mech-space-2);
+  margin-bottom: var(--mech-space-1);
 }
 
 .synergy-effect {
-  font-size: 13px;
+  font-size: 12px;
   font-style: italic;
   color: var(--mech-warn);
-  margin-bottom: var(--mech-space-2);
+  margin-bottom: var(--mech-space-1);
 }
 
 .synergy-bonuses {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--mech-space-2);
+  gap: var(--mech-space-1);
 }
 
 .synergy-bonuses span {
-  padding: 4px 8px;
+  padding: 2px 6px;
   background: rgba(245, 158, 11, 0.18);
   border-radius: var(--mech-radius-sm);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--mech-warn);
 }
@@ -340,22 +340,22 @@ defineProps<{
   background: rgba(239, 68, 68, 0.08);
   border: 1px solid var(--mech-danger-glow);
   border-radius: var(--mech-radius-md);
-  padding: var(--mech-space-5);
+  padding: 12px 14px;
 }
 
 .warnings-section h3 {
-  margin: 0 0 var(--mech-space-4) 0;
+  margin: 0 0 var(--mech-space-3) 0;
   color: var(--mech-danger);
-  font-size: 20px;
+  font-size: 15px;
 }
 
 .warning-item {
-  padding: var(--mech-space-3);
+  padding: var(--mech-space-2);
   background: var(--mech-surface-2);
   border-left: 4px solid var(--mech-danger-strong);
   border-radius: var(--mech-radius-sm);
   margin-bottom: var(--mech-space-2);
   color: var(--mech-danger);
-  font-size: 14px;
+  font-size: 12px;
 }
 </style>
