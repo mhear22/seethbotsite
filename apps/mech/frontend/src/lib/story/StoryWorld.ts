@@ -369,32 +369,12 @@ export class StoryWorld {
   }
 
   private setupSky(): void {
-    // Daytime gradient sky (lighter, friendlier than the battle arena's night sky
-    // — matches the playful overworld tone).
+    // Daytime overworld sky (OverworldSky.ts): gradient + sun disk + drifting
+    // procedural clouds + horizon haze. The material's `time` uniform is driven
+    // each frame in animate() so the clouds actually drift.
     const skyGeometry = new THREE.SphereGeometry(WORLD_HALF_EXTENT * 2.4, 32, 16)
-    const skyMaterial = new THREE.ShaderMaterial({
-      side: THREE.BackSide,
-      uniforms: {},
-      vertexShader: `
-        varying vec3 vWorldPosition;
-        void main() {
-          vec4 worldPos = modelMatrix * vec4(position, 1.0);
-          vWorldPosition = worldPos.xyz;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }
-      `,
-      fragmentShader: `
-        varying vec3 vWorldPosition;
-        void main() {
-          vec3 dir = normalize(vWorldPosition);
-          float t = clamp(dir.y * 0.5 + 0.5, 0.0, 1.0);
-          vec3 horizon = vec3(0.85, 0.9, 0.98);
-          vec3 zenith = vec3(0.32, 0.55, 0.85);
-          gl_FragColor = vec4(mix(horizon, zenith, t), 1.0);
-        }
-      `,
-    })
-    this.scene.add(new THREE.Mesh(skyGeometry, skyMaterial))
+    this.skyMaterial = markRaw(createOverworldSkyMaterial())
+    this.scene.add(new THREE.Mesh(skyGeometry, this.skyMaterial))
 
     // Distance haze: fades the far edges of the (large) map into the horizon
     // colour so the world reads as open and continuous rather than a flat slab.
@@ -405,7 +385,9 @@ export class StoryWorld {
     this.scene.add(new THREE.AmbientLight(0xffffff, 0.6))
 
     const sun = new THREE.DirectionalLight(0xfff4e0, 0.9)
-    sun.position.set(120, 200, 80)
+    // Place the light along the sky shader's sun direction so the visible disk
+    // and the cast shadows agree (SUN_DIRECTION is shared for exactly this).
+    sun.position.copy(SUN_DIRECTION).multiplyScalar(250)
     sun.castShadow = this.shadowsEnabled
     sun.shadow.camera.left = -WORLD_HALF_EXTENT
     sun.shadow.camera.right = WORLD_HALF_EXTENT
@@ -473,6 +455,9 @@ export class StoryWorld {
     this.lastTime = currentTime
     this.elapsed += deltaTime
     this.battleTime += deltaTime
+
+    // Drift the sky clouds (freezes naturally while paused-hidden, which is fine).
+    if (this.skyMaterial) updateOverworldSky(this.skyMaterial, this.elapsed)
 
     this.update(deltaTime)
     this.render()
