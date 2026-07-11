@@ -515,8 +515,9 @@ export class ParticleSystem {
       // Apply gravity (per-particle multiplier; negative = rises)
       p.velocity.y -= 10 * p.gravity * deltaTime
 
-      // Apply velocity
-      p.position.add(p.velocity.clone().multiplyScalar(deltaTime))
+      // Apply velocity (addScaledVector is allocation-free — this runs per live
+      // particle per frame, up to MAX_PARTICLES during heavy VFX)
+      p.position.addScaledVector(p.velocity, deltaTime)
 
       // Drag
       p.velocity.multiplyScalar(p.drag)

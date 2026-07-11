@@ -83,7 +83,12 @@ export class CameraController {
       this.profile.baseFov, // FOV
       aspect,
       0.1, // Near
-      1000 // Far
+      // Far must cover the sky spheres from anywhere the camera can stand: the
+      // overworld dome is r=1440 (WORLD_HALF_EXTENT*2.4) centred at the origin
+      // while the player roams ±600u; the arena skies are r=800/900. At 1000
+      // the dome's screen-centre fragments (view depth ≈ its radius) were
+      // frustum-clipped, rendering as a giant black hole in the story sky.
+      3000 // Far
     ))
   }
 

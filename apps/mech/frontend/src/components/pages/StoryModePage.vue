@@ -625,8 +625,11 @@ async function beginRoaming() {
   roaming.value = true
   showCredits.value = false
   pendingFinaleTownId = null
-  // A continued run mid-finale should announce again; a fresh/exploring run shouldn't.
-  finaleAnnounced = story.phase.value !== 'finale'
+  // Fresh-false every (re)mount so handleFinale announces the withdrawal order the
+  // first frame the run is in the finale — whether continued mid-finale or unlocked
+  // live during this session. Re-issuing a locked-in decision is prevented by the
+  // obeyed-withdrawal/refused-order flag gate in handleFinale, not by this latch.
+  finaleAnnounced = false
   await nextTick()
   const canvas = canvasRef.value
   if (!canvas || !story.run.value) return

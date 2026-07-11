@@ -568,6 +568,10 @@ export class EnemyAI {
     let fireChance = (enemy.stats.accuracy / 100) * deltaTime * fireRateMult
     // Smoke screen also makes the AI hold fire more often (loss of a clean lock).
     if (player.smokeScreenTimer > 0) fireChance *= 0.4
-    return Math.random() < fireChance && distanceToPlayer < 30
+    // Max firing range tracks the profile's own range band: the kite logic holds
+    // long-range archetypes (sniper: optimalRange 34) at distances a flat 30u gate
+    // would silence entirely. Fire anywhere inside the hold/chase band.
+    const maxFireRange = Math.max(30, this.profile.optimalRange + this.profile.rangeDiscipline)
+    return Math.random() < fireChance && distanceToPlayer < maxFireRange
   }
 }

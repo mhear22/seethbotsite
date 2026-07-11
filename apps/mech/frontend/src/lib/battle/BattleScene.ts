@@ -148,6 +148,9 @@ export class BattleScene {
   // Battle ending animation
   protected battleEnding: boolean = false
   protected battleEndTimer: number = 0
+  /** One-shot latch so onBattleEnd never re-fires if the rAF loop is resumed
+   *  (e.g. a tab hide/show inside the between-waves window restarts animate()). */
+  protected battleEndFired: boolean = false
   protected battleEndResult: 'victory' | 'defeat' = 'victory'
 
   constructor(config: BattleSceneConfig) {
@@ -656,7 +659,8 @@ export class BattleScene {
       this.camera.update(deltaTime, input.mouseX, input.mouseY)
       this.inputManager.resetMouseMovement()
 
-      if (this.battleEndTimer <= 0) {
+      if (this.battleEndTimer <= 0 && !this.battleEndFired) {
+        this.battleEndFired = true
         this.onBattleEnd(this.battleEndResult)
         this.stop()
       }
@@ -1019,6 +1023,7 @@ export class BattleScene {
     // (Remove active projectiles without disposing the shared visual pools.)
     this.battleEnding = false
     this.battleEndTimer = 0
+    this.battleEndFired = false
     this.targetingState = { isTargeted: false, screenX: 0, screenY: 0, screenWidth: 0, screenHeight: 0 }
     for (const proj of this.projectileSystem.getProjectiles().slice()) {
       this.projectileSystem.removeProjectile(proj)

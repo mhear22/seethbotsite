@@ -246,8 +246,18 @@ export class MechEntity {
       modelGroup.position.copy(this.position)
       modelGroup.rotation.copy(this.rotation)
 
+      // The caller typically scene.add()s the procedural mesh before this async
+      // load resolves — swap the new group into the same parent so the rendered
+      // body stays attached (and the old one doesn't linger as a frozen ghost).
+      const parent = this.mesh.parent
+
       // Dispose old procedural geometry
       this.disposeMeshGroup()
+
+      if (parent) {
+        parent.remove(this.mesh)
+        parent.add(modelGroup)
+      }
 
       // Replace with loaded model
       this.mesh = markRaw(modelGroup)

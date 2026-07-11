@@ -454,8 +454,8 @@ export class ProjectileSystem {
         }
       }
 
-      // Update position
-      proj.position.add(proj.velocity.clone().multiplyScalar(deltaTime))
+      // Update position (allocation-free; runs per projectile per frame)
+      proj.position.addScaledVector(proj.velocity, deltaTime)
       proj.mesh.position.copy(proj.position)
 
       // Glow trail follows every projectile that has one (energy/ballistic/missile).

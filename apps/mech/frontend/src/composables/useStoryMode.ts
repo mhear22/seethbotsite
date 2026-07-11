@@ -1515,6 +1515,17 @@ export function useStoryMode() {
     const reason = loadoutInvalidReason(candidate)
     if (reason) return { ok: false, reason }
 
+    // A swap never destroys the part you took off (same invariant as
+    // installFromInventory): stow the displaced part in the inventory, pristine.
+    const displaced = run.value.loadout[slot]
+    if (displaced) {
+      run.value.inventory.push({
+        instanceId: nextInstanceId(run.value.inventory),
+        partId: displaced.id,
+        condition: 'pristine',
+      })
+    }
+
     run.value.loadout = candidate
     run.value.salvage -= price
     save()
