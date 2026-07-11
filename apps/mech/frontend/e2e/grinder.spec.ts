@@ -258,3 +258,57 @@ test('grinder: reload mid-run resumes via Continue (save/load)', async ({ page }
   expect(watcher.crashes, `page crashes/exceptions:\n${watcher.crashes.join('\n')}`).toEqual([])
   expect(watcher.errors, `severe console errors:\n${watcher.errors.join('\n')}`).toEqual([])
 })
+
+/**
+ * (e) Tactical map (M): the Act II decision surface — all five settlements with
+ * live state, the player marker, focus-a-town detail, and clean open/close that
+ * pauses/resumes underneath (world pause is exercised implicitly: keys are owned
+ * by the overlay while open).
+ */
+test('grinder: tactical map opens on M, lists all towns, closes on Escape', async ({
+  page,
+}, testInfo) => {
+  const watcher = watchConsole(page)
+
+  await page.goto('story', { waitUntil: 'domcontentloaded' })
+  await expect(page.getByRole('heading', { name: /talus reach/i })).toBeVisible({ timeout: 30_000 })
+  await page.getByRole('button', { name: /new run/i }).click()
+
+  const canvas = page.locator('canvas.story-canvas')
+  await expect(canvas).toBeVisible({ timeout: 30_000 })
+  await waitForCanvasRender(page, 'canvas.story-canvas', { timeout: 40_000, minDistinctColors: 3 })
+
+  // M opens the map dialog.
+  await page.keyboard.press('KeyM')
+  const map = page.getByRole('dialog', { name: /tactical map/i })
+  await expect(map).toBeVisible({ timeout: 10_000 })
+
+  // All five settlements are plotted, plus the player marker, ordered roster,
+  // and the legend. A fresh run reads every town as Cold.
+  await expect(map.locator('.tacmap-town')).toHaveCount(5)
+  await expect(map.locator('.tacmap-player')).toBeVisible()
+  await expect(map.locator('.roster-row')).toHaveCount(5)
+  await expect(map.locator('.tacmap-legend')).toContainText(/occupied/i)
+  await expect(map.locator('.tacmap-town').first()).toHaveClass(/neutral/)
+
+  // Focusing a settlement swaps the roster for its detail card.
+  await map.locator('.tacmap-town').first().click()
+  await expect(map.locator('.side-town')).toBeVisible()
+  await expect(map.locator('.side-row')).toHaveCount(2) // condition + standing
+
+  await page.screenshot({ path: 'e2e/screenshots/grinder-tacmap.png' })
+  await page.screenshot({ path: testInfo.outputPath('grinder-tacmap.png') })
+
+  // Escape closes it; M reopens it; the Map HUD pill also toggles it.
+  await page.keyboard.press('Escape')
+  await expect(map).toBeHidden()
+  await page.keyboard.press('KeyM')
+  await expect(map).toBeVisible()
+  await page.keyboard.press('KeyM')
+  await expect(map).toBeHidden()
+  await page.getByRole('button', { name: /map/i }).click()
+  await expect(map).toBeVisible()
+
+  expect(watcher.crashes, `page crashes/exceptions:\n${watcher.crashes.join('\n')}`).toEqual([])
+  expect(watcher.errors, `severe console errors:\n${watcher.errors.join('\n')}`).toEqual([])
+})

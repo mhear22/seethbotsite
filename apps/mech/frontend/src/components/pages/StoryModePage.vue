@@ -95,15 +95,16 @@
           WASD walk · Mouse look · E interact · F mount up
         </template>
         <template v-else>
-          WASD move · Mouse look · Shift dash (i-frame dodge) · Space jump · LMB/RMB fire · E boost · Q rack ability
+          WASD move · Mouse look · Shift dash (i-frame dodge) · Space jump · LMB/RMB fire · E boost · Q rack ability · M map
         </template>
       </div>
 
       <button type="button" class="story-exit" @click="openPause">☰ Menu</button>
+      <button type="button" class="story-exit story-map-btn" @click="showMap ? closeMap() : openMap()">◈ Map</button>
 
       <!-- On-screen controls (touch devices only; self-gates). Hidden while a panel is open. -->
       <TouchControls
-        v-if="!showDialog && !showGarage && !showCredits && !showBoard && !storyTree && !isPauseOpen"
+        v-if="!showDialog && !showGarage && !showCredits && !showBoard && !storyTree && !isPauseOpen && !showMap"
         :input="touchInput"
         context="story"
       />
@@ -167,6 +168,20 @@
         @close="closeGarage"
       />
 
+      <!-- Tactical map (M): towns, their state, the active mission, and you. -->
+      <TacticalMap
+        v-if="showMap && story.run.value"
+        :towns="story.run.value.towns"
+        :player-x="mapPlayerX"
+        :player-z="mapPlayerZ"
+        :phase="story.phase.value"
+        :finale-target-ids="mapFinaleTargetIds"
+        :active-quest-town-id="story.activeQuest.value?.townId ?? null"
+        :half-extent="WORLD_HALF_EXTENT"
+        :phase-label="phaseLabel"
+        @close="closeMap"
+      />
+
       <!-- Pause menu (§5): resume / settings / save-exit / abandon (with confirm). -->
       <div v-if="isPauseOpen" class="story-pause-backdrop" @click.self="resumeFromPause">
         <div class="story-pause-panel" role="dialog" aria-modal="true" aria-label="Paused">
@@ -228,6 +243,7 @@ import {
   isPartRepUnlocked,
   partRepAxis,
   townIndexFromId,
+  WORLD_HALF_EXTENT,
   SHOP_TIER_T2_STANDING,
   SHOP_TIER_T3_STANDING,
   MILITARY_REP_UNLOCK,
@@ -275,6 +291,7 @@ import TownHubHud, { type HubAnchorPrompt } from '../mech/story/TownHubHud.vue'
 import MissionBoard from '../mech/story/MissionBoard.vue'
 import QuestDialog from '../mech/story/QuestDialog.vue'
 import Garage from '../mech/story/Garage.vue'
+import TacticalMap from '../mech/story/TacticalMap.vue'
 import StoryCredits from '../mech/story/StoryCredits.vue'
 import CommsToast from '../mech/story/CommsToast.vue'
 import DialogueView from '../mech/story/DialogueView.vue'
@@ -298,6 +315,11 @@ const ironmanOptIn = ref(false)
 const isPauseOpen = ref(false)
 const isSettingsOpen = ref(false)
 const confirmAbandon = ref(false)
+// Tactical map overlay (M): the Act II "which town do I save" decision surface.
+// Player position is snapshotted on open — the world is paused underneath it.
+const showMap = ref(false)
+const mapPlayerX = ref(0)
+const mapPlayerZ = ref(0)
 
 // Live HUD state fed by the world's per-frame callback.
 const nearestTownName = ref<string | null>(null)
@@ -393,6 +415,9 @@ const phaseLabel = computed(() => {
   }
 })
 
+/** Towns currently held by finale aces (marker + roster colouring on the map). */
+const mapFinaleTargetIds = computed(() => story.remainingFinaleTargets.value.map((t) => t.id))
+
 /** Any blocking hub/story panel is open (suppresses roam-key interactions). */
 const anyModalOpen = computed(
   () =>
@@ -401,7 +426,8 @@ const anyModalOpen = computed(
     showCredits.value ||
     showBoard.value ||
     storyTree.value !== null ||
-    isPauseOpen.value,
+    isPauseOpen.value ||
+    showMap.value,
 )
 
 /**
@@ -583,11 +609,18 @@ function handleKey(e: KeyboardEvent) {
   if (e.code === 'Escape') {
     // Escape closes the topmost hub panel; with nothing else open it toggles the
     // pause menu (never a soft-lock — pause is always dismissable to Resume).
-    if (showBoard.value) closeBoard()
+    if (showMap.value) closeMap()
+    else if (showBoard.value) closeBoard()
     else if (showGarage.value) closeGarage()
     else if (showDialog.value) closeDialog()
     else if (isPauseOpen.value) resumeFromPause()
     else if (!anyModalOpen.value) openPause()
+    return
+  }
+  // M toggles the tactical map whenever no other panel owns the screen.
+  if (e.code === 'KeyM') {
+    if (showMap.value) closeMap()
+    else if (!anyModalOpen.value) openMap()
     return
   }
   if (anyModalOpen.value) return
@@ -1531,6 +1564,21 @@ function openPause() {
   world?.setPaused(true)
 }
 
+/** Open the tactical map (M / HUD button): snapshot the Frame's position, pause. */
+function openMap() {
+  if (!world) return
+  mapPlayerX.value = world.playerMech.position.x
+  mapPlayerZ.value = world.playerMech.position.z
+  showMap.value = true
+  world.setPaused(true)
+}
+
+/** Close the map; resume the world only if nothing else holds it paused. */
+function closeMap() {
+  showMap.value = false
+  if (!anyModalOpen.value) world?.setPaused(false)
+}
+
 /** Close the pause overlay; resume the world only if nothing else holds it paused. */
 function resumeFromPause() {
   isPauseOpen.value = false
@@ -1867,6 +1915,11 @@ function abandonRun() {
 
 .story-exit:hover {
   background: rgba(15, 23, 42, 0.75);
+}
+
+/* Tactical-map pill: sits just under the Menu pill, same look. */
+.story-map-btn {
+  top: 60px;
 }
 
 /* Active-quest objective tracker (top-right under exit) */
