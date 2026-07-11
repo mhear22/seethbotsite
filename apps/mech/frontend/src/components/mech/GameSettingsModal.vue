@@ -1,9 +1,9 @@
 <template>
   <div v-if="isOpen" class="modal-overlay" @click.self="close">
-    <div class="modal-content">
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="settings-modal-title">
       <div class="modal-header">
-        <h2>Game Settings</h2>
-        <button @click="close" class="close-btn">&times;</button>
+        <h2 id="settings-modal-title">Game Settings</h2>
+        <button @click="close" class="close-btn" aria-label="Close settings">&times;</button>
       </div>
 
       <div class="modal-tabs">
@@ -24,7 +24,7 @@
         <!-- AI Difficulty -->
         <div class="setting-group">
           <label class="setting-label">AI Difficulty</label>
-          <select v-model="settings.aiDifficulty" class="difficulty-select">
+          <select v-model="settings.aiDifficulty" class="difficulty-select" aria-label="AI Difficulty">
             <option value="tutorial">Tutorial - Learn the basics</option>
             <option value="easy">Easy - For beginners</option>
             <option value="medium">Medium - Balanced challenge</option>
@@ -46,6 +46,7 @@
             step="0.5"
             v-model.number="settings.mouseSensitivity"
             class="slider"
+            aria-label="Mouse Sensitivity"
           />
           <div class="slider-labels">
             <span>0.5x</span>
@@ -66,6 +67,7 @@
             step="2.5"
             v-model.number="settings.movementSpeed"
             class="slider"
+            aria-label="Movement Speed"
           />
           <div class="slider-labels">
             <span>Slow</span>
@@ -100,6 +102,7 @@
                 @keydown="captureKey($event, 'forward')"
                 readonly
                 class="keybind-input"
+                aria-label="Forward key binding"
                 placeholder="Press key..."
               />
             </div>
@@ -111,6 +114,7 @@
                 @keydown="captureKey($event, 'backward')"
                 readonly
                 class="keybind-input"
+                aria-label="Backward key binding"
                 placeholder="Press key..."
               />
             </div>
@@ -122,6 +126,7 @@
                 @keydown="captureKey($event, 'left')"
                 readonly
                 class="keybind-input"
+                aria-label="Left key binding"
                 placeholder="Press key..."
               />
             </div>
@@ -133,6 +138,7 @@
                 @keydown="captureKey($event, 'right')"
                 readonly
                 class="keybind-input"
+                aria-label="Right key binding"
                 placeholder="Press key..."
               />
             </div>
@@ -144,6 +150,7 @@
                 @keydown="captureKey($event, 'jump')"
                 readonly
                 class="keybind-input"
+                aria-label="Jump key binding"
                 placeholder="Press key..."
               />
             </div>
@@ -155,6 +162,7 @@
                 @keydown="captureKey($event, 'dash')"
                 readonly
                 class="keybind-input"
+                aria-label="Dash key binding"
                 placeholder="Press key..."
               />
             </div>
@@ -197,7 +205,7 @@
         <!-- Shadow Quality -->
         <div class="setting-group">
           <label class="setting-label">Shadow Quality</label>
-          <select v-model="settings.graphics.shadowQuality" class="difficulty-select">
+          <select v-model="settings.graphics.shadowQuality" class="difficulty-select" aria-label="Shadow Quality">
             <option value="off">Off - Best performance</option>
             <option value="low">Low - 512px shadow map</option>
             <option value="medium">Medium - 1024px shadow map</option>
@@ -211,7 +219,7 @@
             Render Scale
             <span class="setting-value">{{ Math.round(settings.graphics.renderScale * 100) }}%</span>
           </label>
-          <select v-model.number="settings.graphics.renderScale" class="difficulty-select">
+          <select v-model.number="settings.graphics.renderScale" class="difficulty-select" aria-label="Render Scale">
             <option :value="0.5">50% - Best performance</option>
             <option :value="0.75">75% - Balanced</option>
             <option :value="1.0">100% - Native resolution</option>
@@ -245,7 +253,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch, onBeforeUnmount } from 'vue'
 import { useGameSettings } from '../../composables/useGameSettings'
 
 const props = defineProps<{
@@ -263,6 +271,21 @@ const activeTab = ref<'controls' | 'graphics'>('controls')
 function close() {
   emit('close')
 }
+
+// Escape closes the dialog (standard modal keyboard behavior). Rebinding inputs
+// are unaffected: captureKey stops propagation before this document listener.
+function onDocumentKeydown(e: KeyboardEvent) {
+  if (e.code === 'Escape') close()
+}
+watch(
+  () => props.isOpen,
+  (open) => {
+    if (open) document.addEventListener('keydown', onDocumentKeydown)
+    else document.removeEventListener('keydown', onDocumentKeydown)
+  },
+  { immediate: true },
+)
+onBeforeUnmount(() => document.removeEventListener('keydown', onDocumentKeydown))
 
 // Convert key code to display name
 function getKeyDisplay(keyCode: string): string {

@@ -7,7 +7,7 @@
     <div class="home-vignette" aria-hidden="true"></div>
 
     <!-- Settings (gear, top-right) — opens the shared modal in-place -->
-    <button class="home-gear" type="button" title="Settings" @click="isSettingsOpen = true">⚙</button>
+    <button class="home-gear" type="button" title="Settings" aria-label="Settings" @click="isSettingsOpen = true">⚙</button>
     <GameSettingsModal :is-open="isSettingsOpen" @close="isSettingsOpen = false" />
 
     <div class="home-content">
