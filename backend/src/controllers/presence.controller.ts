@@ -101,13 +101,21 @@ export function setupWebSocketServer(server: any) {
 
   // Handle WebSocket upgrade requests
   server.on('upgrade', (request: IncomingMessage, socket: any, head: Buffer) => {
-    // Only handle /ws path
-    const pathname = new URL(request.url || '', `http://${request.headers.host}`).pathname;
+    // Only handle /ws path. A malformed request line makes `new URL` throw
+    // synchronously inside this 'upgrade' listener — uncaught, that kills the
+    // whole Node process. Reject the socket instead of crashing the site.
+    let url: URL;
+    try {
+      url = new URL(request.url || '', `http://${request.headers.host}`);
+    } catch {
+      socket.write('HTTP/1.1 400 Bad Request\r\n\r\nMalformed URL');
+      socket.destroy();
+      return;
+    }
+    const pathname = url.pathname;
     if (pathname !== '/ws' && pathname !== '/presence') {
       return;
     }
-    // Parse query parameters
-    const url = new URL(request.url || '', `http://${request.headers.host}`);
 
     const userId = url.searchParams.get('userId');
     const userName = url.searchParams.get('userName');

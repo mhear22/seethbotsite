@@ -23,8 +23,18 @@ export function setupMultiplayerWebSocket(server: any) {
 
   // Handle WebSocket upgrade requests
   server.on('upgrade', (request: IncomingMessage, socket: any, head: Buffer) => {
-    // Only handle supported multiplayer WebSocket paths.
-    const pathname = new URL(request.url || '', `http://${request.headers.host}`).pathname;
+    // Only handle supported multiplayer WebSocket paths. A malformed request
+    // line (e.g. 'GET //[a') makes `new URL` throw synchronously inside this
+    // 'upgrade' listener — uncaught, that kills the whole Node process, so any
+    // unauthenticated client could crash the site. Reject the socket instead.
+    let pathname: string;
+    try {
+      pathname = new URL(request.url || '', `http://${request.headers.host}`).pathname;
+    } catch {
+      socket.write('HTTP/1.1 400 Bad Request\r\n\r\nMalformed URL');
+      socket.destroy();
+      return;
+    }
     if (!MULTIPLAYER_WS_PATHS.includes(pathname as typeof MULTIPLAYER_WS_PATHS[number])) {
       return; // Let other handlers deal with it
     }

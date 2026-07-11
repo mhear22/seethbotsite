@@ -30,6 +30,24 @@ async function getUserIdFromToken(req: Request): Promise<number | null> {
 }
 
 /**
+ * Wrap an async handler so a rejected promise becomes a 500 instead of an
+ * unhandled rejection. Express 4 does not forward async errors; on Node 20 an
+ * unhandled rejection terminates the process, so ANY Prisma/DB error in these
+ * handlers (e.g. the OpenAPI-documented integer targetId hitting the String
+ * target_id column) used to kill the whole site.
+ */
+function wrap(fn: (req: Request, res: Response) => Promise<unknown>) {
+  return (req: Request, res: Response) => {
+    fn(req, res).catch((err) => {
+      console.error('[Reactions] handler error:', err);
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Internal server error' });
+      }
+    });
+  };
+}
+
+/**
  * @openapi
  * /api/reactions:
  *   post:
@@ -81,7 +99,7 @@ async function getUserIdFromToken(req: Request): Promise<number | null> {
  *       401:
  *         description: Unauthorized
  */
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', wrap(async (req: Request, res: Response) => {
   const userId = await getUserIdFromToken(req);
 
   if (!userId) {
@@ -109,14 +127,14 @@ router.post('/', async (req: Request, res: Response) => {
     });
   }
 
-  const result = await toggleReaction(userId, targetType as 'message' | 'post' | 'comment', targetId, emoji);
+  const result = await toggleReaction(userId, targetType as 'message' | 'post' | 'comment', String(targetId), emoji);
 
   res.json({
     success: true,
     added: result.added,
     removed: result.removed
   });
-});
+}));
 
 /**
  * @openapi
@@ -152,7 +170,7 @@ router.post('/', async (req: Request, res: Response) => {
  *       401:
  *         description: Unauthorized
  */
-router.post('/force', async (req: Request, res: Response) => {
+router.post('/force', wrap(async (req: Request, res: Response) => {
   const userId = await getUserIdFromToken(req);
 
   if (!userId) {
@@ -180,7 +198,7 @@ router.post('/force', async (req: Request, res: Response) => {
     });
   }
 
-  const reaction = addReaction(userId, targetType as 'message' | 'post' | 'comment', targetId, emoji);
+  const reaction = await addReaction(userId, targetType as 'message' | 'post' | 'comment', String(targetId), emoji);
 
   if (!reaction) {
     return res.status(409).json({
@@ -193,7 +211,7 @@ router.post('/force', async (req: Request, res: Response) => {
     success: true,
     reaction
   });
-});
+}));
 
 /**
  * @openapi
@@ -217,7 +235,7 @@ router.post('/force', async (req: Request, res: Response) => {
  *       404:
  *         description: Reaction not found or doesn't belong to user
  */
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', wrap(async (req: Request, res: Response) => {
   const userId = await getUserIdFromToken(req);
 
   if (!userId) {
@@ -236,7 +254,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
     });
   }
 
-  const success = removeReactionById(reactionId, userId);
+  const success = await removeReactionById(reactionId, userId);
 
   if (!success) {
     return res.status(404).json({
@@ -249,7 +267,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
     success: true,
     message: 'Reaction removed'
   });
-});
+}));
 
 /**
  * @openapi
@@ -299,7 +317,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
  *                         items:
  *                           type: integer
  */
-router.get('/:targetType/:targetId', async (req: Request, res: Response) => {
+router.get('/:targetType/:targetId', wrap(async (req: Request, res: Response) => {
   const { targetType, targetId } = req.params;
   const { detailed } = req.query;
 
@@ -361,7 +379,7 @@ router.get('/:targetType/:targetId', async (req: Request, res: Response) => {
       });
     }
   }
-});
+}));
 
 /**
  * @openapi
@@ -400,7 +418,7 @@ router.get('/:targetType/:targetId', async (req: Request, res: Response) => {
  *       401:
  *         description: Unauthorized
  */
-router.get('/check', async (req: Request, res: Response) => {
+router.get('/check', wrap(async (req: Request, res: Response) => {
   const userId = await getUserIdFromToken(req);
 
   if (!userId) {
@@ -439,7 +457,7 @@ router.get('/check', async (req: Request, res: Response) => {
     success: true,
     has_reacted: hasReacted
   });
-});
+}));
 
 /**
  * @openapi
@@ -454,7 +472,7 @@ router.get('/check', async (req: Request, res: Response) => {
  *       401:
  *         description: Unauthorized
  */
-router.get('/user', async (req: Request, res: Response) => {
+router.get('/user', wrap(async (req: Request, res: Response) => {
   const userId = await getUserIdFromToken(req);
 
   if (!userId) {
@@ -470,6 +488,6 @@ router.get('/user', async (req: Request, res: Response) => {
     success: true,
     reactions
   });
-});
+}));
 
 export default router;

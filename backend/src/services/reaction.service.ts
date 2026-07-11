@@ -22,9 +22,14 @@ export interface ReactionCount {
 }
 
 /**
- * Add or remove a reaction
- * If user already reacted with this emoji, it removes the reaction (toggle)
- * Otherwise, it adds the reaction
+ * Add, switch or remove a reaction.
+ * The schema enforces ONE reaction per (user, target) — `@@unique([user_id,
+ * target_type, target_id])` deliberately omits emoji — so:
+ *  - same emoji again  -> remove (toggle off)
+ *  - different emoji   -> switch the existing reaction to the new emoji
+ *  - no reaction yet   -> create
+ * (The previous findFirst included `emoji`, so switching emoji hit the unique
+ * constraint with an unhandled P2002 that killed the process.)
  */
 export async function toggleReaction(
   userId: number,
@@ -32,22 +37,28 @@ export async function toggleReaction(
   targetId: string,
   emoji: string
 ): Promise<{ added: boolean; removed: boolean }> {
-  // Check if reaction already exists
+  // One row per (user, target) exists at most — look it up regardless of emoji.
   const existingReaction = await prisma.reaction.findFirst({
     where: {
       user_id: userId,
       target_type: targetType,
-      target_id: targetId,
-      emoji: emoji
+      target_id: targetId
     }
   });
 
-  if (existingReaction) {
+  if (existingReaction && existingReaction.emoji === emoji) {
     // Remove reaction (toggle off)
     await prisma.reaction.delete({
       where: { id: existingReaction.id }
     });
     return { added: false, removed: true };
+  } else if (existingReaction) {
+    // Switch to the new emoji (delete+create would race the unique constraint).
+    await prisma.reaction.update({
+      where: { id: existingReaction.id },
+      data: { emoji }
+    });
+    return { added: true, removed: false };
   } else {
     // Add reaction
     await prisma.reaction.create({
@@ -72,7 +83,9 @@ export async function addReaction(
   emoji: string
 ): Promise<Reaction | null> {
   try {
-    return prisma.reaction.create({
+    // The await is load-bearing: without it the promise rejection escapes this
+    // try/catch and becomes an unhandled rejection (process exit on Node 20).
+    return await prisma.reaction.create({
       data: {
         user_id: userId,
         target_type: targetType,
