@@ -22,6 +22,12 @@ const LEGS_DESTROYED_SPEED_MULT = 0.4
 
 export class PhysicsSystem {
   public speedMultiplier = 1.0
+  /** Overworld free-roam scales top speed via speedMultiplier, but accel/friction
+   *  are otherwise fixed — so at 2.6× speed the mech spooled up slushily and
+   *  coasted forever. These let the host restore arena-equivalent spool/stop feel
+   *  at overworld pace. Default 1.0 so battle (BattleScene) is untouched. */
+  public accelMultiplier = 1.0
+  public frictionMultiplier = 1.0
   private arenaHalfW: number = MOVEMENT.DEFAULT_ARENA_HALF
   private arenaHalfD: number = MOVEMENT.DEFAULT_ARENA_HALF
 
@@ -92,8 +98,8 @@ export class PhysicsSystem {
     // Legs-destroyed strand (design §3.3): cut top speed and acceleration so the
     // mech becomes a slow, easy target once its legs are shot off.
     const strandMult = mech.legsDestroyed ? LEGS_DESTROYED_SPEED_MULT : 1
-    const accelRate = weightCurve.accel * strandMult
-    const frictionRate = weightCurve.friction * legMod.frictionMult
+    const accelRate = weightCurve.accel * strandMult * this.accelMultiplier
+    const frictionRate = weightCurve.friction * legMod.frictionMult * this.frictionMultiplier
     const backwardSpeedPenalty = legMod.backwardPenalty
 
     // Get movement directions relative to camera view
@@ -307,7 +313,17 @@ export class PhysicsSystem {
     // enough above the ground to have walked off a ledge. Otherwise the mech is
     // grounded and simply hugs the terrain — this keeps walking over rolling
     // hills smooth instead of falling-and-snapping every frame on a downslope.
-    const airborne = mech.isJumping || mech.velocity.y > 0 || aboveGround > MOVEMENT.GROUND_STICK_DISTANCE
+    //
+    // The stick distance is made speed-aware: at overworld pace (2.6×) a fast
+    // descent down a steep mountain face drops more than the fixed 1.5u in a
+    // single frame, which used to flip the mech to "airborne" and produce a
+    // floaty lift/re-snap. Allowing an extra margin proportional to how far the
+    // mech would travel this frame keeps it hugging the slope, while genuine
+    // ledge-drops (small per-frame descent) still fall. Arena feel is unchanged
+    // because speedMultiplier is 1 there.
+    const horizSpeed = Math.sqrt(mech.velocity.x ** 2 + mech.velocity.z ** 2)
+    const stickDistance = MOVEMENT.GROUND_STICK_DISTANCE + horizSpeed * deltaTime
+    const airborne = mech.isJumping || mech.velocity.y > 0 || aboveGround > stickDistance
 
     if (airborne) {
       // Apply gravity (increased for faster falling)

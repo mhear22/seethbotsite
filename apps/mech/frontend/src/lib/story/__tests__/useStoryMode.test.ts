@@ -287,8 +287,9 @@ describe('composable: quests + garage', () => {
     const story = useStoryMode()
     story.newRun()
     story.addMoney(5000)
-    // Starter has only a left arm weapon; equipping the support shield there
-    // would leave no weapon -> rejected, money untouched.
+    // Reduce to a single weapon; equipping the support shield over it would leave
+    // no weapon -> rejected, money untouched.
+    story.run.value!.loadout.rightArm = null
     const shield = findPartById('arm-shield-gen')!
     const before = story.money.value
     const result = story.buyAndEquip(shield, 'leftArm')

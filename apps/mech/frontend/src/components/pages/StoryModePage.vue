@@ -51,6 +51,7 @@
         :condition="nearestTownCondition"
         :standing="nearestTownStanding"
         :distance="nearestTownDistance"
+        :bearing="nearestTownBearing"
         :inside="insideTown"
         :command-rep="commandRep"
         :collateral-tick="collateralTick"
@@ -308,6 +309,10 @@ const fps = ref(0)
 const showFPS = computed(() => gameSettings.settings.value.graphics.showFPS)
 const nearestTownName = ref<string | null>(null)
 const nearestTownDistance = ref(0)
+// Compass bearing to the nearest town (radians, camera-relative). Updated at full
+// frame rate but quantised to ~2° so a still/steady view doesn't churn re-renders
+// (Vue no-ops equal writes) while a turn still animates the arrow smoothly.
+const nearestTownBearing = ref(0)
 const insideTown = ref(false)
 const nearestTownCondition = ref(100)
 const nearestTownStanding = ref(0)
@@ -712,6 +717,20 @@ async function beginRoaming() {
       pilotMode.value = 'mech'
       story.setPilotMode('mech')
     }
+  } else {
+    // Fresh run: don't strand the player alone at empty world-centre. Spawn just
+    // outside the first town so the very first frame frames a fully-dressed
+    // landmark (gate arch, beacon pillar, NPCs) — teaching the core loop and
+    // giving an immediate destination instead of an empty horizon to scan.
+    const t0 = story.run.value.towns[0]?.position
+    if (t0) {
+      const [tx, , tz] = t0
+      const len = Math.hypot(tx, tz) || 1
+      // 72u from the town centre toward the map centre — just OUTSIDE the 60u
+      // presence-decay radius, so the town reads as a nearby destination (gate,
+      // beacon, NPCs all in view) rather than immediately bleeding its condition.
+      world.setPlayerPosition(tx - (tx / len) * 72, tz - (tz / len) * 72)
+    }
   }
 
   // Act I arrival hail (once per run). A continued mid-campaign run won't re-hear
@@ -951,6 +970,10 @@ function handleFrame(info: StoryFrameInfo) {
     fps.value = world?.getFPS() ?? 0
   }
   nearestTownName.value = info.nearestTownName
+  // Bearing drives the rotating compass arrow — NOT gated by hudDistanceAccum
+  // (that 10Hz throttle would make the arrow visibly lag under rotation), but
+  // quantised so a steady view short-circuits the write.
+  nearestTownBearing.value = Math.round(info.nearestTownBearing / 0.035) * 0.035
   hudDistanceAccum += info.deltaTime
   if (hudDistanceAccum >= 0.1) { // ~10Hz; TownHud rounds to whole metres anyway
     hudDistanceAccum = 0

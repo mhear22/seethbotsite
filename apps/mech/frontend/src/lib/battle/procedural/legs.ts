@@ -60,6 +60,14 @@ function createBipedalLeg(side: -1 | 1): THREE.Group {
   hipCollar.rotation.y = Math.PI / 2
   leg.add(hipCollar)
 
+  // --- THIGH CLUSTER --------------------------------------------------------
+  // The thigh is a flat pile of sibling meshes (plate + upper block + side plate
+  // + trims + piston + hydraulic lines). Wrap the whole pile in one UNNAMED group
+  // (still bakes) and cant it back at the top so the leg gets a knee break rather
+  // than reading as a straight plank. Pivot is the hip (group origin).
+  const thighGroup = new THREE.Group()
+  thighGroup.rotation.x = -0.08 // top leans back
+
   // Upper leg armor (thigh) — layered chamfered plate, tapered toward the knee.
   const thigh = panelPlate(0.48, 1.0, 0.44, {
     baseMat: armor,
@@ -70,28 +78,28 @@ function createBipedalLeg(side: -1 | 1): THREE.Group {
   thigh.position.set(0, -0.6, 0.05)
   // Slight inward taper so the thigh narrows toward the knee.
   thigh.scale.set(0.82, 1, 0.85)
-  leg.add(thigh)
+  thighGroup.add(thigh)
   // Untapered upper block keeps the hip end full-width (overlap layering).
   const thighUpper = new THREE.Mesh(chamferBox(0.5, 0.34, 0.46, 0.06), armor)
   thighUpper.position.set(0, -0.24, 0.04)
-  leg.add(thighUpper)
+  thighGroup.add(thighUpper)
 
   // Outer thigh side plate, splayed and sloped for a sharper silhouette.
   const thighSide = new THREE.Mesh(chamferBox(0.18, 0.74, 0.42, 0.05), armorTier)
   thighSide.position.set(side * 0.31, -0.55, 0.02)
   thighSide.rotation.z = side * 0.14
-  leg.add(thighSide)
+  thighGroup.add(thighSide)
   // Gold edge line tracing the outer thigh plate.
   const thighSideTrim = edgeLine(0.66, { thickness: 0.02, mat: gold })
   thighSideTrim.rotation.z = Math.PI / 2 + side * 0.14
   thighSideTrim.position.set(side * 0.41, -0.55, 0.03)
-  leg.add(thighSideTrim)
+  thighGroup.add(thighSideTrim)
 
   // Thin gold edge line down the front centre of the thigh.
   const thighTrim = edgeLine(0.82, { thickness: 0.022, mat: gold })
   thighTrim.rotation.z = Math.PI / 2
   thighTrim.position.set(0.0, -0.6, 0.3)
-  leg.add(thighTrim)
+  thighGroup.add(thighTrim)
 
   // Upper leg inner piston (exposed steel mechanical, behind armor)
   const upperPiston = new THREE.Mesh(
@@ -99,52 +107,69 @@ function createBipedalLeg(side: -1 | 1): THREE.Group {
     steelLight
   )
   upperPiston.position.set(0, -0.6, -0.12)
-  leg.add(upperPiston)
+  thighGroup.add(upperPiston)
 
   // Hydraulic lines (thin steel)
   for (const pos of [0.18, -0.18]) {
     const line = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.9, 6), steel)
     line.position.set(0, -0.6, pos - 0.02)
-    leg.add(line)
+    thighGroup.add(line)
   }
+  leg.add(thighGroup)
 
-  // Knee joint (steel cylinder pivot) with end caps.
+  // --- KNEE CLUSTER ---------------------------------------------------------
+  // The joint bridges the thigh and shin clusters. Nudge the whole cluster
+  // forward (+0.04 z) so the guard sits at the forward bend apex of the pose.
+  const KNEE_Z = 0.12 // was 0.08, pushed forward to the bend apex
   const knee = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.3, 12), steel)
   knee.rotation.z = Math.PI / 2
-  knee.position.set(0, -1.15, 0.08)
+  knee.position.set(0, -1.15, KNEE_Z)
   leg.add(knee)
   for (const cx of [-1, 1]) {
     const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.18, 0.04, 12), steelLight)
     cap.rotation.z = Math.PI / 2
-    cap.position.set(cx * 0.15, -1.15, 0.08)
+    cap.position.set(cx * 0.15, -1.15, KNEE_Z)
     leg.add(cap)
   }
 
   // Knee guard — angular charcoal cap (layered base + raised tier), red accent.
   const kneeCap = new THREE.Mesh(chamferBox(0.3, 0.34, 0.2, 0.05), armor)
-  kneeCap.position.set(0, -1.13, 0.26)
+  kneeCap.position.set(0, -1.13, KNEE_Z + 0.18)
   kneeCap.rotation.x = -0.14
   leg.add(kneeCap)
   const kneeTier = new THREE.Mesh(chamferBox(0.22, 0.24, 0.1, 0.04), armorTier)
-  kneeTier.position.set(0, -1.13, 0.37)
+  kneeTier.position.set(0, -1.13, KNEE_Z + 0.29)
   kneeTier.rotation.x = -0.14
   leg.add(kneeTier)
   // Gold trim framing the raised knee tier.
   const kneeTrim = trimStripe(0.24, 0.26, { thickness: 0.018, mat: gold })
-  kneeTrim.position.set(0, -1.13, 0.43)
+  kneeTrim.position.set(0, -1.13, KNEE_Z + 0.35)
   kneeTrim.rotation.x = -0.14
   leg.add(kneeTrim)
 
   // Red knee accent slat set into the guard front.
   const kneeRed = ventSlats(2, 0.16, 0.16, { depth: 0.04, slatMat: red })
-  kneeRed.position.set(0, -1.13, 0.44)
+  kneeRed.position.set(0, -1.13, KNEE_Z + 0.36)
   kneeRed.rotation.x = -0.14
   leg.add(kneeRed)
   // Amber sensor dot centred on the knee guard.
   const kneeSensor = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.03, 10), amber)
   kneeSensor.rotation.x = Math.PI / 2 - 0.14
-  kneeSensor.position.set(0, -1.05, 0.47)
+  kneeSensor.position.set(0, -1.05, KNEE_Z + 0.39)
   leg.add(kneeSensor)
+
+  // --- SHIN CLUSTER ---------------------------------------------------------
+  // Like the thigh, a flat pile of siblings (plate + front plate + edge lines +
+  // red slash + rivets + rear actuator). Wrap it and cant it FORWARD at the top
+  // (knee forward, ankle tucked back) so it completes the knee break. Pivot is
+  // the knee joint, so the shin top stays welded to the thigh's knee end. An
+  // undo-offset inner group lets the children keep their original coordinates.
+  const shinPivot = new THREE.Group()
+  shinPivot.position.set(0, -1.15, KNEE_Z) // hinge at the knee joint
+  shinPivot.rotation.x = 0.16
+  const shinGroup = new THREE.Group()
+  shinGroup.position.set(0, 1.15, -KNEE_Z) // undo the pivot translation
+  shinPivot.add(shinGroup)
 
   // Lower leg (shin) — forward-sloped layered plate.
   const shin = panelPlate(0.42, 1.1, 0.38, {
@@ -155,32 +180,32 @@ function createBipedalLeg(side: -1 | 1): THREE.Group {
   })
   shin.position.set(0, -1.8, -0.03)
   shin.rotation.x = 0.1
-  leg.add(shin)
+  shinGroup.add(shin)
 
   // Forward-sloped shin front plate (canted out at the toe) with twin edge lines.
   const shinFront = new THREE.Mesh(chamferBox(0.36, 0.88, 0.12, 0.04), armorTier)
   shinFront.position.set(0, -1.78, 0.21)
   shinFront.rotation.x = 0.24
-  leg.add(shinFront)
+  shinGroup.add(shinFront)
   // Twin thin yellow edge lines running down the shin front.
   for (const lx of [-1, 1]) {
     const line = edgeLine(0.82, { thickness: 0.018, mat: gold })
     line.rotation.z = Math.PI / 2
     line.rotation.x = 0.24
     line.position.set(lx * 0.13, -1.78, 0.28)
-    leg.add(line)
+    shinGroup.add(line)
   }
 
   // Small red slash near the bottom of the shin.
   const shinRed = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.06, 0.04), red)
   shinRed.position.set(0, -2.16, 0.27)
   shinRed.rotation.x = 0.24
-  leg.add(shinRed)
+  shinGroup.add(shinRed)
   // Side panel-line rivets on the shin.
   const shinRivets = riveting(3, 0.22, { mat: steelLight })
   shinRivets.rotation.y = Math.PI / 2
   shinRivets.position.set(side * 0.21, -1.8, -0.02)
-  leg.add(shinRivets)
+  shinGroup.add(shinRivets)
 
   // Lower leg rear actuator (exposed steel)
   const actuator = new THREE.Mesh(
@@ -188,7 +213,8 @@ function createBipedalLeg(side: -1 | 1): THREE.Group {
     steelLight
   )
   actuator.position.set(0, -1.8, -0.22)
-  leg.add(actuator)
+  shinGroup.add(actuator)
+  leg.add(shinPivot)
 
   // Ankle joint (steel)
   const ankle = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), steel)
@@ -199,9 +225,10 @@ function createBipedalLeg(side: -1 | 1): THREE.Group {
   ankleCuff.position.set(0, -2.36, 0.02)
   leg.add(ankleCuff)
 
-  // Foot — chunky angular chamfered block, widening toward the toe.
-  const foot = new THREE.Mesh(chamferBox(0.54, 0.16, 0.8, 0.05), armor)
-  foot.position.set(0, -2.52, 0.1)
+  // Foot — broad chunky sole. Bottom pinned to y≈-2.60 (ground contact): with
+  // height 0.18 the centre sits at -2.51 so nothing dips below ground.
+  const foot = new THREE.Mesh(chamferBox(0.62, 0.18, 0.92, 0.05), armor)
+  foot.position.set(0, -2.51, 0.1)
   leg.add(foot)
 
   // Foot top tier plate for layered overlap.
@@ -218,17 +245,20 @@ function createBipedalLeg(side: -1 | 1): THREE.Group {
   footTrim.position.set(0, -2.43, 0.49)
   leg.add(footTrim)
 
-  // Toe claw (angular, splayed down)
-  const toe = new THREE.Mesh(chamferBox(0.44, 0.12, 0.24, 0.03), armor)
-  toe.position.set(0, -2.56, 0.51)
-  toe.rotation.x = 0.18
-  leg.add(toe)
+  // Three forward claw toes (steel cones, tip toward +Z), splayed across the
+  // sole front. Radius 0.09 keeps the lowest point (y≈-2.59) clear of the ground.
+  for (const cx of [-0.18, 0, 0.18]) {
+    const clawToe = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.34, 5), steelLight)
+    clawToe.rotation.x = Math.PI / 2 // tip -> +Z
+    clawToe.position.set(cx, -2.5, 0.55)
+    leg.add(clawToe)
+  }
 
-  // Heel spur (angular, kicked back)
-  const heel = new THREE.Mesh(chamferBox(0.34, 0.12, 0.22, 0.03), armor)
-  heel.position.set(0, -2.55, -0.26)
-  heel.rotation.x = -0.2
-  leg.add(heel)
+  // Rear heel spur claw (same cone, tip toward -Z) for a planted stance.
+  const heelClaw = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.34, 5), steelLight)
+  heelClaw.rotation.x = -Math.PI / 2 // tip -> -Z
+  heelClaw.position.set(0, -2.5, -0.35)
+  leg.add(heelClaw)
 
   // Rivets along the foot side for weathered detail.
   const footRivets = riveting(3, 0.18, { mat: steelLight })
@@ -594,14 +624,23 @@ function createQuadLeg(x: -1 | 1, z: -1 | 1): THREE.Group {
   lowerTrim.position.set(x * 0.32, -1.7, z * 0.22)
   leg.add(lowerTrim)
 
-  // Foot pad — chunky angular hoof with a forward claw and rivet detail.
+  // Foot pad — chunky angular hoof with splayed claws and rivet detail.
   const foot = new THREE.Mesh(chamferBox(0.36, 0.14, 0.38, 0.05), armor)
   foot.position.set(x * 0.2, -2.25, z * 0.2)
   leg.add(foot)
-  const claw = new THREE.Mesh(chamferBox(0.3, 0.1, 0.16, 0.03), armorTier)
-  claw.position.set(x * 0.2, -2.27, z * 0.42)
-  claw.rotation.x = z * 0.2
-  leg.add(claw)
+  // Three forward claw toes (steel cones), tip pointing along the leg's outward
+  // z (z*Math.PI/2 aims +Z for front legs, -Z for rear legs), splayed across X.
+  for (const cx of [-0.11, 0, 0.11]) {
+    const clawToe = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.24, 5), steelLight)
+    clawToe.rotation.x = z * (Math.PI / 2)
+    clawToe.position.set(x * 0.2 + cx, -2.24, z * 0.42)
+    leg.add(clawToe)
+  }
+  // Rear heel spur claw (points opposite the toes).
+  const heelClaw = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.24, 5), steelLight)
+  heelClaw.rotation.x = -z * (Math.PI / 2)
+  heelClaw.position.set(x * 0.2, -2.24, z * -0.06)
+  leg.add(heelClaw)
   const footBolt = bolt(0.03, { mat: steelLight })
   footBolt.position.set(x * 0.2, -2.18, z * 0.36)
   leg.add(footBolt)

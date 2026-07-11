@@ -119,13 +119,26 @@ function buildVFin(): THREE.Group {
   return g
 }
 
+/** Face optic layout per head archetype (see buildFace). */
+type FaceVariant = 'standard' | 'targeting' | 'reinforced' | 'scout'
+
 /**
- * The dark face mask + twin amber eyes + brow visor. Centered on origin, faces
- * +Z. The mask is a near-black recessed plate with a chin taper and a central
- * ridge; the eyes sit in dark sockets behind a slim charcoal brow with gold
- * underline so the amber glow pops.
+ * The dark face mask + eyes + brow visor. Centered on origin, faces +Z. The
+ * mask is a near-black recessed plate with a chin taper and a central ridge.
+ *
+ * The optic treatment varies by archetype so the four heads don't read as one
+ * head with swapped antennas:
+ *   - standard   : twin amber eyes in dark sockets (the classic real-robot mask)
+ *   - targeting  : twin eyes as tall narrow slits (precision gunsight read)
+ *   - reinforced : one horizontal amber optic band behind a heavy dark brow
+ *                  slot (armored bunker read) + a wider brow
+ *   - scout      : a single cyclopean mono-eye in a steel bezel + a slimmer brow
  */
-function buildFace(eyeColor = PALETTE.glowAmber): THREE.Group {
+function buildFace(
+  eyeColor = PALETTE.glowAmber,
+  opts: { variant?: FaceVariant } = {}
+): THREE.Group {
+  const { variant = 'standard' } = opts
   const g = new THREE.Group()
 
   // Dark recessed face mask (the "T" visor backing).
@@ -150,12 +163,14 @@ function buildFace(eyeColor = PALETTE.glowAmber): THREE.Group {
   g.add(ridge)
 
   // Brow visor lip (charcoal) proud of the mask, slightly down-angled, with an
-  // overlapping second tier so the brow reads as layered armor.
-  const brow = new THREE.Mesh(chamferBox(0.66, 0.1, 0.12, 0.03), armorMat(PALETTE.armorMid))
+  // overlapping second tier so the brow reads as layered armor. Reinforced heads
+  // widen the brow into a heavy cowl; scouts slim it into a sharper wedge.
+  const browW = variant === 'reinforced' ? 0.74 : variant === 'scout' ? 0.58 : 0.66
+  const brow = new THREE.Mesh(chamferBox(browW, 0.1, 0.12, 0.03), armorMat(PALETTE.armorMid))
   brow.position.set(0, 0.18, 0.05)
   brow.rotation.x = 0.22
   g.add(brow)
-  const browTier = new THREE.Mesh(chamferBox(0.5, 0.05, 0.1, 0.02), armorMat())
+  const browTier = new THREE.Mesh(chamferBox(browW * 0.76, 0.05, 0.1, 0.02), armorMat())
   browTier.position.set(0, 0.21, 0.09)
   browTier.rotation.x = 0.22
   g.add(browTier)
@@ -165,18 +180,41 @@ function buildFace(eyeColor = PALETTE.glowAmber): THREE.Group {
   browTrim.position.set(0, 0.11, 0.085)
   g.add(browTrim)
 
-  // Dark eye sockets so the amber eyes read as recessed glow, not stickers.
+  // --- Optic cluster (varies by archetype) ----------------------------------
   const eyeMat = glowEyeMat(eyeColor)
-  for (const side of [-1, 1]) {
-    const socket = new THREE.Mesh(chamferBox(0.2, 0.1, 0.05, 0.015), maskMat)
-    socket.position.set(side * 0.16, 0.04, 0.045)
-    socket.rotation.z = side * 0.12
-    g.add(socket)
+  if (variant === 'reinforced') {
+    // Single horizontal amber optic band recessed behind a heavy dark brow slot.
+    const slot = new THREE.Mesh(chamferBox(0.54, 0.14, 0.05, 0.02), ventMat())
+    slot.position.set(0, 0.04, 0.04)
+    g.add(slot)
+    const band = new THREE.Mesh(chamferBox(0.46, 0.09, 0.05, 0.02), eyeMat)
+    band.position.set(0, 0.04, 0.07)
+    g.add(band)
+  } else if (variant === 'scout') {
+    // Cyclopean mono-eye in a steel bezel (recon read).
+    const bezel = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.05, 14), frameMat())
+    bezel.rotation.x = Math.PI / 2
+    bezel.position.set(0, 0.04, 0.05)
+    g.add(bezel)
+    const mono = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.06, 14), eyeMat)
+    mono.rotation.x = Math.PI / 2
+    mono.position.set(0, 0.04, 0.08)
+    g.add(mono)
+  } else {
+    // Twin eyes in dark sockets. Standard = wide lenses; targeting = tall slits.
+    const ew = variant === 'targeting' ? 0.1 : 0.16
+    const eh = variant === 'targeting' ? 0.12 : 0.07
+    for (const side of [-1, 1]) {
+      const socket = new THREE.Mesh(chamferBox(ew + 0.04, eh + 0.03, 0.05, 0.015), maskMat)
+      socket.position.set(side * 0.16, 0.04, 0.045)
+      socket.rotation.z = side * 0.12
+      g.add(socket)
 
-    const eye = new THREE.Mesh(chamferBox(0.16, 0.07, 0.05, 0.015), eyeMat)
-    eye.position.set(side * 0.16, 0.04, 0.07)
-    eye.rotation.z = side * 0.12
-    g.add(eye)
+      const eye = new THREE.Mesh(chamferBox(ew, eh, 0.05, 0.015), eyeMat)
+      eye.position.set(side * 0.16, 0.04, 0.07)
+      eye.rotation.z = side * 0.12
+      g.add(eye)
+    }
   }
 
   // Central mouth/intake slit (dark backing + thin red bar) below the ridge.
@@ -321,8 +359,8 @@ export function createTargetingArray(): THREE.Group {
   crown.rotation.x = -0.32
   group.add(crown)
 
-  // Face mask + twin amber eyes.
-  const face = buildFace()
+  // Face mask + twin eyes as tall narrow targeting slits.
+  const face = buildFace(PALETTE.glowAmber, { variant: 'targeting' })
   face.position.set(0, 0.56, 0.33)
   group.add(face)
 
@@ -422,17 +460,19 @@ export function createReinforcedPod(): THREE.Group {
     group.add(b)
   }
 
-  // Reinforced face mask + twin eyes (narrower visor for armored look).
-  const face = buildFace()
+  // Reinforced face mask + single horizontal amber optic band (bunker read).
+  const face = buildFace(PALETTE.glowAmber, { variant: 'reinforced' })
   face.scale.set(1.05, 0.9, 1)
   face.position.set(0, 0.58, 0.4)
   group.add(face)
 
-  // Stubby armored V-fin.
-  const fin = buildVFin()
-  fin.scale.set(0.85, 0.8, 1)
-  fin.position.set(0, 0.96, 0.1)
-  group.add(fin)
+  // No V-fin on the bunker head — instead stubby armored side "ear" housings
+  // flanking the skull (ported from the Juggernaut bunker head).
+  for (const side of [-1, 1]) {
+    const ear = new THREE.Mesh(chamferBox(0.12, 0.3, 0.34, 0.04), steel)
+    ear.position.set(side * 0.5, 0.62, -0.04)
+    group.add(ear)
+  }
 
   // Side cheek armor blocks + red vents (heavier).
   for (const side of [-1, 1]) {
@@ -490,8 +530,8 @@ export function createScoutSuite(): THREE.Group {
   crownTrim.rotation.x = -0.4
   group.add(crownTrim)
 
-  // Face mask + twin amber eyes.
-  const face = buildFace()
+  // Face mask + single cyclopean mono-eye (recon read).
+  const face = buildFace(PALETTE.glowAmber, { variant: 'scout' })
   face.scale.set(0.92, 1, 1)
   face.position.set(0, 0.54, 0.32)
   group.add(face)

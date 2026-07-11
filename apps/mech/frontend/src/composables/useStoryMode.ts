@@ -7,6 +7,7 @@ import {
   CORE_PARTS,
   LEGS_PARTS,
   HEAD_PARTS,
+  RACK_PARTS,
   findPartById,
 } from '../shared/data/MechParts'
 import {
@@ -372,34 +373,55 @@ export function populationForCondition(condition: number, initial: number): numb
 }
 
 // ============================================================================
-// Starter loadout (Q10) — lightest valid chassis/legs/head + one basic weapon
+// Starter loadout (Q10) — fixed BASIC build from the original (non-chassis) parts
 // ============================================================================
 
 /**
- * Picks the lightest valid Starter loadout straight from MechParts (ignores the
- * builder loadout per Q10). Validity mirrors useMechBuilder's rules: core + legs
- * + head present, at least one real weapon, non-negative energy budget.
+ * Returns a FIXED, deterministic basic starter loadout built only from the
+ * original (non-chassis) parts, so every new run opens with the same clean,
+ * fully-armed frame instead of a "random"-looking lightest-part grab.
+ *
+ * Every slot is filled (no null arm/rack) so the model never renders the plain
+ * blue BoxGeometry fallback (see MechModelLoader.createFallbackPart). Validity
+ * mirrors useMechBuilder's rules: core + legs + head present, at least one real
+ * weapon, non-negative energy budget. Chosen energy budget:
+ *   fusion(+100) + bipedal(0) + optics(-5) + 2× autocannon(-20) + jets(-15) = +60.
+ *
+ * Each lookup falls back to the lightest part of its type if the ID is somehow
+ * missing, so the function can never return an invalid loadout.
  */
 export function buildStarterLoadout(): MechLoadout {
   const byWeight = <T extends { weight: number }>(arr: T[]): T[] =>
     [...arr].sort((a, b) => a.weight - b.weight)
 
-  const lightestCore = byWeight(CORE_PARTS)[0] as CorePart
-  const lightestLegs = byWeight(LEGS_PARTS)[0] as LegsPart
-  const lightestHead = byWeight(HEAD_PARTS)[0] as HeadPart
+  const pick = <T extends { id: string }>(arr: T[], id: string): T =>
+    (arr.find((p) => p.id === id) ?? byWeight(arr)[0]) as T
 
-  // Cheapest/basic real weapon: the autocannon (low draw, no energy deficit).
-  const basicWeapon =
+  // Balanced original core with a large energy budget (falls back to the diesel
+  // generator, then the lightest core, if the fusion reactor is ever removed).
+  const core =
+    (CORE_PARTS.find((c) => c.id === 'core-fusion') as CorePart | undefined) ??
+    pick(CORE_PARTS, 'core-diesel-gen')
+  const legs = pick(LEGS_PARTS, 'legs-bipedal-standard')
+  const head = pick(HEAD_PARTS, 'head-standard-optics')
+
+  // Dual autocannons: deliberately simple, symmetric, and the lowest-draw real
+  // weapon, so both arms are armed and neither renders the blue fallback box.
+  const weaponFallback = (): ArmPart =>
+    byWeight(ARM_PARTS.filter((a) => a.weaponType !== 'support'))[0] as ArmPart
+  const autocannon =
     (ARM_PARTS.find((a) => a.id === 'arm-autocannon-mk1') as ArmPart | undefined) ??
-    (byWeight(ARM_PARTS.filter((a) => a.weaponType !== 'support'))[0] as ArmPart)
+    weaponFallback()
+
+  const rack = pick(RACK_PARTS, 'rack-jump-jets')
 
   return {
-    leftArm: basicWeapon,
-    rightArm: null,
-    core: lightestCore,
-    legs: lightestLegs,
-    head: lightestHead,
-    rack: null,
+    leftArm: autocannon,
+    rightArm: autocannon,
+    core,
+    legs,
+    head,
+    rack,
   }
 }
 

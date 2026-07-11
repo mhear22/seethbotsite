@@ -1,4 +1,116 @@
 import * as THREE from 'three'
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
+
+// ============================================================================
+// Wilderness scatter (rocks / alien flora / grass tufts). Deterministic,
+// InstancedMesh-based props that dress the empty heightfield between towns.
+// Assets are built once per Terrain; placement is seeded from the terrain seed
+// so reloads reproduce the same distribution as the heightfield itself.
+// ============================================================================
+
+interface ScatterAssets {
+  rockBoulderGeo: THREE.IcosahedronGeometry
+  rockSlabGeo: THREE.BoxGeometry
+  rockMat: THREE.MeshStandardMaterial
+  floraSpireTrunkGeo: THREE.CylinderGeometry
+  floraSpireCanopyGeo: THREE.IcosahedronGeometry
+  floraSpireTrunkMat: THREE.MeshStandardMaterial
+  floraSpireCanopyMat: THREE.MeshStandardMaterial
+  floraMushStalkGeo: THREE.CylinderGeometry
+  floraMushCapGeo: THREE.CylinderGeometry
+  floraMushStalkMat: THREE.MeshStandardMaterial
+  floraMushCapMat: THREE.MeshStandardMaterial
+  grassTuftGeo: THREE.BufferGeometry
+  grassMat: THREE.MeshLambertMaterial
+}
+
+/** Builds every prop geometry+material once. Unit-sized; per-instance scale does the rest. */
+function buildScatterAssets(): ScatterAssets {
+  const rockBoulderGeo = new THREE.IcosahedronGeometry(1, 0)
+  const rockSlabGeo = new THREE.BoxGeometry(1, 1, 1)
+  const rockMat = new THREE.MeshStandardMaterial({
+    color: 0x756b5c, roughness: 1, metalness: 0, flatShading: true,
+  })
+
+  // Alien flora #1 "spire": tapered trunk + angular violet canopy pod.
+  const floraSpireTrunkGeo = new THREE.CylinderGeometry(0.1, 0.2, 1, 5)
+  floraSpireTrunkGeo.translate(0, 0.5, 0)
+  const floraSpireCanopyGeo = new THREE.IcosahedronGeometry(0.65, 0)
+  floraSpireCanopyGeo.translate(0, 1.15, 0) // sit atop the trunk under the shared transform
+  const floraSpireTrunkMat = new THREE.MeshStandardMaterial({
+    color: 0x4a3f52, roughness: 0.9, metalness: 0, flatShading: true,
+  })
+  const floraSpireCanopyMat = new THREE.MeshStandardMaterial({
+    color: 0x7a5cc4, roughness: 0.6, metalness: 0.05, flatShading: true,
+    emissive: 0x3a2a66, emissiveIntensity: 0.25,
+  })
+
+  // Alien flora #2 "mushroom": short stalk + wide flattened teal cap.
+  const floraMushStalkGeo = new THREE.CylinderGeometry(0.16, 0.2, 1, 6)
+  floraMushStalkGeo.translate(0, 0.5, 0)
+  const floraMushCapGeo = new THREE.CylinderGeometry(1, 0.45, 0.35, 7)
+  floraMushCapGeo.translate(0, 1.0, 0)
+  const floraMushStalkMat = new THREE.MeshStandardMaterial({
+    color: 0x5a4a3a, roughness: 0.9, metalness: 0, flatShading: true,
+  })
+  const floraMushCapMat = new THREE.MeshStandardMaterial({
+    color: 0x3fa695, roughness: 0.55, metalness: 0.05, flatShading: true,
+    emissive: 0x145048, emissiveIntensity: 0.2,
+  })
+
+  // Grass tuft: 3 thin cone "blades" fanned out and merged into one geometry.
+  const bladeGeos: THREE.BufferGeometry[] = []
+  for (let i = 0; i < 3; i++) {
+    const blade = new THREE.ConeGeometry(0.05, 0.5, 4)
+    blade.translate(0, 0.25, 0)
+    const angle = (i / 3) * Math.PI * 2
+    blade.rotateZ(0.35)
+    blade.rotateY(angle)
+    blade.translate(Math.cos(angle) * 0.06, 0, Math.sin(angle) * 0.06)
+    bladeGeos.push(blade.toNonIndexed())
+  }
+  const grassTuftGeo = mergeGeometries(bladeGeos, false)
+  bladeGeos.forEach((g) => g.dispose())
+  const grassMat = new THREE.MeshLambertMaterial({ color: 0x5f8f45 })
+
+  return {
+    rockBoulderGeo, rockSlabGeo, rockMat,
+    floraSpireTrunkGeo, floraSpireCanopyGeo, floraSpireTrunkMat, floraSpireCanopyMat,
+    floraMushStalkGeo, floraMushCapGeo, floraMushStalkMat, floraMushCapMat,
+    grassTuftGeo, grassMat,
+  }
+}
+
+/** mulberry32: tiny deterministic PRNG (not Math.random — reproducible per seed). */
+function mulberry32(seed: number): () => number {
+  let a = seed >>> 0
+  return () => {
+    a |= 0; a = (a + 0x6d2b79f5) | 0
+    let t = Math.imul(a ^ (a >>> 15), 1 | a)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+interface ScatterTypeSpec {
+  count: number
+  attemptsPerInstance: number
+  waterMargin: number
+  minY: number
+  maxY: number
+  maxSlope: number
+  moistureBias?: [lo: number, hi: number]
+  scaleRange: [min: number, max: number]
+  sinkDepth: number
+}
+
+const SCATTER_SPECS: Record<'rockBoulder' | 'rockSlab' | 'floraSpire' | 'floraMush' | 'grass', ScatterTypeSpec> = {
+  rockBoulder: { count: 120, attemptsPerInstance: 6, waterMargin: 1.5, minY: -6, maxY: 200, maxSlope: 1.4, scaleRange: [0.8, 3.2], sinkDepth: 0.3 },
+  rockSlab:    { count: 80,  attemptsPerInstance: 6, waterMargin: 1.5, minY: -6, maxY: 200, maxSlope: 1.4, scaleRange: [0.9, 2.6], sinkDepth: 0.15 },
+  floraSpire:  { count: 170, attemptsPerInstance: 8, waterMargin: 2,   minY: -5, maxY: 34,  maxSlope: 0.5, moistureBias: [0.25, 0.55], scaleRange: [1.4, 3.2], sinkDepth: 0.2 },
+  floraMush:   { count: 140, attemptsPerInstance: 8, waterMargin: 2,   minY: -5, maxY: 30,  maxSlope: 0.45, moistureBias: [0.35, 0.7], scaleRange: [1.0, 2.2], sinkDepth: 0.15 },
+  grass:       { count: 450, attemptsPerInstance: 4, waterMargin: 0.5, minY: -7, maxY: 45,  maxSlope: 0.6, moistureBias: [0.2, 0.5], scaleRange: [0.7, 1.8], sinkDepth: 0.05 },
+}
 
 /**
  * A flattened circular region of the heightfield (towns + the player spawn).
@@ -45,6 +157,9 @@ export class Terrain {
   readonly mesh: THREE.Mesh
   /** Translucent water plane at sea level (rivers/oceans show through). */
   readonly waterMesh: THREE.Mesh
+  /** Instanced wilderness props (rocks, alien flora, grass). Add each to the
+   *  scene; disposed via Terrain.dispose(). */
+  readonly scatterMeshes: THREE.InstancedMesh[]
 
   private readonly seed: number
   private readonly pads: TerrainPad[]
@@ -52,9 +167,16 @@ export class Terrain {
   // --- Heightfield tuning (world units) ---
   /** Sea level. Plains sit ~0, so water reads as low ground/coast. */
   static readonly WATER_LEVEL = -8
-  private static readonly OCEAN_FLOOR = -28
-  /** Continent field below this is ocean; above it is land. */
-  private static readonly SEA_THRESHOLD = 0.42
+  // Ocean basins are deliberately SHALLOW: the ground provider (heightAt) returns
+  // the seabed, so a deep floor would let the mech walk submerged in a dead,
+  // disorienting trench under the translucent water plane. Keeping the floor only
+  // a few units under WATER_LEVEL makes basins read as wadeable coastal shallows /
+  // lakes instead. This regenerates the heightfield, so the visible mesh and the
+  // physics ground height stay in sync automatically.
+  private static readonly OCEAN_FLOOR = -14
+  /** Continent field below this is ocean; above it is land. Lowered so oceans
+   *  cover less of the map (more walkable land, smaller dead-water regions). */
+  private static readonly SEA_THRESHOLD = 0.3
   private static readonly CONTINENT_SCALE = 540
   private static readonly MOUNTAIN_SCALE = 250
   private static readonly DETAIL_SCALE = 72
@@ -85,6 +207,102 @@ export class Terrain {
     this.pads = config.pads ?? []
     this.mesh = this.buildMesh(config.size, config.segments ?? 300)
     this.waterMesh = this.buildWater(config.size)
+    this.scatterMeshes = this.buildScatter(config.size)
+  }
+
+  // --- Deterministic wilderness scatter -------------------------------------
+
+  /** Central-difference slope (gradient magnitude); only run at scatter-build time. */
+  private slopeAt(x: number, z: number): number {
+    const e = 2
+    const hx = (this.heightAt(x + e, z) - this.heightAt(x - e, z)) / (2 * e)
+    const hz = (this.heightAt(x, z + e) - this.heightAt(x, z - e)) / (2 * e)
+    return Math.hypot(hx, hz)
+  }
+
+  /** True if (x,z) falls inside any town/spawn pad's flattened+blend footprint. */
+  private isInsidePad(x: number, z: number): boolean {
+    for (const pad of this.pads) {
+      const d = Math.hypot(x - pad.x, z - pad.z)
+      if (d < pad.flatRadius + pad.blendRadius + 4) return true
+    }
+    return false
+  }
+
+  /**
+   * Scatter rocks, two alien-flora silhouettes, and grass tufts across the
+   * wilderness, each as a single InstancedMesh (or a matched pair for two-part
+   * props). Seeded from the terrain seed so reloads reproduce the same layout.
+   * Rejects water, town pads, out-of-band elevation/slope, and biases by moisture.
+   */
+  private buildScatter(size: number): THREE.InstancedMesh[] {
+    const assets = buildScatterAssets()
+    const rng = mulberry32(this.seed ^ 0x5c1e57e5)
+    const half = size / 2 - 20 // keep off the very edge of the world
+    const meshes: THREE.InstancedMesh[] = []
+
+    const place = (
+      spec: ScatterTypeSpec,
+      build: (matrices: THREE.Matrix4[]) => THREE.InstancedMesh[],
+    ): THREE.InstancedMesh[] => {
+      const matrices: THREE.Matrix4[] = []
+      const maxAttempts = spec.count * spec.attemptsPerInstance
+      let attempts = 0
+      while (matrices.length < spec.count && attempts < maxAttempts) {
+        attempts++
+        const x = (rng() * 2 - 1) * half
+        const z = (rng() * 2 - 1) * half
+        if (this.isInsidePad(x, z)) continue
+        const y = this.heightAt(x, z)
+        if (y < Terrain.WATER_LEVEL + spec.waterMargin) continue
+        if (y < spec.minY || y > spec.maxY) continue
+        if (this.slopeAt(x, z) > spec.maxSlope) continue
+        if (spec.moistureBias) {
+          const [lo, hi] = spec.moistureBias
+          const w = THREE.MathUtils.smoothstep(this.moistureAt(x, z), lo, hi)
+          if (rng() > w) continue
+        }
+
+        const scale = THREE.MathUtils.lerp(spec.scaleRange[0], spec.scaleRange[1], rng())
+        const anisotropy = 0.85 + rng() * 0.3
+        const rotY = rng() * Math.PI * 2
+        const tilt = (rng() - 0.5) * 0.12
+
+        const m = new THREE.Matrix4()
+        const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(tilt, rotY, tilt * 0.7))
+        m.compose(
+          new THREE.Vector3(x, y - spec.sinkDepth, z),
+          q,
+          new THREE.Vector3(scale, scale * anisotropy, scale),
+        )
+        matrices.push(m)
+      }
+      return build(matrices)
+    }
+
+    const makeSingle = (geo: THREE.BufferGeometry, mat: THREE.Material, matrices: THREE.Matrix4[], castShadow: boolean): THREE.InstancedMesh => {
+      const mesh = new THREE.InstancedMesh(geo, mat, matrices.length)
+      matrices.forEach((m, i) => mesh.setMatrixAt(i, m))
+      mesh.instanceMatrix.needsUpdate = true
+      mesh.castShadow = castShadow
+      mesh.receiveShadow = false
+      mesh.computeBoundingSphere() // per-instance transforms span the whole map
+      return mesh
+    }
+
+    meshes.push(...place(SCATTER_SPECS.rockBoulder, (mats) => [makeSingle(assets.rockBoulderGeo, assets.rockMat, mats, true)]))
+    meshes.push(...place(SCATTER_SPECS.rockSlab, (mats) => [makeSingle(assets.rockSlabGeo, assets.rockMat, mats, true)]))
+    meshes.push(...place(SCATTER_SPECS.floraSpire, (mats) => [
+      makeSingle(assets.floraSpireTrunkGeo, assets.floraSpireTrunkMat, mats, true),
+      makeSingle(assets.floraSpireCanopyGeo, assets.floraSpireCanopyMat, mats, true),
+    ]))
+    meshes.push(...place(SCATTER_SPECS.floraMush, (mats) => [
+      makeSingle(assets.floraMushStalkGeo, assets.floraMushStalkMat, mats, true),
+      makeSingle(assets.floraMushCapGeo, assets.floraMushCapMat, mats, true),
+    ]))
+    meshes.push(...place(SCATTER_SPECS.grass, (mats) => [makeSingle(assets.grassTuftGeo, assets.grassMat, mats, false)]))
+
+    return meshes
   }
 
   // --- Public height query (used by physics + spawn placement) -------------
@@ -299,7 +517,7 @@ export class Terrain {
   }
 
   dispose(): void {
-    for (const m of [this.mesh, this.waterMesh]) {
+    for (const m of [this.mesh, this.waterMesh, ...this.scatterMeshes]) {
       m.geometry.dispose()
       const mat = m.material
       if (Array.isArray(mat)) mat.forEach((x) => x.dispose())

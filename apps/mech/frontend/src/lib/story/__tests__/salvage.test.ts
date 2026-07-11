@@ -47,7 +47,7 @@ function installMemoryStorage() {
 /** A constant rng for deterministic drop rolls. */
 const rngConst = (v: number) => () => v
 
-/** The killed enemy's loadout used across drop tests (starter = 4 equipped slots). */
+/** The killed enemy's loadout used across drop tests (starter = 6 equipped slots). */
 function killedLoadout(): MechLoadout {
   return buildStarterLoadout()
 }
@@ -317,8 +317,8 @@ describe('composable: inventory & salvage', () => {
     expect(story.money.value).toBe(before - partPrice(railgun))
     expect(story.inventory.value).toHaveLength(1)
     expect(story.inventory.value[0].condition).toBe('pristine')
-    // Loadout is untouched — buying only stocks the inventory.
-    expect(story.run.value!.loadout.rightArm).toBeNull()
+    // Loadout is untouched — buying only stocks the inventory (starter arm intact).
+    expect(story.run.value!.loadout.rightArm?.id).toBe('arm-autocannon-mk1')
   })
 
   it('buyPart refuses when too poor and never deducts scrap', () => {
@@ -335,22 +335,17 @@ describe('composable: inventory & salvage', () => {
     const story = useStoryMode()
     story.newRun()
     story.addMoney(10_000)
-    // Give the mech a big core first so a draw-heavy weapon stays legal.
-    const fusion = findPartById('core-fusion')!
-    story.buyPart(fusion)
-    const fusionInst = story.inventory.value[0].instanceId
-    story.installFromInventory(fusionInst, 'core')
-
+    // Starter already runs the big fusion core, so a draw-heavy weapon stays legal.
     const railgun = findPartById('arm-railgun')!
     story.buyPart(railgun)
-    const inst = story.inventory.value.find((i) => i.partId === 'arm-railgun')!.instanceId
-    const res = story.installFromInventory(inst, 'rightArm')
+    const res = story.installFromInventory(story.inventory.value[0].instanceId, 'rightArm')
 
     expect(res.ok).toBe(true)
     expect(story.run.value!.loadout.rightArm?.id).toBe('arm-railgun')
     expect(isLoadoutValid(story.run.value!.loadout)).toBe(true)
-    // The railgun instance is no longer loose in inventory.
-    expect(story.inventory.value.find((i) => i.instanceId === inst)).toBeUndefined()
+    // The railgun instance is no longer loose in inventory (the displaced starter
+    // autocannon is stowed instead).
+    expect(story.inventory.value.find((i) => i.partId === 'arm-railgun')).toBeUndefined()
   })
 
   it('installFromInventory returns the displaced part to inventory (swap, no loss)', () => {
@@ -379,14 +374,17 @@ describe('composable: inventory & salvage', () => {
     const res = story.installFromInventory('inst-0', 'rightArm')
     expect(res.ok).toBe(false)
     expect(res.reason).toMatch(/damaged/i)
-    expect(story.run.value!.loadout.rightArm).toBeNull()
+    // Loadout untouched — the starter autocannon stays on the right arm.
+    expect(story.run.value!.loadout.rightArm?.id).toBe('arm-autocannon-mk1')
   })
 
   it('installFromInventory rejects an illegal result, leaving inventory intact', () => {
     const story = useStoryMode()
     story.newRun()
     story.addMoney(10_000)
-    // Installing the support shield over the only weapon leaves no weapon -> illegal.
+    // Reduce to a single weapon, then installing the support shield over it leaves
+    // no weapon -> illegal.
+    story.run.value!.loadout.rightArm = null
     const shield = findPartById('arm-shield-gen')!
     story.buyPart(shield)
     const inst = story.inventory.value[0].instanceId
@@ -490,12 +488,13 @@ describe('Phase 3 salvage counterweights', () => {
     const story = useStoryMode()
     story.newRun() // salvage 0
     // Seed a pristine part directly so the only cost gating the install is the fee.
-    story.run.value!.inventory.push({ instanceId: 'inst-0', partId: 'core-fusion', condition: 'pristine' })
+    // Use a core distinct from the starter's fusion so the "unchanged" check is real.
+    story.run.value!.inventory.push({ instanceId: 'inst-0', partId: 'core-diesel-gen', condition: 'pristine' })
     const res = story.installFromInventory('inst-0', 'core')
     expect(res.ok).toBe(false)
     expect(res.reason).toMatch(/fitting fee/i)
     // Loadout unchanged, instance not consumed.
-    expect(story.run.value!.loadout.core?.id).not.toBe('core-fusion')
+    expect(story.run.value!.loadout.core?.id).not.toBe('core-diesel-gen')
     expect(story.inventory.value.find((i) => i.instanceId === 'inst-0')).toBeDefined()
   })
 })

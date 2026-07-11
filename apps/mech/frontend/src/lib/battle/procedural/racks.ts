@@ -82,37 +82,46 @@ export function createSmokeLauncher(): THREE.Group {
     group.add(slash)
   }
 
-  // --- Launcher tube cluster (2x3) on a tilted mantlet, projecting forward.
-  const tubeBlock = new THREE.Group()
-  // Steel mantlet plate the tubes are seated in.
-  const mantlet = new THREE.Mesh(chamferBox(0.74, 0.42, 0.12, 0.03), steel)
-  mantlet.position.set(0, 0, 0.16)
-  tubeBlock.add(mantlet)
+  // --- Launcher: three angled 2-tube banks fanned like a mortar rack. Each bank
+  // splays about the battery centre (outer columns rotate outward) so the tubes
+  // point in a spread rather than sitting in one flat grid.
+  const battery = new THREE.Group()
+  const goldTrim = trimGoldMat()
+  for (const col of [-1, 0, 1]) {
+    const bank = new THREE.Group()
+    bank.rotation.y = col * 0.35 // outer columns splay outward about the centre
+    const bx = col * 0.26
 
-  for (let row = 0; row < 2; row++) {
-    for (let col = 0; col < 3; col++) {
-      const x = (col - 1) * 0.26
-      const y = row * 0.18 - 0.09
-      // Steel collar around each tube.
+    // Per-bank steel mantlet the two tubes seat in.
+    const mantlet = new THREE.Mesh(chamferBox(0.24, 0.42, 0.12, 0.03), steel)
+    mantlet.position.set(bx, 0, 0.16)
+    bank.add(mantlet)
+    // Thin gold frame around each bank face.
+    const frame = trimStripe(0.2, 0.4, { thickness: 0.014, mat: goldTrim })
+    frame.position.set(bx, 0, 0.23)
+    bank.add(frame)
+
+    // Two stacked tubes per bank — reuse the collar / gold ring / dark bore set,
+    // kept co-axial within the bank.
+    for (const y of [-0.09, 0.09]) {
       const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.1, 0.14, 12), steel)
       collar.rotation.x = Math.PI / 2
-      collar.position.set(x, y, 0.22)
-      tubeBlock.add(collar)
+      collar.position.set(bx, y, 0.22)
+      bank.add(collar)
 
-      // Gold muzzle ring (edge trim catching the light).
-      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.078, 0.012, 8, 14), trimGoldMat())
-      ring.position.set(x, y, 0.29)
-      tubeBlock.add(ring)
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.078, 0.012, 8, 14), goldTrim)
+      ring.position.set(bx, y, 0.29)
+      bank.add(ring)
 
-      // Dark recessed bore.
       const bore = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.16, 12), ventBlack)
       bore.rotation.x = Math.PI / 2
-      bore.position.set(x, y, 0.24)
-      tubeBlock.add(bore)
+      bore.position.set(bx, y, 0.24)
+      bank.add(bore)
     }
+    battery.add(bank)
   }
-  tubeBlock.rotation.x = -0.14 // angle the whole battery up
-  group.add(tubeBlock)
+  battery.rotation.x = -0.14 // angle the whole battery up
+  group.add(battery)
 
   // --- Detail: gold crown line, amber targeting sensor, rivet rows.
   const crown = edgeLine(0.82, { thickness: 0.018 })
@@ -120,10 +129,15 @@ export function createSmokeLauncher(): THREE.Group {
   crown.rotation.x = -0.16
   group.add(crown)
 
-  // Amber targeting eye nested in the upper tier.
-  const sensor = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.04, 0.03), amber)
-  sensor.position.set(0, 0.22, 0.12)
-  sensor.rotation.x = -0.16
+  // Taller central amber targeting sensor rising between the fanned banks, set
+  // in a dark recessed housing so the glow reads as a mortar sight.
+  const sensorHousing = new THREE.Mesh(chamferBox(0.12, 0.3, 0.06, 0.02), ventBlack)
+  sensorHousing.position.set(0, 0.16, 0.16)
+  sensorHousing.rotation.x = -0.14
+  group.add(sensorHousing)
+  const sensor = new THREE.Mesh(chamferBox(0.08, 0.26, 0.05, 0.02), amber)
+  sensor.position.set(0, 0.16, 0.19)
+  sensor.rotation.x = -0.14
   group.add(sensor)
 
   // Rivet rows along the lower front edge for weathered greeble.

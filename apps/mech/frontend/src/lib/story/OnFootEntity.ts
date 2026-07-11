@@ -152,12 +152,19 @@ export class OnFootEntity implements PilotableEntity {
     const idleBob = Math.sin(this.idlePhase) * ON_FOOT.BOB_IDLE_AMPLITUDE * (1 - moveT)
     this.mesh.position.y = this.position.y + this.baseBodyY + walkBob + idleBob
 
-    // Limb swing: opposed leg/arm pendulum, amplitude scaled by speed.
-    const swing = Math.sin(this.walkCycle) * 0.5 * moveT
+    // Limb swing: opposed leg/arm pendulum. The arc grows with gait so a walk
+    // takes short ~10° steps and only a sprint reaches the full ~29° stride
+    // (quadratic in moveT), instead of one fixed amplitude merely faded in.
+    const arc = (0.18 + 0.32 * moveT) * moveT
+    const swing = Math.sin(this.walkCycle) * arc
     this.legLeft.rotation.x = swing
     this.legRight.rotation.x = -swing
-    this.armLeft.rotation.x = -swing
-    this.armRight.rotation.x = swing
+    // Arms counter the legs at a hair less amplitude so they trail naturally.
+    this.armLeft.rotation.x = -swing * 0.9
+    this.armRight.rotation.x = swing * 0.9
+    // Gentle forward torso lean into the run + a subtle stride bounce (the torso
+    // capsule tilts visibly in X, unlike a Y-twist which is radially invisible).
+    this.torso.rotation.x = moveT * 0.09 + Math.sin(this.walkCycle * 2) * 0.02 * moveT
   }
 
   /** Dispose owned geometry/materials (mirror MechEntity/Town teardown). */

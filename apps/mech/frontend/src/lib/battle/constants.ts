@@ -162,6 +162,70 @@ export const FOOTFALL = {
 } as const
 
 // ---------------------------------------------------------------------------
+// MECH_ANIM — procedural walk/idle/lean tuning for MechEntity.animateWalk.
+// All the leg-swing arcs, idle breathing, turn lean and gait body motion that
+// used to be magic numbers inside animateWalk live here so the machine's motion
+// can be retuned in one place (parity with FOOTFALL / ON_FOOT).
+// ---------------------------------------------------------------------------
+export const MECH_ANIM = {
+  /** Horizontal speed (u/s) at which the walk cycle reads as "full" — normalises
+   *  moveT (0 parked → 1 striding) for amplitude + idle cross-fades. */
+  WALK_REF_SPEED: 8,
+  /** Phase-rate speed cap (u/s): dash speeds past this stop quickening the
+   *  cadence so the legs saturate instead of strobing. */
+  CADENCE_CAP_SPEED: 16,
+  /** Walk-cycle phase advance per (capped) u/s. */
+  CADENCE_RATE: 0.8,
+
+  /** Bipedal leg swing arc (rad) = BASE + SPEED*moveT (short steps at a crawl,
+   *  the full ~18° only at speed). */
+  BIPED_ARC_BASE: 0.12,
+  BIPED_ARC_SPEED: 0.2,
+  /** Quadruped leg swing arc (rad) — a touch tighter than the biped. */
+  QUAD_ARC_BASE: 0.1,
+  QUAD_ARC_SPEED: 0.16,
+  /** Arm counter-swing as a fraction of the same-side leg swing (opposed). */
+  ARM_COUNTER_SWING: 0.5,
+
+  /** Idle "breathing" phase rate (rad/s) — always advancing so a parked mech
+   *  settles instead of freezing. */
+  IDLE_FREQUENCY: 1.6,
+  /** Idle leg sway amplitude (rad), cross-faded out as the mech gets moving. */
+  IDLE_LEG_AMPLITUDE: 0.02,
+  /** Idle vertical breath amplitude (units). */
+  IDLE_BOB_AMPLITUDE: 0.015,
+  /** Vertical body bob amplitude at full walk (units). */
+  WALK_BOB_AMPLITUDE: 0.06,
+
+  /** Torso lean into turns: rad of roll per (rad/s) of yaw rate, and its clamp. */
+  TURN_LEAN_GAIN: 0.06,
+  TURN_LEAN_MAX: 0.18,
+  /** Nose pitch under acceleration: rad per (u/s²) forward accel, and its clamp. */
+  ACCEL_PITCH_GAIN: 0.012,
+  ACCEL_PITCH_MAX: 0.1,
+  /** Exponential ease rate for lean/pitch so they glide rather than snap. */
+  LEAN_EASE_RATE: 8,
+
+  /** Quad trot: per-diagonal foot lift (units) on the forward half of the step. */
+  QUAD_FOOT_LIFT: 0.08,
+  /** Quad hull rock: fore/aft pitch and side roll amplitudes (rad). */
+  QUAD_PITCH: 0.03,
+  QUAD_ROLL: 0.04,
+
+  /** Hover bank into strafe / pitch into forward drive: gain (rad per u/s of local
+   *  velocity) and clamp for each. */
+  HOVER_BANK_GAIN: 0.05,
+  HOVER_BANK_MAX: 0.25,
+  HOVER_PITCH_GAIN: 0.04,
+  HOVER_PITCH_MAX: 0.2,
+  /** Tracked suspension rumble: fast jitter amplitude (units), scaled by moveT. */
+  TRACKED_JITTER: 0.01,
+
+  /** Dash tell: extra forward crouch-pitch (rad) eased in while dashing. */
+  DASH_CROUCH_PITCH: 0.14,
+} as const
+
+// ---------------------------------------------------------------------------
 // ON-FOOT — the dismount (design §4.1/§4.3). The pilot is a fragile human, not
 // a machine: no weight, no dash i-frames, no jump-jets, no power economy. Speed
 // collapses from the mech's tens-of-u/s to a walk, acceleration is near-instant
@@ -182,8 +246,10 @@ export const ON_FOOT = {
 
   /** Base walk speed (units/s). */
   WALK_SPEED: 6,
-  /** Sprint speed (units/s) while the dash key is held — no i-frames, just a jog. */
-  SPRINT_SPEED: 10,
+  /** Sprint speed (units/s) while the dash key is held — no i-frames, just a jog.
+   *  A clear 2× over the walk so the jog actually reads (paired with a small FOV
+   *  kick on sprint-start in StoryWorld.updateOnFoot). */
+  SPRINT_SPEED: 12,
   /** Near-instant acceleration (units/s²) — a human has no momentum to spool up. */
   ACCEL: 60,
   /** Ground friction (per-second exponential decay) when input releases. Stops fast. */
@@ -225,8 +291,10 @@ export const CAMERA = {
   SHOULDER_UP: 3.0,
   ANCHOR_UP: 3.0,
 
-  // Mouse-look smoothing.
-  MOUSE_VELOCITY_DECAY: 16,
+  // Mouse-look smoothing. Higher = tighter: residual aim glide dies in ~2 frames
+  // instead of ~10, so aim/turn stops feeling floaty. The base sensitivity in
+  // CameraController.update is bumped in step to keep the same per-flick gain.
+  MOUSE_VELOCITY_DECAY: 28,
 
   // Screen shake.
   SHAKE_DECAY: 8,
@@ -260,6 +328,15 @@ export const CAMERA = {
   POSITION_LAG_BASE: 40,
   /** How much the lag rate is reduced at SPEED_FOV_REF_SPEED (0..1). */
   POSITION_LAG_SPEED_FALLOFF: 0.5,
+
+  // Dash "catch-up": on a dash the mech lunges forward instantly, but the camera
+  // should hang back and then lerp forward to catch it, so the dodge reads as a
+  // burst of speed instead of the whole view teleporting. For a short window
+  // after a dash the position-lag rate is clamped to a much lower value (a long
+  // trail), then eases back to normal.
+  DASH_LAG_RATE: 6,
+  /** Seconds the reduced dash catch-up lag stays in effect after a dash starts. */
+  DASH_CATCHUP_DURATION: 0.5,
 } as const
 
 // ---------------------------------------------------------------------------

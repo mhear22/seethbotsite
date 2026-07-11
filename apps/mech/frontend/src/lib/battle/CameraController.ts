@@ -62,6 +62,11 @@ export class CameraController {
   // Smoothed camera position for subtle speed-based positional lag.
   private smoothedPosition: THREE.Vector3 | null = null
 
+  // Seconds remaining in the post-dash catch-up window, during which the
+  // positional-lag rate is clamped low so the camera trails the lunge and then
+  // lerps forward to catch up. Set by onDash(), counted down in update().
+  private dashCatchupTimer = 0
+
   /**
    * Active dismount/remount transition (design §4.1). While set, update() eases
    * the rig geometry from `from` → `to` over `duration`, punches a landing
@@ -177,7 +182,10 @@ export class CameraController {
 
   update(deltaTime: number, mouseX: number, mouseY: number) {
     this.advanceTransition(deltaTime)
-    const baseSensitivity = 0.0003
+    // Bumped from 0.0003 to compensate for the tighter MOUSE_VELOCITY_DECAY: a
+    // higher decay drains each impulse over fewer frames, so a larger impulse
+    // keeps the same per-flick rotation gain while aim stops gliding.
+    const baseSensitivity = 0.00048
     const sensitivity = baseSensitivity * this.sensitivityMultiplier
 
     // Apply invert settings
@@ -236,11 +244,15 @@ export class CameraController {
     // spot, and the lag rate drops a little at speed so the rig trails the mech
     // just enough to feel weighty. Snappy enough to stay readable.
     const speed = Math.sqrt(this.target.velocity.x ** 2 + this.target.velocity.z ** 2)
+    if (this.dashCatchupTimer > 0) this.dashCatchupTimer = Math.max(0, this.dashCatchupTimer - deltaTime)
     if (!this.smoothedPosition) {
       this.smoothedPosition = desiredPosition.clone()
     } else {
       const speedT = Math.min(1, speed / CAMERA.SPEED_FOV_REF_SPEED)
-      const lagRate = CAMERA.POSITION_LAG_BASE * (1 - CAMERA.POSITION_LAG_SPEED_FALLOFF * speedT)
+      let lagRate = CAMERA.POSITION_LAG_BASE * (1 - CAMERA.POSITION_LAG_SPEED_FALLOFF * speedT)
+      // Just dashed: clamp to a long trail so the camera visibly lerps forward to
+      // catch the lunge instead of rigidly tracking it.
+      if (this.dashCatchupTimer > 0) lagRate = Math.min(lagRate, CAMERA.DASH_LAG_RATE)
       const lerpFactor = 1 - Math.exp(-lagRate * deltaTime)
       this.smoothedPosition.lerp(desiredPosition, lerpFactor)
     }
@@ -319,6 +331,17 @@ export class CameraController {
       this.shakeIntensity,
       intensity * this.profile.shakeScale * this.motionScale,
     )
+  }
+
+  /**
+   * Open the post-dash catch-up window: for a short spell the positional lag is
+   * clamped low so the camera hangs back as the mech lunges, then lerps forward
+   * to catch up (a burst-of-speed read rather than a rigid teleport of the view).
+   * Reduced-motion (motionScale 0) skips the trail so the view stays locked.
+   */
+  onDash() {
+    if (this.motionScale <= 0) return
+    this.dashCatchupTimer = CAMERA.DASH_CATCHUP_DURATION
   }
 
   /** Punch the FOV outward (dash juice); eased back to base in update(). */

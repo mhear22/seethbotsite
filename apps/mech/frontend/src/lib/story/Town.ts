@@ -52,6 +52,273 @@ const SHARED = {
   mastGeo: new THREE.CylinderGeometry(0.5, 0.8, 11, 6),
   dishGeo: new THREE.SphereGeometry(2.2, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2),
   wellGeo: new THREE.CylinderGeometry(1.8, 2.0, 1.6, 16),
+
+  // ===== Rich-prefab additions (all module-shared across the 5 towns) =====
+
+  // --- Dwellings & halls: roofs, doors, windows, chimneys, garage bay, flag ---
+  doorGeo: new THREE.BoxGeometry(1.6, 2.4, 0.14),
+  doorMat: new THREE.MeshStandardMaterial({ color: 0x2b1c12, roughness: 0.85, metalness: 0.05 }),
+  windowGeo: new THREE.BoxGeometry(0.85, 0.85, 0.1),
+  windowMat: new THREE.MeshStandardMaterial({
+    color: 0x362b20, emissive: 0xffcf7a, emissiveIntensity: 0.55, roughness: 0.6, metalness: 0.0,
+  }),
+  roofMatWarm: new THREE.MeshStandardMaterial({ color: 0x6b3a2a, roughness: 0.85, metalness: 0.05 }),
+  roofMatSlate: new THREE.MeshStandardMaterial({ color: 0x4d4a48, roughness: 0.8, metalness: 0.05 }),
+  chimneyCapGeo: new THREE.BoxGeometry(1.15, 0.22, 1.15),
+  chimneyMat: new THREE.MeshStandardMaterial({ color: 0x5a4a3f, roughness: 0.9, metalness: 0.03 }),
+  beamMat: new THREE.MeshStandardMaterial({ color: 0x3d2b1f, roughness: 0.9, metalness: 0.02 }),
+  workbenchMat: new THREE.MeshStandardMaterial({ color: 0x6b4f3a, roughness: 0.9, metalness: 0.02 }),
+  plinthMat: new THREE.MeshStandardMaterial({ color: 0x8d8377, roughness: 0.9, metalness: 0.05 }),
+  flagGeo: new THREE.PlaneGeometry(1.3, 0.85),
+  flagMat: new THREE.MeshStandardMaterial({
+    color: 0x8a2f2f, roughness: 0.8, metalness: 0.0, side: THREE.DoubleSide,
+  }),
+  flagPoleGeo: new THREE.CylinderGeometry(0.05, 0.07, 3.2, 6),
+  flagPoleMat: new THREE.MeshStandardMaterial({ color: 0x746b5e, roughness: 0.6, metalness: 0.3 }),
+
+  // --- Civic landmarks: gate arch, comms mast/dish, well, quest marker ---
+  archKeystoneGeo: new THREE.ConeGeometry(1.0, 1.3, 4),
+  lampHeadGeo: new THREE.OctahedronGeometry(0.35, 0),
+  bannerGeo: new THREE.PlaneGeometry(1.6, 3.2),
+  berthOuterGeo: new THREE.RingGeometry(4.4, 4.9, 24),
+  latticeRingGeo: new THREE.TorusGeometry(0.95, 0.07, 6, 12),
+  guyWireGeo: new THREE.CylinderGeometry(0.035, 0.035, 1, 4),
+  yokeAxleGeo: new THREE.CylinderGeometry(0.12, 0.12, 2.6, 8),
+  dishRimGeo: new THREE.TorusGeometry(2.2, 0.08, 6, 16),
+  commsLightGeo: new THREE.SphereGeometry(0.22, 8, 6),
+  wellRimGeo: new THREE.TorusGeometry(1.85, 0.15, 8, 16),
+  wellRoofGeo: new THREE.ConeGeometry(2.0, 1.2, 4),
+  wellAxleGeo: new THREE.CylinderGeometry(0.09, 0.09, 3.2, 8),
+  wellRopeGeo: new THREE.CylinderGeometry(0.04, 0.04, 2.0, 6),
+  bucketGeo: new THREE.CylinderGeometry(0.35, 0.28, 0.5, 10),
+  markerCoreGeo: new THREE.IcosahedronGeometry(0.55, 0),
+  markerRing1Geo: new THREE.TorusGeometry(1.5, 0.09, 6, 20),
+  markerRing2Geo: new THREE.TorusGeometry(2.0, 0.07, 6, 20),
+  // Tall light-shaft beacon: an open-ended tube rising from the town centre so a
+  // colored beam is visible over the 72u mountains from across the map (towns are
+  // 330-468u away). Geometry is module-shared (session-lived, like every other
+  // SHARED geo); only the additive material is per-town so each beam gets its own
+  // tint and disposes with its town. Open-ended = no end caps (pure side glow).
+  beaconGeo: new THREE.CylinderGeometry(1.8, 1.8, 110, 12, 1, true),
+  lampMat: new THREE.MeshStandardMaterial({
+    color: 0xffd54f, emissive: 0xffb300, emissiveIntensity: 1.1, roughness: 0.4, metalness: 0.1,
+  }),
+  bannerMat: new THREE.MeshStandardMaterial({
+    color: 0x8a3b2f, roughness: 0.85, metalness: 0.0, side: THREE.DoubleSide,
+  }),
+  guyWireMat: new THREE.MeshStandardMaterial({ color: 0x2b2f33, roughness: 0.7, metalness: 0.3 }),
+  commsLightMat: new THREE.MeshStandardMaterial({
+    color: 0xffb300, emissive: 0xffb300, emissiveIntensity: 0.2, roughness: 0.3, metalness: 0.1,
+  }),
+  markerCoreMat: new THREE.MeshStandardMaterial({
+    color: 0xffe9b0, emissive: 0xffc94d, emissiveIntensity: 1.2, roughness: 0.3, metalness: 0.1,
+  }),
+  markerRingMat: new THREE.MeshStandardMaterial({
+    color: 0xffb300, emissive: 0xffb300, emissiveIntensity: 0.85, roughness: 0.4, metalness: 0.2,
+  }),
+
+  // --- Folk & farms: person kit, comms console, farm dressing ---
+  personBodyGeo: new THREE.CapsuleGeometry(0.3, 0.7, 4, 8),
+  personHeadGeo: new THREE.SphereGeometry(0.23, 8, 6),
+  personHatGeo: new THREE.ConeGeometry(0.27, 0.34, 6),
+  personHairGeo: new THREE.SphereGeometry(0.25, 6, 5, 0, Math.PI * 2, 0, Math.PI / 2),
+  consoleBaseGeo: new THREE.BoxGeometry(1.1, 1.2, 0.7),
+  consoleScreenGeo: new THREE.BoxGeometry(0.9, 0.6, 0.08),
+  consoleAntennaGeo: new THREE.CylinderGeometry(0.03, 0.03, 1.0, 5),
+  consoleBaseMat: new THREE.MeshStandardMaterial({
+    color: 0x3d4552, roughness: 0.5, metalness: 0.6, transparent: true, opacity: 1,
+  }),
+  consoleScreenMat: new THREE.MeshStandardMaterial({
+    color: 0x5fd0ff, roughness: 0.3, metalness: 0.1,
+    emissive: 0x1c6f8c, emissiveIntensity: 0.6, transparent: true, opacity: 1,
+  }),
+  consoleAntennaMat: new THREE.MeshStandardMaterial({
+    color: 0x2b2f36, roughness: 0.6, metalness: 0.5, transparent: true, opacity: 1,
+  }),
+  cropBushGeo: new THREE.SphereGeometry(0.4, 6, 5),
+  cropRowGeo: new THREE.BoxGeometry(0.5, 0.3, 0.9),
+  furrowGeo: new THREE.BoxGeometry(11, 0.1, 0.5),
+  furrowMat: new THREE.MeshStandardMaterial({ color: 0x5b4632, roughness: 1.0, metalness: 0.0 }),
+  fencePostGeo: new THREE.CylinderGeometry(0.07, 0.09, 0.9, 5),
+  fenceMat: new THREE.MeshStandardMaterial({ color: 0x6b5236, roughness: 0.9, metalness: 0.0 }),
+  scarecrowPoleGeo: new THREE.CylinderGeometry(0.06, 0.06, 2.2, 5),
+  scarecrowArmGeo: new THREE.BoxGeometry(1.3, 0.08, 0.08),
+  scarecrowHeadGeo: new THREE.SphereGeometry(0.22, 6, 5),
+  scarecrowHatGeo: new THREE.ConeGeometry(0.32, 0.3, 6),
+  scarecrowMat: new THREE.MeshStandardMaterial({ color: 0x8a6a3f, roughness: 1.0, metalness: 0.0 }),
+  scarecrowClothMat: new THREE.MeshStandardMaterial({ color: 0x6b4a3a, roughness: 0.95, metalness: 0.0 }),
+}
+
+// ============================================================================
+// Rich dwelling builders. Each wraps the original tintable SHELL mesh in a
+// THREE.Group and hangs purely-decorative geometry off the shell (not the
+// group) as children, in shell-local space. Parenting to the shell means
+// setCondition's squash/lean/position writes on the shell (applyBuildings)
+// carry the roof/door/windows/chimney along for free — they collapse into the
+// rubble with the shell with zero extra condition-system code. Decorative
+// materials are the SHARED.* ones (never tinted); only the shell's own cloned
+// material is ever written to. Roof panels are plain Box panels tilted via
+// rotation.x (exact for non-square footprints, unlike a rotated-cone hip roof).
+// ============================================================================
+
+/** Attach a low-poly gable (ridge) roof to a building shell as two child panels. */
+function addGableRoof(
+  shell: THREE.Mesh, w: number, d: number, h: number, mat: THREE.MeshStandardMaterial,
+): { rise: number } {
+  const rise = Math.max(1.4, Math.min(3.2, h * 0.32))
+  const overhangD = (d / 2) * 1.15
+  const ridgeLen = w * 1.05
+  const pitch = Math.atan2(rise, overhangD)
+  const panelLen = Math.hypot(overhangD, rise)
+  const panelGeo = sharedBoxGeo(ridgeLen, 0.2, panelLen)
+  for (const side of [-1, 1] as const) {
+    const panel = new THREE.Mesh(panelGeo, mat)
+    panel.rotation.x = side * pitch
+    panel.position.set(0, h / 2 + rise / 2, side * (overhangD / 2))
+    panel.castShadow = true
+    panel.receiveShadow = true
+    shell.add(panel)
+  }
+  return { rise }
+}
+
+/** A recessed door + two flanking lit windows on the shell's local +Z face. */
+function addDoorAndWindows(shell: THREE.Mesh, w: number, h: number, d: number): void {
+  const door = new THREE.Mesh(SHARED.doorGeo, SHARED.doorMat)
+  door.position.set(0, -h / 2 + 1.2, d / 2 + 0.08)
+  shell.add(door)
+
+  const winY = -h / 2 + h * 0.62
+  for (const side of [-1, 1]) {
+    const win = new THREE.Mesh(SHARED.windowGeo, SHARED.windowMat)
+    win.position.set(side * w * 0.27, winY, d / 2 + 0.06)
+    shell.add(win)
+  }
+}
+
+/** A chimney stack + cowl cap, poked through the roof slope near the ridge. */
+function addChimney(shell: THREE.Mesh, w: number, h: number, rise: number): void {
+  const stackH = 2.0
+  const stackGeo = sharedBoxGeo(0.75, stackH, 0.75)
+  const stackCenterY = h / 2 + rise + 0.7
+  const stack = new THREE.Mesh(stackGeo, SHARED.chimneyMat)
+  stack.position.set(w * 0.28, stackCenterY, 0)
+  stack.castShadow = true
+  shell.add(stack)
+
+  const cap = new THREE.Mesh(SHARED.chimneyCapGeo, SHARED.chimneyMat)
+  cap.position.set(w * 0.28, stackCenterY + stackH / 2 + 0.11, 0)
+  shell.add(cap)
+}
+
+/** Residential building: gable roof, door, 2 windows, chimney. */
+function buildRichBuilding(
+  w: number, h: number, d: number, x: number, z: number, shellMat: THREE.MeshStandardMaterial,
+): THREE.Group {
+  const shell = new THREE.Mesh(sharedBoxGeo(w, h, d), shellMat)
+  shell.position.set(x, h / 2, z)
+  shell.castShadow = true
+  shell.receiveShadow = true
+  shell.userData.baseHeight = h
+
+  const { rise } = addGableRoof(shell, w, d, h, SHARED.roofMatWarm)
+  addDoorAndWindows(shell, w, h, d)
+  addChimney(shell, w, h, rise)
+
+  const group = new THREE.Group()
+  group.add(shell)
+  group.userData.shell = shell
+  return group
+}
+
+/** Warden's office: stone plinth, slate gable roof, door, 2 windows, flag. */
+function makeRichWarden(
+  w: number, h: number, d: number, x: number, z: number, shellMat: THREE.MeshStandardMaterial,
+): THREE.Group {
+  const shell = new THREE.Mesh(sharedBoxGeo(w, h, d), shellMat)
+  shell.position.set(x, h / 2, z)
+  shell.castShadow = true
+  shell.receiveShadow = true
+  shell.userData.baseHeight = h
+  shell.name = 'anchor-warden'
+
+  const plinth = new THREE.Mesh(sharedBoxGeo(w + 1.6, 0.6, d + 1.6), SHARED.plinthMat)
+  plinth.position.set(0, -h / 2 + 0.3, 0)
+  plinth.castShadow = true
+  plinth.receiveShadow = true
+  shell.add(plinth)
+
+  const { rise } = addGableRoof(shell, w, d, h, SHARED.roofMatSlate)
+  addDoorAndWindows(shell, w, h, d)
+
+  const pole = new THREE.Mesh(SHARED.flagPoleGeo, SHARED.flagPoleMat)
+  pole.position.set(0, h / 2 + rise + 1.6, 0)
+  pole.castShadow = true
+  shell.add(pole)
+
+  const flag = new THREE.Mesh(SHARED.flagGeo, SHARED.flagMat)
+  flag.rotation.y = Math.PI / 2
+  flag.position.set(0.65, h / 2 + rise + 2.85, 0)
+  shell.add(flag)
+
+  const group = new THREE.Group()
+  group.add(shell)
+  group.userData.shell = shell
+  return group
+}
+
+/** Garage: enclosed workshop (gable roof + side window) plus an open lean-to bay. */
+function makeRichGarage(
+  w: number, h: number, d: number, x: number, z: number, shellMat: THREE.MeshStandardMaterial,
+): THREE.Group {
+  const shell = new THREE.Mesh(sharedBoxGeo(w, h, d), shellMat)
+  shell.position.set(x, h / 2, z)
+  shell.castShadow = true
+  shell.receiveShadow = true
+  shell.userData.baseHeight = h
+  shell.name = 'anchor-garage'
+
+  addGableRoof(shell, w, d, h, SHARED.roofMatWarm)
+
+  const win = new THREE.Mesh(SHARED.windowGeo, SHARED.windowMat)
+  win.rotation.y = Math.PI / 2
+  win.position.set(w / 2 + 0.06, -h / 2 + h * 0.6, -d * 0.15)
+  shell.add(win)
+
+  // Open bay: asymmetric lean-to canopy on two posts, past the front (+Z) wall.
+  const bayWidth = w * 0.7
+  const bayDepth = d * 0.5
+  const postH = h * 0.55
+  const eaveY = -h / 2 + postH
+  const attachY = h / 2 - 0.6
+  const drop = attachY - eaveY
+  const angle = Math.atan2(drop, bayDepth)
+  const slantLen = Math.hypot(bayDepth, drop)
+
+  const canopy = new THREE.Mesh(sharedBoxGeo(bayWidth, 0.22, slantLen), SHARED.roofMatWarm)
+  canopy.rotation.x = angle
+  canopy.position.set(0, (attachY + eaveY) / 2, d / 2 + bayDepth / 2)
+  canopy.castShadow = true
+  canopy.receiveShadow = true
+  shell.add(canopy)
+
+  const postGeo = sharedBoxGeo(0.4, postH, 0.4)
+  for (const side of [-1, 1]) {
+    const post = new THREE.Mesh(postGeo, SHARED.beamMat)
+    post.position.set(side * (bayWidth / 2), -h / 2 + postH / 2, d / 2 + bayDepth * 0.92)
+    post.castShadow = true
+    shell.add(post)
+  }
+
+  const bench = new THREE.Mesh(sharedBoxGeo(2.2, 0.9, 0.8), SHARED.workbenchMat)
+  bench.position.set(bayWidth * 0.22, -h / 2 + 0.45, d / 2 + bayDepth * 0.55)
+  bench.castShadow = true
+  shell.add(bench)
+
+  const group = new THREE.Group()
+  group.add(shell)
+  group.userData.shell = shell
+  return group
 }
 
 // ============================================================================
@@ -137,9 +404,18 @@ export class Town {
   private farms: THREE.Mesh[] = []
   /** Crop tufts per farm plot (wilt/cull with condition). */
   private farmCrops: THREE.Mesh[][] = []
-  private townsfolk: THREE.Mesh[] = []
-  private marker!: THREE.Mesh
+  /** Townsfolk figures — each a small Group (body+head+accessory), faded/culled as a unit. */
+  private townsfolk: THREE.Group[] = []
+  private marker!: THREE.Group
   private markerBaseY: number = 0
+  /** Tall additive light-shaft rising from the town centre (long-range beacon). */
+  private beacon!: THREE.Mesh
+  /** Counter-rotating halo rings on the quest marker (animated in updateAnimated). */
+  private markerRings!: THREE.Mesh[]
+  /** Comms dish+yoke pivot (slow azimuth spin), the dish, and the blinking feed light. */
+  private dishPivot!: THREE.Group
+  private dish!: THREE.Mesh
+  private commsLight!: THREE.Mesh
 
   // --- Pedestrian pass (design §4.4) ---
   /** Anchor structure meshes kept for condition-reactive tinting. */
@@ -148,8 +424,8 @@ export class Town {
   private anchors: TownAnchor[] = []
   /** Nameable NPC stations (one per meaningful anchor). */
   private npcs: TownNPC[] = []
-  /** NPC figure meshes, index-aligned with `npcs`, for condition-reactive slump. */
-  private npcMeshes: THREE.Mesh[] = []
+  /** NPC figure groups, index-aligned with `npcs`, for condition-reactive slump/fade. */
+  private npcMeshes: THREE.Group[] = []
   /** On-foot collision volumes (buildings + anchor structures), WORLD-space. */
   private colliders: PedestrianCollider[] = []
   /** Local (town-relative) anchor stand points, from which world anchors derive. */
@@ -237,13 +513,14 @@ export class Town {
     ]
     for (const b of buildingDefs) {
       // Per-building material clone: setCondition tints each shell individually.
-      const mesh = new THREE.Mesh(sharedBoxGeo(b.w, b.h, b.d), this.trackMat(SHARED.buildingBaseMat.clone()))
-      mesh.position.set(b.x, b.h / 2, b.z)
-      mesh.castShadow = true
-      mesh.receiveShadow = true
-      mesh.userData.baseHeight = b.h
+      // The shell is wrapped in a rich Group (gable roof, door, lit windows,
+      // chimney) whose decoration rides the shell's transform — so the existing
+      // scorch/lean/collapse in applyBuildings still drives the whole dwelling.
+      const mat = this.trackMat(SHARED.buildingBaseMat.clone())
+      const richGroup = buildRichBuilding(b.w, b.h, b.d, b.x, b.z, mat)
+      const mesh = richGroup.userData.shell as THREE.Mesh
       this.buildings.push(mesh)
-      this.group.add(mesh)
+      this.group.add(richGroup)
 
       // Pedestrian AABB collider (world-space) so on-foot walkers can't clip it.
       this.colliders.push({
@@ -275,13 +552,20 @@ export class Town {
       { x: -14, z: 12 },
       { x: 14, z: 13 },
     ]
-    // One crop material per town: applyFarms writes the same wilt colour to every
-    // alive tuft, and dead plots hide their tufts, so both plots can share it.
-    const cropMat = this.trackMat(new THREE.MeshStandardMaterial({
-      color: Town.CROP_GREEN,
-      roughness: 0.9,
-      metalness: 0.0,
-    }))
+
+    // Static perimeter posts + furrow ridges for BOTH plots share one
+    // InstancedMesh each per town — they never change with condition, so a single
+    // draw call covers all of them (not ~20 separate meshes).
+    const postsPerPlot = 10
+    const fencePosts = new THREE.InstancedMesh(SHARED.fencePostGeo, SHARED.fenceMat, postsPerPlot * farmDefs.length)
+    fencePosts.castShadow = true
+    let postIx = 0
+    const furrowRows = 6
+    const furrows = new THREE.InstancedMesh(SHARED.furrowGeo, SHARED.furrowMat, furrowRows * farmDefs.length)
+    furrows.receiveShadow = true
+    let furrowIx = 0
+    const m4 = new THREE.Matrix4()
+
     for (const f of farmDefs) {
       // Per-plot material: applyFarms colours alive/dead plots differently.
       const mat = this.trackMat(new THREE.MeshStandardMaterial({
@@ -296,48 +580,98 @@ export class Town {
       this.farms.push(farm)
       this.group.add(farm)
 
-      // Crop tufts standing on the plot — they wilt (shrink + brown) then vanish
-      // as the plot dies, giving the farm a readable green → dead transition.
+      // Furrow rows across the plot (static dirt ridges, not condition-tinted).
+      for (let r = 0; r < furrowRows; r++) {
+        const rz = f.z + (r - (furrowRows - 1) / 2) * 1.4
+        m4.makeTranslation(f.x, 0.1, rz)
+        furrows.setMatrixAt(furrowIx++, m4)
+      }
+
+      // Perimeter fence posts (static decoration just outside the plot).
+      const hw = 6.4, hd = 4.8
+      const postPts: Array<[number, number]> = [
+        [-hw, -hd], [0, -hd], [hw, -hd],
+        [-hw, 0], [hw, 0],
+        [-hw, hd], [0, hd], [hw, hd],
+        [-hw * 0.5, -hd], [hw * 0.5, hd],
+      ]
+      for (const [px, pz] of postPts) {
+        m4.makeTranslation(f.x + px, 0.45, f.z + pz)
+        fencePosts.setMatrixAt(postIx++, m4)
+      }
+
+      // Scarecrow: one per plot, never wilted.
+      const scarecrow = this.buildScarecrow()
+      scarecrow.position.set(f.x + (Math.random() - 0.5) * 2, 0, f.z + (Math.random() - 0.5) * 1.5)
+      scarecrow.rotation.y = Math.random() * Math.PI * 2
+      this.detail.add(scarecrow)
+
+      // Crop tufts — mixed shapes for variety; they wilt (shrink + brown) then
+      // vanish as the plot dies. Each crop has its own tintable material so a
+      // couple can carry a warm hue on top of the shared wilt curve applyFarms
+      // drives every frame (via userData.tint).
       const crops: THREE.Mesh[] = []
+      let cropI = 0
       for (let cx = -1; cx <= 1; cx++) {
         for (let cz = -1; cz <= 1; cz++) {
-          const crop = new THREE.Mesh(SHARED.cropGeo, cropMat)
-          crop.position.set(f.x + cx * 3.2, 0.8, f.z + cz * 2.4)
+          const kind = cropI % 3
+          const geo = kind === 0 ? SHARED.cropGeo : kind === 1 ? SHARED.cropBushGeo : SHARED.cropRowGeo
+          const baseY = kind === 0 ? 0.8 : kind === 1 ? 0.45 : 0.2
+          const cropMat = this.trackMat(new THREE.MeshStandardMaterial({
+            color: Town.CROP_GREEN, roughness: 0.9, metalness: 0.0,
+          }))
+          const crop = new THREE.Mesh(geo, cropMat)
+          crop.position.set(
+            f.x + cx * 3.2 + (Math.random() - 0.5) * 0.6,
+            baseY,
+            f.z + cz * 2.4 + (Math.random() - 0.5) * 0.6,
+          )
+          crop.rotation.y = Math.random() * Math.PI * 2
           crop.castShadow = true
-          crop.userData.baseY = 0.8
+          crop.userData.baseY = baseY
+          crop.userData.tint = new THREE.Color(
+            1 + (Math.random() - 0.5) * 0.3,
+            1 + (Math.random() - 0.5) * 0.15,
+            1 + (Math.random() - 0.5) * 0.2,
+          )
           crops.push(crop)
           this.detail.add(crop)
+          cropI++
         }
       }
       this.farmCrops.push(crops)
     }
+    furrows.instanceMatrix.needsUpdate = true
+    fencePosts.instanceMatrix.needsUpdate = true
+    this.detail.add(furrows)
+    this.detail.add(fencePosts)
 
-    // --- Townsfolk (small crowd of simple figures) ---
+    // --- Townsfolk (small crowd of low-poly figures) ---
+    const CLOTH_COLORS = [0x8a6f4e, 0x5b7065, 0x6d5a7a, 0x9c6b4a, 0x4f6a80, 0x7a6a4f]
+    const SKIN_COLORS = [0xe8c39e, 0xd8b48a, 0xc99a72]
     for (let i = 0; i < Town.CROWD_SIZE; i++) {
-      // Per-folk material so an individual can fade out as the crowd thins.
-      const folkMat = this.trackMat(new THREE.MeshStandardMaterial({
-        color: 0xe8c39e,
-        roughness: 0.8,
-        metalness: 0.0,
-        transparent: true,
-        opacity: 1,
-      }))
+      const hasAccessory = Math.random() < 0.6
+      const folk = this.buildPerson({
+        skinColor: SKIN_COLORS[i % SKIN_COLORS.length],
+        clothColor: CLOTH_COLORS[i % CLOTH_COLORS.length],
+        accessory: hasAccessory ? (Math.random() < 0.5 ? 'hat' : 'hair') : 'none',
+        accessoryColor: 0x2e2620,
+        scale: 0.92 + Math.random() * 0.16,
+      })
       const angle = (i / Town.CROWD_SIZE) * Math.PI * 2
       const r = 5 + (i % 3) * 1.5
-      const folk = new THREE.Mesh(SHARED.capsuleGeo, folkMat)
-      folk.position.set(Math.cos(angle) * r, 0.9, Math.sin(angle) * r)
-      folk.castShadow = true
+      folk.position.set(Math.cos(angle) * r, 0, Math.sin(angle) * r)
+      folk.rotation.y = Math.random() * Math.PI * 2
+      folk.userData.baseY = 0
       this.townsfolk.push(folk)
       this.detail.add(folk)
     }
 
-    // --- Quest-giver marker (floating beacon) ---
-    this.marker = new THREE.Mesh(SHARED.markerGeo, SHARED.markerMat)
-    this.markerBaseY = 6
-    this.marker.position.set(0, this.markerBaseY, 0)
-    this.marker.rotation.x = Math.PI // point down
-    this.marker.name = 'quest-marker'
-    this.group.add(this.marker)
+    // --- Quest-giver marker (floating beacon: spike + glowing core + halos) ---
+    this.buildRichMarker()
+
+    // --- Long-range light-shaft beacon (visible over hills from across the map) ---
+    this.buildBeacon()
 
     this.buildPedestrian()
   }
@@ -363,83 +697,16 @@ export class Town {
       })
     })
 
-    // --- Gate: two pillars + a lintel forming a berth arch over the dismount pad ---
-    const gate = L.gate
-    const stoneMat = this.trackMat(new THREE.MeshStandardMaterial({
-      color: 0x8d8377, roughness: 0.9, metalness: 0.05,
-    }))
-    const pillarGeo = sharedBoxGeo(1.6, 8, 1.6)
-    for (const side of [-1, 1]) {
-      const pillar = new THREE.Mesh(pillarGeo, stoneMat)
-      pillar.position.set(gate.x + side * 5, 4, gate.z)
-      pillar.castShadow = true
-      pillar.userData.baseHeight = 8
-      this.anchorStructures.push(pillar)
-      this.group.add(pillar)
-      this.colliders.push({
-        kind: 'cylinder',
-        center: new THREE.Vector3(this.position.x + gate.x + side * 5, 4, this.position.z + gate.z),
-        radius: 1.1, height: 8,
-      })
-    }
-    const lintel = new THREE.Mesh(sharedBoxGeo(12, 1.4, 2), stoneMat)
-    lintel.position.set(gate.x, 8.3, gate.z)
-    lintel.castShadow = true
-    lintel.userData.baseHeight = 1.4
-    this.anchorStructures.push(lintel)
-    this.group.add(lintel)
-    // Dismount pad ring on the ground so the berth reads as the Frame's spot.
-    const berth = new THREE.Mesh(SHARED.berthGeo, SHARED.berthMat)
-    berth.rotation.x = -Math.PI / 2
-    berth.position.set(gate.x, 0.06, gate.z)
-    berth.receiveShadow = true
-    this.detail.add(berth)
-
-    // --- Garage: a wide, open-fronted hangar (Rooker) ---
-    this.buildAnchorBox('garage', L.garage.x, L.garage.z, 11, 6, 9, 0x7a6f63)
-    // --- Warden's office: a taller, sturdier hall with a mast flag ---
-    this.buildAnchorBox('warden', L.warden.x, L.warden.z, 8, 8, 8, 0x9c8f6f)
-
-    // --- Comms post: a lattice mast topped with a dish ---
-    const comms = L.comms
-    const mastMat = this.trackMat(new THREE.MeshStandardMaterial({
-      color: 0x556070, roughness: 0.6, metalness: 0.4,
-    }))
-    const mast = new THREE.Mesh(SHARED.mastGeo, mastMat)
-    mast.position.set(comms.x, 5.5, comms.z)
-    mast.castShadow = true
-    mast.userData.baseHeight = 11
-    this.anchorStructures.push(mast)
-    this.group.add(mast)
-    const dish = new THREE.Mesh(SHARED.dishGeo, mastMat)
-    dish.position.set(comms.x, 11, comms.z)
-    dish.rotation.set(Math.PI * 0.7, 0, 0)
-    dish.castShadow = true
-    this.anchorStructures.push(dish)
-    this.group.add(dish)
-    this.colliders.push({
-      kind: 'cylinder',
-      center: new THREE.Vector3(this.position.x + comms.x, 5.5, this.position.z + comms.z),
-      radius: 1.2, height: 11,
-    })
-
-    // --- Commons: a low stone well the survivors gather around ---
-    const commons = L.commons
-    const wellMat = this.trackMat(new THREE.MeshStandardMaterial({
-      color: 0x8d8377, roughness: 0.95, metalness: 0.0,
-    }))
-    const well = new THREE.Mesh(SHARED.wellGeo, wellMat)
-    well.position.set(commons.x, 0.8, commons.z)
-    well.castShadow = true
-    well.receiveShadow = true
-    well.userData.baseHeight = 1.6
-    this.anchorStructures.push(well)
-    this.detail.add(well)
-    this.colliders.push({
-      kind: 'cylinder',
-      center: new THREE.Vector3(this.position.x + commons.x, 0.8, this.position.z + commons.z),
-      radius: 2.1, height: 1.6,
-    })
+    // --- Gate: monumental berth arch (buttressed pillars, keystone, lamps, banners) ---
+    this.buildRichGate(L.gate.x, L.gate.z)
+    // --- Garage: open-fronted hangar with a lean-to bay + workbench (Rooker) ---
+    this.buildRichGarage(11, 6, 9, L.garage.x, L.garage.z)
+    // --- Warden's office: sturdier hall with a stone plinth + flag ---
+    this.buildRichWarden(8, 8, 8, L.warden.x, L.warden.z)
+    // --- Comms post: braced lattice mast, guy-wires, rotating dish, blinking light ---
+    this.buildRichComms(L.comms.x, L.comms.z)
+    // --- Commons: roofed stone well with a crank + hanging bucket ---
+    this.buildRichWell(L.commons.x, L.commons.z)
 
     // --- NPC stations: one nameable figure per interactable anchor ---
     // Gate is the parked-Frame berth, so it carries no figure.
@@ -449,19 +716,12 @@ export class Town {
     this.buildNPC('local', 'Townsfolk', 'commons', L.commons.x + 3, L.commons.z + 2, 0xd8b48a)
   }
 
-  /** Build a box anchor structure (garage/warden), register its collider + tint. */
-  private buildAnchorBox(
-    kind: AnchorKind, x: number, z: number, w: number, h: number, d: number, color: number,
-  ): void {
-    const mat = this.trackMat(new THREE.MeshStandardMaterial({ color, roughness: 0.85, metalness: 0.05 }))
-    const mesh = new THREE.Mesh(sharedBoxGeo(w, h, d), mat)
-    mesh.position.set(x, h / 2, z)
-    mesh.castShadow = true
-    mesh.receiveShadow = true
-    mesh.userData.baseHeight = h
-    mesh.name = `anchor-${kind}`
-    this.anchorStructures.push(mesh)
-    this.group.add(mesh)
+  /** Garage: rich open-fronted hangar. Wires the shell into the tint/collider system. */
+  private buildRichGarage(w: number, h: number, d: number, x: number, z: number): void {
+    const mat = this.trackMat(new THREE.MeshStandardMaterial({ color: 0x7a6f63, roughness: 0.85, metalness: 0.05 }))
+    const richGroup = makeRichGarage(w, h, d, x, z, mat)
+    this.anchorStructures.push(richGroup.userData.shell as THREE.Mesh)
+    this.group.add(richGroup)
     this.colliders.push({
       kind: 'box',
       center: new THREE.Vector3(this.position.x + x, h / 2, this.position.z + z),
@@ -469,18 +729,437 @@ export class Town {
     })
   }
 
-  /** Stand a nameable NPC capsule at an anchor and register it for the E-prompt. */
-  private buildNPC(role: NPCRole, name: string, anchor: AnchorKind, x: number, z: number, color: number): void {
-    const mat = this.trackMat(new THREE.MeshStandardMaterial({
-      color, roughness: 0.8, metalness: 0.0, transparent: true, opacity: 1,
+  /** Warden's office: rich sturdier hall (stone plinth + flag). */
+  private buildRichWarden(w: number, h: number, d: number, x: number, z: number): void {
+    const mat = this.trackMat(new THREE.MeshStandardMaterial({ color: 0x9c8f6f, roughness: 0.85, metalness: 0.05 }))
+    const richGroup = makeRichWarden(w, h, d, x, z, mat)
+    this.anchorStructures.push(richGroup.userData.shell as THREE.Mesh)
+    this.group.add(richGroup)
+    this.colliders.push({
+      kind: 'box',
+      center: new THREE.Vector3(this.position.x + x, h / 2, this.position.z + z),
+      halfExtents: new THREE.Vector3(w / 2, h / 2, d / 2),
+    })
+  }
+
+  /**
+   * Gate: a monumental berth arch over the Frame dismount pad — buttressed
+   * pillars, a keystone lintel, hanging lamps, weathered banners, and a
+   * two-ring stone berth. The clear passage between the pillars (|x-offset| = 5)
+   * and the lintel underside are unchanged, so the parked Frame still fits.
+   */
+  private buildRichGate(x: number, z: number): void {
+    const stoneMat = this.trackMat(new THREE.MeshStandardMaterial({
+      color: 0x8d8377, roughness: 0.9, metalness: 0.05,
     }))
-    const mesh = new THREE.Mesh(SHARED.capsuleGeo, mat)
-    mesh.position.set(x, 0.9, z)
-    mesh.castShadow = true
-    mesh.userData.baseY = 0.9
-    mesh.name = `npc-${role}`
-    this.npcMeshes.push(mesh)
-    this.detail.add(mesh)
+    const pillarGeo = sharedBoxGeo(1.6, 8, 1.6)
+    const buttressGeo = sharedBoxGeo(0.9, 4.2, 1.3)
+
+    for (const side of [-1, 1]) {
+      const pillar = new THREE.Mesh(pillarGeo, stoneMat)
+      pillar.position.set(x + side * 5, 4, z)
+      pillar.castShadow = true
+      pillar.userData.baseHeight = 8
+      this.anchorStructures.push(pillar)
+      this.group.add(pillar)
+      this.colliders.push({
+        kind: 'cylinder',
+        center: new THREE.Vector3(this.position.x + x + side * 5, 4, this.position.z + z),
+        radius: 1.1, height: 8,
+      })
+
+      const buttress = new THREE.Mesh(buttressGeo, stoneMat)
+      buttress.position.set(x + side * (5 + 0.9), 2.1, z)
+      buttress.rotation.z = side * -0.18
+      buttress.castShadow = true
+      this.anchorStructures.push(buttress)
+      this.group.add(buttress)
+      this.colliders.push({
+        kind: 'box',
+        center: new THREE.Vector3(this.position.x + x + side * (5 + 0.9), 2.1, this.position.z + z),
+        halfExtents: new THREE.Vector3(0.45, 2.1, 0.65),
+      })
+
+      const lampHead = new THREE.Mesh(SHARED.lampHeadGeo, SHARED.lampMat)
+      lampHead.position.set(x + side * (5 - 0.75), 6.4, z + 0.85)
+      this.group.add(lampHead)
+
+      const banner = new THREE.Mesh(SHARED.bannerGeo, SHARED.bannerMat)
+      banner.position.set(x + side * (5 - 0.85), 5.5, z)
+      banner.rotation.y = Math.PI / 2
+      this.group.add(banner)
+    }
+
+    const lintel = new THREE.Mesh(sharedBoxGeo(12, 1.4, 2), stoneMat)
+    lintel.position.set(x, 8.3, z)
+    lintel.castShadow = true
+    lintel.userData.baseHeight = 1.4
+    this.anchorStructures.push(lintel)
+    this.group.add(lintel)
+
+    const keystone = new THREE.Mesh(SHARED.archKeystoneGeo, stoneMat)
+    keystone.position.set(x, 7.75, z + 1.1)
+    keystone.rotation.x = Math.PI
+    keystone.rotation.y = Math.PI / 4
+    keystone.castShadow = true
+    this.anchorStructures.push(keystone)
+    this.group.add(keystone)
+
+    const berth = new THREE.Mesh(SHARED.berthGeo, SHARED.berthMat)
+    berth.rotation.x = -Math.PI / 2
+    berth.position.set(x, 0.06, z)
+    berth.receiveShadow = true
+    this.detail.add(berth)
+    const berthOuter = new THREE.Mesh(SHARED.berthOuterGeo, SHARED.padMat)
+    berthOuter.rotation.x = -Math.PI / 2
+    berthOuter.position.set(x, 0.05, z)
+    berthOuter.receiveShadow = true
+    this.detail.add(berthOuter)
+  }
+
+  /**
+   * Comms post: a braced lattice mast with three guy-wires, a dish + yoke on a
+   * rotating pivot, and a small blinking antenna light (see updateAnimated).
+   */
+  private buildRichComms(x: number, z: number): void {
+    const mastMat = this.trackMat(new THREE.MeshStandardMaterial({
+      color: 0x556070, roughness: 0.6, metalness: 0.4,
+    }))
+
+    const mast = new THREE.Mesh(SHARED.mastGeo, mastMat)
+    mast.position.set(x, 5.5, z)
+    mast.castShadow = true
+    mast.userData.baseHeight = 11
+    this.anchorStructures.push(mast)
+    this.group.add(mast)
+    this.colliders.push({
+      kind: 'cylinder',
+      center: new THREE.Vector3(this.position.x + x, 5.5, this.position.z + z),
+      radius: 1.2, height: 11,
+    })
+
+    for (const hy of [2.75, 5.5, 8.25]) {
+      const ring = new THREE.Mesh(SHARED.latticeRingGeo, mastMat)
+      ring.rotation.x = Math.PI / 2
+      ring.position.set(x, hy, z)
+      ring.castShadow = true
+      this.anchorStructures.push(ring)
+      this.group.add(ring)
+    }
+
+    const topPoint = new THREE.Vector3(x, 9.5, z)
+    for (let i = 0; i < 3; i++) {
+      const a = (i / 3) * Math.PI * 2
+      const ground = new THREE.Vector3(x + Math.cos(a) * 3.2, 0, z + Math.sin(a) * 3.2)
+      const dir = new THREE.Vector3().subVectors(ground, topPoint)
+      const len = dir.length()
+      const wire = new THREE.Mesh(SHARED.guyWireGeo, SHARED.guyWireMat)
+      wire.position.copy(topPoint).add(dir.clone().multiplyScalar(0.5))
+      wire.scale.y = len
+      wire.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize())
+      this.group.add(wire)
+    }
+
+    const dishPivot = new THREE.Group()
+    dishPivot.position.set(x, 11, z)
+    this.group.add(dishPivot)
+    this.dishPivot = dishPivot
+
+    const axle = new THREE.Mesh(SHARED.yokeAxleGeo, mastMat)
+    axle.rotation.z = Math.PI / 2
+    dishPivot.add(axle)
+    this.anchorStructures.push(axle)
+
+    for (const side of [-1, 1]) {
+      const arm = new THREE.Mesh(sharedBoxGeo(0.18, 1.0, 0.18), mastMat)
+      arm.position.set(side * 1.1, -0.5, 0)
+      dishPivot.add(arm)
+      this.anchorStructures.push(arm)
+    }
+
+    const dish = new THREE.Mesh(SHARED.dishGeo, mastMat)
+    dish.rotation.set(Math.PI * 0.7, 0, 0)
+    dish.castShadow = true
+    dishPivot.add(dish)
+    this.anchorStructures.push(dish)
+    this.dish = dish
+
+    const dishRim = new THREE.Mesh(SHARED.dishRimGeo, mastMat)
+    dishRim.rotation.set(Math.PI * 0.7, 0, 0)
+    dishPivot.add(dishRim)
+    this.anchorStructures.push(dishRim)
+
+    const commsLight = new THREE.Mesh(SHARED.commsLightGeo, SHARED.commsLightMat)
+    commsLight.position.set(0, 0.4, 0)
+    dishPivot.add(commsLight)
+    this.commsLight = commsLight
+  }
+
+  /**
+   * Commons well: the stone drum plus a rim cap, two posts holding a pitched
+   * roof, a crank axle, and a rope-hung bucket dangling into the mouth.
+   */
+  private buildRichWell(x: number, z: number): void {
+    const wellMat = this.trackMat(new THREE.MeshStandardMaterial({
+      color: 0x8d8377, roughness: 0.95, metalness: 0.0,
+    }))
+
+    const well = new THREE.Mesh(SHARED.wellGeo, wellMat)
+    well.position.set(x, 0.8, z)
+    well.castShadow = true
+    well.receiveShadow = true
+    well.userData.baseHeight = 1.6
+    this.anchorStructures.push(well)
+    this.detail.add(well)
+    this.colliders.push({
+      kind: 'cylinder',
+      center: new THREE.Vector3(this.position.x + x, 0.8, this.position.z + z),
+      radius: 2.1, height: 1.6,
+    })
+
+    const rim = new THREE.Mesh(SHARED.wellRimGeo, wellMat)
+    rim.rotation.x = Math.PI / 2
+    rim.position.set(x, 1.6, z)
+    rim.castShadow = true
+    this.anchorStructures.push(rim)
+    this.detail.add(rim)
+
+    const postGeo = sharedBoxGeo(0.25, 2.3, 0.25)
+    for (const side of [-1, 1]) {
+      const post = new THREE.Mesh(postGeo, wellMat)
+      post.position.set(x + side * 1.6, 2.75, z)
+      post.castShadow = true
+      this.anchorStructures.push(post)
+      this.detail.add(post)
+      this.colliders.push({
+        kind: 'cylinder',
+        center: new THREE.Vector3(this.position.x + x + side * 1.6, 2.75, this.position.z + z),
+        radius: 0.2, height: 2.3,
+      })
+    }
+
+    const roof = new THREE.Mesh(SHARED.wellRoofGeo, wellMat)
+    roof.rotation.y = Math.PI / 4
+    roof.position.set(x, 4.5, z)
+    roof.castShadow = true
+    this.anchorStructures.push(roof)
+    this.detail.add(roof)
+
+    const axle = new THREE.Mesh(SHARED.wellAxleGeo, wellMat)
+    axle.rotation.z = Math.PI / 2
+    axle.position.set(x, 3.7, z)
+    this.anchorStructures.push(axle)
+    this.detail.add(axle)
+
+    const crank = new THREE.Mesh(sharedBoxGeo(0.5, 0.12, 0.12), wellMat)
+    crank.position.set(x + 1.6, 3.7, z + 0.25)
+    crank.rotation.y = Math.PI / 5
+    this.anchorStructures.push(crank)
+    this.detail.add(crank)
+
+    const rope = new THREE.Mesh(SHARED.wellRopeGeo, SHARED.guyWireMat)
+    rope.position.set(x, 2.7, z)
+    this.detail.add(rope)
+
+    const bucketMat = this.trackMat(new THREE.MeshStandardMaterial({
+      color: 0x5b4636, roughness: 0.8, metalness: 0.2,
+    }))
+    const bucket = new THREE.Mesh(SHARED.bucketGeo, bucketMat)
+    bucket.position.set(x, 1.45, z)
+    bucket.castShadow = true
+    this.anchorStructures.push(bucket)
+    this.detail.add(bucket)
+  }
+
+  /**
+   * Quest-giver marker: a downward spike, a glowing core, and two
+   * counter-rotating halo rings for long-range readability. `marker` is a Group
+   * so the existing bob/spin in update() works unchanged.
+   */
+  private buildRichMarker(): void {
+    const marker = new THREE.Group()
+    this.markerBaseY = 6
+    marker.position.set(0, this.markerBaseY, 0)
+    marker.name = 'quest-marker'
+
+    const spike = new THREE.Mesh(SHARED.markerGeo, SHARED.markerMat)
+    spike.rotation.x = Math.PI // point down
+    marker.add(spike)
+
+    const core = new THREE.Mesh(SHARED.markerCoreGeo, SHARED.markerCoreMat)
+    core.position.y = 0.9
+    marker.add(core)
+
+    const ring1 = new THREE.Mesh(SHARED.markerRing1Geo, SHARED.markerRingMat)
+    ring1.rotation.x = Math.PI / 2.4
+    marker.add(ring1)
+
+    const ring2 = new THREE.Mesh(SHARED.markerRing2Geo, SHARED.markerRingMat)
+    ring2.rotation.x = -Math.PI / 3.2
+    marker.add(ring2)
+
+    this.markerRings = [ring1, ring2]
+    this.marker = marker
+    this.group.add(marker)
+  }
+
+  /**
+   * A deterministic per-town beam tint, derived from the town id so each town's
+   * light-shaft is distinguishable at range and reloads reproduce the same hue.
+   * Falls back to the marker's warm amber if the id is empty.
+   */
+  private beaconColor(): THREE.Color {
+    if (!this.id) return new THREE.Color(0xffb300)
+    let h = 0
+    for (let i = 0; i < this.id.length; i++) h = (Math.imul(h, 31) + this.id.charCodeAt(i)) >>> 0
+    return new THREE.Color().setHSL((h % 360) / 360, 0.7, 0.55)
+  }
+
+  /**
+   * Tall vertical light-shaft rising from the town centre. The quest marker
+   * (markerBaseY=6, r1.2 cone) is a pinprick behind the 72u mountains from 300u+
+   * out; this beam pokes well above them so towns stay findable across the map.
+   *
+   * Purely visual — NO collider is registered (mechs/walkers pass straight
+   * through, preserving the collision feel). Parented to `this.group` (not the
+   * bobbing marker group) and frustumCulled=false so it never pops out when the
+   * town centre leaves the frustum. Additive blending + depthWrite=false + a
+   * strong per-town emissive tint keep it reading as a glowing beam through fog.
+   */
+  private buildBeacon(): void {
+    const mat = this.trackMat(new THREE.MeshBasicMaterial({
+      color: this.beaconColor(),
+      transparent: true,
+      opacity: 0.4,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      side: THREE.DoubleSide, // open-ended tube: light the inside faces too
+      fog: true,
+    }))
+    const beacon = new THREE.Mesh(SHARED.beaconGeo, mat)
+    // Geometry is 110u tall centred on its origin; lift so the base sits at the
+    // pad and the beam rises straight up out of the town centre.
+    beacon.position.set(0, 55, 0)
+    beacon.castShadow = false
+    beacon.receiveShadow = false
+    beacon.frustumCulled = false
+    beacon.renderOrder = 2 // draw after opaque terrain/props in the transparent pass
+    beacon.name = 'town-beacon'
+    this.beacon = beacon
+    this.group.add(beacon)
+  }
+
+  /**
+   * Build one low-poly figure (crowd member or named NPC) from the shared person
+   * kit: torso capsule + head sphere, plus an optional hat/hair accessory. A
+   * Group so the whole figure fades/hides as a unit (applyTownsfolk/applyAnchors
+   * traverse it). Every material is a fresh transparent clone, tracked for teardown.
+   */
+  private buildPerson(opts: {
+    skinColor: number
+    clothColor: number
+    accessory?: 'hat' | 'hair' | 'none'
+    accessoryColor?: number
+    scale?: number
+  }): THREE.Group {
+    const group = new THREE.Group()
+
+    const bodyMat = this.trackMat(new THREE.MeshStandardMaterial({
+      color: opts.clothColor, roughness: 0.85, metalness: 0.0, transparent: true, opacity: 1,
+    }))
+    const body = new THREE.Mesh(SHARED.personBodyGeo, bodyMat)
+    body.position.y = 0.695 // capsule half-height so feet sit at y=0
+    body.castShadow = true
+    group.add(body)
+
+    const headMat = this.trackMat(new THREE.MeshStandardMaterial({
+      color: opts.skinColor, roughness: 0.7, metalness: 0.0, transparent: true, opacity: 1,
+    }))
+    const head = new THREE.Mesh(SHARED.personHeadGeo, headMat)
+    head.position.y = 1.47
+    head.castShadow = true
+    group.add(head)
+
+    const accessory = opts.accessory ?? 'none'
+    if (accessory !== 'none') {
+      const accMat = this.trackMat(new THREE.MeshStandardMaterial({
+        color: opts.accessoryColor ?? opts.clothColor, roughness: 0.9, metalness: 0.0, transparent: true, opacity: 1,
+      }))
+      const accGeo = accessory === 'hat' ? SHARED.personHatGeo : SHARED.personHairGeo
+      const acc = new THREE.Mesh(accGeo, accMat)
+      acc.position.y = accessory === 'hat' ? 1.82 : 1.68
+      acc.castShadow = true
+      group.add(acc)
+    }
+
+    group.scale.setScalar(opts.scale ?? 1)
+    return group
+  }
+
+  /** Comms Uplink is a console, not a person: a small terminal prop (cabinet + screen + antenna). */
+  private buildConsole(): THREE.Group {
+    const group = new THREE.Group()
+
+    const base = new THREE.Mesh(SHARED.consoleBaseGeo, this.trackMat(SHARED.consoleBaseMat.clone()))
+    base.position.y = 0.6
+    base.castShadow = true
+    base.receiveShadow = true
+    group.add(base)
+
+    const screen = new THREE.Mesh(SHARED.consoleScreenGeo, this.trackMat(SHARED.consoleScreenMat.clone()))
+    screen.position.set(0, 0.85, 0.36)
+    group.add(screen)
+
+    const antenna = new THREE.Mesh(SHARED.consoleAntennaGeo, this.trackMat(SHARED.consoleAntennaMat.clone()))
+    antenna.position.y = 1.7
+    antenna.castShadow = true
+    group.add(antenna)
+
+    return group
+  }
+
+  /** Static scarecrow decoration (never wilted by applyFarms). */
+  private buildScarecrow(): THREE.Group {
+    const group = new THREE.Group()
+    const pole = new THREE.Mesh(SHARED.scarecrowPoleGeo, SHARED.scarecrowMat)
+    pole.position.y = 1.1
+    pole.castShadow = true
+    group.add(pole)
+
+    const arms = new THREE.Mesh(SHARED.scarecrowArmGeo, SHARED.scarecrowClothMat)
+    arms.position.y = 1.7
+    arms.castShadow = true
+    group.add(arms)
+
+    const head = new THREE.Mesh(SHARED.scarecrowHeadGeo, SHARED.scarecrowMat)
+    head.position.y = 2.15
+    head.castShadow = true
+    group.add(head)
+
+    const hat = new THREE.Mesh(SHARED.scarecrowHatGeo, SHARED.scarecrowClothMat)
+    hat.position.y = 2.42
+    hat.castShadow = true
+    group.add(hat)
+
+    return group
+  }
+
+  /** Stand a nameable NPC figure (or the comms console) at an anchor and register it. */
+  private buildNPC(role: NPCRole, name: string, anchor: AnchorKind, x: number, z: number, color: number): void {
+    const figure = role === 'comms'
+      ? this.buildConsole() // the comms anchor is a terminal prop, not a person
+      : this.buildPerson({
+          skinColor: 0xe8c39e,
+          clothColor: color,
+          accessory: Math.random() < 0.5 ? 'hat' : 'hair', // named NPCs always dressed
+          accessoryColor: 0x3a3226,
+          scale: 1.05,
+        })
+    figure.position.set(x, 0, z)
+    figure.userData.baseY = 0
+    figure.name = `npc-${role}`
+    this.npcMeshes.push(figure)
+    this.detail.add(figure)
     this.npcs.push({
       id: `${this.id}-${role}`,
       townId: this.id,
@@ -489,6 +1168,21 @@ export class Town {
       anchor,
       position: new THREE.Vector3(this.position.x + x, 0.9, this.position.z + z),
     })
+  }
+
+  /**
+   * Per-frame animation for the rich landmark props (comms dish rotation +
+   * blink, marker halo spin + core breathe). Called from update(); a pure
+   * function of `elapsed` so it stays deterministic.
+   */
+  private updateAnimated(elapsed: number): void {
+    this.dishPivot.rotation.y = elapsed * 0.12
+    // SHARED.commsLightMat / markerCoreMat are module-shared: all 5 towns write
+    // the same value in sync — redundant but harmless.
+    SHARED.commsLightMat.emissiveIntensity = Math.sin(elapsed * 3.1) > 0.4 ? 1.6 : 0.12
+    this.markerRings[0].rotation.y = elapsed * 0.6
+    this.markerRings[1].rotation.y = elapsed * -0.4
+    SHARED.markerCoreMat.emissiveIntensity = 1.0 + Math.sin(elapsed * 1.5) * 0.35
   }
 
   /**
@@ -534,11 +1228,17 @@ export class Town {
       this._tmpColor.copy(s.userData.baseColor as THREE.Color).lerp(Town.BUILDING_RUBBLE, damage * 0.8)
       mat.color.copy(this._tmpColor)
     }
-    // NPC figures: slump a touch and fade toward (but not to) gone as morale drops.
+    // NPC figures/console: slump a touch and fade toward (but not to) gone as
+    // morale drops. Each is a Group now, so walk its child meshes for opacity.
+    const npcOpacity = 0.55 + 0.45 * Town.clamp01(c / 100)
     for (const m of this.npcMeshes) {
-      const mat = m.material as THREE.MeshStandardMaterial
-      mat.opacity = 0.55 + 0.45 * Town.clamp01(c / 100)
-      const baseY = (m.userData.baseY as number) ?? 0.9
+      m.traverse((child) => {
+        const mesh = child as THREE.Mesh
+        if ((mesh as unknown as { isMesh?: boolean }).isMesh) {
+          (mesh.material as THREE.MeshStandardMaterial).opacity = npcOpacity
+        }
+      })
+      const baseY = (m.userData.baseY as number) ?? 0
       m.position.y = baseY - damage * 0.12
     }
   }
@@ -577,6 +1277,8 @@ export class Town {
         const baseY = (crop.userData.baseY as number) ?? 0.8
         crop.position.y = baseY * scale
         this._tmpColor.copy(Town.CROP_DEAD).lerp(Town.CROP_GREEN, wilt)
+        // Per-crop hue jitter on top of the shared wilt curve (see userData.tint).
+        if (crop.userData.tint) this._tmpColor.multiply(crop.userData.tint as THREE.Color)
         cropMat.color.copy(this._tmpColor)
       }
     })
@@ -593,18 +1295,26 @@ export class Town {
     const frac = exact - whole
 
     this.townsfolk.forEach((folk, i) => {
-      const mat = folk.material as THREE.MeshStandardMaterial
+      let visible: boolean, opacity: number
       if (i < whole) {
-        folk.visible = true
-        mat.opacity = 1
+        visible = true
+        opacity = 1
       } else if (i === whole && frac > 0.02) {
         // The fading-out individual on the boundary.
-        folk.visible = true
-        mat.opacity = frac
+        visible = true
+        opacity = frac
       } else {
-        folk.visible = false
-        mat.opacity = 0
+        visible = false
+        opacity = 0
       }
+      // folk is a Group now — toggle the group and set each child mesh's opacity.
+      folk.visible = visible
+      folk.traverse((child) => {
+        const mesh = child as THREE.Mesh
+        if ((mesh as unknown as { isMesh?: boolean }).isMesh) {
+          (mesh.material as THREE.MeshStandardMaterial).opacity = opacity
+        }
+      })
     })
   }
 
@@ -686,6 +1396,7 @@ export class Town {
       this.marker.position.y = this.markerBaseY + Math.sin(elapsed * 2) * 0.5
       this.marker.rotation.y += 0.01
     }
+    this.updateAnimated(elapsed)
   }
 
   // --- Pedestrian API (design §4.4) — all positions WORLD-space ---

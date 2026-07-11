@@ -47,7 +47,15 @@
       <span class="decay-pulse"></span>
       Presence load — {{ name }} bleeds condition while your Frame idles here.
     </div>
-    <div v-else class="town-hud-dist">{{ Math.round(distance) }}m to settlement</div>
+    <div v-else class="town-hud-dist">
+      <span
+        v-if="bearing !== undefined"
+        class="town-hud-compass"
+        :style="{ transform: `rotate(${bearing * 180 / Math.PI - 90}deg)` }"
+        aria-hidden="true"
+      >➤</span>
+      <span>{{ Math.round(distance) }}m to {{ name }}</span>
+    </div>
   </div>
 </template>
 
@@ -63,6 +71,9 @@ const props = defineProps<{
   standing: number
   /** Centre distance to the town in world units. */
   distance: number
+  /** Camera-relative bearing to the town (radians): 0 = ahead, +ve = right.
+   *  Drives the rotating compass arrow. Omit to hide the arrow. */
+  bearing?: number
   /** True while the player is inside the decay radius. */
   inside: boolean
   /** Global Command reputation (0..100). Optional — omit to hide the CMD chip. */
@@ -288,7 +299,25 @@ const conditionColor = computed(() => {
 
 .town-hud-dist {
   margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 0.76rem;
   color: #94a3b8;
+}
+
+/* Rotating compass arrow pointing toward the settlement (0 = dead ahead). */
+.town-hud-compass {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  font-size: 0.95rem;
+  line-height: 1;
+  color: #fcd34d;
+  text-shadow: 0 0 6px rgba(252, 211, 77, 0.6);
+  transition: transform 0.08s linear;
 }
 </style>

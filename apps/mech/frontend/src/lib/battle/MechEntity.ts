@@ -4,6 +4,12 @@ import type { ArmPart, DamageType, MechSlot } from '../../shared/types/MechTypes
 import { markRaw } from 'vue'
 import { getMechModelLoader, MODEL_ATTACH_POINTS } from './MechModelLoader'
 import { SHARED_GEOMETRY_FLAG } from './procedural/bakedParts'
+import { MECH_ANIM } from './constants'
+
+/** Clamp `v` into [lo, hi]. */
+function clamp(v: number, lo: number, hi: number): number {
+  return v < lo ? lo : v > hi ? hi : v
+}
 
 // ---- Combat / damage tuning constants (design §3.2 / §3.4). Never inline. ----
 /** Flat-armour reduction ceiling. Dropped 0.90 → 0.75 so nothing is unkillable. */
@@ -116,6 +122,23 @@ export class MechEntity {
 
   // Walk animation
   private walkCycle: number = 0
+  /** Always-advancing phase for the parked idle "breath" (random start so a
+   *  crowd of mechs doesn't breathe in lock-step). */
+  private idlePhase: number = Math.random() * Math.PI * 2
+  /** Eased body-pose state so lean/pitch glide rather than snap between frames. */
+  private leanZ: number = 0
+  private pitchX: number = 0
+  /** Gait-specific body pitch/roll targets set each frame by animateWalk, folded
+   *  into the eased pose in applyBodyPose. */
+  private gaitPitch: number = 0
+  private gaitRoll: number = 0
+  /** swing / speed-normalised movement blend for the current frame. */
+  private animSwing: number = 0
+  private animMoveT: number = 0
+  /** Previous-frame yaw / forward speed for turn-lean + accel-pitch derivatives. */
+  private prevYaw: number = 0
+  private hasPrevYaw: boolean = false
+  private prevForwardSpeed: number = 0
 
   // Emissive-based damage flash (0 = none, 1 = full red). Decayed in update().
   private damageFlash: number = 0
@@ -364,9 +387,12 @@ export class MechEntity {
     this.mesh.position.copy(this.position)
     this.mesh.rotation.copy(this.rotation)
 
-    // Walk animation
+    // Walk animation + body pose (lean/pitch/bob). animateWalk drives the gait
+    // (legs / wheels / hover) and stores this frame's swing + gait targets;
+    // applyBodyPose folds those with turn-lean/accel-pitch into the eased torso.
     if (!this.isDestroyed) {
       this.animateWalk(deltaTime)
+      this.applyBodyPose(deltaTime)
     }
 
     // Decay emissive damage flash
@@ -489,10 +515,16 @@ export class MechEntity {
   private animateWalk(deltaTime: number) {
     const speed = Math.sqrt(this.velocity.x ** 2 + this.velocity.z ** 2)
     const isMoving = speed > 0.5
+    // 0 parked → 1 striding, normalised so slow crawls take short steps and only
+    // real speed reaches the full arc / bob (mirrors the pilot's moveT blend).
+    const moveT = Math.min(1, speed / MECH_ANIM.WALK_REF_SPEED)
+
+    // Idle "breath" always advances so a parked mech settles instead of freezing.
+    this.idlePhase += deltaTime * MECH_ANIM.IDLE_FREQUENCY
 
     if (isMoving) {
-      // Advance walk cycle based on movement speed
-      this.walkCycle += deltaTime * speed * 0.8
+      // Cap the cadence so dash speeds saturate the legs instead of strobing them.
+      this.walkCycle += deltaTime * Math.min(speed, MECH_ANIM.CADENCE_CAP_SPEED) * MECH_ANIM.CADENCE_RATE
     } else {
       // Smoothly return to neutral when stopped
       this.walkCycle *= 0.9
@@ -500,65 +532,102 @@ export class MechEntity {
     }
 
     const swing = Math.sin(this.walkCycle)
+    // Hand this frame's blend to applyBodyPose; reset gait body targets (a gait
+    // that wants hull rock will set them below).
+    this.animSwing = swing
+    this.animMoveT = moveT
+    this.gaitPitch = 0
+    this.gaitRoll = 0
+
+    const idleLeg = Math.sin(this.idlePhase) * MECH_ANIM.IDLE_LEG_AMPLITUDE * (1 - moveT)
+
     const legsGroup = this.findChildByName(this.mesh, 'legs')
     if (!legsGroup) return
 
-    // Bipedal legs — swing left/right legs in opposition
+    // Bipedal legs — swing left/right legs in opposition, arms counter-swing.
     const legLeft = this.findChildByName(legsGroup, 'leg-left')
     const legRight = this.findChildByName(legsGroup, 'leg-right')
     if (legLeft && legRight) {
-      const angle = swing * 0.3 // max ~17 degrees
-      legLeft.rotation.x = angle
-      legRight.rotation.x = -angle
-      // Subtle body bob on the upper parts
-      this.applyBodyBob(swing, isMoving)
+      const arc = MECH_ANIM.BIPED_ARC_BASE + MECH_ANIM.BIPED_ARC_SPEED * moveT
+      const legSwing = swing * arc
+      legLeft.rotation.x = legSwing + idleLeg
+      legRight.rotation.x = -legSwing - idleLeg
+      // Arms counter-swing at half amplitude, opposite the same-side leg, so the
+      // stride reads as a stride (aim is unaffected: firing uses forward dir and
+      // the arm origin, both invariant to the arm group's own rotation.x).
+      const armSwing = legSwing * MECH_ANIM.ARM_COUNTER_SWING
+      this.setArmSwing('leftArm', -armSwing)
+      this.setArmSwing('rightArm', armSwing)
       return
     }
 
-    // Quadrupedal — diagonal pairs move together (trot gait)
+    // Quadrupedal — diagonal pairs trot, feet lift on their forward half, hull rocks.
     const legLF = this.findChildByName(legsGroup, 'leg-lf')
     const legRB = this.findChildByName(legsGroup, 'leg-rb')
     const legRF = this.findChildByName(legsGroup, 'leg-rf')
     const legLB = this.findChildByName(legsGroup, 'leg-lb')
     if (legLF && legRB && legRF && legLB) {
-      const angle = swing * 0.25
-      // Diagonal pair 1
-      legLF.rotation.x = angle
-      legRB.rotation.x = angle
-      // Diagonal pair 2 (opposite)
-      legRF.rotation.x = -angle
-      legLB.rotation.x = -angle
+      const arc = MECH_ANIM.QUAD_ARC_BASE + MECH_ANIM.QUAD_ARC_SPEED * moveT
+      const angle = swing * arc
+      // Diagonal pair 1 (LF+RB) swings on +phase, pair 2 (RF+LB) on the opposite.
+      // The idle sway (blended out by moveT) keeps a parked quad from freezing.
+      this.setQuadLeg(legLF, angle + idleLeg, this.walkCycle, moveT)
+      this.setQuadLeg(legRB, angle + idleLeg, this.walkCycle, moveT)
+      this.setQuadLeg(legRF, -angle - idleLeg, this.walkCycle + Math.PI, moveT)
+      this.setQuadLeg(legLB, -angle - idleLeg, this.walkCycle + Math.PI, moveT)
+      // Hull rocks between the diagonal supports.
+      this.gaitPitch = Math.sin(this.walkCycle * 2) * MECH_ANIM.QUAD_PITCH * moveT
+      this.gaitRoll = Math.sin(this.walkCycle) * MECH_ANIM.QUAD_ROLL * moveT
       return
     }
 
-    // Tracked — spin wheels based on speed
+    // Tracked — wheels roll at their true radius (no tread slip) + suspension rumble.
     const trackLeft = this.findChildByName(legsGroup, 'track-left')
     const trackRight = this.findChildByName(legsGroup, 'track-right')
     if (trackLeft || trackRight) {
-      const spinRate = speed * deltaTime * 3
       const spinWheels = (parent: THREE.Object3D) => {
         parent.traverse((child) => {
-          if (child.name.startsWith('wheel-') || child.name.startsWith('sprocket-') || child.name.startsWith('idler-')) {
-            child.rotation.x += spinRate
+          if (child instanceof THREE.Mesh &&
+            (child.name.startsWith('wheel-') || child.name.startsWith('sprocket-') || child.name.startsWith('idler-'))) {
+            // Cache each wheel's radius once; roll = arc / radius so tread matches ground.
+            let radius = child.userData.rollRadius as number | undefined
+            if (radius === undefined) {
+              child.geometry.computeBoundingSphere()
+              radius = Math.max(0.05, child.geometry.boundingSphere?.radius ?? 0.2)
+              child.userData.rollRadius = radius
+            }
+            child.rotation.x += (speed * deltaTime) / radius
           }
         })
       }
       if (trackLeft) spinWheels(trackLeft)
       if (trackRight) spinWheels(trackRight)
+      // Low-amplitude tread rumble on the whole running gear.
+      if (legsGroup.userData.baseY === undefined) legsGroup.userData.baseY = legsGroup.position.y
+      const jitter = Math.sin(this.walkCycle * 20) * MECH_ANIM.TRACKED_JITTER * moveT
+      legsGroup.position.y = (legsGroup.userData.baseY as number) + jitter
       return
     }
 
-    // Hover — constant bob + thrust glow pulse
+    // Hover — bob + bank into velocity + thrust glow pulse.
     const thruster = this.findChildByName(legsGroup, 'thruster-lf')
     if (thruster) {
-      // Hover always bobs (use raw time via walkCycle advancing)
-      this.walkCycle += deltaTime * 4 // override: constant advance for hover
+      // Constant advance so hover always idles alive.
+      this.walkCycle += deltaTime * 4
       const bobAmount = isMoving ? 0.1 : 0.05
       const bob = Math.sin(this.walkCycle) * bobAmount
-      if (legsGroup.userData.baseY === undefined) {
-        legsGroup.userData.baseY = legsGroup.position.y
-      }
+      if (legsGroup.userData.baseY === undefined) legsGroup.userData.baseY = legsGroup.position.y
       legsGroup.position.y = (legsGroup.userData.baseY as number) + bob
+      // Bank the hover assembly into its local-frame velocity (world velocity
+      // rotated back by the mech's yaw): roll into strafe, pitch nose-down forward.
+      const cos = Math.cos(this.rotation.y), sin = Math.sin(this.rotation.y)
+      const localVX = this.velocity.x * cos - this.velocity.z * sin
+      const localVZ = this.velocity.x * sin + this.velocity.z * cos
+      const bankZ = clamp(-localVX * MECH_ANIM.HOVER_BANK_GAIN, -MECH_ANIM.HOVER_BANK_MAX, MECH_ANIM.HOVER_BANK_MAX)
+      const bankX = clamp(localVZ * MECH_ANIM.HOVER_PITCH_GAIN, -MECH_ANIM.HOVER_PITCH_MAX, MECH_ANIM.HOVER_PITCH_MAX)
+      const k = 1 - Math.exp(-deltaTime * MECH_ANIM.LEAN_EASE_RATE)
+      legsGroup.rotation.z += (bankZ - legsGroup.rotation.z) * k
+      legsGroup.rotation.x += (bankX - legsGroup.rotation.x) * k
       // Pulse thrust glow
       legsGroup.traverse((child) => {
         if (child.name === 'thrust-glow' && child instanceof THREE.Mesh) {
@@ -570,18 +639,73 @@ export class MechEntity {
     }
   }
 
-  private applyBodyBob(swing: number, isMoving: boolean) {
-    // Subtle vertical bob based on walk cycle
-    // Uses the attach points as base, so we set absolute Y offset
-    const bobY = isMoving ? Math.abs(swing) * 0.06 : 0
+  /** Set a quad leg's swing plus a vertical foot lift on its forward half. */
+  private setQuadLeg(leg: THREE.Object3D, angle: number, phase: number, moveT: number) {
+    leg.rotation.x = angle
+    if (leg.userData.baseY === undefined) leg.userData.baseY = leg.position.y
+    const lift = Math.max(0, Math.sin(phase)) * MECH_ANIM.QUAD_FOOT_LIFT * moveT
+    leg.position.y = (leg.userData.baseY as number) + lift
+  }
+
+  /** Rotate a named arm group about X for the walk counter-swing, preserving its
+   *  equipped resting pose (cached like applyBodyPose caches baseY). */
+  private setArmSwing(name: 'leftArm' | 'rightArm', offset: number) {
+    const arm = this.findChildByName(this.mesh, name)
+    if (!arm) return
+    if (arm.userData.baseRotX === undefined) arm.userData.baseRotX = arm.rotation.x
+    arm.rotation.x = (arm.userData.baseRotX as number) + offset
+  }
+
+  /**
+   * Fold this frame's vertical bob (walk + idle breath) and the eased torso lean
+   * (turn roll + accel/gait pitch, plus a dash crouch tell) onto the upper body.
+   * Runs for every gait so parked mechs breathe and turns read with weight.
+   */
+  private applyBodyPose(deltaTime: number) {
+    const swing = this.animSwing
+    const moveT = this.animMoveT
+
+    // Vertical bob: walk bounce cross-faded with a parked idle breath.
+    const bobY = Math.abs(swing) * MECH_ANIM.WALK_BOB_AMPLITUDE * moveT +
+      Math.sin(this.idlePhase) * MECH_ANIM.IDLE_BOB_AMPLITUDE * (1 - moveT)
     for (const name of ['core', 'head', 'leftArm', 'rightArm', 'rack'] as const) {
       const part = this.findChildByName(this.mesh, name)
-      if (part && part.userData.baseY === undefined) {
-        part.userData.baseY = part.position.y
-      }
-      if (part && part.userData.baseY !== undefined) {
-        part.position.y = part.userData.baseY + bobY
-      }
+      if (!part) continue
+      if (part.userData.baseY === undefined) part.userData.baseY = part.position.y
+      part.position.y = (part.userData.baseY as number) + bobY
+    }
+
+    // Yaw rate → lean; forward accel → pitch (both derivatives of this frame).
+    let yawRate = 0
+    if (this.hasPrevYaw) {
+      let dYaw = this.rotation.y - this.prevYaw
+      // Wrap to (-π, π] so a ±2π rollover isn't read as a violent spin.
+      dYaw = ((dYaw + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI
+      yawRate = dYaw / Math.max(deltaTime, 1e-4)
+    }
+    this.prevYaw = this.rotation.y
+    this.hasPrevYaw = true
+
+    const forwardSpeed = this.velocity.z * Math.cos(this.rotation.y) + this.velocity.x * Math.sin(this.rotation.y)
+    const accel = (forwardSpeed - this.prevForwardSpeed) / Math.max(deltaTime, 1e-4)
+    this.prevForwardSpeed = forwardSpeed
+
+    const targetLean = clamp(-yawRate * MECH_ANIM.TURN_LEAN_GAIN, -MECH_ANIM.TURN_LEAN_MAX, MECH_ANIM.TURN_LEAN_MAX) + this.gaitRoll
+    let targetPitch = clamp(accel * MECH_ANIM.ACCEL_PITCH_GAIN, -MECH_ANIM.ACCEL_PITCH_MAX, MECH_ANIM.ACCEL_PITCH_MAX) + this.gaitPitch
+    // Dash tell: a readable forward crouch while the dodge window is open.
+    if (this.isDashing) targetPitch += MECH_ANIM.DASH_CROUCH_PITCH
+
+    const k = 1 - Math.exp(-deltaTime * MECH_ANIM.LEAN_EASE_RATE)
+    this.leanZ += (targetLean - this.leanZ) * k
+    this.pitchX += (targetPitch - this.pitchX) * k
+
+    for (const name of ['core', 'head'] as const) {
+      const part = this.findChildByName(this.mesh, name)
+      if (!part) continue
+      if (part.userData.baseRotX === undefined) part.userData.baseRotX = part.rotation.x
+      if (part.userData.baseRotZ === undefined) part.userData.baseRotZ = part.rotation.z
+      part.rotation.x = (part.userData.baseRotX as number) + this.pitchX
+      part.rotation.z = (part.userData.baseRotZ as number) + this.leanZ
     }
   }
 

@@ -229,11 +229,19 @@ function buildCoreBase(opts: CoreOpts): {
   for (const side of [-1, 1]) {
     const pauldron = new THREE.Group()
 
-    // Tier 1 — big outer cap, tapered (narrower at the bottom front face).
-    const cap = new THREE.Mesh(chamferBox(0.66, 0.5, 0.94, 0.1), armor)
+    // Tier 1 — massive outer cap (grown to match the chassis' 3-tier shoulders),
+    // tapered (narrower at the bottom front face).
+    const cap = new THREE.Mesh(chamferBox(0.9, 0.62, 1.15, 0.1), armor)
     cap.position.set(0, 0.14, 0)
     cap.rotation.x = -0.06
     pauldron.add(cap)
+
+    // Red leading-edge slash across the cap front (bold punctuation, mirrors the
+    // Juggernaut pauldron). Uses the in-scope redMat.
+    const slash = new THREE.Mesh(chamferBox(0.7, 0.14, 0.1, 0.03), redMat)
+    slash.position.set(side * 0.1, 0.34, 0.6)
+    slash.rotation.z = side * -0.16
+    pauldron.add(slash)
 
     // Tier 2 — raised, lighter middle plate facing outward (±X), gold-trimmed.
     const midTier = panelPlate(0.56, 0.36, 0.78, {
@@ -254,10 +262,11 @@ function buildCoreBase(opts: CoreOpts): {
     fang.rotation.x = 0.4
     pauldron.add(fang)
 
-    // Tier 4 — lower skirt plate under the cap (small, angled).
+    // Tier 4 — lower skirt plate under the cap, canting strongly outward so the
+    // tiers step outward like the reference chassis pauldron.
     const skirt = new THREE.Mesh(chamferBox(0.52, 0.3, 0.8, 0.06), armor)
-    skirt.position.set(0, -0.22, 0)
-    skirt.rotation.z = side * 0.12
+    skirt.position.set(0, -0.26, 0)
+    skirt.rotation.z = side * 0.22
     pauldron.add(skirt)
 
     // Steel pivot joint into the torso.
@@ -275,20 +284,21 @@ function buildCoreBase(opts: CoreOpts): {
     pivotBolt.position.set(side * -0.36, -0.06, 0)
     pauldron.add(pivotBolt)
 
-    // Edge rivets along the cap's leading top edge.
-    const rivets = riveting(3, 0.24, { radius: 0.026 })
+    // Edge rivets along the enlarged cap's leading top edge (re-tuned to the
+    // bigger cap: half-height ≈0.31, half-depth ≈0.575).
+    const rivets = riveting(4, 0.26, { radius: 0.026 })
     rivets.rotation.y = Math.PI / 2
-    rivets.position.set(side * 0.36, 0.36, 0.28)
+    rivets.position.set(side * 0.44, 0.45, 0.34)
     pauldron.add(rivets)
 
-    // Thin gold trim line wrapping the cap's outer top edge.
-    const capEdge = edgeLine(0.84, { thickness: 0.018, mat: trimMat })
-    capEdge.position.set(side * 0.34, 0.38, 0.0)
+    // Thin gold trim line wrapping the enlarged cap's outer top edge.
+    const capEdge = edgeLine(1.04, { thickness: 0.018, mat: trimMat })
+    capEdge.position.set(side * 0.42, 0.46, 0.0)
     capEdge.rotation.set(0, Math.PI / 2, 0)
     pauldron.add(capEdge)
 
     pauldron.position.set(side * 1.02, 1.34, 0)
-    pauldron.rotation.z = side * -0.14 // slope outward / up for a sharp line
+    pauldron.rotation.z = side * -0.22 // stronger outward/up cant for wide mass
     pauldron.rotation.y = side * 0.06
     group.add(pauldron)
   }

@@ -51,8 +51,18 @@ function armShell(opts: {
   armorMaterial: THREE.MeshStandardMaterial
   midMaterial?: THREE.MeshStandardMaterial
   forearmLen?: number
+  /** Girth multiplier on the pauldron + forearm cross-section (and all coupled
+   *  forearm detail offsets). 1.0 = stock; >1 = heavier bruiser arm, <1 = slim
+   *  support arm. The elbow joint and the z-axis (weapon mount) stay fixed. */
+  bulk?: number
 }): { group: THREE.Group; forearmFrontZ: number } {
-  const { armorMaterial, midMaterial = armorMat(PALETTE.armorMid), forearmLen = 0.85 } = opts
+  const {
+    armorMaterial,
+    midMaterial = armorMat(PALETTE.armorMid),
+    forearmLen = 0.85,
+    bulk = 1.0,
+  } = opts
+  const b = bulk
   const group = new THREE.Group()
 
   const steel = frameMat()
@@ -61,7 +71,7 @@ function armShell(opts: {
 
   /* --- Upper-arm pauldron: a tapered, layered plate raked back over the
      shoulder mount. Rotated/sloped so it reads as a fitted shoulder cap. --- */
-  const pauldron = panelPlate(0.74, 0.72, 0.42, {
+  const pauldron = panelPlate(0.74 * b, 0.72 * b, 0.42, {
     baseMat: armorMaterial,
     topMat: midMaterial,
     bevel: 0.07,
@@ -117,7 +127,7 @@ function armShell(opts: {
      charcoal armor shell, with a raised mid-plate ridge and gold corner
      piping. The taper (narrower at the front) sharpens the silhouette. --- */
   const sleeve = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.26, 0.3, forearmLen + 0.1, 12),
+    new THREE.CylinderGeometry(0.26 * b, 0.3 * b, forearmLen + 0.1, 12),
     steel
   )
   sleeve.rotation.x = Math.PI / 2
@@ -125,44 +135,46 @@ function armShell(opts: {
   group.add(sleeve)
 
   // Main forearm armor shell (chamfered, slightly larger at the elbow end).
-  const forearm = new THREE.Mesh(chamferBox(0.66, 0.66, forearmLen, 0.08), armorMaterial)
+  const forearm = new THREE.Mesh(chamferBox(0.66 * b, 0.66 * b, forearmLen, 0.08), armorMaterial)
   forearm.position.set(0, 0, 0.18 + forearmLen / 2)
   group.add(forearm)
 
   // Side cheek plates, splayed outward, overlapping the main shell for layering.
+  // The lateral offset scales with bulk so they stay hugged to the wider shell.
   for (const side of [-1, 1]) {
-    const cheek = new THREE.Mesh(chamferBox(0.16, 0.46, forearmLen * 0.78, 0.04), midMaterial)
-    cheek.position.set(side * 0.34, 0, 0.2 + forearmLen / 2)
+    const cheek = new THREE.Mesh(chamferBox(0.16, 0.46 * b, forearmLen * 0.78, 0.04), midMaterial)
+    cheek.position.set(side * 0.34 * b, 0, 0.2 + forearmLen / 2)
     cheek.rotation.z = side * -0.18
     group.add(cheek)
   }
 
-  // Layered top ridge plate proud of the forearm for a tiered crest.
-  const forearmTop = new THREE.Mesh(chamferBox(0.5, 0.16, forearmLen * 0.82, 0.05), midMaterial)
-  forearmTop.position.set(0, 0.36, 0.2 + forearmLen / 2)
+  // Layered top ridge plate proud of the forearm for a tiered crest. Its height
+  // offset scales with bulk so it rides on the (taller) shell top.
+  const forearmTop = new THREE.Mesh(chamferBox(0.5 * b, 0.16, forearmLen * 0.82, 0.05), midMaterial)
+  forearmTop.position.set(0, 0.36 * b, 0.2 + forearmLen / 2)
   group.add(forearmTop)
 
   // Gold edge piping running down both top corners of the forearm.
   for (const side of [-1, 1]) {
     const line = edgeLine(forearmLen * 0.82, { thickness: 0.022, mat: gold })
     line.rotation.y = Math.PI / 2
-    line.position.set(side * 0.3, 0.3, 0.22 + forearmLen / 2)
+    line.position.set(side * 0.3 * b, 0.3 * b, 0.22 + forearmLen / 2)
     group.add(line)
   }
 
   // Panel-line rivet row down the forearm top.
   const forearmRivets = riveting(Math.max(2, Math.round(forearmLen / 0.22)), 0.2, { radius: 0.018 })
   forearmRivets.rotation.z = Math.PI / 2
-  forearmRivets.position.set(0, 0.45, 0.2 + forearmLen / 2)
+  forearmRivets.position.set(0, 0.45 * b, 0.2 + forearmLen / 2)
   group.add(forearmRivets)
 
   // Small glowing amber status eye on the forearm side.
   const eye = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.05, 0.03), glowEyeMat(PALETTE.glowAmber))
-  eye.position.set(0.34, 0.12, 0.22)
+  eye.position.set(0.34 * b, 0.12 * b, 0.22)
   group.add(eye)
 
   // A thin gold trim band wrapping the front lip of the forearm.
-  const frontFrame = trimStripe(0.64, 0.64, { thickness: 0.024, mat: gold })
+  const frontFrame = trimStripe(0.64 * b, 0.64 * b, { thickness: 0.024, mat: gold })
   const forearmFrontZ = 0.18 + forearmLen
   frontFrame.position.set(0, 0, forearmFrontZ - 0.01)
   group.add(frontFrame)
@@ -181,7 +193,7 @@ export function createAutocannon(): THREE.Group {
   const steel = frameMat()
   const gold = trimGoldMat()
 
-  const { group: arm, forearmFrontZ } = armShell({ armorMaterial: armor, midMaterial: mid })
+  const { group: arm, forearmFrontZ } = armShell({ armorMaterial: armor, midMaterial: mid, bulk: 1.15 })
   group.add(arm)
 
   // Rotary breech housing — a multi-tier charcoal block at the muzzle end.
@@ -381,7 +393,7 @@ export function createPileDriver(): THREE.Group {
   const steelLight = frameMat(PALETTE.frameSteelLight)
   const gold = trimGoldMat()
 
-  const { group: arm, forearmFrontZ } = armShell({ armorMaterial: armor, midMaterial: mid, forearmLen: 0.75 })
+  const { group: arm, forearmFrontZ } = armShell({ armorMaterial: armor, midMaterial: mid, forearmLen: 0.75, bulk: 1.15 })
   group.add(arm)
 
   // Heavy hydraulic housing — chunky layered charcoal block with gold trim.
@@ -460,7 +472,7 @@ export function createMissilePod(): THREE.Group {
   const steel = frameMat()
   const gold = trimGoldMat()
 
-  const { group: arm, forearmFrontZ } = armShell({ armorMaterial: armor, midMaterial: mid, forearmLen: 0.7 })
+  const { group: arm, forearmFrontZ } = armShell({ armorMaterial: armor, midMaterial: mid, forearmLen: 0.7, bulk: 1.15 })
   group.add(arm)
 
   // Pod box — layered charcoal housing with gold trim around the launch face.
@@ -627,7 +639,7 @@ export function createShieldGenerator(): THREE.Group {
   const steel = frameMat()
   const gold = trimGoldMat()
 
-  const { group: arm, forearmFrontZ } = armShell({ armorMaterial: armor, midMaterial: mid, forearmLen: 0.7 })
+  const { group: arm, forearmFrontZ } = armShell({ armorMaterial: armor, midMaterial: mid, forearmLen: 0.7, bulk: 0.9 })
   group.add(arm)
 
   // Emitter housing — layered charcoal block with gold trim.

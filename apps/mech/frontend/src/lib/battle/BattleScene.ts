@@ -720,8 +720,9 @@ export class BattleScene {
     const dashStarted = this.physicsSystem.updateDash(this.playerMech, input, deltaTime)
     if (dashStarted) {
       this.camera.triggerShake(0.25)
-      // Dash juice: FOV kick, directional thruster trail, whoosh SFX.
+      // Dash juice: FOV kick, camera catch-up trail, directional thruster trail, whoosh SFX.
       this.camera.triggerFovKick(10)
+      this.camera.onDash()
       const dashDir = this.playerMech.velocity.lengthSq() > 0.001
         ? this.playerMech.velocity.clone().normalize()
         : this.playerMech.getForwardDirection()

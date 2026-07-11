@@ -18,7 +18,6 @@ import type { MechSlot } from '../../shared/types/MechTypes'
 import { motionScale, type GraphicsSettings } from '../../composables/useGameSettings'
 import type { TownState, PilotMode } from '../../composables/useStoryMode'
 import { TOWN_DECAY_RADIUS, WORLD_HALF_EXTENT } from '../../composables/useStoryMode'
-import { terrainHeight, type TerrainParams } from './TerrainNoise'
 import { createOverworldSkyMaterial, updateOverworldSky, SUN_DIRECTION } from './OverworldSky'
 
 /** XZ distance within which the E-key opens a town's quest-giver dialogue. */
@@ -134,6 +133,10 @@ export interface StoryFrameInfo {
   nearestTownName: string | null
   /** Centre distance (world units) to the nearest town. */
   nearestTownDistance: number
+  /** Bearing to the nearest town relative to where the camera is facing, in
+   *  radians: 0 = dead ahead, +ve = to the right, ±π = behind. Lets the HUD show
+   *  a compass arrow so "which way do I go" is answerable, not just "how far". */
+  nearestTownBearing: number
   /** Whether the player is inside the nearest town's decay radius. */
   insideTownId: string | null
   /** Town whose quest-giver the player is close enough to talk to (E), or null. */
@@ -207,28 +210,16 @@ export class StoryWorld {
   private onReinforcement?: (info: { bossName: string; count: number }) => void
   private onCollateral?: (amount: number, position: THREE.Vector3) => void
 
-  /** Animated sky shader material (drives drifting clouds); driven each frame. */
+  /** Animated alien-sky shader material (planet spin / star twinkle); driven each frame. */
   private skyMaterial: THREE.ShaderMaterial | null = null
+  /** The sky dome mesh; re-centred on the camera each frame so it never clips. */
+  private skyMesh: THREE.Mesh | null = null
   /** The sun light; its shadow frustum follows the player (see updateSunShadow). */
   private sun: THREE.DirectionalLight | null = null
   /** Constant world↔light-space rotation, used to texel-snap the shadow frustum
    *  centre in updateSunShadow (built once in setupLighting). */
   private readonly sunBasis = new THREE.Matrix4()
   private readonly sunBasisInverse = new THREE.Matrix4()
-  /**
-   * Terrain shaping parameters. The inner `flatRadius` is kept clear of the
-   * outermost town ring so every town sits on flat ground at y=0 (the mech
-   * physics clamps to y=0, so the play area must read flat).
-   */
-  private readonly terrainParams: TerrainParams = {
-    halfExtent: WORLD_HALF_EXTENT,
-    maxHeight: 70,
-    hillScale: 90,
-    // Outer town ring sits at 0.78 * halfExtent; keep terrain flat well past it.
-    flatRadius: WORLD_HALF_EXTENT * 0.9,
-    flatFalloff: WORLD_HALF_EXTENT * 0.6,
-  }
-
   private animationId: number | null = null
   private lastTime: number = 0
   private elapsed: number = 0
@@ -265,6 +256,8 @@ export class StoryWorld {
    * so opening a hub panel during the grace window doesn't silently burn it (§4.3).
    */
   private _remountSecondsLeft: number | null = null
+  /** Edge-trigger latch for the on-foot sprint FOV kick (fire once per press). */
+  private _onFootWasSprinting = false
 
   // --- Reusable per-frame payloads (perf: no 60Hz allocation churn / GC hitches) ---
   /**
@@ -283,6 +276,7 @@ export class StoryWorld {
     nearestTownId: null,
     nearestTownName: null,
     nearestTownDistance: Infinity,
+    nearestTownBearing: 0,
     insideTownId: null,
     questGiverTownId: null,
     encounterActive: false,
@@ -440,36 +434,33 @@ export class StoryWorld {
   }
 
   private setupSky(): void {
-    // Daytime gradient sky (lighter, friendlier than the battle arena's night sky
-    // — matches the playful overworld tone).
-    const skyGeometry = new THREE.SphereGeometry(WORLD_HALF_EXTENT * 2.4, 32, 16)
-    const skyMaterial = new THREE.ShaderMaterial({
-      side: THREE.BackSide,
-      uniforms: {},
-      vertexShader: `
-        varying vec3 vWorldPosition;
-        void main() {
-          vec4 worldPos = modelMatrix * vec4(position, 1.0);
-          vWorldPosition = worldPos.xyz;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }
-      `,
-      fragmentShader: `
-        varying vec3 vWorldPosition;
-        void main() {
-          vec3 dir = normalize(vWorldPosition);
-          float t = clamp(dir.y * 0.5 + 0.5, 0.0, 1.0);
-          vec3 horizon = vec3(0.85, 0.9, 0.98);
-          vec3 zenith = vec3(0.32, 0.55, 0.85);
-          gl_FragColor = vec4(mix(horizon, zenith, t), 1.0);
-        }
-      `,
-    })
-    this.scene.add(new THREE.Mesh(skyGeometry, skyMaterial))
+    // Alien-world sky (deep violet zenith, huge ringed companion planet, faint
+    // daytime stars) — see OverworldSky.ts. Radius sits well inside the camera's
+    // far plane (1000); the dome FOLLOWS the camera each frame (updateSky) with
+    // depth off + a negative render order, so its far side can never clip to
+    // black and it always renders behind the world.
+    const skyGeometry = new THREE.SphereGeometry(800, 48, 24)
+    this.skyMaterial = createOverworldSkyMaterial()
+    const skyMesh = new THREE.Mesh(skyGeometry, this.skyMaterial)
+    skyMesh.renderOrder = -1
+    skyMesh.frustumCulled = false
+    this.scene.add(skyMesh)
+    this.skyMesh = skyMesh
 
-    // Distance haze: fades the far edges of the (large) map into the horizon
+    // Distance haze: fade the far edges of the (large) map into the horizon
     // colour so the world reads as open and continuous rather than a flat slab.
-    this.scene.fog = new THREE.Fog(0xc9dcef, WORLD_HALF_EXTENT * 0.75, WORLD_HALF_EXTENT * 1.95)
+    // Tinted to the alien horizon rose so terrain melts into the same sky.
+    // Fog FAR is kept inside the camera's 1000u far plane (WORLD_HALF_EXTENT=600
+    // → 900) so distant terrain hazes fully out before it would hard-clip at the
+    // far plane, instead of popping while still ~24% visible.
+    this.scene.fog = new THREE.Fog(0xb08a80, WORLD_HALF_EXTENT * 0.75, WORLD_HALF_EXTENT * 1.5)
+  }
+
+  /** Keep the sky dome centred on the camera (so its far side never clips past
+   *  the far plane) and advance its animated uniforms (planet spin, twinkle). */
+  private updateSky(): void {
+    if (this.skyMesh) this.skyMesh.position.copy(this.camera.camera.position)
+    if (this.skyMaterial) updateOverworldSky(this.skyMaterial, this.elapsed)
   }
 
   private setupLighting(): void {
@@ -503,7 +494,9 @@ export class StoryWorld {
     this.sunBasis.lookAt(SUN_SHADOW_OFFSET, new THREE.Vector3(0, 0, 0), THREE.Object3D.DEFAULT_UP)
     this.sunBasisInverse.copy(this.sunBasis).invert()
 
-    this.scene.add(new THREE.HemisphereLight(0xbfe3ff, 0x4a7a3a, 0.4))
+    // Sky-tinted ambient bounce: a violet-rose skylight agrees with the alien
+    // overworld sky, while the ground term stays earthy so terrain still reads.
+    this.scene.add(new THREE.HemisphereLight(0xb59fd6, 0x5a6a3a, 0.4))
   }
 
   /**
@@ -554,6 +547,8 @@ export class StoryWorld {
     this.terrain = new Terrain({ size, segments: 160, seed: 1337, pads })
     this.scene.add(this.terrain.mesh)
     this.scene.add(this.terrain.waterMesh)
+    // Wilderness scatter (rocks / alien flora / grass) — instanced, disposed by Terrain.
+    for (const m of this.terrain.scatterMeshes) this.scene.add(m)
   }
 
   private setupTowns(townStates: TownState[]): void {
@@ -628,11 +623,19 @@ export class StoryWorld {
       // so free-roam runs at OVERWORLD_SPEED_MULT; combat drops back to arena
       // speed (1.0) so encounters keep their tuned feel.
       this.physicsSystem.speedMultiplier = this.combat.active ? 1.0 : OVERWORLD_SPEED_MULT
+      // Match accel/friction to the free-roam speed scale so fast travel doesn't
+      // spool up slushily or coast forever; combat drops back to arena feel (1.0).
+      this.physicsSystem.accelMultiplier = this.combat.active ? 1.0 : 1.7
+      this.physicsSystem.frictionMultiplier = this.combat.active ? 1.0 : 1.3
       // Player movement (dash / move / jump) — same systems as battle.
       const dashStarted = this.physicsSystem.updateDash(this.playerMech, input, deltaTime)
       if (dashStarted) {
-        this.camera.triggerShake(0.25)
+        // The dash reads as a forward surge: a light shake + FOV punch, and the
+        // camera hangs back then lerps forward to catch the lunge (onDash). The
+        // shake is kept small so it doesn't fight that smooth catch-up.
+        this.camera.triggerShake(0.12)
         this.camera.triggerFovKick(10)
+        this.camera.onDash()
       }
       if (!this.playerMech.isDashing) {
         this.physicsSystem.updateMovement(this.playerMech, input, deltaTime)
@@ -651,9 +654,13 @@ export class StoryWorld {
       this.rackAbilityHeld = input.useRackAbility
     }
 
-    // Re-anchor the camera to the active entity's new position this frame so the
-    // view tracks it as it moves (movement above shifts the entity position).
-    this.camera.reanchor()
+    // NOTE: intentionally NOT calling camera.reanchor() here. camera.update()
+    // above runs before movement (so movement is camera-relative on the same
+    // frame); letting the camera trail the post-move position by a frame + the
+    // built-in positional lerp is what gives fast overworld travel its weighty
+    // trail. A per-frame reanchor used to hard-snap smoothedPosition to the
+    // post-move spot, silently nullifying POSITION_LAG (BattleScene never
+    // reanchors either). setPlayerPosition() still reanchors for teleports.
 
     // --- Active encounter combat (firing, AI, projectiles, VFX) ---
     // Never runs on foot: the interlock blocks dismount during combat, and any
@@ -706,6 +713,17 @@ export class StoryWorld {
     info.nearestTownId = nearest?.id ?? null
     info.nearestTownName = nearest?.name ?? null
     info.nearestTownDistance = nearest ? Math.sqrt(nearestDistSq) : Infinity
+    // Bearing to the nearest town relative to the camera facing (yaw). The camera
+    // forward is +Z at yaw 0 (atan2(x, z) convention), and camera-right is +X, so
+    // (townAngle - yaw) wrapped to (-π, π] gives 0 = ahead, +ve = to the right.
+    if (nearest) {
+      const townAngle = Math.atan2(nearest.position.x - activePos.x, nearest.position.z - activePos.z)
+      let rel = townAngle - this.camera.mouseRotation.x
+      rel = ((rel + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI
+      info.nearestTownBearing = rel
+    } else {
+      info.nearestTownBearing = 0
+    }
     info.insideTownId = insideRadius ? nearest!.id : null
     info.questGiverTownId = questGiverInRange ? nearest!.id : null
     info.encounterActive = this.combat.active
@@ -761,6 +779,16 @@ export class StoryWorld {
     // camera-relative just like the mech. No dash/jump/rack/weapons on foot.
     physics.updateMovement(entity, input, deltaTime)
     entity.update(deltaTime)
+
+    // Sprint tell: a small, edge-triggered FOV widen on the jog so the dash key
+    // actually reads on foot (the mech branch kicks FOV on dash; on-foot had no
+    // juice at all). Kept well under the mech's kick and only when actually moving
+    // so a stationary held-dash doesn't puff the view. The on-foot camera profile
+    // damps it further via shakeScale, so nominal is deliberately generous.
+    const sprintingNow = input.dash &&
+      (entity.velocity.x ** 2 + entity.velocity.z ** 2) > 0.25
+    if (sprintingNow && !this._onFootWasSprinting) this.camera.triggerFovKick(7)
+    this._onFootWasSprinting = sprintingNow
 
     // On-foot Recovery (§2.6): a dismounted search has no combat loop, so drive
     // the hidden-object reveal/collect directly from the pilot's position. Combat
@@ -828,6 +856,9 @@ export class StoryWorld {
   }
 
   private render(): void {
+    // Re-centre + animate the sky just before drawing, using the camera's final
+    // position for this frame (set by update()/reanchor()).
+    this.updateSky()
     this.renderer.render(this.scene, this.camera.camera)
   }
 
