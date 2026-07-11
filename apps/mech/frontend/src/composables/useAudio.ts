@@ -18,17 +18,29 @@ function getAudioContext(): AudioContext | null {
   return sharedAudioContext
 }
 
+// ── Shared audio state (module singleton) ───────────────────────────────────
+// muted/volume used to be created PER useAudio() call, so the settings modal
+// and the game pages each had their own copies — changing volume in settings
+// did nothing to a page that had already called useAudio(). Both are now
+// module-scoped (and persisted) so every consumer shares one source of truth.
+const canPersist = typeof localStorage !== 'undefined'
+
+const sharedMuted = ref(canPersist ? localStorage.getItem('audioMuted') === 'true' : false)
+watch(sharedMuted, (m) => {
+  if (canPersist) localStorage.setItem('audioMuted', String(m))
+})
+
+// Load volume from localStorage (default to 0.5 = 50%)
+const savedVolume = canPersist ? localStorage.getItem('audioVolume') : null
+const sharedVolume = ref(savedVolume !== null ? parseFloat(savedVolume) : 0.5)
+// Persist volume changes to localStorage
+watch(sharedVolume, (newVolume) => {
+  if (canPersist) localStorage.setItem('audioVolume', newVolume.toString())
+})
+
 export function useAudio() {
-  const muted = ref(false)
-
-  // Load volume from localStorage (default to 0.5 = 50%)
-  const savedVolume = localStorage.getItem('audioVolume')
-  const volume = ref(savedVolume !== null ? parseFloat(savedVolume) : 0.5)
-
-  // Persist volume changes to localStorage
-  watch(volume, (newVolume) => {
-    localStorage.setItem('audioVolume', newVolume.toString())
-  })
+  const muted = sharedMuted
+  const volume = sharedVolume
 
   const playSound = (elementId: string, options?: { volume?: number; startTime?: number; rate?: number }) => {
     if (muted.value) return
@@ -274,6 +286,7 @@ export function useAudio() {
     toggleMusic,
     muteAll,
     unmuteAll,
+    muted,
     volume,
     setVolume,
     // Synthesized combat SFX

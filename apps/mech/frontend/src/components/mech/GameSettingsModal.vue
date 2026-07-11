@@ -90,6 +90,30 @@
           </div>
         </div>
 
+        <!-- Audio -->
+        <div class="setting-group">
+          <label class="setting-label">
+            Audio Volume
+            <span class="setting-value">{{ Math.round(audioVolume * 100) }}%</span>
+          </label>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.05"
+            v-model.number="audioVolume"
+            class="slider"
+            aria-label="Audio Volume"
+            :disabled="audioMuted"
+          />
+          <div class="checkbox-group">
+            <label class="checkbox-label">
+              <input type="checkbox" v-model="audioMuted" />
+              <span>Mute all sound</span>
+            </label>
+          </div>
+        </div>
+
         <!-- Key Bindings -->
         <div class="setting-group">
           <label class="setting-label">Key Bindings</label>
@@ -255,6 +279,7 @@
 <script setup lang="ts">
 import { ref, watch, onBeforeUnmount } from 'vue'
 import { useGameSettings } from '../../composables/useGameSettings'
+import { useAudio } from '../../composables/useAudio'
 
 const props = defineProps<{
   isOpen: boolean
@@ -267,6 +292,10 @@ const emit = defineEmits<{
 const gameSettings = useGameSettings()
 const { settings, resetToDefaults } = gameSettings
 const activeTab = ref<'controls' | 'graphics'>('controls')
+
+// Shared audio state (module singleton in useAudio): the slider/checkbox bind
+// straight to the same refs every game page plays through, and both persist.
+const { volume: audioVolume, muted: audioMuted } = useAudio()
 
 function close() {
   emit('close')
