@@ -12,6 +12,8 @@ interface ScatterAssets {
   rockBoulderGeo: THREE.IcosahedronGeometry
   rockSlabGeo: THREE.BoxGeometry
   rockMat: THREE.MeshStandardMaterial
+  pebbleClusterGeo: THREE.BufferGeometry
+  pebbleMat: THREE.MeshStandardMaterial
   floraSpireTrunkGeo: THREE.CylinderGeometry
   floraSpireCanopyGeo: THREE.IcosahedronGeometry
   floraSpireTrunkMat: THREE.MeshStandardMaterial
@@ -30,6 +32,32 @@ function buildScatterAssets(): ScatterAssets {
   const rockSlabGeo = new THREE.BoxGeometry(1, 1, 1)
   const rockMat = new THREE.MeshStandardMaterial({
     color: 0x756b5c, roughness: 1, metalness: 0, flatShading: true,
+  })
+
+  // Pebble cluster: 5 small merged icosahedron/dodecahedron lumps forming an
+  // irregular clump (unit-sized; per-instance scale/rotation gives variety).
+  // Offsets are a fixed hand-placed pattern (not RNG) — deterministic like the
+  // grass tuft below, and built once regardless of map seed.
+  const pebbleLumpGeos: THREE.BufferGeometry[] = []
+  const pebbleLumps: Array<[number, number, number, number, boolean]> = [
+    [0, 0, 0, 0.34, true],
+    [0.26, 0.02, 0.12, 0.24, false],
+    [-0.22, -0.01, 0.18, 0.22, true],
+    [0.05, 0.03, -0.28, 0.2, false],
+    [-0.18, 0, -0.2, 0.18, true],
+  ]
+  for (const [ox, oy, oz, r, dodeca] of pebbleLumps) {
+    // Polyhedron geometries (Icosahedron/Dodecahedron) are already
+    // non-indexed in three r182, unlike the grass blade's ConeGeometry below
+    // — no .toNonIndexed() needed (it would just warn and no-op).
+    const lump = dodeca ? new THREE.DodecahedronGeometry(r, 0) : new THREE.IcosahedronGeometry(r, 0)
+    lump.translate(ox, oy + r * 0.5, oz)
+    pebbleLumpGeos.push(lump)
+  }
+  const pebbleClusterGeo = mergeGeometries(pebbleLumpGeos, false) as THREE.BufferGeometry
+  pebbleLumpGeos.forEach((g) => g.dispose())
+  const pebbleMat = new THREE.MeshStandardMaterial({
+    color: 0x8c8172, roughness: 1, metalness: 0, flatShading: true,
   })
 
   // Alien flora #1 "spire": tapered trunk + angular violet canopy pod.
@@ -75,6 +103,7 @@ function buildScatterAssets(): ScatterAssets {
 
   return {
     rockBoulderGeo, rockSlabGeo, rockMat,
+    pebbleClusterGeo, pebbleMat,
     floraSpireTrunkGeo, floraSpireCanopyGeo, floraSpireTrunkMat, floraSpireCanopyMat,
     floraMushStalkGeo, floraMushCapGeo, floraMushStalkMat, floraMushCapMat,
     grassTuftGeo, grassMat,
@@ -102,14 +131,42 @@ interface ScatterTypeSpec {
   moistureBias?: [lo: number, hi: number]
   scaleRange: [min: number, max: number]
   sinkDepth: number
+  /** Extra 0..1 acceptance weight (multiplied against a fresh rng() roll),
+   *  e.g. to bias a prop toward steep/rocky ground or river banks without a
+   *  hard cutoff like maxSlope. */
+  extraBias?: (x: number, z: number, y: number, slope: number) => number
 }
 
-const SCATTER_SPECS: Record<'rockBoulder' | 'rockSlab' | 'floraSpire' | 'floraMush' | 'grass', ScatterTypeSpec> = {
-  rockBoulder: { count: 120, attemptsPerInstance: 6, waterMargin: 1.5, minY: -6, maxY: 200, maxSlope: 1.4, scaleRange: [0.8, 3.2], sinkDepth: 0.3 },
-  rockSlab:    { count: 80,  attemptsPerInstance: 6, waterMargin: 1.5, minY: -6, maxY: 200, maxSlope: 1.4, scaleRange: [0.9, 2.6], sinkDepth: 0.15 },
+const SCATTER_SPECS: Record<'rockBoulder' | 'rockSlab' | 'pebbleCluster' | 'floraSpire' | 'floraMush' | 'grass', ScatterTypeSpec> = {
+  rockBoulder: { count: 150, attemptsPerInstance: 6, waterMargin: 1.5, minY: -6, maxY: 200, maxSlope: 1.4, scaleRange: [0.8, 3.2], sinkDepth: 0.3 },
+  rockSlab:    { count: 100, attemptsPerInstance: 6, waterMargin: 1.5, minY: -6, maxY: 200, maxSlope: 1.4, scaleRange: [0.9, 2.6], sinkDepth: 0.15 },
+  // Small pebble clumps: broadly scattered but weighted toward steep/rocky
+  // ground and river-bank elevations (just above the waterline).
+  pebbleCluster: {
+    count: 80, attemptsPerInstance: 10, waterMargin: 0.5, minY: -7, maxY: 200, maxSlope: 1.6,
+    scaleRange: [0.35, 0.9], sinkDepth: 0.08,
+    extraBias: (_x, _z, y, slope) => {
+      const riverBank = 1 - THREE.MathUtils.smoothstep(y, Terrain.WATER_LEVEL + 0.6, Terrain.WATER_LEVEL + 6)
+      const rocky = THREE.MathUtils.smoothstep(slope, 0.25, 0.9)
+      return THREE.MathUtils.clamp(Math.max(riverBank, rocky) + 0.15, 0, 1)
+    },
+  },
   floraSpire:  { count: 170, attemptsPerInstance: 8, waterMargin: 2,   minY: -5, maxY: 34,  maxSlope: 0.5, moistureBias: [0.25, 0.55], scaleRange: [1.4, 3.2], sinkDepth: 0.2 },
   floraMush:   { count: 140, attemptsPerInstance: 8, waterMargin: 2,   minY: -5, maxY: 30,  maxSlope: 0.45, moistureBias: [0.35, 0.7], scaleRange: [1.0, 2.2], sinkDepth: 0.15 },
   grass:       { count: 450, attemptsPerInstance: 4, waterMargin: 0.5, minY: -7, maxY: 45,  maxSlope: 0.6, moistureBias: [0.2, 0.5], scaleRange: [0.7, 1.8], sinkDepth: 0.05 },
+}
+
+/** One sampled sub-segment of a curved dirt path between two pads, with a
+ *  precomputed bounding box for cheap distance-query rejection. */
+interface PathSegment {
+  ax: number
+  az: number
+  bx: number
+  bz: number
+  minX: number
+  maxX: number
+  minZ: number
+  maxZ: number
 }
 
 /**
@@ -163,6 +220,16 @@ export class Terrain {
 
   private readonly seed: number
   private readonly pads: TerrainPad[]
+  /** Sampled polyline segments of the dirt-path network connecting town pads
+   *  (built once at construction). Empty when fewer than 2 pads exist. */
+  private readonly pathSegments: PathSegment[]
+  /** Coarse spatial index over pathSegments (world units -> grid cell) so
+   *  heightAt/applyBiomeColors/buildScatter can cheaply reject points far from
+   *  any path instead of scanning every segment. */
+  private readonly pathGrid: Map<string, PathSegment[]> = new Map()
+  /** Optional tiling bump-noise texture (falls back to none if canvas 2D isn't
+   *  available, e.g. under the headless test DOM). Disposed in dispose(). */
+  private bumpTexture: THREE.Texture | null = null
 
   // --- Heightfield tuning (world units) ---
   /** Sea level. Plains sit ~0, so water reads as low ground/coast. */
@@ -193,6 +260,18 @@ export class Terrain {
   private static readonly RIVER_DEPTH = 16
   private static readonly SNOW_LINE = 34
 
+  // --- Dirt path network (world units) ---
+  /** Distance from a path centerline that stays fully "on path" (flatten +
+   *  full dirt colour). */
+  private static readonly PATH_HALF_WIDTH = 2.5
+  /** Distance at which the path's height/colour influence fully fades out.
+   *  The band between PATH_HALF_WIDTH and this is the soft falloff. */
+  private static readonly PATH_BAND = 5
+  /** Cell size of the coarse spatial grid used to bucket path segments. */
+  private static readonly PATH_GRID_CELL = 40
+  /** Dry, worn-dirt tone paths blend toward. */
+  private static readonly PATH_COLOR = new THREE.Color(0x8a6f4d)
+
   // --- Biome palette ---
   private static readonly MUD = new THREE.Color(0x4d4733)
   private static readonly SAND = new THREE.Color(0xcdbd8b)
@@ -205,6 +284,11 @@ export class Terrain {
   constructor(config: TerrainConfig) {
     this.seed = config.seed ?? 1337
     this.pads = config.pads ?? []
+    // Path network must exist before the mesh/scatter build: heightAt (used by
+    // buildMesh's per-vertex displacement) and buildScatter's exclusion check
+    // both consult it.
+    this.pathSegments = this.buildPathNetwork(config.size)
+    this.buildPathGrid()
     this.mesh = this.buildMesh(config.size, config.segments ?? 300)
     this.waterMesh = this.buildWater(config.size)
     this.scatterMeshes = this.buildScatter(config.size)
@@ -253,13 +337,20 @@ export class Terrain {
         const x = (rng() * 2 - 1) * half
         const z = (rng() * 2 - 1) * half
         if (this.isInsidePad(x, z)) continue
+        // Keep props off the worn dirt paths (matches the visual/height blend band).
+        if (this.pathSegments.length > 0 && this.nearestPathDist(x, z) < Terrain.PATH_BAND) continue
         const y = this.heightAt(x, z)
         if (y < Terrain.WATER_LEVEL + spec.waterMargin) continue
         if (y < spec.minY || y > spec.maxY) continue
-        if (this.slopeAt(x, z) > spec.maxSlope) continue
+        const slope = this.slopeAt(x, z)
+        if (slope > spec.maxSlope) continue
         if (spec.moistureBias) {
           const [lo, hi] = spec.moistureBias
           const w = THREE.MathUtils.smoothstep(this.moistureAt(x, z), lo, hi)
+          if (rng() > w) continue
+        }
+        if (spec.extraBias) {
+          const w = spec.extraBias(x, z, y, slope)
           if (rng() > w) continue
         }
 
@@ -292,6 +383,7 @@ export class Terrain {
 
     meshes.push(...place(SCATTER_SPECS.rockBoulder, (mats) => [makeSingle(assets.rockBoulderGeo, assets.rockMat, mats, true)]))
     meshes.push(...place(SCATTER_SPECS.rockSlab, (mats) => [makeSingle(assets.rockSlabGeo, assets.rockMat, mats, true)]))
+    meshes.push(...place(SCATTER_SPECS.pebbleCluster, (mats) => [makeSingle(assets.pebbleClusterGeo, assets.pebbleMat, mats, true)]))
     meshes.push(...place(SCATTER_SPECS.floraSpire, (mats) => [
       makeSingle(assets.floraSpireTrunkGeo, assets.floraSpireTrunkMat, mats, true),
       makeSingle(assets.floraSpireCanopyGeo, assets.floraSpireCanopyMat, mats, true),
@@ -305,12 +397,159 @@ export class Terrain {
     return meshes
   }
 
+  // --- Dirt path network ------------------------------------------------------
+  // Connects town/spawn pads with gently curved dirt paths so settlements read
+  // as a lived-in place rather than isolated dots on a heightfield. Built once
+  // at construction; heightAt/applyBiomeColors/buildScatter all consult the
+  // precomputed segment list (never recomputed per frame).
+
+  /**
+   * Build a sparse path graph over the pads (each connects to its 1-2 nearest
+   * neighbours, edges deduped, long edges skipped) then sample each edge as a
+   * quadratic bezier — a seeded perpendicular offset at the midpoint gives it a
+   * gentle curve — into short PathSegments with precomputed bounding boxes.
+   */
+  private buildPathNetwork(size: number): PathSegment[] {
+    const pads = this.pads
+    if (pads.length < 2) return []
+
+    const maxEdgeLen = size * (2 / 3)
+    const edgeKeys = new Set<string>()
+    const edges: Array<[number, number]> = []
+    for (let i = 0; i < pads.length; i++) {
+      const candidates: Array<{ j: number; d: number }> = []
+      for (let j = 0; j < pads.length; j++) {
+        if (i === j) continue
+        const d = Math.hypot(pads[i].x - pads[j].x, pads[i].z - pads[j].z)
+        if (d > maxEdgeLen) continue
+        candidates.push({ j, d })
+      }
+      candidates.sort((a, b) => a.d - b.d)
+      for (let k = 0; k < Math.min(2, candidates.length); k++) {
+        const j = candidates[k].j
+        const key = i < j ? `${i}_${j}` : `${j}_${i}`
+        if (edgeKeys.has(key)) continue
+        edgeKeys.add(key)
+        edges.push(i < j ? [i, j] : [j, i])
+      }
+    }
+
+    const SEGMENTS_PER_EDGE = 20
+    const segments: PathSegment[] = []
+    for (const [i, j] of edges) {
+      const a = pads[i]
+      const b = pads[j]
+      // Seed from the pad pair (not the whole-network rng) so edge order/count
+      // changes elsewhere never reshuffle an already-generated curve.
+      const rng = mulberry32(this.seed ^ ((i + 1) * 92821) ^ ((j + 1) * 51329))
+      const dx = b.x - a.x
+      const dz = b.z - a.z
+      const len = Math.hypot(dx, dz) || 1
+      const px = -dz / len // perpendicular unit vector
+      const pz = dx / len
+      const offset = (rng() - 0.5) * len * 0.28 // gentle bow, seeded per edge
+      const cx = (a.x + b.x) / 2 + px * offset
+      const cz = (a.z + b.z) / 2 + pz * offset
+
+      let prevX = a.x
+      let prevZ = a.z
+      for (let s = 1; s <= SEGMENTS_PER_EDGE; s++) {
+        const t = s / SEGMENTS_PER_EDGE
+        const it = 1 - t
+        const qx = it * it * a.x + 2 * it * t * cx + t * t * b.x
+        const qz = it * it * a.z + 2 * it * t * cz + t * t * b.z
+        segments.push({
+          ax: prevX, az: prevZ, bx: qx, bz: qz,
+          minX: Math.min(prevX, qx), maxX: Math.max(prevX, qx),
+          minZ: Math.min(prevZ, qz), maxZ: Math.max(prevZ, qz),
+        })
+        prevX = qx
+        prevZ = qz
+      }
+    }
+    return segments
+  }
+
+  /** Bucket path segments into a coarse grid so distance queries only scan the
+   *  handful of segments near (x,z) instead of the whole network. */
+  private buildPathGrid(): void {
+    const cell = Terrain.PATH_GRID_CELL
+    const margin = Terrain.PATH_BAND
+    for (const seg of this.pathSegments) {
+      const minCX = Math.floor((seg.minX - margin) / cell)
+      const maxCX = Math.floor((seg.maxX + margin) / cell)
+      const minCZ = Math.floor((seg.minZ - margin) / cell)
+      const maxCZ = Math.floor((seg.maxZ + margin) / cell)
+      for (let cx = minCX; cx <= maxCX; cx++) {
+        for (let cz = minCZ; cz <= maxCZ; cz++) {
+          const key = `${cx}_${cz}`
+          let bucket = this.pathGrid.get(key)
+          if (!bucket) { bucket = []; this.pathGrid.set(key, bucket) }
+          bucket.push(seg)
+        }
+      }
+    }
+  }
+
+  /** Shortest distance from (x,z) to the path network, via the coarse grid
+   *  (only the 3x3 neighbourhood of cells around the point is scanned). */
+  private nearestPathDist(x: number, z: number): number {
+    if (this.pathSegments.length === 0) return Infinity
+    const cell = Terrain.PATH_GRID_CELL
+    const cx = Math.floor(x / cell)
+    const cz = Math.floor(z / cell)
+    let best = Infinity
+    for (let dcx = -1; dcx <= 1; dcx++) {
+      for (let dcz = -1; dcz <= 1; dcz++) {
+        const bucket = this.pathGrid.get(`${cx + dcx}_${cz + dcz}`)
+        if (!bucket) continue
+        for (const seg of bucket) {
+          const d = Terrain.distToSegment(x, z, seg.ax, seg.az, seg.bx, seg.bz)
+          if (d < best) best = d
+        }
+      }
+    }
+    return best
+  }
+
+  /** Point-to-segment distance in the XZ plane. */
+  private static distToSegment(px: number, pz: number, ax: number, az: number, bx: number, bz: number): number {
+    const dx = bx - ax
+    const dz = bz - az
+    const lenSq = dx * dx + dz * dz
+    let t = lenSq > 1e-8 ? ((px - ax) * dx + (pz - az) * dz) / lenSq : 0
+    t = THREE.MathUtils.clamp(t, 0, 1)
+    return Math.hypot(px - (ax + t * dx), pz - (az + t * dz))
+  }
+
+  /** 0..1 path influence at (x,z): 1 within PATH_HALF_WIDTH of a centerline,
+   *  fading to 0 by PATH_BAND. Drives both the height smoothing and the dirt
+   *  colour blend so the visual and physical surfaces always agree. */
+  private pathInfluence(x: number, z: number): number {
+    if (this.pathSegments.length === 0) return 0
+    const d = this.nearestPathDist(x, z)
+    if (d >= Terrain.PATH_BAND) return 0
+    return 1 - THREE.MathUtils.smoothstep(d, Terrain.PATH_HALF_WIDTH, Terrain.PATH_BAND)
+  }
+
   // --- Public height query (used by physics + spawn placement) -------------
 
-  /** World-space ground height at (x, z): biome height, rivers, then town pads. */
+  /** World-space ground height at (x, z): biome height, rivers, worn dirt
+   *  paths, then town pads. */
   heightAt(x: number, z: number): number {
     let h = this.landHeight(x, z)
     h -= this.riverCarve(x, z, h)
+
+    // Paths are worn, not carved trenches: suppress local noise (not the
+    // underlying continent/mountain shape) near the centerline, feathered out
+    // across the band, so the mesh reads as smoothed dirt rather than a ditch.
+    const pathT = this.pathInfluence(x, z)
+    if (pathT > 0) {
+      const smoothLand = this.landHeight(x, z, 0)
+      const smoothH = smoothLand - this.riverCarve(x, z, smoothLand)
+      h = THREE.MathUtils.lerp(h, smoothH, pathT * 0.5) // ~50% noise suppression at center
+    }
+
     for (const pad of this.pads) {
       const d = Math.hypot(x - pad.x, z - pad.z)
       const w = 1 - THREE.MathUtils.smoothstep(d, pad.flatRadius, pad.flatRadius + pad.blendRadius)
@@ -321,10 +560,15 @@ export class Terrain {
 
   // --- Procedural biome heightfield ----------------------------------------
 
-  /** Natural land/ocean height (before river carving and pads). */
-  private landHeight(x: number, z: number): number {
+  /**
+   * Natural land/ocean height (before river carving and pads).
+   * `detailMul` scales the fine detail-noise term only (continent/mountain
+   * shape is untouched) — heightAt passes 0 near dirt paths to get a "worn
+   * smooth" variant of the same ground for the path height blend.
+   */
+  private landHeight(x: number, z: number, detailMul: number = 1): number {
     const cont = this.fbm(x / Terrain.CONTINENT_SCALE, z / Terrain.CONTINENT_SCALE, this.seed)
-    const detail = this.fbm(x / Terrain.DETAIL_SCALE, z / Terrain.DETAIL_SCALE, this.seed + 99) - 0.5
+    const detail = (this.fbm(x / Terrain.DETAIL_SCALE, z / Terrain.DETAIL_SCALE, this.seed + 99) - 0.5) * detailMul
 
     if (cont < Terrain.SEA_THRESHOLD) {
       // Ocean basin: deep offshore, rising to just under the waterline at the coast.
@@ -442,6 +686,11 @@ export class Terrain {
     const mat = new THREE.MeshLambertMaterial({
       vertexColors: true,
     })
+    this.bumpTexture = this.buildBumpTexture()
+    if (this.bumpTexture) {
+      mat.bumpMap = this.bumpTexture
+      mat.bumpScale = 0.35
+    }
     const mesh = new THREE.Mesh(geo, mat)
     mesh.receiveShadow = true
     // The ground does not cast — a near-flat heightfield self-shadowing under a
@@ -452,13 +701,59 @@ export class Terrain {
     return mesh
   }
 
+  /**
+   * Small tiling noise texture used as a subtle bump map so the terrain isn't
+   * perfectly smooth under grazing light. Drawn with fillStyle/fillRect ONLY
+   * (many small rects) — no drawImage/getImageData/gradients on the fill path
+   * — because the headless unit-test DOM stubs canvas 2D with just fillStyle,
+   * fillRect and createRadialGradient. Wrapped in try/catch so any environment
+   * that can't produce a real 2D context (that stub, or a canvas-less host)
+   * silently falls back to no bump map instead of throwing during Terrain
+   * construction.
+   */
+  private buildBumpTexture(): THREE.Texture | null {
+    try {
+      const size = 128
+      const canvas = document.createElement('canvas') as HTMLCanvasElement
+      canvas.width = size
+      canvas.height = size
+      const ctx = canvas.getContext('2d') as CanvasRenderingContext2D | null
+      if (!ctx) return null
+
+      ctx.fillStyle = '#808080' // neutral mid-grey = no bump
+      ctx.fillRect(0, 0, size, size)
+
+      const rng = mulberry32(this.seed ^ 0x9e3779b1)
+      const cell = 4
+      for (let y = 0; y < size; y += cell) {
+        for (let x = 0; x < size; x += cell) {
+          const v = Math.floor(96 + rng() * 96) // 96..192 grey
+          const hex = v.toString(16).padStart(2, '0')
+          ctx.fillStyle = `#${hex}${hex}${hex}`
+          ctx.fillRect(x, y, cell, cell)
+        }
+      }
+
+      const texture = new THREE.CanvasTexture(canvas)
+      texture.wrapS = THREE.RepeatWrapping
+      texture.wrapT = THREE.RepeatWrapping
+      texture.repeat.set(56, 56) // PlaneGeometry UVs span 0..1 over the whole terrain
+      texture.needsUpdate = true
+      return texture
+    } catch {
+      return null
+    }
+  }
+
   /** Colour each vertex by biome: elevation + moisture + slope + snow line. */
   private applyBiomeColors(geo: THREE.BufferGeometry): void {
     const pos = geo.attributes.position as THREE.BufferAttribute
     const normal = geo.attributes.normal as THREE.BufferAttribute
     const colors = new Float32Array(pos.count * 3)
     const c = new THREE.Color()
+    const dirt = new THREE.Color()
     const SS = THREE.MathUtils.smoothstep
+    const hasPaths = this.pathSegments.length > 0
 
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i)
@@ -490,6 +785,35 @@ export class Terrain {
       // Steep faces trend rocky regardless of biome.
       const rockFromSlope = (1 - SS(slopeUp, 0.74, 0.94)) * 0.8
       if (rockFromSlope > 0 && y > Terrain.WATER_LEVEL + 2.6) c.lerp(Terrain.ROCK, rockFromSlope)
+
+      // Dirt paths: blend toward a dry worn tone near path centerlines, with a
+      // seeded high-frequency wobble on the distance so the border reads as a
+      // ragged trodden edge instead of a ruler-straight line.
+      if (hasPaths) {
+        const d = this.nearestPathDist(x, zc)
+        if (d < Terrain.PATH_BAND + 2) {
+          const edgeNoise = (this.valueNoise(x / 4, zc / 4, this.seed + 777) - 0.5) * 2.2
+          const t = 1 - SS(d + edgeNoise, Terrain.PATH_HALF_WIDTH, Terrain.PATH_BAND)
+          if (t > 0) {
+            const tone = (this.valueNoise(x / 6 + 50, zc / 6 + 50, this.seed + 888) - 0.5) * 0.12
+            dirt.copy(Terrain.PATH_COLOR)
+            dirt.r = THREE.MathUtils.clamp(dirt.r + tone, 0, 1)
+            dirt.g = THREE.MathUtils.clamp(dirt.g + tone * 0.8, 0, 1)
+            dirt.b = THREE.MathUtils.clamp(dirt.b + tone * 0.6, 0, 1)
+            c.lerp(dirt, t)
+          }
+        }
+      }
+
+      // High-frequency per-vertex jitter so large flat-biome areas break up
+      // instead of reading as one flat colour; slightly stronger where mossy/
+      // grassy (mid moisture) since flat green fields show banding the most.
+      const jitterHash = Terrain.hash2(Math.round(x * 2), Math.round(zc * 2), this.seed + 4242)
+      const jitterStrength = 0.05 + 0.02 * SS(moisture, 0.3, 0.6)
+      const jitter = (jitterHash - 0.5) * 2 * jitterStrength
+      c.r = THREE.MathUtils.clamp(c.r * (1 + jitter), 0, 1)
+      c.g = THREE.MathUtils.clamp(c.g * (1 + jitter), 0, 1)
+      c.b = THREE.MathUtils.clamp(c.b * (1 + jitter * 0.9), 0, 1)
 
       colors[i * 3] = c.r
       colors[i * 3 + 1] = c.g
@@ -523,5 +847,6 @@ export class Terrain {
       if (Array.isArray(mat)) mat.forEach((x) => x.dispose())
       else mat.dispose()
     }
+    this.bumpTexture?.dispose()
   }
 }

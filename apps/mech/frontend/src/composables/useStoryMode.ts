@@ -726,6 +726,33 @@ export function applyCollateral(run: StoryRun, townId: TownId, severity: number)
 }
 
 // ============================================================================
+// Reckless fire — pure (free-roam gunplay). Firing near a town with no
+// hostiles around taxes the SAME per-town standing quests raise, unlike
+// collateral (which taxes physical condition). Mirrors applyCollateral's
+// one-way-ratchet shape, but standing has no re-derived farms/population.
+// ============================================================================
+
+/** Standing lost per unit of reckless-fire severity, rounded up so even a
+ *  glancing (low-severity) shot always costs at least 1 point. */
+export const RECKLESS_FIRE_STANDING_PER_SEVERITY = 3
+
+/**
+ * Register a free-roam reckless-fire penalty against a town: converts the
+ * `severity` (0..1, `1 - dist/RECKLESS_FIRE_RADIUS` — see OverworldGunplay) into
+ * a standing hit, floored at 1 so any registered shot bites. Mutates the town in
+ * `run.towns`. Returns the standing actually removed (0 if the town id is
+ * unknown or severity is non-positive).
+ */
+export function applyRecklessFire(run: StoryRun, townId: TownId, severity: number): number {
+  const town = run.towns.find((t) => t.id === townId)
+  if (!town || severity <= 0) return 0
+  const hit = Math.max(1, Math.round(RECKLESS_FIRE_STANDING_PER_SEVERITY * severity))
+  const before = town.standing
+  town.standing = Math.max(0, town.standing - hit)
+  return before - town.standing
+}
+
+// ============================================================================
 // Death stakes — pure (design §3.7). Downed, not game-over.
 // ============================================================================
 

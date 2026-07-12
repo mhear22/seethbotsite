@@ -25,6 +25,8 @@ import {
   isPartRepUnlocked,
   repPriceModifier,
   applyCollateral,
+  applyRecklessFire,
+  RECKLESS_FIRE_STANDING_PER_SEVERITY,
   handlePlayerDefeated,
   isFinaleUnlocked,
   happyTownCount,
@@ -193,6 +195,44 @@ describe('collateral tax (§3.5) — gentle, dominated by hits + time', () => {
     expect(sloppyCost).toBeLessThan(8)
     // ...and sloppy is meaningfully worse than clean, so skill = mercy is legible.
     expect(sloppyCost).toBeGreaterThan(cleanCost * 4)
+  })
+})
+
+// ===========================================================================
+describe('reckless fire — free-roam gunplay standing tax (OverworldGunplay)', () => {
+  it('scales the standing hit with severity, floored at 1', () => {
+    const run = createFreshRun(1)
+    run.towns[0].standing = 50
+    const hit = applyRecklessFire(run, 'town-0', 1)
+    expect(hit).toBe(Math.round(RECKLESS_FIRE_STANDING_PER_SEVERITY * 1))
+    expect(run.towns[0].standing).toBe(50 - hit)
+
+    // A glancing (near-zero severity) shot still bites for at least 1.
+    const run2 = createFreshRun(1)
+    run2.towns[0].standing = 50
+    const glancingHit = applyRecklessFire(run2, 'town-0', 0.01)
+    expect(glancingHit).toBe(1)
+    expect(run2.towns[0].standing).toBe(49)
+  })
+
+  it('clamps standing at 0 and returns the actual amount removed', () => {
+    const run = createFreshRun(1)
+    run.towns[0].standing = 2
+    const hit = applyRecklessFire(run, 'town-0', 1) // nominal hit is 3
+    expect(run.towns[0].standing).toBe(0)
+    expect(hit).toBe(2) // only 2 was left to remove
+    // Firing again on an already-zeroed town removes nothing further.
+    expect(applyRecklessFire(run, 'town-0', 1)).toBe(0)
+    expect(run.towns[0].standing).toBe(0)
+  })
+
+  it('is a no-op for an unknown town id or non-positive severity', () => {
+    const run = createFreshRun(1)
+    const before = run.towns[0].standing
+    expect(applyRecklessFire(run, 'nope', 1)).toBe(0)
+    expect(applyRecklessFire(run, 'town-0', 0)).toBe(0)
+    expect(applyRecklessFire(run, 'town-0', -1)).toBe(0)
+    expect(run.towns[0].standing).toBe(before)
   })
 })
 

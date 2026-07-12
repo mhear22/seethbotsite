@@ -18,7 +18,11 @@ import type { MechSlot } from '../../shared/types/MechTypes'
 import { motionScale, type GraphicsSettings } from '../../composables/useGameSettings'
 import type { TownState, PilotMode } from '../../composables/useStoryMode'
 import { TOWN_DECAY_RADIUS, WORLD_HALF_EXTENT } from '../../composables/useStoryMode'
-import { createOverworldSkyMaterial, updateOverworldSky, SUN_DIRECTION } from './OverworldSky'
+import { createOverworldSkyMaterial, updateOverworldSky } from './OverworldSky'
+import { WeatherSystem } from './Weather'
+import { DayNightCycle } from './DayNightCycle'
+import { OverworldGunplay } from './OverworldGunplay'
+import { BanditSystem } from './Bandits'
 
 /** XZ distance within which the E-key opens a town's quest-giver dialogue. */
 export const QUEST_GIVER_RADIUS = 14
@@ -58,8 +62,21 @@ const OVERWORLD_SPEED_MULT = 2.6
 /** Constant offset from the shadow target to the sun. Position and target move
  *  together each frame (updateSunShadow), so the light DIRECTION never changes. */
 const SUN_SHADOW_OFFSET = new THREE.Vector3(120, 200, 80)
+/** Distance the sun's shadow-casting position sits from its target — held
+ *  constant even though the light's DIRECTION now follows DayNightCycle.sunDir
+ *  (see updateSunShadow), so the shadow map's projection depth never changes. */
+const SUN_SHADOW_DISTANCE = SUN_SHADOW_OFFSET.length()
 /** Scratch for the per-frame shadow-frustum re-centre (never retained). */
 const _shadowCenter = new THREE.Vector3()
+/** Scratch sun direction used ONLY for the shadow-casting light position — a
+ *  copy of DayNightCycle.sunDir with a small positive elevation floor, so the
+ *  shadow-casting light never dives below the terrain and flips the shadow
+ *  direction upside-down at night (when sun.intensity is already near zero,
+ *  so the visual difference is imperceptible). Never reallocated. */
+const _shadowSunDir = new THREE.Vector3()
+/** Reused offset vector (direction × distance) added to the shadow target to
+ *  place the light each frame (updateSunShadow). Never reallocated. */
+const _sunOffset = new THREE.Vector3()
 
 /** On-foot slice of the per-frame info (null while in the mech). */
 export interface OnFootFrameInfo {
@@ -103,6 +120,11 @@ export interface StoryWorldConfig {
   onPlayerDefeated?: (destroyedSlots: MechSlot[]) => void
   /** Fired per enemy killed with its loadout + destroyed limbs (host awards salvage, §3.6). */
   onEnemyKilled?: (kill: EnemyKill) => void
+  /** Fired per roaming BANDIT killed (same payload shape as onEnemyKilled — the
+   *  host awards salvage identically); see Bandits.ts. */
+  onBanditKilled?: (kill: EnemyKill) => void
+  /** Fired (throttled) the first time a roaming bandit aggros on the player. */
+  onBanditsSpotted?: (count: number) => void
   /** Fired when a named ace calls in its half-health reinforcement pair (§3.6 comms callout). */
   onReinforcement?: (info: { bossName: string; count: number }) => void
   /**
@@ -111,6 +133,12 @@ export interface StoryWorldConfig {
    * Phase 2 only surfaces this; Phase 3 routes it into a town-condition decrement.
    */
   onCollateral?: (amount: number, position: THREE.Vector3) => void
+  /**
+   * Fired when a free-roam shot (outside an active encounter) lands near a town
+   * with no hostiles around to blame it on (see OverworldGunplay). `severity` is
+   * `1 - dist/RECKLESS_FIRE_RADIUS`; the host taxes that town's standing.
+   */
+  onRecklessFire?: (townId: string, severity: number) => void
   /**
    * Fired whenever the body mode flips (dismount/mount/restore). The host routes
    * this into `useStoryMode.setPilotMode(mode, { townId, mechPark })` so the decay
@@ -207,15 +235,41 @@ export class StoryWorld {
   private onQuestFailed?: (quest: QuestDef, reason: string) => void
   private onPlayerDefeated?: (destroyedSlots: MechSlot[]) => void
   private onEnemyKilled?: (kill: EnemyKill) => void
+  private onBanditKilled?: (kill: EnemyKill) => void
+  private onBanditsSpotted?: (count: number) => void
   private onReinforcement?: (info: { bossName: string; count: number }) => void
   private onCollateral?: (amount: number, position: THREE.Vector3) => void
+  private onRecklessFire?: (townId: string, severity: number) => void
+  /** Free-roam weapons fire outside active encounters (cadence, ground scars,
+   *  near-town reckless-fire standing tax). Constructed after setupTowns(). */
+  private gunplay!: OverworldGunplay
+  /** Roaming hostile mechs that prowl near living towns (design: bandits give
+   *  the player something to fight — and justify weapons fire near towns —
+   *  outside quest encounters). Not underscore-prefixed so the dev debug handle
+   *  (`window.__storyWorld.bandits`) can poke it. Constructed after gunplay
+   *  (shares the projectile/particle systems + terrain + live town states). */
+  bandits!: BanditSystem
+  /** Live town state (id/position/condition), retained from config so BanditSystem
+   *  always reads the CURRENT condition as decay/collateral tick — see Bandits.ts. */
+  private townStates: TownState[] = []
 
+  /** Day/night cycle: rotates the sun/planet/moon overhead as one rigid sweep
+   *  and derives the lighting/fog outputs WeatherSystem composes each frame
+   *  (see DayNightCycle.ts). Public-ish (not underscore-prefixed) so the dev
+   *  debug handle (`window.__storyWorld.dayNight`) can poke it manually. */
+  readonly dayNight: DayNightCycle = new DayNightCycle()
   /** Animated alien-sky shader material (planet spin / star twinkle); driven each frame. */
   private skyMaterial: THREE.ShaderMaterial | null = null
   /** The sky dome mesh; re-centred on the camera each frame so it never clips. */
   private skyMesh: THREE.Mesh | null = null
   /** The sun light; its shadow frustum follows the player (see updateSunShadow). */
   private sun: THREE.DirectionalLight | null = null
+  /** Ambient/hemisphere lights, kept as fields so WeatherSystem can mutate their
+   *  intensity in place (never re-added — see WeatherRefs' ownership doc). */
+  private ambientLight: THREE.AmbientLight | null = null
+  private hemiLight: THREE.HemisphereLight | null = null
+  /** Drifting clouds / rain / dust storms / shifting fog-haze (see Weather.ts). */
+  private weather!: WeatherSystem
   /** Constant world↔light-space rotation, used to texel-snap the shadow frustum
    *  centre in updateSunShadow (built once in setupLighting). */
   private readonly sunBasis = new THREE.Matrix4()
@@ -311,9 +365,15 @@ export class StoryWorld {
     this.onQuestFailed = config.onQuestFailed
     this.onPlayerDefeated = config.onPlayerDefeated
     this.onEnemyKilled = config.onEnemyKilled
+    this.onBanditKilled = config.onBanditKilled
+    this.onBanditsSpotted = config.onBanditsSpotted
     this.onReinforcement = config.onReinforcement
     this.onCollateral = config.onCollateral
+    this.onRecklessFire = config.onRecklessFire
     this.onModeChange = config.onModeChange
+    // Retained (not just consumed) so BanditSystem's spawn eligibility always
+    // reads the LIVE condition as the host's decay/collateral ticks mutate it.
+    this.townStates = config.towns
 
     // --- Scene + renderer (mirrors BattleScene setup; honours graphics settings) ---
     const gfx = config.graphics
@@ -396,6 +456,66 @@ export class StoryWorld {
     this.setupTerrain(config.towns)
     this.setupTowns(config.towns)
 
+    // Free-roam weapons fire (outside active encounters): cadence-gated firing,
+    // ground scars, near-town reckless-fire standing tax, stray-impact/building-
+    // hit condition tax. Needs the terrain (ground impacts) and towns (reckless-
+    // fire proximity + building colliders), so it's built here.
+    this.gunplay = new OverworldGunplay({
+      projectileSystem: this.projectileSystem,
+      particleSystem: this.particleSystem,
+      terrain: this.terrain,
+      scene: this.scene,
+      towns: this.towns,
+    })
+    this.gunplay.onRecklessFire = (townId, severity) => this.onRecklessFire?.(townId, severity)
+    // Stray-impact/building-hit condition tax reuses the existing onCollateral
+    // seam (StoryCombat's own collateral contract, §3.5) rather than adding a
+    // new StoryWorldConfig callback — onCollateral is (amount, position), so
+    // resolve the town's position from its id before forwarding.
+    this.gunplay.onStrayImpact = (townId, severity) => {
+      const town = this.towns.find((t) => t.id === townId)
+      if (town) this.onCollateral?.(severity, town.position)
+    }
+
+    // Roaming bandits (design: hostile mechs that prowl near living towns, can
+    // be fought/killed in free roam, and justify the player's weapons fire near
+    // a town — see BanditSystem.hasHostileNear below). Shares the projectile/
+    // particle systems + terrain with gunplay/combat; needs the live town states
+    // for spawn eligibility (condition + player proximity).
+    this.bandits = new BanditSystem({
+      scene: this.scene,
+      projectileSystem: this.projectileSystem,
+      particleSystem: this.particleSystem,
+      terrain: this.terrain,
+      towns: this.townStates,
+      onShake: (amount) => this.camera.triggerShake(amount),
+      onBanditKilled: (kill) => this.onBanditKilled?.(kill),
+      // Shared defeat flow with StoryCombat: the host's onPlayerDefeated handler
+      // already tolerates no active quest/town context (see StoryModePage).
+      onPlayerDefeated: (slots) => this.onPlayerDefeated?.(slots),
+      onBanditsSpotted: (count) => this.onBanditsSpotted?.(count),
+      onHostileWhileOnFoot: () => this.signalHostileWhileOnFoot(),
+    })
+    // Reckless-fire gate (design): a live bandit within weapons range of the
+    // shot vouches for it — no town protest when there's an actual hostile to
+    // blame it on. 130u ≈ practical engagement range (autocannon rounds carry
+    // ~120-180u), so opening fire on a bandit you can actually hit never reads
+    // as vandalism, while bandits spawn 90-150u out from towns.
+    // The stray-impact/building CONDITION tax stays unconditional (onStrayImpact
+    // above is untouched) — mirrors how combat collateral still taxes the town
+    // during a sanctioned fight.
+    this.gunplay.hostilesNear = (pos) => this.bandits.hasHostileNear(pos, 130)
+
+    // Ambient weather (drifting clouds, occasional rain/dust storms, shifting
+    // haze/fog). Mutates the fog + lights just set up above in place; a fresh
+    // random seed per session keeps the state-machine's sequence varied while
+    // staying fully deterministic/testable (see Weather.ts).
+    this.weather = new WeatherSystem(
+      this.scene,
+      { fog: this.scene.fog as THREE.Fog, sun: this.sun!, ambient: this.ambientLight!, hemi: this.hemiLight! },
+      Math.floor(Math.random() * 0xffffffff),
+    )
+
     // Mechs walk on the procedural terrain (towns sit on flattened pads).
     this.physicsSystem.setGroundHeightProvider((x, z) => this.terrain.heightAt(x, z))
 
@@ -418,6 +538,12 @@ export class StoryWorld {
     this.handleContextRestoredBound = () => this.handleContextRestored()
     this.canvas.addEventListener('webglcontextlost', this.handleContextLostBound, false)
     this.canvas.addEventListener('webglcontextrestored', this.handleContextRestoredBound, false)
+
+    // Dev-only escape hatch for manual/automated poking (force weather states,
+    // teleport, inspect subsystems) without shipping any surface in prod builds.
+    if (import.meta.env.DEV && typeof window !== 'undefined') {
+      ;(window as unknown as Record<string, unknown>).__storyWorld = this
+    }
   }
 
   /**
@@ -457,14 +583,23 @@ export class StoryWorld {
   }
 
   /** Keep the sky dome centred on the camera (so its far side never clips past
-   *  the far plane) and advance its animated uniforms (planet spin, twinkle). */
+   *  the far plane) and advance its animated uniforms (planet spin, twinkle,
+   *  and the current sun/planet/moon directions from the day/night cycle —
+   *  see DayNightCycle.ts). */
   private updateSky(): void {
     if (this.skyMesh) this.skyMesh.position.copy(this.camera.camera.position)
-    if (this.skyMaterial) updateOverworldSky(this.skyMaterial, this.elapsed)
+    if (this.skyMaterial) {
+      updateOverworldSky(
+        this.skyMaterial, this.elapsed,
+        this.dayNight.sunDir, this.dayNight.planetDir, this.dayNight.moonDir,
+      )
+    }
   }
 
   private setupLighting(): void {
-    this.scene.add(new THREE.AmbientLight(0xffffff, 0.6))
+    const ambient = new THREE.AmbientLight(0xffffff, 0.6)
+    this.scene.add(ambient)
+    this.ambientLight = ambient
 
     const sun = new THREE.DirectionalLight(0xfff4e0, 0.9)
     sun.position.copy(SUN_SHADOW_OFFSET)
@@ -496,15 +631,26 @@ export class StoryWorld {
 
     // Sky-tinted ambient bounce: a violet-rose skylight agrees with the alien
     // overworld sky, while the ground term stays earthy so terrain still reads.
-    this.scene.add(new THREE.HemisphereLight(0xb59fd6, 0x5a6a3a, 0.4))
+    const hemi = new THREE.HemisphereLight(0xb59fd6, 0x5a6a3a, 0.4)
+    this.scene.add(hemi)
+    this.hemiLight = hemi
   }
 
   /**
-   * Re-centre the sun's shadow follow-box on `center` (the active body). Target
-   * and light translate by the SAME offset, so the light direction is constant.
-   * The centre is snapped to whole shadow-map texels in light space — without
-   * this, sub-texel frustum movement re-rasterises every shadow edge each frame
-   * and static geometry's shadows shimmer/crawl as the player moves.
+   * Re-centre the sun's shadow follow-box on `center` (the active body). The
+   * target moves to the (texel-snapped) centre and the light sits
+   * SUN_SHADOW_DISTANCE away along the CURRENT day/night sun direction — so
+   * the shadows swing with the sky instead of a fixed offset. The texel-snap
+   * basis (sunBasis/sunBasisInverse, built once in setupLighting from the
+   * ORIGINAL fixed sun offset) is kept constant rather than rebuilt every
+   * frame: the day/night rotation is slow enough that re-deriving it per-
+   * frame would buy negligible shimmer reduction for a real cost, and the
+   * snap only needs to fight camera-motion shimmer, not track the sun exactly.
+   *
+   * The shadow-casting direction is floored to a small positive elevation
+   * (_shadowSunDir) so the light never dives below the terrain and flips the
+   * shadow direction upside-down at night — by then sun.intensity is already
+   * near its NIGHT_SUN_FLOOR, so the visual difference is imperceptible.
    */
   private updateSunShadow(center: THREE.Vector3): void {
     const sun = this.sun
@@ -515,7 +661,12 @@ export class StoryWorld {
     _shadowCenter.y = Math.round(_shadowCenter.y / worldUnitsPerTexel) * worldUnitsPerTexel
     _shadowCenter.applyMatrix4(this.sunBasis)
     sun.target.position.copy(_shadowCenter)
-    sun.position.copy(_shadowCenter).add(SUN_SHADOW_OFFSET)
+
+    _shadowSunDir.copy(this.dayNight.sunDir)
+    if (_shadowSunDir.y < 0.05) _shadowSunDir.y = 0.05
+    _shadowSunDir.normalize()
+    _sunOffset.copy(_shadowSunDir).multiplyScalar(SUN_SHADOW_DISTANCE)
+    sun.position.copy(_shadowCenter).add(_sunOffset)
   }
 
   /**
@@ -599,6 +750,16 @@ export class StoryWorld {
   private update(deltaTime: number): void {
     const input = this.inputManager.getInputState()
 
+    // The planet's rotation (sun/planet/moon sweep + lighting/fog outputs)
+    // advances first, unconditionally (like weather, it must not freeze on a
+    // paused menu) — WeatherSystem.update reads its outputs this same frame.
+    this.dayNight.update(deltaTime)
+
+    // Ambient weather (drifting clouds/rain/dust storms, shifting fog/haze) keeps
+    // evolving even while a UI panel pauses free-roam/combat below — it must not
+    // freeze on menus, so it runs unconditionally ahead of the paused early-return.
+    this.weather.update(deltaTime, this.activePosition(), this.dayNight)
+
     // While a UI panel (dialogue/garage) is open the world is paused: no input,
     // no decay, no combat. Particles still settle so nothing freezes mid-burst.
     if (this.paused) {
@@ -674,6 +835,22 @@ export class StoryWorld {
         this.battleTime,
       )
     }
+    // Free-roam weapons fire (outside active encounters): cadence-gated firing
+    // with free aim, projectile flight while no encounter owns it, and ground-
+    // impact scarring (runs regardless of combat state — stray encounter fire
+    // scars the terrain too).
+    this.gunplay.update(
+      deltaTime,
+      this.playerMech,
+      { shootLeft: input.shootLeft, shootRight: input.shootRight },
+      this.getAimDirection(),
+      this.combat.active,
+      this._mode,
+    )
+    // Roaming bandits: spawn/wander/aggro/combat, AFTER gunplay has advanced the
+    // projectile system this frame (bandits' own hit-resolution pass reads the
+    // post-move positions — see BanditSystem.resolveCombat).
+    this.bandits.update(deltaTime, this.playerMech, this._mode, this.combat.active)
 
     // Towns: animate markers + find the nearest one to the ACTIVE body (mech or
     // pilot), so all proximity readouts follow whoever the camera is on.
@@ -1209,8 +1386,11 @@ export class StoryWorld {
     this.inputManager.cleanup()
 
     this.combat.cleanup()
+    this.bandits.dispose()
     this.projectileSystem.cleanup()
     this.particleSystem.cleanup()
+    this.gunplay.dispose()
+    this.weather.dispose()
 
     for (const town of this.towns) town.dispose()
     this.towns = []

@@ -237,6 +237,7 @@ import {
   SHOP_TIER_T3_STANDING,
   MILITARY_REP_UNLOCK,
   CIVILIAN_REP_UNLOCK,
+  applyRecklessFire,
 } from '../../composables/useStoryMode'
 import { useAudio } from '../../composables/useAudio'
 import { useGameSettings } from '../../composables/useGameSettings'
@@ -677,8 +678,11 @@ async function beginRoaming() {
       onQuestFailed: handleQuestFailed,
       onPlayerDefeated: handlePlayerDefeated,
       onEnemyKilled: handleEnemyKilled,
+      onBanditKilled: handleBanditKilled,
+      onBanditsSpotted: handleBanditsSpotted,
       onReinforcement: handleReinforcement,
       onCollateral: handleCollateral,
+      onRecklessFire: handleRecklessFire,
       onModeChange: handleModeChange,
     })
     world.start()
@@ -1439,6 +1443,38 @@ function handleEnemyKilled(kill: EnemyKill) {
   }
 }
 
+/**
+ * Roaming-bandit salvage (see BanditSystem): a killed bandit drops scrap + parts
+ * via the SAME awardKillSalvage path as a quest-enemy kill (kill payload shape
+ * matches EnemyKill) — just a distinct toast so it doesn't read as quest progress.
+ */
+function handleBanditKilled(kill: EnemyKill) {
+  const result = story.awardKillSalvage(kill.loadout, kill.destroyedSlots, Math.random)
+  const drops = result.drops.length
+  const parts = drops === 1 ? 'part' : 'parts'
+  showToast(
+    drops > 0
+      ? `Bandit down. Salvage: +◈${result.scrap} and ${drops} ${parts} stripped.`
+      : `Bandit down. Salvage: +◈${result.scrap}.`,
+  )
+}
+
+/**
+ * Roaming-bandit sighting (see BanditSystem.onBanditsSpotted, throttled ~20s):
+ * the first time a bandit aggros on the player, radio it in — this is also the
+ * player's cue that their weapons fire near a town is now justified.
+ */
+function handleBanditsSpotted(count: number) {
+  pushComms({
+    id: `bandits-spotted-${Date.now()}`,
+    callsign: 'FRAME AI',
+    line: count > 1
+      ? `Hostile contacts — ${count} bandit mechs closing.`
+      : 'Hostile contact — a bandit mech is closing.',
+    variant: 'hostile',
+  })
+}
+
 /** Comms callout (§3.6): a named ace called in reinforcements at half health. */
 function handleReinforcement(info: { bossName: string; count: number }) {
   audio.playError()
@@ -1475,6 +1511,28 @@ function handleCollateral(amount: number, _position: THREE.Vector3) {
     collateralSeverityAccum = 0
     collateralTick.value++
     story.save()
+  }
+}
+
+/**
+ * Reckless-fire penalty (free-roam gunplay, OverworldGunplay): firing near a
+ * town with no encounter active — so no hostiles to blame it on — taxes that
+ * town's standing instead of its condition. Already throttled per-town by
+ * OverworldGunplay's ~4s cooldown before this callback ever fires, so (unlike
+ * the per-frame collateral tax) every call here is worth persisting directly.
+ */
+function handleRecklessFire(townId: string, severity: number) {
+  if (!story.run.value) return
+  const town = story.getTown(townId)
+  if (!town) return
+  const hit = applyRecklessFire(story.run.value, townId, severity)
+  if (hit > 0) {
+    story.save()
+    showToast(`⚠ ${town.name} protests the stray weapons fire (-${hit} standing)`, true)
+  } else {
+    // Standing already at rock bottom — the town still protests; staying silent
+    // would read as the shots going unnoticed.
+    showToast(`⚠ ${town.name} protests the stray weapons fire`, true)
   }
 }
 
