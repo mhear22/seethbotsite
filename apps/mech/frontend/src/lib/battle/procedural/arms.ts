@@ -32,6 +32,17 @@ import {
   bolt,
   riveting,
 } from './detailing'
+import {
+  seededRand,
+  jitter,
+  applyWear,
+  patchPlate,
+  rustStreak,
+  scorchDecal,
+  hangingCable,
+  exposedRibs,
+  fadedOliveMat,
+} from './weathering'
 
 /* ------------------------------------------------------------------ */
 /* Shared arm-shell builder                                            */
@@ -55,12 +66,22 @@ function armShell(opts: {
    *  forearm detail offsets). 1.0 = stock; >1 = heavier bruiser arm, <1 = slim
    *  support arm. The elbow joint and the z-axis (weapon mount) stay fixed. */
   bulk?: number
+  /**
+   * Opt-in salvage-grade wear pass (default off — every other caller keeps
+   * the crisp factory-fresh shell unchanged). Pass a seeded PRNG (see
+   * `seededRand` in ./weathering) to knock the pauldron skirt, cheek plates
+   * and forearm top ridge slightly off their machined alignment and swap the
+   * skirt for a mismatched faded-olive replacement panel, reading as
+   * "re-bolted by hand" rather than damaged.
+   */
+  salvage?: () => number
 }): { group: THREE.Group; forearmFrontZ: number } {
   const {
     armorMaterial,
     midMaterial = armorMat(PALETTE.armorMid),
     forearmLen = 0.85,
     bulk = 1.0,
+    salvage,
   } = opts
   const b = bulk
   const group = new THREE.Group()
@@ -86,6 +107,13 @@ function armShell(opts: {
   const pauldronSkirt = new THREE.Mesh(chamferBox(0.6, 0.26, 0.34, 0.05), midMaterial)
   pauldronSkirt.position.set(0, -0.26, -0.26)
   pauldronSkirt.rotation.x = 0.22
+  if (salvage) {
+    // Scavenged replacement panel — mismatched faded olive, sits askew.
+    // fadedOliveMat is a weathering-native material, so it survives applyWear
+    // unchanged and stays visibly mismatched against the worn charcoal armor.
+    pauldronSkirt.material = fadedOliveMat()
+    jitter(pauldronSkirt, salvage, 0.025, 0.07)
+  }
   group.add(pauldronSkirt)
 
   // Bolts along the pauldron shoulder edge.
@@ -145,6 +173,7 @@ function armShell(opts: {
     const cheek = new THREE.Mesh(chamferBox(0.16, 0.46 * b, forearmLen * 0.78, 0.04), midMaterial)
     cheek.position.set(side * 0.34 * b, 0, 0.2 + forearmLen / 2)
     cheek.rotation.z = side * -0.18
+    if (salvage) jitter(cheek, salvage, 0.018, 0.05)
     group.add(cheek)
   }
 
@@ -152,6 +181,7 @@ function armShell(opts: {
   // offset scales with bulk so it rides on the (taller) shell top.
   const forearmTop = new THREE.Mesh(chamferBox(0.5 * b, 0.16, forearmLen * 0.82, 0.05), midMaterial)
   forearmTop.position.set(0, 0.36 * b, 0.2 + forearmLen / 2)
+  if (salvage) jitter(forearmTop, salvage, 0.02, 0.06)
   group.add(forearmTop)
 
   // Gold edge piping running down both top corners of the forearm.
@@ -192,8 +222,12 @@ export function createAutocannon(): THREE.Group {
   const mid = armorMat(PALETTE.armorMid)
   const steel = frameMat()
   const gold = trimGoldMat()
+  // Starter weapon — salvage-grade, patched together in a field workshop.
+  // Single seeded generator threads through the arm-shell wear pass and the
+  // detailing below so the whole part bakes deterministically.
+  const rand = seededRand(101)
 
-  const { group: arm, forearmFrontZ } = armShell({ armorMaterial: armor, midMaterial: mid, bulk: 1.15 })
+  const { group: arm, forearmFrontZ } = armShell({ armorMaterial: armor, midMaterial: mid, bulk: 1.15, salvage: rand })
   group.add(arm)
 
   // Rotary breech housing — a multi-tier charcoal block at the muzzle end.
@@ -272,6 +306,52 @@ export function createAutocannon(): THREE.Group {
   vent.rotation.y = -Math.PI / 2
   vent.position.set(-0.35, 0, forearmFrontZ + 0.18)
   group.add(vent)
+
+  /* --- Salvage detailing: field-patched, not factory-fresh. Asymmetric on
+     purpose — real repairs don't mirror left/right. --- */
+
+  // Mismatched primer patch plate slapped proud of the pauldron shoulder,
+  // tilted like it was bolted on in a hurry. Includes its own weld bead.
+  const shoulderPatch = patchPlate(0.18, 0.15)
+  shoulderPatch.position.set(0.15, 0.11, -0.05)
+  shoulderPatch.rotation.x = -0.16 + (rand() - 0.5) * 0.24
+  shoulderPatch.rotation.y = (rand() - 0.5) * 0.3
+  shoulderPatch.rotation.z = (rand() - 0.5) * 0.22
+  group.add(shoulderPatch)
+
+  // Rust bleed under the forearm rivet row.
+  const rustA = rustStreak(0.06, 0.16)
+  rustA.position.set(0.09, 0.2, forearmFrontZ + 0.005)
+  group.add(rustA)
+  const rustB = rustStreak(0.05, 0.12)
+  rustB.position.set(-0.06, 0.14, forearmFrontZ + 0.005)
+  group.add(rustB)
+
+  // Rust bleed below one elbow end cap.
+  const rustC = rustStreak(0.05, 0.1)
+  rustC.position.set(0.28, -0.2, 0.02)
+  group.add(rustC)
+
+  // Soot scorch near the muzzle hub from sustained rotary fire.
+  const scorch = scorchDecal(0.16)
+  scorch.position.set(-0.1, 0.05, forearmFrontZ + 0.34)
+  group.add(scorch)
+
+  // Drooping exposed cable off the ammo feed — conduit cover gone missing.
+  const feedCable = hangingCable(
+    new THREE.Vector3(0.1, 0.14, forearmFrontZ + 0.05),
+    new THREE.Vector3(0.02, -0.08, forearmFrontZ - 0.12),
+    { sag: 0.12, radius: 0.018 }
+  )
+  group.add(feedCable)
+
+  // Small torn-open cavity sunk into the forearm's off side, guts exposed.
+  const ribs = exposedRibs(0.14, 0.22, 0.09, { ribs: 2, cable: false, seed: 101 })
+  ribs.rotation.y = -Math.PI / 2
+  ribs.position.set(-0.36, -0.08, 0.5)
+  group.add(ribs)
+
+  applyWear(group)
 
   return group
 }

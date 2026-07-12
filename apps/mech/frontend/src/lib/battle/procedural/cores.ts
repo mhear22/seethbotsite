@@ -34,6 +34,20 @@ import {
   riveting,
   bolt,
 } from './detailing'
+import {
+  seededRand,
+  applyWear,
+  jitter,
+  patchPlate,
+  weldSeam,
+  hangingCable,
+  rustStreak,
+  scorchDecal,
+  exposedRibs,
+  primerMat,
+  fadedOliveMat,
+  bareSteelMat,
+} from './weathering'
 
 /* ------------------------------------------------------------------ */
 /* Shared core silhouette builder                                      */
@@ -51,6 +65,24 @@ interface CoreOpts {
 }
 
 /**
+ * Optional output-only hook: when passed to buildCoreBase, specific layered
+ * plates get pushed into these arrays as they're built, so a caller (e.g. a
+ * salvage-grade variant) can jitter/re-material individual plates afterward
+ * without buildCoreBase itself changing what it returns or how it's built.
+ * Omitting `capture` (the default for every existing caller) is a no-op.
+ */
+interface CoreCapture {
+  /** The two layered pectoral panelPlate groups (index 0 = left, 1 = right). */
+  pecs?: THREE.Object3D[]
+  /** The four stacked abdomen plate segments, top to bottom. */
+  abdomenSegs?: THREE.Object3D[]
+  /** The two hip-flare "side skirt" plates (index 0 = left, 1 = right). */
+  hips?: THREE.Object3D[]
+  /** The single back armor plate. */
+  back?: THREE.Object3D[]
+}
+
+/**
  * Builds the shared core skeleton: inner frame, sloped/tapered torso shell,
  * tiered overlapping chest plates, a raised collar with exposed steel neck, a
  * narrowing layered abdomen, an armoured waist with hip flares, a panelled
@@ -59,7 +91,7 @@ interface CoreOpts {
  * Returns the group plus the shared materials so each generator can drop in its
  * own signature chest detail (red vent vs. fusion core vs. turbine vs. caps).
  */
-function buildCoreBase(opts: CoreOpts): {
+function buildCoreBase(opts: CoreOpts, capture?: CoreCapture): {
   group: THREE.Group
   armor: THREE.MeshStandardMaterial
   armorTier: THREE.MeshStandardMaterial
@@ -111,6 +143,7 @@ function buildCoreBase(opts: CoreOpts): {
     pec.rotation.x = -0.1
     pec.rotation.z = side * -0.04
     group.add(pec)
+    capture?.pecs?.push(pec)
 
     // Thin gold edge highlight down the inner chest seam.
     const seam = edgeLine(0.66, { thickness: 0.02, mat: trimMat })
@@ -176,6 +209,7 @@ function buildCoreBase(opts: CoreOpts): {
     seg.position.set(0, abY, 0.07 + i * 0.012)
     seg.rotation.x = 0.06
     group.add(seg)
+    capture?.abdomenSegs?.push(seg)
     // Thin gold under-edge on the two larger plates only (sparse trim).
     if (i < 2) {
       const lip = edgeLine(abWidths[i] * 0.7, { thickness: 0.014, mat: trimMat })
@@ -203,6 +237,7 @@ function buildCoreBase(opts: CoreOpts): {
     hip.position.set(side * 0.66, 0.28, 0.05)
     hip.rotation.z = side * 0.22
     group.add(hip)
+    capture?.hips?.push(hip)
     // Steel hip-joint disc peeking from under the flare.
     const hipJoint = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.16, 12), steel)
     hipJoint.rotation.z = Math.PI / 2
@@ -214,6 +249,7 @@ function buildCoreBase(opts: CoreOpts): {
   const back = new THREE.Mesh(chamferBox(1.26, 1.3, 0.16, 0.08), armor)
   back.position.set(0, 1.05, -0.62)
   group.add(back)
+  capture?.back?.push(back)
   // Vertical spine ridge + panel trim on the back.
   const spine = new THREE.Mesh(chamferBox(0.18, 1.1, 0.1, 0.03), armorTier)
   spine.position.set(0, 1.05, -0.72)
@@ -383,12 +419,16 @@ export function createFusionReactor(): THREE.Group {
   const armor = armorMat(PALETTE.armorMid)
   const armorTier = armorMat(PALETTE.armorDark)
   const steel = frameMat(PALETTE.frameSteelLight)
-  const { group, trimMat } = buildCoreBase({
-    armor,
-    armorTier,
-    steel,
-    glow: PALETTE.glowAmber,
-  })
+  const capture: CoreCapture = { pecs: [], abdomenSegs: [], hips: [], back: [] }
+  const { group, trimMat } = buildCoreBase(
+    {
+      armor,
+      armorTier,
+      steel,
+      glow: PALETTE.glowAmber,
+    },
+    capture
+  )
 
   // Glowing amber fusion core set into the chest between the pec plates.
   const coreGlow = glowEyeMat(PALETTE.glowAmber)
@@ -432,6 +472,85 @@ export function createFusionReactor(): THREE.Group {
   backVent.position.set(0, 1.05, -0.72)
   backVent.rotation.y = Math.PI
   group.add(backVent)
+
+  /* --- Salvage wear pass — starter mech, field-patched not factory-fresh -- *
+   * A battered shell around a still-hot heart: the reactor core, sensor      *
+   * strip and back vent above stay glowing (applyWear skips strong emissive  *
+   * / transparent materials); everything else gets roughed up below.        */
+  const rand = seededRand(202)
+
+  // 1. Break the "all one piece" look — re-bolted-by-hand jitter on the
+  //    layered chest tiers, hip "side skirt" flares, and the back plate.
+  for (const pec of capture.pecs ?? []) jitter(pec, rand, 0.02, 0.06)
+  for (const seg of capture.abdomenSegs ?? []) jitter(seg, rand, 0.015, 0.05)
+  for (const hip of capture.hips ?? []) jitter(hip, rand, 0.025, 0.07)
+  for (const b of capture.back ?? []) jitter(b, rand, 0.02, 0.04)
+
+  // 2. One exposed cavity sunk into the LEFT abdomen — asymmetric missing
+  //    panel showing dark internals, ribs and a cable.
+  const cavity = exposedRibs(0.3, 0.32, 0.12, { ribs: 3, cable: true, seed: 202 })
+  cavity.position.set(-0.34, 0.42, 0.1)
+  cavity.rotation.x = 0.06
+  group.add(cavity)
+
+  // 3. Mismatched patch plates bolted proud on the RIGHT side — opposite the
+  //    cavity — plus one existing plate re-materialed to a scavenged olive
+  //    panel (fadedOliveMat survives applyWear, so it stays mismatched).
+  const patch1 = patchPlate(0.32, 0.36, { mat: primerMat(), weld: false })
+  patch1.position.set(0.56, 0.46, 0.14)
+  patch1.rotation.y = -0.3
+  patch1.rotation.z = 0.07
+  group.add(patch1)
+
+  const patch2 = patchPlate(0.22, 0.22, { mat: bareSteelMat(), weld: false })
+  patch2.position.set(0.66, 0.86, 0.58)
+  patch2.rotation.y = -0.4
+  patch2.rotation.x = 0.1
+  group.add(patch2)
+
+  const rightPec = capture.pecs?.[1]
+  const rightPecTop = rightPec?.children[1]
+  if (rightPecTop instanceof THREE.Mesh) rightPecTop.material = fadedOliveMat()
+
+  // 4. Wear reads: rust bleeding from bolt rows / the reactor collar, a
+  //    repaired weld seam, scorch marks at the reactor exhaust vent, and a
+  //    drooping cable across the abdomen from the exposed conduit.
+  for (const side of [-1, 1]) {
+    const streak = rustStreak(0.09, 0.32)
+    streak.position.set(side * 0.66, 1.0, 0.665)
+    streak.rotation.y = side * 0.16
+    streak.rotation.x = -0.1
+    group.add(streak)
+  }
+  const collarStreak = rustStreak(0.1, 0.26)
+  collarStreak.position.set(0.12, 1.02, 0.505)
+  group.add(collarStreak)
+  const buckleStreak = rustStreak(0.08, 0.2)
+  buckleStreak.position.set(0, 0.08, 0.475)
+  group.add(buckleStreak)
+
+  const seam = weldSeam(0.4, { radius: 0.035 })
+  seam.position.set(0, 1.0, 0.52)
+  seam.rotation.x = 0.03
+  group.add(seam)
+
+  for (const [x, y] of [[-0.25, 1.0], [0.2, 1.15]] as const) {
+    const scorch = scorchDecal(0.2)
+    scorch.position.set(x, y, -0.755)
+    scorch.rotation.y = Math.PI
+    group.add(scorch)
+  }
+
+  const conduitCable = hangingCable(
+    new THREE.Vector3(-0.3, 0.95, 0.5),
+    new THREE.Vector3(0.32, 0.68, 0.42),
+    { sag: 0.18, radius: 0.02 }
+  )
+  group.add(conduitCable)
+
+  // 5. Material wear pass last — desaturates/grimes clean armor + trim while
+  //    leaving the reactor glow, sensor strip and decals untouched.
+  applyWear(group)
 
   return group
 }

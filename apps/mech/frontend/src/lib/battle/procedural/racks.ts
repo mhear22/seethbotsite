@@ -33,6 +33,19 @@ import {
   riveting,
   ventMat,
 } from './detailing'
+import {
+  seededRand,
+  jitter,
+  patchPlate,
+  weldSeam,
+  hangingCable,
+  rustStreak,
+  scorchDecal,
+  sootMat,
+  primerMat,
+  bareSteelMat,
+  applyWear,
+} from './weathering'
 
 export function createSmokeLauncher(): THREE.Group {
   const group = new THREE.Group()
@@ -235,6 +248,10 @@ export function createAmmoFeed(): THREE.Group {
 export function createJumpJets(): THREE.Group {
   const group = new THREE.Group()
 
+  // Salvage-grade starter rack: field-patched but flown hard. All scatter
+  // below is deterministic through one shared PRNG so the bake is stable.
+  const rand = seededRand(505)
+
   const armor = armorMat()
   const armorTier = armorMat(PALETTE.armorMid)
   const steel = frameMat()
@@ -243,6 +260,7 @@ export function createJumpJets(): THREE.Group {
   // --- Central armored thruster spine connecting the two pods.
   const spine = new THREE.Mesh(chamferBox(0.3, 0.72, 0.28, 0.05), armor)
   spine.position.set(0, 0.36, -0.06)
+  jitter(spine, rand, 0.015, 0.035)
   group.add(spine)
 
   // Raised gold-trimmed plate on the spine face.
@@ -254,6 +272,7 @@ export function createJumpJets(): THREE.Group {
     trim: true,
   })
   spinePlate.position.set(0, 0.38, 0.11)
+  jitter(spinePlate, rand, 0.012, 0.03)
   group.add(spinePlate)
 
   // Amber power-core strip glowing down the spine center.
@@ -261,20 +280,50 @@ export function createJumpJets(): THREE.Group {
   core.position.set(0, 0.4, 0.17)
   group.add(core)
 
+  // Tilted red-oxide patch plate slapped over the spine base — a replacement
+  // panel from the scrapper that never got painted to match.
+  const spinePatch = patchPlate(0.14, 0.12, { mat: primerMat(), d: 0.03 })
+  spinePatch.position.set(0.05, 0.07, 0.095)
+  spinePatch.rotation.z = 0.18
+  group.add(spinePatch)
+
+  // Rust streaks bleeding down from the spine's bolt row (gravity stains
+  // under the rivet heads).
+  const boltXs = [-0.08, 0, 0.08]
+  for (const bx of boltXs) {
+    const h = 0.09 + rand() * 0.07
+    const streak = rustStreak(0.018 + rand() * 0.012, h)
+    streak.position.set(bx + (rand() - 0.5) * 0.01, 0.04 - h / 2 - 0.01, 0.086)
+    group.add(streak)
+  }
+
+  // A fuel/ignition line slung between the two thruster housings, its
+  // conduit cover long gone.
+  const spineCable = hangingCable(
+    new THREE.Vector3(-0.3, 0.2, 0.22),
+    new THREE.Vector3(0.3, 0.2, 0.22),
+    { sag: 0.12, radius: 0.018 }
+  )
+  group.add(spineCable)
+
   // --- Twin angular thruster pods, canted outward, layered shells.
   for (const side of [-1, 1]) {
     const cant = side * 0.09
+    // The left jet has flown harder than the right — asymmetric burn wear.
+    const heavyBurn = side === -1
 
     // Outer tapered armored pod shell (wider at base).
     const pod = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.26, 0.64, 12), armor)
     pod.position.set(side * 0.35, 0.3, 0)
     pod.rotation.z = cant
+    jitter(pod, rand, 0.015, 0.04)
     group.add(pod)
 
     // Mid armor band wrapping the pod (overlap layer / panel line).
     const band = new THREE.Mesh(new THREE.CylinderGeometry(0.235, 0.235, 0.1, 12), armorTier)
     band.position.set(side * 0.35 - Math.sin(cant) * 0.12, 0.18, 0)
     band.rotation.z = cant
+    jitter(band, rand, 0.012, 0.035)
     group.add(band)
 
     // Gold trim ring at the band seam.
@@ -289,13 +338,33 @@ export function createJumpJets(): THREE.Group {
     collar.rotation.z = cant
     group.add(collar)
 
+    // Right pod only: one tank strap sheared off and got patched with a
+    // crude bare-steel clamp, welded shut down the front seam.
+    if (side === 1) {
+      const strapRadius = 0.195
+      const strapX = side * 0.35 - Math.sin(cant) * 0.12
+      const repairStrap = new THREE.Mesh(
+        new THREE.CylinderGeometry(strapRadius, strapRadius, 0.06, 12),
+        bareSteelMat()
+      )
+      repairStrap.position.set(strapX, 0.46, 0)
+      repairStrap.rotation.z = cant
+      group.add(repairStrap)
+
+      const strapWeld = weldSeam(0.05, { radius: 0.014 })
+      strapWeld.rotation.z = Math.PI / 2
+      strapWeld.position.set(strapX, 0.46, strapRadius + 0.006)
+      group.add(strapWeld)
+    }
+
     // Hot amber thrust nozzle pointing down (flared cone).
     const nozzle = new THREE.Mesh(
       new THREE.ConeGeometry(0.18, 0.24, 12),
       createEnergyMaterial(PALETTE.glowAmber)
     )
     nozzle.rotation.x = Math.PI
-    nozzle.position.set(side * 0.35 - Math.sin(cant) * 0.34, -0.1, 0)
+    const nozzleX = side * 0.35 - Math.sin(cant) * 0.34
+    nozzle.position.set(nozzleX, -0.1, 0)
     nozzle.rotation.z = cant
     group.add(nozzle)
 
@@ -305,6 +374,32 @@ export function createJumpJets(): THREE.Group {
     ring.rotation.x = Math.PI / 2
     ring.rotation.y = cant
     group.add(ring)
+
+    // Soot collar scorched into the nozzle lip where it meets the housing.
+    const sootCollar = new THREE.Mesh(new THREE.TorusGeometry(0.185, 0.02, 8, 16), sootMat())
+    sootCollar.position.set(nozzleX, 0.01, 0)
+    sootCollar.rotation.x = Math.PI / 2
+    sootCollar.rotation.y = cant
+    group.add(sootCollar)
+
+    // Charred tip where the exhaust point pokes out below the housing.
+    const tipChar = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), sootMat())
+    tipChar.position.set(nozzleX, -0.21, 0)
+    group.add(tipChar)
+
+    // Scorch decals fanning out across the housing directly around/below
+    // the exhaust — every jet has flown, the left one harder.
+    const scorchCount = heavyBurn ? 4 : 2
+    for (let i = 0; i < scorchCount; i++) {
+      const decal = scorchDecal(0.13 + rand() * 0.08)
+      decal.position.set(
+        side * 0.35 - Math.sin(cant) * 0.1 + (rand() - 0.5) * 0.16,
+        -0.01 + rand() * 0.15,
+        0.225
+      )
+      decal.rotation.z = cant + (rand() - 0.5) * 0.4
+      group.add(decal)
+    }
 
     // Red intake slats on the outer face of each pod.
     const slats = ventSlats(3, 0.22, 0.26, { depth: 0.04 })
@@ -323,6 +418,7 @@ export function createJumpJets(): THREE.Group {
   rivets.position.set(0, 0.04, 0.1)
   group.add(rivets)
 
+  applyWear(group)
   return group
 }
 

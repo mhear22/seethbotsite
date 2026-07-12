@@ -28,6 +28,15 @@ import {
   ventSlats,
   bolt,
 } from './detailing'
+import {
+  seededRand,
+  applyWear,
+  jitter,
+  patchPlate,
+  rustStreak,
+  exposedRibs,
+  primerMat,
+} from './weathering'
 
 /* ------------------------------------------------------------------ */
 /* Shared sub-assemblies                                               */
@@ -309,6 +318,7 @@ export function createStandardOptics(): THREE.Group {
   group.add(fin)
 
   // Side cheek vents (red slats) + dark cheek armor pods, raked outward.
+  const wearRand = seededRand(404)
   for (const side of [-1, 1]) {
     const cheek = buildCheek(0.18, 0.42, 0.5, 3, armorBase)
     cheek.position.set(side * 0.46, 0.56, 0.02)
@@ -319,6 +329,31 @@ export function createStandardOptics(): THREE.Group {
     const b = bolt(0.022)
     b.position.set(side * 0.5, 0.78, 0.2)
     group.add(b)
+
+    // --- Salvage damage: field-workshop patch, kept to one side only ---
+    if (side === 1) {
+      // Mismatched primer patch welded proud over the cheek's outer plate,
+      // tilted like it was eyeballed on rather than measured.
+      const patch = patchPlate(0.1, 0.09, { mat: primerMat(), d: 0.03 })
+      patch.position.set(0, -0.05, 0.355)
+      patch.rotation.set(0.12, -0.2, 0.16)
+      jitter(patch, wearRand, 0.01, 0.06)
+      cheek.add(patch)
+
+      // Small missing-panel cavity low on the same cheek's base plate.
+      const ribs = exposedRibs(0.08, 0.08, 0.08, { ribs: 2, cable: false, seed: 404 })
+      ribs.position.set(0, -0.19, 0.22)
+      cheek.add(ribs)
+
+      // Rust bleeding down from the rivet above.
+      const streak = rustStreak(0.05, 0.18)
+      streak.position.set(side * 0.5, 0.66, 0.205)
+      group.add(streak)
+
+      // Hand-fit jitter: the rivet and the whole cheek pod sit slightly off.
+      jitter(b, wearRand, 0.01, 0.05)
+      jitter(cheek, wearRand, 0.01, 0.04)
+    }
   }
 
   // Rear sensor block with a steel frame collar.
@@ -329,6 +364,8 @@ export function createStandardOptics(): THREE.Group {
   rearTrim.position.set(0, 0.6, -0.53)
   rearTrim.rotation.y = Math.PI
   group.add(rearTrim)
+
+  applyWear(group)
 
   return group
 }

@@ -37,6 +37,18 @@ import {
   riveting,
   bolt,
 } from './detailing'
+import {
+  seededRand,
+  jitter,
+  patchPlate,
+  weldSeam,
+  hangingCable,
+  rustStreak,
+  exposedRibs,
+  primerMat,
+  bareSteelMat,
+  applyWear,
+} from './weathering'
 
 function createBipedalLeg(side: -1 | 1): THREE.Group {
   // Pivot at hip joint position — all child positions relative to hip
@@ -52,6 +64,10 @@ function createBipedalLeg(side: -1 | 1): THREE.Group {
   const red = accentRedMat()
   const gold = trimGoldMat()
   const amber = glowEyeMat()
+
+  // Salvage-wear scatter for this leg — deterministic bake, so both legs seed
+  // from the same base (their mirrored geometry keeps the result asymmetric).
+  const rand = seededRand(303)
 
   // Hip joint ball (exposed steel mechanical) + collar ring.
   const hipJoint = new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 12), steel)
@@ -115,6 +131,27 @@ function createBipedalLeg(side: -1 | 1): THREE.Group {
     line.position.set(0, -0.6, pos - 0.02)
     thighGroup.add(line)
   }
+
+  // Salvage wear — the thigh plates were never quite flush to begin with.
+  jitter(thigh, rand, 0.02, 0.04)
+  jitter(thighUpper, rand, 0.015, 0.035)
+  jitter(thighSide, rand, 0.012, 0.03)
+
+  // Asymmetric damage: the left leg's thigh took a hit and got a scavenged
+  // primer-red patch plate bolted (crookedly) over the wound, weld bead and all.
+  if (side === -1) {
+    const thighPatch = patchPlate(0.22, 0.26, { mat: primerMat(), weld: false })
+    thighPatch.position.set(-0.06, -0.82, 0.34)
+    thighPatch.rotation.z = 0.16
+    thighPatch.rotation.y = -0.1
+    jitter(thighPatch, rand, 0.02, 0.06)
+    thighGroup.add(thighPatch)
+    const thighWeld = weldSeam(0.2, { radius: 0.03 })
+    thighWeld.position.set(-0.06, -0.68, 0.36)
+    thighWeld.rotation.z = 0.16
+    thighGroup.add(thighWeld)
+  }
+
   leg.add(thighGroup)
 
   // --- KNEE CLUSTER ---------------------------------------------------------
@@ -158,6 +195,22 @@ function createBipedalLeg(side: -1 | 1): THREE.Group {
   kneeSensor.position.set(0, -1.05, KNEE_Z + 0.39)
   leg.add(kneeSensor)
 
+  // Asymmetric damage: only the left knee guard rides askew — the right one
+  // is still seated true.
+  if (side === -1) {
+    jitter(kneeCap, rand, 0.025, 0.09)
+    jitter(kneeTier, rand, 0.025, 0.09)
+  } else {
+    // A rusty hydraulic line droops behind the right knee — its conduit
+    // cover went missing somewhere along the way.
+    const kneeCable = hangingCable(
+      new THREE.Vector3(-0.1, -1.02, KNEE_Z - 0.1),
+      new THREE.Vector3(0.1, -1.26, KNEE_Z - 0.14),
+      { sag: 0.09, radius: 0.02 }
+    )
+    leg.add(kneeCable)
+  }
+
   // --- SHIN CLUSTER ---------------------------------------------------------
   // Like the thigh, a flat pile of siblings (plate + front plate + edge lines +
   // red slash + rivets + rear actuator). Wrap it and cant it FORWARD at the top
@@ -181,12 +234,20 @@ function createBipedalLeg(side: -1 | 1): THREE.Group {
   shin.position.set(0, -1.8, -0.03)
   shin.rotation.x = 0.1
   shinGroup.add(shin)
+  jitter(shin, rand, 0.018, 0.04)
 
   // Forward-sloped shin front plate (canted out at the toe) with twin edge lines.
   const shinFront = new THREE.Mesh(chamferBox(0.36, 0.88, 0.12, 0.04), armorTier)
   shinFront.position.set(0, -1.78, 0.21)
   shinFront.rotation.x = 0.24
   shinGroup.add(shinFront)
+  jitter(shinFront, rand, 0.015, 0.04)
+
+  // Rust-drip decal running down from the knee joint, on the shin front plate.
+  const kneeDripStreak = rustStreak(0.08, 0.42)
+  kneeDripStreak.position.set(side * 0.06, -1.5, 0.285)
+  kneeDripStreak.rotation.x = 0.24
+  shinGroup.add(kneeDripStreak)
   // Twin thin yellow edge lines running down the shin front.
   for (const lx of [-1, 1]) {
     const line = edgeLine(0.82, { thickness: 0.018, mat: gold })
@@ -207,6 +268,23 @@ function createBipedalLeg(side: -1 | 1): THREE.Group {
   shinRivets.position.set(side * 0.21, -1.8, -0.02)
   shinGroup.add(shinRivets)
 
+  // Rust bleed weeping down from under the rivet row. Decal materials are
+  // single-sided, so the facing rotation must flip with `side` (unlike the
+  // radially-symmetric rivets above) to stay visible from outside the leg.
+  const boltRowStreak = rustStreak(0.07, 0.32)
+  boltRowStreak.rotation.y = side * (Math.PI / 2)
+  boltRowStreak.position.set(side * 0.215, -1.96, -0.02)
+  shinGroup.add(boltRowStreak)
+
+  // Asymmetric damage: the right shin lost a panel — exposed frame ribs and
+  // a bit of internal cabling, sunk flush into the front plate.
+  if (side === 1) {
+    const shinCavity = exposedRibs(0.14, 0.22, 0.05, { ribs: 2, cable: true, seed: 5109 })
+    shinCavity.position.set(-0.06, -1.94, 0.26)
+    shinCavity.rotation.x = 0.24
+    shinGroup.add(shinCavity)
+  }
+
   // Lower leg rear actuator (exposed steel)
   const actuator = new THREE.Mesh(
     new THREE.CylinderGeometry(0.1, 0.08, 1.0, 8),
@@ -225,14 +303,21 @@ function createBipedalLeg(side: -1 | 1): THREE.Group {
   ankleCuff.position.set(0, -2.36, 0.02)
   leg.add(ankleCuff)
 
+  // Scuff-level rust streak weeping down over the ankle cuff — the feet take
+  // the worst of the wear.
+  const ankleStreak = rustStreak(0.06, 0.15)
+  ankleStreak.position.set(side * 0.05, -2.32, 0.175)
+  leg.add(ankleStreak)
+
   // Foot — broad chunky sole. Bottom pinned to y≈-2.60 (ground contact): with
   // height 0.18 the centre sits at -2.51 so nothing dips below ground.
-  const foot = new THREE.Mesh(chamferBox(0.62, 0.18, 0.92, 0.05), armor)
+  // Scraped to bare steel — feet take the worst of the wear.
+  const foot = new THREE.Mesh(chamferBox(0.62, 0.18, 0.92, 0.05), bareSteelMat())
   foot.position.set(0, -2.51, 0.1)
   leg.add(foot)
 
-  // Foot top tier plate for layered overlap.
-  const footTop = new THREE.Mesh(chamferBox(0.42, 0.1, 0.52, 0.04), armorTier)
+  // Foot top tier plate for layered overlap — also scraped bare.
+  const footTop = new THREE.Mesh(chamferBox(0.42, 0.1, 0.52, 0.04), bareSteelMat())
   footTop.position.set(0, -2.42, 0.05)
   leg.add(footTop)
 
@@ -313,6 +398,10 @@ export function createBipedalLegs(): THREE.Group {
   const pelvisRed = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.12, 0.04), red)
   pelvisRed.position.set(0, 2.55, 0.24)
   group.add(pelvisRed)
+
+  // Salvage-grade starter mech: desaturate/grime every clean surface. Skips
+  // glow/decal materials and passes weathering-native materials through untouched.
+  applyWear(group)
 
   return group
 }
