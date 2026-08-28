@@ -10,6 +10,11 @@ import path from 'path';
 
 // Import the controller
 import healthController from '../../src/controllers/health.controller';
+import { registerApiKey } from '../../src/auth';
+
+// POST /api/health/check requires an API key since the auth hardening
+const TEST_API_KEY = 'test-health-api-key';
+registerApiKey(TEST_API_KEY);
 
 // Create a test app
 const createTestApp = (): Express => {
@@ -95,7 +100,7 @@ describe('Health API', () => {
     it('should update health check timestamp', async () => {
       const beforeTime = new Date().toISOString();
 
-      const response = await request(app).post('/api/health/check');
+      const response = await request(app).post('/api/health/check').set('X-API-Key', TEST_API_KEY);
 
       const afterTime = new Date().toISOString();
 
@@ -111,13 +116,13 @@ describe('Health API', () => {
     });
 
     it('should persist health check state', async () => {
-      const response1 = await request(app).post('/api/health/check');
+      const response1 = await request(app).post('/api/health/check').set('X-API-Key', TEST_API_KEY);
       const firstTimestamp = response1.body.lastCheckTime;
 
       // Wait a bit
       await new Promise(resolve => setTimeout(resolve, 10));
 
-      const response2 = await request(app).post('/api/health/check');
+      const response2 = await request(app).post('/api/health/check').set('X-API-Key', TEST_API_KEY);
       const secondTimestamp = response2.body.lastCheckTime;
 
       expect(secondTimestamp).toBeGreaterThan(firstTimestamp);
@@ -127,7 +132,7 @@ describe('Health API', () => {
   describe('Health state persistence', () => {
     it('should update and read health state correctly', async () => {
       // Perform a health check to update state
-      const checkResponse = await request(app).post('/api/health/check');
+      const checkResponse = await request(app).post('/api/health/check').set('X-API-Key', TEST_API_KEY);
       expect(checkResponse.status).toBe(200);
 
       const savedTimestamp = checkResponse.body.lastChecked;

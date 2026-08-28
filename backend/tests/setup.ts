@@ -14,6 +14,11 @@ if (!process.env.DATABASE_URL) {
   process.env.DATABASE_URL = 'postgresql://seethbot:seethbot_secret_change_me@localhost:5432/seethbot?schema=public';
 }
 
+// auth.ts throws at import time without a JWT secret; tests never verify real tokens
+if (!process.env.SEETHBOT_JWT_SECRET) {
+  process.env.SEETHBOT_JWT_SECRET = 'test-only-jwt-secret';
+}
+
 // Silence noisy console output during tests (console.error kept for real failures)
 const originalConsoleLog = console.log;
 const originalConsoleWarn = console.warn;

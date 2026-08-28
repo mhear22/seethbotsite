@@ -51,10 +51,10 @@ describe('Authentication Module', () => {
       expect(key.length).toBe(35);
     });
 
-    it('should only contain alphanumeric characters after prefix', () => {
+    it('should only contain base64url characters after prefix', () => {
       const key = generateApiKey();
       const keyWithoutPrefix = key.substring(3);
-      expect(keyWithoutPrefix).toMatch(/^[A-Za-z0-9]+$/);
+      expect(keyWithoutPrefix).toMatch(/^[A-Za-z0-9_-]+$/);
     });
   });
 

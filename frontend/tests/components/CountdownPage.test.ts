@@ -66,20 +66,32 @@ describe('CountdownPage', () => {
   })
 
   it('renders countdown timer for upcoming releases', () => {
-    wrapper = mount(CountdownPage)
-    const cards = wrapper.findAll('.countdown-card')
-    
-    const activeCards = cards.filter(c => !c.classes('released'))
-    expect(activeCards.some(c => c.find('.timer').exists())).toBe(true)
+    // Pin the clock before the release dates so at least one release is upcoming,
+    // regardless of when the suite actually runs.
+    vi.useFakeTimers({ now: new Date('2026-01-01T00:00:00Z') })
+    try {
+      wrapper = mount(CountdownPage)
+      const cards = wrapper.findAll('.countdown-card')
+
+      const activeCards = cards.filter(c => !c.classes('released'))
+      expect(activeCards.some(c => c.find('.timer').exists())).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('renders time units (days, hours, minutes, seconds)', () => {
-    wrapper = mount(CountdownPage)
-    const timer = wrapper.find('.timer')
-    expect(timer.exists()).toBe(true)
-    
-    const timeUnits = timer.findAll('.time-unit')
-    expect(timeUnits.length).toBe(4)
+    vi.useFakeTimers({ now: new Date('2026-01-01T00:00:00Z') })
+    try {
+      wrapper = mount(CountdownPage)
+      const timer = wrapper.find('.timer')
+      expect(timer.exists()).toBe(true)
+
+      const timeUnits = timer.findAll('.time-unit')
+      expect(timeUnits.length).toBe(4)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('renders footer note section', () => {

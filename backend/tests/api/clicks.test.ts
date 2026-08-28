@@ -4,6 +4,10 @@
  */
 
 import request from 'supertest';
+import { registerApiKey } from '../../src/auth';
+
+const TEST_API_KEY = 'test-suite-api-key';
+registerApiKey(TEST_API_KEY);
 import express, { Express } from 'express';
 
 // Import the controller and database functions
@@ -14,6 +18,12 @@ import { getClickCount, incrementClick, resetClick } from '../../src/db';
 const createTestApp = (): Express => {
   const app = express();
   app.use(express.json());
+  // These suites exercise CRUD/flow logic, not auth (covered by auth.test.ts);
+  // authenticate every request so the API-key middleware lets them through.
+  app.use((req, _res, next) => {
+    req.headers['x-api-key'] = TEST_API_KEY;
+    next();
+  });
 
   // Mount the controller
   app.use('/api', clicksController);

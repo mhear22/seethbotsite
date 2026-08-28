@@ -57,7 +57,7 @@ describe('useQuote', () => {
     expect(error.value).toBe(null)
   })
 
-  it('should handle errors gracefully', async () => {
+  it('should fall back to local quotes when both sources fail', async () => {
     const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     mockGetQuote.mockRejectedValue(new Error('API error'))
     mockFetch.mockRejectedValue(new Error('Network error'))
@@ -66,9 +66,11 @@ describe('useQuote', () => {
 
     await new Promise(resolve => setTimeout(resolve, 0))
 
+    // Resilient by design (Ticket #31): failures never surface as errors,
+    // the user always gets a local fallback quote + advice instead.
     expect(loading.value).toBe(false)
-    expect(error.value).toBe('Failed to load quote')
-    expect(currentQuote.value).toBe('Stay curious, keep asking questions.')
+    expect(error.value).toBe(null)
+    expect(currentQuote.value).toMatch(/^.+\n\n💡 .+$/)
 
     consoleErrorSpy.mockRestore()
   })
@@ -87,7 +89,8 @@ describe('useQuote', () => {
 
     await new Promise(resolve => setTimeout(resolve, 0))
 
-    expect(currentQuote.value).toBe('Test quote')
+    // Missing advice is backfilled from the local fallback advice list
+    expect(currentQuote.value).toMatch(/^Test quote\n\n💡 .+$/)
   })
 
   it('should fetch new quote when fetchRandomQuote is called', async () => {

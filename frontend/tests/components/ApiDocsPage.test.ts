@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi } from 'vitest'
-import { mount, flushMarks } from '@vue/test-utils'
+import { mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 
 vi.mock('../../stores/useAppStore', () => ({
@@ -25,7 +25,7 @@ describe('ApiDocsPage', () => {
     expect(wrapper.find('.api-docs-page').exists()).toBe(true)
   })
 
-  it('renders the iframe element', () => {
+  it('renders the iframe element', async () => {
     const wrapper = mount((await import('../../components/pages/ApiDocsPage.vue')).default as any, {
       global: {
         stubs: {
@@ -36,7 +36,7 @@ describe('ApiDocsPage', () => {
     expect(wrapper.find('iframe').exists()).toBe(true)
   })
 
-  it('has api-docs-iframe-wrapper div', () => {
+  it('has api-docs-iframe-wrapper div', async () => {
     const wrapper = mount((await import('../../components/pages/ApiDocsPage.vue')).default as any, {
       global: {
         stubs: {
@@ -48,7 +48,7 @@ describe('ApiDocsPage', () => {
     expect(wrapper.find('.api-docs-iframe-wrapper').exists()).toBe(true)
   })
 
-  it('does not show loading overlay when not loading', () => {
+  it('does not show loading overlay when not loading', async () => {
     const wrapper = mount((await import('../../components/pages/ApiDocsPage.vue')).default as any, {
       global: {
         stubs: {
