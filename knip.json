@@ -1,0 +1,37 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignoreExportsUsedInFile": true,
+  "workspaces": {
+    ".": {
+      "entry": ["cli.js", "scripts/*.{js,mjs}"],
+      "ignoreDependencies": ["openclaw"]
+    },
+    "backend": {
+      "entry": ["scripts/*.js"],
+      "project": ["src/**", "scripts/**", "prisma/**"],
+      "ignoreDependencies": ["@prisma/engines"]
+    },
+    "frontend": {
+      "entry": ["scripts/*.js", "vite-plugin-ffl.js"],
+      "project": ["**/*.{ts,vue,js}", "!dist/**", "!public/**"],
+      "ignore": ["shared/**", "src/types/openapi.ts"]
+    },
+    "apps/mech/backend": {
+      "project": ["src/**"],
+      "ignore": ["src/shared/**"]
+    },
+    "apps/mech/frontend": {
+      "project": ["src/**", "e2e/**"],
+      "ignore": ["src/shared/**"]
+    },
+    "apps/tickets/frontend": {
+      "project": ["src/**"],
+      "paths": {
+        "@frontend/*": ["../../../frontend/*"]
+      }
+    },
+    "apps/datacenter/frontend": {
+      "project": ["src/**"]
+    }
+  }
+}

@@ -9,9 +9,19 @@
     "build:backend": "pnpm --filter ./backend build",
     "build:frontend": "pnpm --filter ./frontend build",
     "build:mech": "pnpm --filter ./apps/mech/frontend build",
-    "build:mech-backend": "pnpm --filter ./apps/mech/backend build"
+    "build:mech-backend": "pnpm --filter ./apps/mech/backend build",
+    "lint:deps": "depcruise backend/src frontend apps/mech/backend/src apps/mech/frontend/src apps/tickets/frontend/src apps/datacenter/frontend/src --config .dependency-cruiser.cjs",
+    "lint:dup": "jscpd backend/src frontend apps/mech/backend/src apps/mech/frontend/src apps/tickets/frontend/src apps/datacenter/frontend/src",
+    "lint:structure": "pnpm run lint:deps && pnpm run lint:dup",
+    "knip": "knip",
+    "quality": "pnpm run knip && pnpm run lint:structure"
   },
   "dependencies": {
     "openclaw": "^2026.2.14"
+  },
+  "devDependencies": {
+    "dependency-cruiser": "^18.2.0",
+    "jscpd": "^5.0.16",
+    "knip": "^6.32.3"
   }
 }

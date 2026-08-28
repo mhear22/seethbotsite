@@ -1,0 +1,30 @@
+{
+  "threshold": 4,
+  "minTokens": 100,
+  "minLines": 8,
+  "mode": "mild",
+  "format": ["typescript", "javascript"],
+  "reporters": ["consoleFull"],
+  "gitignore": true,
+  "ignore": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/coverage/**",
+    "**/*.d.ts",
+    "**/generated/**",
+    "**/src/types/openapi.ts",
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "**/tests/**",
+    "**/e2e/**",
+    "**/fixtures/**",
+    "**/__mocks__/**",
+    "backend/mech-webdist/**",
+    "**/public/**",
+    "**/prisma/migrations/**",
+    "frontend/shared/**",
+    "apps/mech/frontend/src/shared/**",
+    "apps/mech/backend/src/shared/**"
+  ]
+}
